@@ -39,6 +39,7 @@ using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Users;
 using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Infrastructure.Persistence.Entities;
+using Backend.Veteriner.Domain.Waitlist;
 using Backend.Veteriner.Infrastructure.Web;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -126,6 +127,9 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<AppointmentReason> AppointmentReasons => Set<AppointmentReason>();
     public DbSet<AppointmentOwnerLink> AppointmentOwnerLinks => Set<AppointmentOwnerLink>();
+    public DbSet<WaitlistEntry> WaitlistEntries => Set<WaitlistEntry>();
+    public DbSet<WaitlistOffer> WaitlistOffers => Set<WaitlistOffer>();
+    public DbSet<WaitlistEntryEvent> WaitlistEntryEvents => Set<WaitlistEntryEvent>();
     public DbSet<ClinicMarketingSettings> ClinicMarketingSettings => Set<ClinicMarketingSettings>();
     public DbSet<MarketingOptOutLink> MarketingOptOutLinks => Set<MarketingOptOutLink>();
     public DbSet<AppointmentRequest> AppointmentRequests => Set<AppointmentRequest>();

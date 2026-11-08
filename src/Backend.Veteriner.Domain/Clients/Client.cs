@@ -40,6 +40,11 @@ public sealed class Client : AggregateRoot, ITenantOwned, IChangeTracked
     /// <summary>Otomatik hatırlatma alabilen müşteri koşulu (tek kural; hatırlatma aday sorguları bunu kullanır).</summary>
     public static readonly Expression<Func<Client, bool>> AcceptsReminders = c => !c.RemindersOptedOut;
 
+    private static readonly Func<Client, bool> AcceptsRemindersCompiled = AcceptsReminders.Compile();
+
+    /// <summary>Bellekteki kayıt için <see cref="AcceptsReminders"/> (bekleme listesi teklifi, TIER-018).</summary>
+    public bool IsAcceptingReminders => AcceptsRemindersCompiled(this);
+
     /// <summary>KVKK açık rıza formu sonucu (ADR-021); varsayılan <see cref="KvkkConsentStatus.None"/>. Yalnız <see cref="RecordKvkkConsent"/> ile değişir.</summary>
     public KvkkConsentStatus KvkkConsentStatus { get; private set; } = KvkkConsentStatus.None;
 

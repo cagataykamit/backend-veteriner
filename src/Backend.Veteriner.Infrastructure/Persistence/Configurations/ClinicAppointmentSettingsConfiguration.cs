@@ -20,6 +20,8 @@ public sealed class ClinicAppointmentSettingsConfiguration : IEntityTypeConfigur
         // Varsayılan açık (TIER-019) domain'dedir; mevcut satırlar migration'da açık doldurulur. Veritabanı varsayılanı
         // tanımlanmaz: "false" değeri EF sentinel'i sayılıp yok sayılmasın.
         b.Property(x => x.OwnerCancelLinkEnabled).IsRequired();
+        // Bekleme listesi otomatik teklifi (TIER-018): aynı kural, mevcut satırlar migration'da açık doldurulur.
+        b.Property(x => x.WaitlistAutoOfferEnabled).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);
 

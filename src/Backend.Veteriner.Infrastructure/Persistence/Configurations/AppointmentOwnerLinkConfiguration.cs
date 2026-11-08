@@ -1,10 +1,11 @@
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Waitlist;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Backend.Veteriner.Infrastructure.Persistence.Configurations;
 
-/// <summary>Hatırlatma "onayla / iptal et" ve "takvime ekle" bağlantısı (TIER-019/020); ham token yalnız e-postada, burada SHA-256 özeti.</summary>
+/// <summary>Hatırlatma "onayla / iptal et", "takvime ekle" ve bekleme listesi teklifi bağlantısı (TIER-019/020/018); ham token yalnız e-postada, burada SHA-256 özeti.</summary>
 public sealed class AppointmentOwnerLinkConfiguration : IEntityTypeConfiguration<AppointmentOwnerLink>
 {
     public void Configure(EntityTypeBuilder<AppointmentOwnerLink> b)
@@ -21,9 +22,17 @@ public sealed class AppointmentOwnerLinkConfiguration : IEntityTypeConfiguration
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.ClosedAtUtc);
         b.Property(x => x.UsedAction).HasConversion<int?>();
+        b.Property(x => x.WaitlistOfferId);
 
         b.HasIndex(x => x.TokenHash).IsUnique();
         b.HasIndex(x => new { x.TenantId, x.AppointmentId });
+        b.HasIndex(x => x.WaitlistOfferId).HasFilter("[WaitlistOfferId] IS NOT NULL");
+
+        // Bekleme listesi teklifi (TIER-018): teklif silinmez; bağlantı teklifle birlikte kalır.
+        b.HasOne<WaitlistOffer>()
+            .WithMany()
+            .HasForeignKey(x => x.WaitlistOfferId)
+            .OnDelete(DeleteBehavior.NoAction);
 
         b.HasOne<Appointment>()
             .WithMany()

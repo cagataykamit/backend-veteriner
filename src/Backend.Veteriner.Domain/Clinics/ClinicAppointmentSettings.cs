@@ -24,6 +24,15 @@ public sealed class ClinicAppointmentSettings : ITenantOwned
     /// </summary>
     public bool OwnerCancelLinkEnabled { get; private set; } = DefaultOwnerCancelLinkEnabled;
 
+    /// <summary>Bekleme listesinde boşalan saate otomatik teklif varsayılan açık (TIER-018; çalışma varsayımı). Kayıt yoksa da açıktır.</summary>
+    public const bool DefaultWaitlistAutoOfferEnabled = true;
+
+    /// <summary>
+    /// Randevu iptal edilince bekleme listesindeki sıradaki uygun kayda otomatik teklif gider (TIER-018). Kapalıysa personel teklifi
+    /// elle gönderir.
+    /// </summary>
+    public bool WaitlistAutoOfferEnabled { get; private set; } = DefaultWaitlistAutoOfferEnabled;
+
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
 
@@ -36,7 +45,8 @@ public sealed class ClinicAppointmentSettings : ITenantOwned
         int slotIntervalMinutes,
         bool allowOverlappingAppointments,
         DateTime utcNow,
-        bool ownerCancelLinkEnabled = DefaultOwnerCancelLinkEnabled)
+        bool ownerCancelLinkEnabled = DefaultOwnerCancelLinkEnabled,
+        bool waitlistAutoOfferEnabled = DefaultWaitlistAutoOfferEnabled)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -53,6 +63,7 @@ public sealed class ClinicAppointmentSettings : ITenantOwned
             SlotIntervalMinutes = slotIntervalMinutes,
             AllowOverlappingAppointments = allowOverlappingAppointments,
             OwnerCancelLinkEnabled = ownerCancelLinkEnabled,
+            WaitlistAutoOfferEnabled = waitlistAutoOfferEnabled,
             CreatedAtUtc = utcNow,
             UpdatedAtUtc = null,
         };
@@ -63,13 +74,15 @@ public sealed class ClinicAppointmentSettings : ITenantOwned
         int slotIntervalMinutes,
         bool allowOverlappingAppointments,
         bool ownerCancelLinkEnabled,
-        DateTime utcNow)
+        DateTime utcNow,
+        bool? waitlistAutoOfferEnabled = null)
     {
         Validate(defaultAppointmentDurationMinutes, slotIntervalMinutes);
         DefaultAppointmentDurationMinutes = defaultAppointmentDurationMinutes;
         SlotIntervalMinutes = slotIntervalMinutes;
         AllowOverlappingAppointments = allowOverlappingAppointments;
         OwnerCancelLinkEnabled = ownerCancelLinkEnabled;
+        WaitlistAutoOfferEnabled = waitlistAutoOfferEnabled ?? WaitlistAutoOfferEnabled;
         UpdatedAtUtc = utcNow;
     }
 
