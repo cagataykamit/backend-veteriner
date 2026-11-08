@@ -15,6 +15,7 @@ public sealed class ScheduleSubscriptionDowngradeCommandHandler
     private readonly IReadRepository<TenantSubscription> _subscriptionsRead;
     private readonly IRepository<ScheduledSubscriptionPlanChange> _changesWrite;
     private readonly IReadRepository<ScheduledSubscriptionPlanChange> _changesRead;
+    private readonly TenantPlanFeatureEvaluator _planFeatures;
     private readonly TimeProvider _timeProvider;
 
     public ScheduleSubscriptionDowngradeCommandHandler(
@@ -23,6 +24,7 @@ public sealed class ScheduleSubscriptionDowngradeCommandHandler
         IReadRepository<TenantSubscription> subscriptionsRead,
         IRepository<ScheduledSubscriptionPlanChange> changesWrite,
         IReadRepository<ScheduledSubscriptionPlanChange> changesRead,
+        TenantPlanFeatureEvaluator planFeatures,
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
@@ -30,6 +32,7 @@ public sealed class ScheduleSubscriptionDowngradeCommandHandler
         _subscriptionsRead = subscriptionsRead;
         _changesWrite = changesWrite;
         _changesRead = changesRead;
+        _planFeatures = planFeatures;
         _timeProvider = timeProvider;
     }
 
@@ -55,6 +58,12 @@ public sealed class ScheduleSubscriptionDowngradeCommandHandler
         var effectiveStatus = TenantSubscriptionEffectiveWriteEvaluator.GetEffectiveStatus(sub, now);
         if (effectiveStatus == TenantSubscriptionStatus.Cancelled)
             return Result<PendingSubscriptionPlanChangeDto>.Failure("Subscriptions.TenantCancelled", "İptal edilmiş abonelikte plan değişikliği yapılamaz.");
+
+        // Seçenek A (ADR-035 2026-11-08): aktif klinik ve kullanıcı sayısı hedef pakete sığmıyorsa düşürme planlanmaz; dönem
+        // sonunda yeniden kontrol edilir (ScheduledPlanChangeProcessorHostedService).
+        var fits = await _planFeatures.EnsureFitsPlanAsync(request.TenantId, target, ct);
+        if (!fits.IsSuccess)
+            return Result<PendingSubscriptionPlanChangeDto>.Failure(fits.Error);
 
         var open = await _changesRead.FirstOrDefaultAsync(new OpenScheduledPlanChangeByTenantSpec(request.TenantId), ct);
         if (open is not null)

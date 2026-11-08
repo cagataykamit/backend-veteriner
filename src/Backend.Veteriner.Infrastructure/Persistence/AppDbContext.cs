@@ -124,6 +124,8 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<AppointmentReason> AppointmentReasons => Set<AppointmentReason>();
     public DbSet<AppointmentOwnerLink> AppointmentOwnerLinks => Set<AppointmentOwnerLink>();
+    public DbSet<ClinicMarketingSettings> ClinicMarketingSettings => Set<ClinicMarketingSettings>();
+    public DbSet<MarketingOptOutLink> MarketingOptOutLinks => Set<MarketingOptOutLink>();
     public DbSet<AppointmentRequest> AppointmentRequests => Set<AppointmentRequest>();
     public DbSet<AppointmentRequestEmailVerification> AppointmentRequestEmailVerifications => Set<AppointmentRequestEmailVerification>();
     public DbSet<ClinicAppointmentRequestEmailTemplate> ClinicAppointmentRequestEmailTemplates => Set<ClinicAppointmentRequestEmailTemplate>();

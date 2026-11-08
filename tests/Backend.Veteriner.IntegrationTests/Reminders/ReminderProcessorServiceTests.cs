@@ -1307,6 +1307,7 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
             IntegrationTestDbContexts.TenantScopeOf(db),
             enqueuer,
             TestAppointmentOwnerLinks.Issuer(),
+            TestAppointmentOwnerLinks.MarketingOptOutIssuer(),
             Options.Create(new ReminderProcessorOptions
             {
                 Enabled = enabled,

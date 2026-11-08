@@ -1,11 +1,14 @@
+using Ardalis.Specification;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Billing;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.SalesPartners;
 using Backend.Veteriner.Application.SalesPartners.Specs;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Tenants.Billing;
 using Backend.Veteriner.Application.Tenants.Commands.Checkout;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
@@ -29,6 +32,9 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
     private readonly Mock<IBillingCheckoutProviderResolver> _resolver = new();
     private readonly Mock<IRepository<DiscountRedemption>> _redemptions = new();
     private readonly Mock<ISubscriptionCheckoutActivationService> _activation = new();
+    private readonly Mock<IReadRepository<Clinic>> _clinics = new();
+    private readonly Mock<IReadRepository<UserTenant>> _userTenants = new();
+    private readonly Mock<IReadRepository<TenantInvite>> _invites = new();
 
     private StartSubscriptionCheckoutCommandHandler CreateHandler(BillingOptions billing)
         => new(
@@ -44,6 +50,7 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
             _resolver.Object,
             new CheckoutPaymentReconciler(_resolver.Object, _activation.Object, NullLogger<CheckoutPaymentReconciler>.Instance),
             new SalesPartnerDiscountBilling(_redemptions.Object, NullLogger<SalesPartnerDiscountBilling>.Instance),
+            new TenantPlanFeatureEvaluator(_subscriptionsRead.Object, _clinics.Object, _userTenants.Object, _invites.Object, TimeProvider.System),
             NullLogger<StartSubscriptionCheckoutCommandHandler>.Instance,
             TimeProvider.System);
 
@@ -960,4 +967,59 @@ public sealed class StartSubscriptionCheckoutCommandHandlerTests
         monthlyOpen.Status.Should().Be(BillingCheckoutSessionStatus.Cancelled);
         _checkoutSessionsWrite.Verify(x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()), Times.Once);
     }
-}
+
+    [Fact]
+    public async Task Trial_PlanChange_Should_Be_Rejected_When_Trial_Clinics_And_Users_Do_Not_Fit_Target()
+    {
+        var tid = Guid.NewGuid();
+        var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
+        SetupCheckoutInfrastructure(tid, CreateTenant(tid), sub);
+        _clinics.Setup(x => x.CountAsync(It.IsAny<ISpecification<Clinic>>(), It.IsAny<CancellationToken>())).ReturnsAsync(2);
+        _userTenants.Setup(x => x.CountAsync(It.IsAny<ISpecification<UserTenant>>(), It.IsAny<CancellationToken>())).ReturnsAsync(5);
+        _invites.Setup(x => x.CountAsync(It.IsAny<ISpecification<TenantInvite>>(), It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var result = await CreateHandler(CreateBillingOptions()).Handle(new StartSubscriptionCheckoutCommand(tid, "Pro"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be(TenantPlanFeatureEvaluator.PlanLimitsExceededCode);
+        result.Error.Extensions!["maxActiveClinics"].Should().Be(1);
+        result.Error.Extensions!["maxUsers"].Should().Be(5);
+        result.Error.Extensions!["activeClinicCount"].Should().Be(2);
+        result.Error.Extensions!["memberCount"].Should().Be(5);
+        result.Error.Extensions!["pendingInviteCount"].Should().Be(1);
+        result.Error.Extensions!["excessClinicCount"].Should().Be(1);
+        result.Error.Extensions!["excessUserCount"].Should().Be(1);
+        sub.PlanCode.Should().Be(SubscriptionPlanCode.Basic);
+        _subscriptionsWrite.Verify(x => x.UpdateAsync(It.IsAny<TenantSubscription>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Trial_PlanChange_Should_Apply_When_Usage_Fits_Target()
+    {
+        var tid = Guid.NewGuid();
+        var sub = TenantSubscription.StartTrial(tid, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14);
+        SetupCheckoutInfrastructure(tid, CreateTenant(tid), sub);
+        _clinics.Setup(x => x.CountAsync(It.IsAny<ISpecification<Clinic>>(), It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        _userTenants.Setup(x => x.CountAsync(It.IsAny<ISpecification<UserTenant>>(), It.IsAny<CancellationToken>())).ReturnsAsync(3);
+
+        var result = await CreateHandler(CreateBillingOptions()).Handle(new StartSubscriptionCheckoutCommand(tid, "Pro"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.TrialPlanChangeApplied.Should().BeTrue();
+        sub.PlanCode.Should().Be(SubscriptionPlanCode.Pro);
+    }
+
+    [Fact]
+    public async Task Renewal_Of_Expired_Subscription_Should_Apply_Same_Fit_Rule()
+    {
+        var tid = Guid.NewGuid();
+        var sub = CreateExpiredReadOnlyPaidSubscription(tid, SubscriptionPlanCode.Basic);
+        SetupCheckoutInfrastructure(tid, CreateTenant(tid), sub);
+        _clinics.Setup(x => x.CountAsync(It.IsAny<ISpecification<Clinic>>(), It.IsAny<CancellationToken>())).ReturnsAsync(2);
+
+        var result = await CreatePricedManualHandler().Handle(new StartSubscriptionCheckoutCommand(tid, "Basic"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be(TenantPlanFeatureEvaluator.PlanLimitsExceededCode);
+        _checkoutSessionsWrite.Verify(x => x.AddAsync(It.IsAny<BillingCheckoutSession>(), It.IsAny<CancellationToken>()), Times.Never);
+    }}

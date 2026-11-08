@@ -36,7 +36,7 @@ public sealed class AcknowledgePortalClinicDisclosureCommandHandler : IRequestHa
 
     public async ValueTask<Result> Handle(AcknowledgePortalClinicDisclosureCommand request, CancellationToken ct)
     {
-        var scope = await _access.ResolveLinkAsync(request.OwnerAccountId, request.LinkId, ct);
+        var scope = await _access.ResolveLinkForOwnerRightsAsync(request.OwnerAccountId, request.LinkId, ct);
         if (!scope.IsSuccess)
             return Result.Failure(scope.Error);
 

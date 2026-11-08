@@ -102,13 +102,66 @@ public sealed class TenantPlanFeatureEvaluatorTests
         result.Error.Extensions!["requiredPlanCode"].Should().Be("Premium");
     }
 
-    [Fact]
-    public async Task Trial_Should_Not_Limit_Clinic_Count_But_Follow_Selected_Plan_For_Portal()
+    /// <summary>ADR-035 2026-11-08: deneme seçilen pakete göre davranır, çok klinik dahil (K7 istisnası kalktı).</summary>
+    [Theory]
+    [InlineData(SubscriptionPlanCode.Basic, false)]
+    [InlineData(SubscriptionPlanCode.Pro, false)]
+    [InlineData(SubscriptionPlanCode.Premium, true)]
+    public async Task Trial_Should_Follow_Selected_Plan_For_Second_Clinic(SubscriptionPlanCode plan, bool allowed)
     {
-        var evaluator = PlanFeatureTestFactory.ForPlan(SubscriptionPlanCode.Basic, new Clinic(TenantId, "Merkez", "İzmir"), trialing: true);
+        var evaluator = PlanFeatureTestFactory.ForPlan(plan, new Clinic(TenantId, "Merkez", "İzmir"), trialing: true);
 
-        (await evaluator.EnsureCanAddActiveClinicAsync(TenantId, CancellationToken.None)).IsSuccess.Should().BeTrue();
+        (await evaluator.EnsureCanAddActiveClinicAsync(TenantId, CancellationToken.None)).IsSuccess.Should().Be(allowed);
+        (await evaluator.IsAllowedAsync(TenantId, PlanFeature.MultiClinic, CancellationToken.None)).Should().Be(allowed);
+    }
+
+    [Fact]
+    public async Task Trial_Should_Follow_Selected_Plan_For_Portal()
+    {
+        var evaluator = PlanFeatureTestFactory.ForPlan(SubscriptionPlanCode.Basic, trialing: true);
+
         (await evaluator.IsAllowedAsync(TenantId, PlanFeature.OwnerPortal, CancellationToken.None)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task EnsureFitsPlan_Should_Report_Limits_Counts_And_Excess_When_Usage_Does_Not_Fit()
+    {
+        var result = await PlanFeatureTestFactory.ForPlan(SubscriptionPlanCode.Premium, activeClinicCount: 2, memberCount: 5)
+            .EnsureFitsPlanAsync(TenantId, SubscriptionPlanCode.Basic, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be(TenantPlanFeatureEvaluator.PlanLimitsExceededCode);
+        result.Error.Extensions!["targetPlanCode"].Should().Be("Basic");
+        result.Error.Extensions!["maxActiveClinics"].Should().Be(1);
+        result.Error.Extensions!["maxUsers"].Should().Be(3);
+        result.Error.Extensions!["activeClinicCount"].Should().Be(2);
+        result.Error.Extensions!["memberCount"].Should().Be(5);
+        result.Error.Extensions!["pendingInviteCount"].Should().Be(0);
+        result.Error.Extensions!["excessClinicCount"].Should().Be(1);
+        result.Error.Extensions!["excessUserCount"].Should().Be(2);
+    }
+
+    [Fact]
+    public async Task EnsureFitsPlan_Should_Count_Pending_Invites_Like_Invite_Limit()
+    {
+        var result = await PlanFeatureTestFactory.ForPlan(SubscriptionPlanCode.Pro, activeClinicCount: 1, memberCount: 3, pendingInviteCount: 1)
+            .EnsureFitsPlanAsync(TenantId, SubscriptionPlanCode.Basic, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Extensions!["excessClinicCount"].Should().Be(0);
+        result.Error.Extensions!["excessUserCount"].Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData(SubscriptionPlanCode.Basic, 1, 3)]
+    [InlineData(SubscriptionPlanCode.Pro, 1, 5)]
+    [InlineData(SubscriptionPlanCode.Premium, 7, 15)]
+    public async Task EnsureFitsPlan_Should_Accept_Usage_Within_Target_Limits(SubscriptionPlanCode target, int clinics, int members)
+    {
+        var result = await PlanFeatureTestFactory.ForPlan(SubscriptionPlanCode.Premium, activeClinicCount: clinics, memberCount: members)
+            .EnsureFitsPlanAsync(TenantId, target, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
     }
 
     [Fact]

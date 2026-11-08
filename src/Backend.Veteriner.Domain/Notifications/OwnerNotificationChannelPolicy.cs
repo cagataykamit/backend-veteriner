@@ -36,7 +36,7 @@ public enum OwnerNotificationCategory
     /// <summary>Aşı/randevu hatırlatması: müşteri kaydının hatırlatma tercihi (<c>Client.AcceptsReminders</c>).</summary>
     Reminder = 1,
 
-    /// <summary>Ticari elektronik ileti (ETK, İYS): ayrı onay + gönderim anahtarı.</summary>
+    /// <summary>Ticari elektronik ileti (ETK, İYS): bağdaki onay + kliniğin ticari ileti kapısı (ADR-046).</summary>
     Marketing = 2,
 }
 
@@ -70,13 +70,11 @@ public enum OwnerNotificationChannelMode
 /// <summary>
 /// Bildirim türü × kanal kuralı — tek yer (PORTAL-010; ADR-031 K7). E-posta işlemsel iletide her zaman, hatırlatmada tercihe bağlı;
 /// push tercih + sağlayıcı ister, gizli bilgi (kod, davet bağlantısı) push'a yazılmaz; WhatsApp yalnız personel bağlantısıdır.
-/// Ticari ileti İYS kaydı ve hukuki görüş sonrasına kadar kapalıdır (<see cref="MarketingSendingEnabled"/>; HUKUKI-ONAY-LISTESI C5/C6).
+/// Ticari ileti yalnız e-postadır: alıcının o klinik için onayı (bağ) ve kliniğin ticari ileti kapısı (<c>ClinicMarketingSettings</c>,
+/// ADR-046) ister; kapı varsayılan kapalıdır. Hatırlatmalar kapıdan bağımsızdır.
 /// </summary>
 public static class OwnerNotificationChannelPolicy
 {
-    /// <summary>Ticari ileti gönderimi. İYS/ETK hukuki görüşü gelene dek kapalı; açmak ürün ve hukuk kararıdır.</summary>
-    public const bool MarketingSendingEnabled = false;
-
     public static IReadOnlyList<OwnerNotificationType> AllTypes { get; } = Enum.GetValues<OwnerNotificationType>();
 
     public static IReadOnlyList<OwnerNotificationChannel> AllChannels { get; } = Enum.GetValues<OwnerNotificationChannel>();
@@ -99,7 +97,7 @@ public static class OwnerNotificationChannelPolicy
             {
                 OwnerNotificationCategory.Transactional => OwnerNotificationChannelMode.Always,
                 OwnerNotificationCategory.Reminder => OwnerNotificationChannelMode.Preference,
-                _ => MarketingSendingEnabled ? OwnerNotificationChannelMode.Preference : OwnerNotificationChannelMode.Disabled,
+                _ => OwnerNotificationChannelMode.Preference,
             },
             OwnerNotificationChannel.Push => category == OwnerNotificationCategory.Marketing || CarriesSecret(type) || IsEmailOnly(type)
                 ? OwnerNotificationChannelMode.Disabled
@@ -113,7 +111,8 @@ public static class OwnerNotificationChannelPolicy
 
     /// <summary>
     /// Sistemin bu kanaldan şimdi göndermesi gerekir mi. <paramref name="recipientOptedIn"/>: kanal tercihi (push için hesap
-    /// tercihi, hatırlatma için müşteri kaydı, ticari için bağdaki onay). Personel bağlantısı hiçbir zaman sistem gönderimi değildir.
+    /// tercihi, hatırlatma için müşteri kaydı, ticari için bağdaki onay; kliniğin ticari ileti kapısı çağıranda denetlenir). Personel
+    /// bağlantısı hiçbir zaman sistem gönderimi değildir.
     /// </summary>
     public static bool ShouldSend(OwnerNotificationType type, OwnerNotificationChannel channel, bool pushConfigured, bool recipientOptedIn)
         => ModeOf(type, channel, pushConfigured) switch

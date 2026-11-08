@@ -24,8 +24,10 @@ using Backend.Veteriner.Application.LabResults.Access;
 using Backend.Veteriner.Application.ExternalApi;
 using Backend.Veteriner.Application.OwnerPortal.Access;
 using Backend.Veteriner.Application.OwnerPortal.Invites;
+using Backend.Veteriner.Application.OwnerPortal.MarketingOptOut;
 using Backend.Veteriner.Application.OwnerPortal.Sessions;
 using Backend.Veteriner.Application.Pets.Timeline;
+using Backend.Veteriner.Application.Reminders.Marketing;
 using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Application.Sales;
 using Backend.Veteriner.Application.SalesPartners;
@@ -71,6 +73,12 @@ public static class DependencyInjection
         services.AddScoped<AppointmentOwnerLinkIssuer>();
         services.AddScoped<AppointmentOwnerLinkResolver>();
         services.AddScoped<AppointmentOwnerLinkActions>();
+
+        // Ticari ileti (ADR-046): klinik kapısı ve iletideki ret bağlantısı.
+        services.AddScoped<ClinicMarketingGate>();
+        services.AddScoped<MarketingOptOutLinkIssuer>();
+        services.AddScoped<MarketingOptOutLinkResolver>();
+
         services.AddScoped<ClinicSiteAddressBook>();
         services.AddScoped<ClinicSiteImageContentReader>();
         services.AddScoped<PublicSiteResolver>();

@@ -1,4 +1,5 @@
 using Backend.IntegrationTests.Infrastructure;
+using Backend.Veteriner.Application.OwnerPortal.MarketingOptOut;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Charges;
@@ -23,7 +24,7 @@ namespace Backend.Veteriner.IntegrationTests.Reminders;
 
 /// <summary>
 /// TIER-003 işleyicisi (docs/AUTOMATED_REMINDERS_API_CONTRACT.md §4): kontrol ve borç kuralı e-postası, tekrar engeli, hatırlatma tercihi,
-/// paket kapısı, açınca birikmiş kayıtlara gitmeme; "dönmedi" kuralı onay ve merkezi anahtar olmadan gitmez.
+/// paket kapısı, açınca birikmiş kayıtlara gitmeme; "dönmedi" kuralı onay ve kliniğin ticari ileti kapısı olmadan gitmez (ADR-046).
 /// </summary>
 public sealed class AutomatedReminderRulesProcessorTests : IAsyncLifetime
 {
@@ -64,6 +65,7 @@ public sealed class AutomatedReminderRulesProcessorTests : IAsyncLifetime
             IntegrationTestDbContexts.TenantScopeOf(db),
             _email,
             TestAppointmentOwnerLinks.Issuer(),
+            TestAppointmentOwnerLinks.MarketingOptOutIssuer(),
             Options.Create(new ReminderProcessorOptions { Enabled = true, IntervalMinutes = 5, BatchSize = 100, WindowToleranceMinutes = 10 }),
             NullLogger<ReminderProcessorService>.Instance,
             TimeProvider.System);
@@ -266,8 +268,17 @@ public sealed class AutomatedReminderRulesProcessorTests : IAsyncLifetime
         await s.Db.SaveChangesAsync();
     }
 
+    private static async Task OpenMarketingGateAsync(Seeded s)
+    {
+        var gate = ClinicMarketingSettings.Create(s.Tenant.Id, s.Clinic.Id, DateTime.UtcNow);
+        gate.Enable(declarationAccepted: true, UserId, DateTime.UtcNow).IsSuccess.Should().BeTrue();
+        s.Db.ClinicMarketingSettings.Add(gate);
+        await s.Db.SaveChangesAsync();
+    }
+
+    /// <summary>ADR-046: kliniğin ticari ileti kapısı varsayılan kapalıdır; onay olsa da "dönmedi" iletisi gitmez, günlük yazılmaz.</summary>
     [Fact]
-    public async Task NoReturn_Should_Not_Send_While_Marketing_Sending_Is_Off_Even_With_Consent()
+    public async Task NoReturn_Should_Not_Send_While_Clinic_Gate_Is_Closed_Even_With_Consent()
     {
         var s = await SeedAsync();
         await AddVisitAsync(s, DateTime.UtcNow.AddDays(-200));
@@ -278,22 +289,48 @@ public sealed class AutomatedReminderRulesProcessorTests : IAsyncLifetime
 
         _email.Enqueued.Should().BeEmpty();
         (await s.Db.ReminderDispatchLogs.CountAsync()).Should().Be(0);
+        (await s.Db.MarketingOptOutLinks.CountAsync()).Should().Be(0);
+    }
+
+    /// <summary>Kapı kapalıyken hatırlatmalar (kontrol) aynen gider: kapı yalnız ticari iletiyi bağlar.</summary>
+    [Fact]
+    public async Task Reminders_Should_Not_Depend_On_Clinic_Marketing_Gate()
+    {
+        var s = await SeedAsync();
+        await AddTreatmentAsync(s, DateTime.UtcNow.AddDays(2));
+        await EnableRuleAsync(s, ClinicReminderRuleType.FollowUp, 3, DateTime.UtcNow);
+
+        await s.Service.ProcessOnceAsync(CancellationToken.None);
+
+        var sent = _email.Enqueued.Should().ContainSingle().Subject;
+        sent.Subject.Should().NotStartWith(NoReturnMarketingEmail.SubjectPrefix);
+        sent.Body.Should().NotContain("ticari-ileti-ret");
     }
 
     [Fact]
-    public async Task NoReturn_Path_Should_Send_Once_Only_With_Consent_And_No_Later_Visit()
+    public async Task NoReturn_Should_Send_Once_Only_To_Consented_Owner_With_Commercial_Subject_Clinic_Name_And_OptOut_Link()
     {
         var s = await SeedAsync();
         await AddVisitAsync(s, DateTime.UtcNow.AddDays(-200));
-        var rule = await EnableRuleAsync(s, ClinicReminderRuleType.NoReturn, 180, DateTime.UtcNow.AddDays(-30));
+        await EnableRuleAsync(s, ClinicReminderRuleType.NoReturn, 180, DateTime.UtcNow.AddDays(-30));
+        await OpenMarketingGateAsync(s);
 
-        await s.Service.ProcessNoReturnRuleAsync(rule, DateTime.UtcNow, 100, CancellationToken.None);
+        await s.Service.ProcessOnceAsync(CancellationToken.None);
         _email.Enqueued.Should().BeEmpty("ticari ileti onayı yok");
 
         await AddMarketingConsentAsync(s, consented: true);
-        await s.Service.ProcessNoReturnRuleAsync(rule, DateTime.UtcNow, 100, CancellationToken.None);
-        await s.Service.ProcessNoReturnRuleAsync(rule, DateTime.UtcNow, 100, CancellationToken.None);
-        _email.Enqueued.Should().ContainSingle();
+        await s.Service.ProcessOnceAsync(CancellationToken.None);
+        await s.Service.ProcessOnceAsync(CancellationToken.None);
+
+        var sent = _email.Enqueued.Should().ContainSingle().Subject;
+        sent.To.Should().Be("ali@example.com");
+        sent.Subject.Should().StartWith("Tanıtım: ").And.Contain("Merkez");
+        sent.Body.Should().Contain("Merkez").And.Contain("ticari elektronik ileti")
+            .And.Contain($"{TestAppointmentOwnerLinks.PortalBaseUrl}/ticari-ileti-ret?token=");
+        var optOut = await s.Db.MarketingOptOutLinks.AsNoTracking().SingleAsync();
+        optOut.ClinicId.Should().Be(s.Clinic.Id);
+        optOut.UsedAtUtc.Should().BeNull();
+        (await s.Db.ReminderDispatchLogs.AsNoTracking().SingleAsync()).ReminderType.Should().Be(ReminderType.NoReturn);
 
         var other = new Pet(s.Tenant.Id, s.Client.Id, "Boncuk", s.Pet.SpeciesId);
         s.Db.Pets.Add(other);
@@ -303,10 +340,26 @@ public sealed class AutomatedReminderRulesProcessorTests : IAsyncLifetime
         s.Db.Visits.Add(firstVisit);
         s.Db.Visits.Add(new Visit(s.Tenant.Id, s.Clinic.Id, other.Id, null, null, UserId, DateTime.UtcNow.AddDays(-2)));
         await s.Db.SaveChangesAsync();
-        await s.Service.ProcessNoReturnRuleAsync(rule, DateTime.UtcNow, 100, CancellationToken.None);
+        await s.Service.ProcessOnceAsync(CancellationToken.None);
         _email.Enqueued.Should().ContainSingle("sonradan gelen hayvan dönmedi sayılmaz");
     }
 
+    [Fact]
+    public async Task NoReturn_Should_Stop_After_Owner_Opts_Out()
+    {
+        var s = await SeedAsync();
+        await AddVisitAsync(s, DateTime.UtcNow.AddDays(-200));
+        await AddMarketingConsentAsync(s, consented: true);
+        await EnableRuleAsync(s, ClinicReminderRuleType.NoReturn, 180, DateTime.UtcNow.AddDays(-30));
+        await OpenMarketingGateAsync(s);
+        var link = await s.Db.OwnerAccountClientLinks.SingleAsync();
+        link.SetMarketingConsent(false, DateTime.UtcNow);
+        await s.Db.SaveChangesAsync();
+
+        await s.Service.ProcessOnceAsync(CancellationToken.None);
+
+        _email.Enqueued.Should().BeEmpty();
+    }
     private async Task<AppDbContext> CreateDbContextAsync()
     {
         var commandDbName = IntegrationTestDatabaseNames.WithRunId($"{CommandDatabasePrefix}{Guid.NewGuid():N}");

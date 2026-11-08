@@ -23,7 +23,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandlerTests
     {
         var eval = new TenantSubscriptionEffectiveWriteEvaluator(_tenants.Object, _subscriptions.Object, TimeProvider.System);
         return new(_tenantContext.Object, _permissions.Object, _tenants.Object, _subscriptions.Object, _planChanges.Object, eval, TimeProvider.System,
-            Options.Create(billing ?? new BillingOptions()));
+            Options.Create(billing ?? new BillingOptions()), PlanFeatureTestFactory.ForPlan(SubscriptionPlanCode.Basic));
     }
 
     [Fact]

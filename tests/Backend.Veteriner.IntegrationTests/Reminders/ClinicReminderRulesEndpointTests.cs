@@ -85,7 +85,7 @@ public sealed class ClinicReminderRulesEndpointTests : IClassFixture<CustomWebAp
         rules["Debt"].GetProperty("days").GetInt32().Should().Be(30);
         rules["NoReturn"].GetProperty("days").GetInt32().Should().Be(180);
         rules["FollowUp"].GetProperty("sendingAvailable").GetBoolean().Should().BeTrue();
-        rules["NoReturn"].GetProperty("sendingAvailable").GetBoolean().Should().BeFalse("ticari ileti gönderimi merkezi olarak kapalı");
+        rules["NoReturn"].GetProperty("sendingAvailable").GetBoolean().Should().BeFalse("kliniğin ticari ileti kapısı varsayılan kapalı (ADR-046)");
     }
 
     [Fact]
@@ -154,6 +154,60 @@ public sealed class ClinicReminderRulesEndpointTests : IClassFixture<CustomWebAp
 
         var (readOnlyToken, clinicId) = await SeedAsync(SubscriptionPlanCode.Pro, [PermissionCatalog.Reminders.Read]);
         (await SendAsync(HttpMethod.Put, Url(clinicId), readOnlyToken, new { rules = new[] { new { ruleType = "Debt", isEnabled = true, days = 30 } } }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    private static string GateUrl(Guid clinicId) => $"/api/v1/reminders/clinics/{clinicId}/marketing-gate";
+
+    /// <summary>ADR-046 K2: kapı İYS beyanıyla açılır; beyan ve kapatma kimin, ne zaman verdiğiyle denetim kaydına yazılır.</summary>
+    [Fact]
+    public async Task Marketing_Gate_Should_Require_Declaration_And_Audit_Opening_And_Closing()
+    {
+        var (token, clinicId) = await SeedAsync(SubscriptionPlanCode.Pro);
+
+        var gate = (await (await SendAsync(HttpMethod.Get, Url(clinicId), token)).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("marketingGate");
+        gate.GetProperty("isEnabled").GetBoolean().Should().BeFalse();
+        gate.GetProperty("declarationText").GetString().Should().Contain("İYS'ye kayıtlıdır");
+
+        var missing = await SendAsync(HttpMethod.Put, GateUrl(clinicId), token, new { isEnabled = true, iysDeclarationAccepted = false });
+        missing.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(missing)).Should().Be("Reminders.MarketingGate.Validation.DeclarationRequired");
+
+        var opened = await SendAsync(HttpMethod.Put, GateUrl(clinicId), token, new { isEnabled = true, iysDeclarationAccepted = true });
+        opened.StatusCode.Should().Be(HttpStatusCode.OK, await opened.Content.ReadAsStringAsync());
+        var openedJson = await opened.Content.ReadFromJsonAsync<JsonElement>();
+        openedJson.GetProperty("isEnabled").GetBoolean().Should().BeTrue();
+        openedJson.GetProperty("declaredAtUtc").ValueKind.Should().Be(JsonValueKind.String);
+        var declaredBy = openedJson.GetProperty("declaredByUserId").GetGuid();
+
+        var rules = RulesOf(await (await SendAsync(HttpMethod.Get, Url(clinicId), token)).Content.ReadFromJsonAsync<JsonElement>());
+        rules["NoReturn"].GetProperty("sendingAvailable").GetBoolean().Should().BeTrue();
+
+        (await SendAsync(HttpMethod.Put, GateUrl(clinicId), token, new { isEnabled = false, iysDeclarationAccepted = false }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var audits = await db.AuditLogs.AsNoTracking()
+            .Where(l => l.Action == "Reminders.MarketingGate.Update" && l.TargetId!.Contains(clinicId.ToString()))
+            .OrderBy(l => l.OccurredAtUtc)
+            .ToListAsync();
+        audits.Where(a => a.Success).Should().HaveCount(2);
+        audits.Should().OnlyContain(a => a.ActorUserId == declaredBy);
+        audits.Single(a => a.Success && a.TargetId!.Contains("IsEnabled=True")).TargetId.Should()
+            .Contain("IysDeclarationAccepted=True").And.Contain("DeclarationVersion=2026-11-08");
+        audits.Should().Contain(a => a.Success && a.TargetId!.Contains("IsEnabled=False"));
+        var row = await db.ClinicMarketingSettings.AsNoTracking().SingleAsync(s => s.ClinicId == clinicId);
+        row.IsEnabled.Should().BeFalse();
+        row.DeclaredByUserId.Should().Be(declaredBy);
+    }
+
+    [Fact]
+    public async Task Marketing_Gate_Should_Require_Manage_Permission()
+    {
+        var (token, clinicId) = await SeedAsync(SubscriptionPlanCode.Pro, [PermissionCatalog.Reminders.Read]);
+
+        (await SendAsync(HttpMethod.Put, GateUrl(clinicId), token, new { isEnabled = true, iysDeclarationAccepted = true }))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 }

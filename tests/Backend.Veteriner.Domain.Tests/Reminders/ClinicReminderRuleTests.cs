@@ -64,6 +64,6 @@ public sealed class ClinicReminderRuleTests
     [InlineData(ClinicReminderRuleType.FollowUp, true)]
     [InlineData(ClinicReminderRuleType.Debt, true)]
     [InlineData(ClinicReminderRuleType.NoReturn, false)]
-    public void SendingAvailable_Should_Keep_Commercial_Rule_Off(ClinicReminderRuleType type, bool expected)
-        => ClinicReminderRuleDefinition.Of(type).SendingAvailable.Should().Be(expected);
+    public void Only_NoReturn_Should_Be_Commercial(ClinicReminderRuleType type, bool expectedReminder)
+        => ClinicReminderRuleDefinition.Of(type).IsMarketing.Should().Be(!expectedReminder);
 }

@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Notifications;
 using Backend.Veteriner.Application.OwnerPortal.Access;
 using Backend.Veteriner.Application.OwnerPortal.Specs;
+using Backend.Veteriner.Application.Reminders.Marketing;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Notifications;
 using Backend.Veteriner.Domain.OwnerPortal;
@@ -69,13 +70,14 @@ internal static class PortalNotificationPreferencesMapping
     public static PortalAccountNotificationPreferencesDto ToDto(OwnerAccount account, IPushNotificationSender push, int deviceCount)
         => new(new PortalPushPreferenceDto(account.PushEnabled, push.IsConfigured, deviceCount));
 
-    public static PortalLinkNotificationPreferencesDto ToDto(Client client, OwnerAccountClientLink link)
+    /// <summary><paramref name="marketingSendingEnabled"/>: bağın kliniğinde ticari ileti kapısı açık mı (ADR-046).</summary>
+    public static PortalLinkNotificationPreferencesDto ToDto(Client client, OwnerAccountClientLink link, bool marketingSendingEnabled)
         => new(
             client.RemindersOptedOut,
             client.OwnerCanEnableReminders,
             link.MarketingConsentAtUtc.HasValue,
             link.MarketingConsentAtUtc,
-            OwnerNotificationChannelPolicy.MarketingSendingEnabled);
+            marketingSendingEnabled);
 }
 
 public sealed class GetPortalAccountNotificationPreferencesQueryHandler
@@ -149,28 +151,33 @@ public sealed class GetPortalLinkNotificationPreferencesQueryHandler
     private readonly OwnerPortalAccess _access;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<OwnerAccountClientLink> _links;
+    private readonly ClinicMarketingGate _marketing;
 
     public GetPortalLinkNotificationPreferencesQueryHandler(
         OwnerPortalAccess access,
         IReadRepository<Client> clients,
-        IReadRepository<OwnerAccountClientLink> links)
+        IReadRepository<OwnerAccountClientLink> links,
+        ClinicMarketingGate marketing)
     {
         _access = access;
         _clients = clients;
         _links = links;
+        _marketing = marketing;
     }
 
     public async ValueTask<Result<PortalLinkNotificationPreferencesDto>> Handle(GetPortalLinkNotificationPreferencesQuery request, CancellationToken ct)
     {
-        var scope = await _access.ResolveLinkAsync(request.OwnerAccountId, request.LinkId, ct);
+        var scope = await _access.ResolveLinkForOwnerRightsAsync(request.OwnerAccountId, request.LinkId, ct);
         if (!scope.IsSuccess)
             return Result<PortalLinkNotificationPreferencesDto>.Failure(scope.Error);
 
         var client = await _clients.FirstOrDefaultAsync(new ClientByIdSpec(scope.Value!.TenantId, scope.Value.ClientId), ct);
         var link = await _links.FirstOrDefaultAsync(new OwnerAccountClientLinkByIdSpec(scope.Value.LinkId), ct);
-        return client is null || link is null
-            ? Result<PortalLinkNotificationPreferencesDto>.Failure("Portal.Links.NotFound", "Kayıt bulunamadı.")
-            : Result<PortalLinkNotificationPreferencesDto>.Success(PortalNotificationPreferencesMapping.ToDto(client, link));
+        if (client is null || link is null)
+            return Result<PortalLinkNotificationPreferencesDto>.Failure("Portal.Links.NotFound", "Kayıt bulunamadı.");
+
+        var marketingOpen = await _marketing.IsOpenAsync(scope.Value.TenantId, scope.Value.ClinicId, ct);
+        return Result<PortalLinkNotificationPreferencesDto>.Success(PortalNotificationPreferencesMapping.ToDto(client, link, marketingOpen));
     }
 }
 
@@ -180,23 +187,26 @@ public sealed class UpdatePortalLinkNotificationPreferencesCommandHandler
     private readonly OwnerPortalAccess _access;
     private readonly IRepository<Client> _clients;
     private readonly IRepository<OwnerAccountClientLink> _links;
+    private readonly ClinicMarketingGate _marketing;
     private readonly TimeProvider _timeProvider;
 
     public UpdatePortalLinkNotificationPreferencesCommandHandler(
         OwnerPortalAccess access,
         IRepository<Client> clients,
         IRepository<OwnerAccountClientLink> links,
+        ClinicMarketingGate marketing,
         TimeProvider timeProvider)
     {
         _access = access;
         _clients = clients;
         _links = links;
+        _marketing = marketing;
         _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<PortalLinkNotificationPreferencesDto>> Handle(UpdatePortalLinkNotificationPreferencesCommand request, CancellationToken ct)
     {
-        var scope = await _access.ResolveLinkAsync(request.OwnerAccountId, request.LinkId, ct);
+        var scope = await _access.ResolveLinkForOwnerRightsAsync(request.OwnerAccountId, request.LinkId, ct);
         if (!scope.IsSuccess)
             return Result<PortalLinkNotificationPreferencesDto>.Failure(scope.Error);
 
@@ -228,6 +238,7 @@ public sealed class UpdatePortalLinkNotificationPreferencesCommandHandler
                 "Kayıt bu sırada klinik tarafından güncellendi; sayfayı yenileyip tekrar deneyin.");
         }
 
-        return Result<PortalLinkNotificationPreferencesDto>.Success(PortalNotificationPreferencesMapping.ToDto(client, link));
+        var marketingOpen = await _marketing.IsOpenAsync(scope.Value.TenantId, scope.Value.ClinicId, ct);
+        return Result<PortalLinkNotificationPreferencesDto>.Success(PortalNotificationPreferencesMapping.ToDto(client, link, marketingOpen));
     }
 }
