@@ -64,6 +64,11 @@ yayında değil" şeridi içindir (K9). `isClosedBySubscription` yalnız panelde
 Yapılandırma sihirbazın ürettiği, motorun çizdiği JSON nesnesidir; backend tasarım alanlarını **yorumlamaz**, olduğu gibi saklar
 ve döner. Yeni tasarım paketi backend değişikliği istemez (K3). Taslak modeli: `content`, `design`, `structure`, `seo`, `publish`.
 
+**Tek istisna — randevu sayfasının markası (APPT-022):** online randevu bağlantı sayfası logo ve rengi ayrı bir alandan değil siteden
+alır. Backend bunun için yayındaki sürümde yalnız iki yolu okur: `content.clinic.logo` (`site-image:{id}`) ve `design.colors.primary`
+(`#rrggbb`); tek yer `ClinicSiteBrand`. Motor bu iki alanın adını ya da biçimini değiştirirse ONLINE_APPOINTMENT_API_CONTRACT.md §16
+birlikte güncellenir.
+
 Backend'in zorladığı sınırlar (ihlal 400 `ClinicSites.Validation`):
 
 | Kural | Ayrıntı |

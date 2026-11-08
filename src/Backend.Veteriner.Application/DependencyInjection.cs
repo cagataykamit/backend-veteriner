@@ -1,5 +1,6 @@
 using System.Reflection;
 using Backend.Veteriner.Application.AppointmentRequests;
+using Backend.Veteriner.Application.AppointmentRequests.Public;
 using Backend.Veteriner.Application.AppointmentRequests.Staff;
 using Backend.Veteriner.Application.Appointments;
 using Backend.Veteriner.Application.Notifications;
@@ -107,6 +108,7 @@ public static class DependencyInjection
         services.AddScoped<AppointmentRequestEmailComposer>();
         services.AddScoped<AppointmentRequestVerificationService>();
         services.AddScoped<AppointmentRequestIntake>();
+        services.AddScoped<OnlineBookingBrandReader>();
         services.AddScoped<StaffAppointmentRequestAccess>();
         services.AddScoped<StaffAppointmentRequestMapper>();
         services.AddScoped<StockBatchResolver>();

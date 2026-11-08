@@ -11,7 +11,7 @@ Tüm saatler UTC ISO-8601 taşınır; gösterim ve müsaitlik hesabı İstanbul 
 | `AppointmentReason` | Klinik başına neden: ad, varsayılan süre (5–240 dk), online'da görünür, sıra, aktif, uygun hekimler (boş = tüm hekimler). |
 | `Appointment` (+alan) | `reasonId?`, `veterinarianUserId?` eklendi. Hekim bazlı çakışma: `Appointments.VeterinarianTimeConflict` (409). |
 | `ClinicOnlineBookingSettings` | Açık/kapalı (**varsayılan kapalı**), `minLeadMinutes` (0–10080, varsayılan 120), `maxAdvanceDays` (1–180, varsayılan 30), 12 karakterlik bağlantı kodu. |
-| `AppointmentRequest` | Durum: `0 Pending`, `1 Approved`, `2 Rejected`, `3 Cancelled`, `4 Expired`. Giriş kapısı (`source`): `0 Portal`, `1 Link`. Kaynak (`channel`, §14): `0 ClinicLink`, `1 ClinicSite`, `2 OwnerPortal`, `3 Phone`, `4 VetFinder`, eski talepte `null`. İletişim anlığı + durum geçmişi. |
+| `AppointmentRequest` | Durum: `0 Pending`, `1 Approved`, `2 Rejected`, `3 Cancelled`, `4 Expired`. Giriş kapısı (`source`): `0 Portal`, `1 Link`. Kaynak (`channel`, §14): `0 ClinicLink`, `1 ClinicSite`, `2 OwnerPortal`, `3 Phone`, `4 VetFinder`, `5 ExternalSite`, eski talepte `null`. İletişim anlığı + durum geçmişi. |
 | `ClinicAppointmentRequestEmailTemplate` | Tür: `0 Received`, `1 Approved`, `2 Rescheduled`, `3 Rejected`. Yoksa Vetinity varsayılanı. |
 | `UserNotification` | Tür: `0 AppointmentRequestCreated`, `1 AppointmentRequestCancelled`, `2 AppointmentAssigned`. |
 
@@ -110,7 +110,8 @@ salt okunur ise sebep ayırt edilmeden 404 `OnlineBooking.NotFound`.
 
 | Uç | Açıklama |
 |---|---|
-| `GET` | `OnlineBookingPageDto`: `{ clinicName, clinicCity, clinicPhone, clinicAddress, minLeadMinutes, maxAdvanceDays, maxPendingRequests, reasons: [{ id, name, durationMinutes, requiresNote }] }` (aktif + online nedenler; sonda her zaman "Diğer", §11). |
+| `GET` | `OnlineBookingPageDto`: `{ clinicName, clinicCity, clinicPhone, clinicAddress, minLeadMinutes, maxAdvanceDays, maxPendingRequests, reasons: [{ id, name, durationMinutes, requiresNote }], branding: { accentColor, hasLogo } }` (aktif + online nedenler; sonda her zaman "Diğer", §11; `branding` §16). |
+| `GET /logo` | Kliniğin sitesindeki logo (§16). Hız sınırı `portal-auth` değil site görseliyle aynı `public-site-image` (dakikada 600); yanıt başlıkları herkese açık site görseliyle aynı (`Cache-Control: public, max-age=300`, `ETag`, `nosniff`). Logo yoksa 404 `OnlineBooking.NotFound`. |
 | `GET /availability?reasonId&from&days` | `[{ date, slots: [{ startUtc, endUtc }] }]`; online sınırlar uygulanır, hekim bilgisi dönmez. `reasonId` isteğe bağlı: boşsa "Diğer" (§11). |
 | `POST /verification-code` | `{ email }` → 204. 6 haneli kod, 10 dk, 5 deneme, 60 sn yeniden gönderim beklemesi (portal kod kuralları). |
 | `POST /requests` | Gövde aşağıda → 201 `{ id, status, requestedStartUtc }`. |
@@ -262,10 +263,11 @@ bilgisi saklanmaz. Paket kilidi yoktur.
 | `2` | `OwnerPortal` | Portal | §6 portal ucu, her zaman (gövdede kaynak alanı yok; gönderilse yok sayılır) |
 | `3` | `Phone` | Telefon / elle | Henüz üretilmez: personelin talep girdiği bir yol yok |
 | `4` | `VetFinder` | Veteriner bul | §5 bağlantı ucu, `channel: "veteriner-bul"` (kart bağlantıya `?kaynak=veteriner-bul` ekler; VET_FINDER_API_CONTRACT.md §6) |
+| `5` | `ExternalSite` | Dış site | §5 bağlantı ucu, `channel: "dis-site"` (panelin verdiği HTML düğme ve gömme kodu bağlantıya `?kaynak=dis-site` ekler; §15) |
 | `null` | — | Bilinmiyor | TIER-016 öncesi talepler (geriye dönük doldurulmaz) |
 
 **Kural (tek yer: `AppointmentRequestChannels.ForLink`, domain):** §5 `POST /requests` gövdesindeki `channel` serbest metin olarak
-saklanmaz. Yalnız izinli değer (`site`, `veteriner-bul`; büyük/küçük harf ve baş/son boşluk önemsiz) eşlenir; bilinmeyen, boş, sayı ya
+saklanmaz. Yalnız izinli değer (`site`, `veteriner-bul`, `dis-site`; büyük/küçük harf ve baş/son boşluk önemsiz) eşlenir; bilinmeyen, boş, sayı ya
 da başka kapının değeri (`portal`, `telefon`) `0 ClinicLink` olur ve talep **reddedilmez**. Değer kimliksiz istemciden geldiği için
 kötüye kullanılabilir (ör. doğrudan bağlantı `site` diye gösterilebilir); bu yalnız özetteki sayıları etkiler.
 
@@ -289,3 +291,57 @@ Satırlar kaynak sayısına göre sıralı, `null` (bilinmiyor) sonda; dönemde 
 taleplerden bugün `Approved` durumunda olanlardır (onaylanıp randevusu sonra iptal edilen talep `Approved` kalır).
 
 §4 liste ve detay (`summary`) satırına `channel` (sayı ya da `null`) eklendi; `source` (giriş kapısı) değişmedi.
+
+## 15. Ek (2026-11-08): sitenize ekleyin — HTML düğme ve gömme (APPT-020/021)
+
+Panel Ayarlar > Online randevu > "Sitenize ekleyin" iki kopyalanabilir kod verir. **Yeni uç yoktur**; ikisi de §5 bağlantısını açar.
+Paket kilidi yoktur (online randevu her pakette, ADR-042). Kodu panel üretir (`online-booking-embed.utils.ts`); dış betik dosyası ve
+çerez yoktur.
+
+| Kod | İçerik |
+|---|---|
+| Düğme (APPT-020) | `<a href="{bookingUrl}?kaynak=dis-site" target="_blank" rel="noopener" aria-label="Online randevu al (yeni sekmede açılır)" style="…">Online randevu al</a>`. Satır içi stil (sitenin stil dosyasından bağımsız), beyaz yazı / zemin kontrastı 4.5:1 üstü, en az 44 px yükseklik. |
+| Gömme (APPT-021) | `<iframe src="{bookingUrl}?kaynak=dis-site" title="{klinik}: online randevu talebi" data-vetinity-randevu loading="lazy" style="…height:900px…">` ve yükseklik betiği (aşağıda). |
+
+**Kaynak:** ikisi de `dis-site` → `5 ExternalSite` (§14). Ayrı değer, çünkü `site` Vetinity'nin kurduğu klinik sitesidir (ADR-045) ve
+`ClinicLink` bağlantının elle paylaşılmasıdır; klinik "dış sitemden kaç talep geldi" sorusunu ayrı görür. Düğme ile gömme ayrılmaz.
+
+**Yükseklik:** gömülü sayfa kendi yüksekliğini `postMessage({ type: "vetinity-randevu-yukseklik", height }, "*")` ile bildirir. İleti
+yalnız piksel taşır (kişisel veri yok); gömen sitenin kökeni önceden bilinmediğinden hedef `*`'dır. Gömme kodundaki betik iletiyi yalnız
+`event.origin` portal kökeni ve `event.source` kendi çerçevesi ise uygular, değeri 480–6000 px arasına sıkıştırır. Site oluşturucu betiği
+silerse çerçeve 900 px sabit kalır, içerik çerçeve içinde kaydırılır.
+
+**Gömülü görünüm:** üst marka başlığı çizilmez; gizlilik ve kullanım şartları bağlantıları yeni sekmede açılır. E-posta kodu akışı çerez
+ve `localStorage` kullanmaz (kod ve talep gövdeyle gider), üçüncü taraf çerez engelinden etkilenmez; bu yüzden yeni sekmeye yönlendirme
+gerekmez.
+
+**Güvenlik (tıklama tuzağı):**
+
+- API yanıtları değişmedi: `X-Frame-Options: DENY` ve `frame-ancestors 'none'` (SECURITY_CONFIGURATION.md). Çerçeve API'yi değil portal
+  sayfasını açar; API'ye istek portal kökeninden gider, CORS değişmedi.
+- **Yayın sunucusu kuralı (portal henüz yayında değil; canlı kılavuzuna eklenmeli):** yalnız `/randevu/*` belge yanıtı
+  `Content-Security-Policy: frame-ancestors *` (ya da `https:`) taşır ve `X-Frame-Options` göndermez. Diğer bütün portal yolları
+  `frame-ancestors 'none'` ve `X-Frame-Options: DENY` taşır. Panel hiçbir yolda gömülemez. `frame-ancestors` meta etiketle verilemez.
+- Portal tek sayfalık uygulamadır: başlık yalnız ilk belge yüklemesini korur, çerçeve içindeki uygulama içi geçiş başlık görmez. Bu yüzden
+  portal kökü çerçevede yalnız rota verisinde `embeddable` olan sayfayı (`/randevu/:bookingCode`) çizer; diğer sayfalarda içerik yerine
+  "yeni sekmede aç" bağlantısı gösterir (frontend `projects/portal/src/app/core/embed/portal-embed.ts`).
+- Gömülebilen sayfa kimliksizdir; oturum, hasta ya da klinik verisi göstermez. Kalan risk: kötü niyetli bir site sayfayı gömüp kişiyi
+  yanıltarak talep göndertebilir. Talep yine e-posta koduna, e-posta + klinik başına 3 bekleyen talep sınırına ve hız sınırına bağlıdır;
+  klinik onaylamadan randevu olmaz. Kaynak değeri gömen siteyi doğrulamaz (§14: yalnız istatistik).
+
+## 16. Ek (2026-11-08): bağlantı sayfasının markası (APPT-022)
+
+Bağlantı sayfası kliniğin logosu ve ana rengiyle çizilir. **Kaynak kliniğin sitesidir** (ADR-045, CLINIC_SITE_API_CONTRACT.md §3): ikinci
+bir yükleme alanı yoktur. Paket kilidi yoktur.
+
+- Yalnız yayında ve geçici kapalı olmayan sitenin **yayındaki sürümü** okunur; taslak okunmaz. Site yoksa ya da kapalıysa marka boştur,
+  sayfa Vetinity görünümündedir. Abonelik ve klinik kapısı §5 kapısıdır.
+- Okunan iki alan (tek yer `ClinicSiteBrand`, domain): `content.clinic.logo` yalnız `site-image:{id}` ve yayındaki sürümün başvurduğu,
+  silinmemiş görsel (hazır fotoğraf `stock:` logo sayılmaz); `design.colors.primary` yalnız `#rrggbb`, küçük harfle döner.
+- `branding`: `{ "accentColor": "#0a7d6f", "hasLogo": true }`; değer yoksa `accentColor: null`, `hasLogo: false`. Yalnız §5 sayfasında
+  dolar, §6 portal ucunda `null`.
+- Logo: `GET /api/portal/v1/booking/{bookingCode}/logo` (§5 tablo). Logo yoksa, site kapalıysa ya da kod bilinmiyorsa 404
+  `OnlineBooking.NotFound` (ayrım yapılmaz).
+- **Kontrast portalın kuralıdır:** renk beyaz yazılı zemin (adım numarası, gönder düğmesi), seçili saat ve odak halkası olur. Kart,
+  sayfa zemini ve yumuşak vurgu yüzeylerinin hepsinde 4.5:1 tutmayan renk uygulanmaz, Vetinity renkleri kalır
+  (frontend `projects/portal/src/app/features/booking/portal-booking-brand.ts`).

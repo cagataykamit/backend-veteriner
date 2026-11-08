@@ -9,6 +9,7 @@ using Ardalis.Specification.EntityFrameworkCore;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Api.Configuration;
 using Backend.Veteriner.Api.Controllers;
+using Backend.Veteriner.Api.Controllers.Portal;
 using Backend.Veteriner.Api.Middleware;
 using Backend.Veteriner.Application.AppointmentRequests;
 using Backend.Veteriner.Application.Auth;
@@ -1271,6 +1272,78 @@ public sealed class ClinicSiteIntegrationTests : IClassFixture<CustomWebApplicat
         on.GetProperty("bookingCode").GetString().Should().Be(code);
         on.GetProperty("bookingUrl").GetString().Should().EndWith($"/randevu/{code}");
     }
+
+    // ---------- randevu sayfasının markası (APPT-022) ----------
+
+    private static object BrandConfig(string? logo, string? primary)
+        => new
+        {
+            schemaVersion = 1,
+            content = new { clinic = new { logo, slogan = "marka" } },
+            design = new { conceptKey = "modern", colors = new { primary, secondary = "#222222", accent = "#333333" } },
+        };
+
+    private async Task<JsonElement> BookingBrandingAsync(string code)
+        => (await OkJsonAsync(await _client.GetAsync($"/api/portal/v1/booking/{code}"))).GetProperty("branding");
+
+    private Task<HttpResponseMessage> BookingLogoAsync(string code) => _client.GetAsync($"/api/portal/v1/booking/{code}/logo");
+
+    private static void ShouldBeUnbranded(JsonElement branding)
+    {
+        branding.GetProperty("accentColor").ValueKind.Should().Be(JsonValueKind.Null);
+        branding.GetProperty("hasLogo").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Booking_Page_Should_Carry_Brand_Of_Published_Open_Site_Only()
+    {
+        var ctx = await SeedAsync();
+        var code = await EnableBookingAsync(ctx);
+
+        ShouldBeUnbranded(await BookingBrandingAsync(code));
+        await ShouldFailAsync(await BookingLogoAsync(code), HttpStatusCode.NotFound, "OnlineBooking.NotFound");
+
+        // Taslaktaki marka yayınlanmadan randevu sayfasına geçmez.
+        await SaveDraftAsync(ctx, Config());
+        var logo = await UploadOkAsync(ctx);
+        await UpdateDraftAsync(ctx, BrandConfig($"site-image:{logo}", "#0A7D6F"));
+        ShouldBeUnbranded(await BookingBrandingAsync(code));
+
+        await PublishAsync(ctx);
+        var branding = await BookingBrandingAsync(code);
+        branding.GetProperty("accentColor").GetString().Should().Be("#0a7d6f");
+        branding.GetProperty("hasLogo").GetBoolean().Should().BeTrue();
+
+        var image = await BookingLogoAsync(code);
+        image.StatusCode.Should().Be(HttpStatusCode.OK);
+        image.Content.Headers.ContentType!.MediaType.Should().Be("image/jpeg");
+        image.Headers.CacheControl!.Public.Should().BeTrue();
+        (await image.Content.ReadAsByteArrayAsync()).Should().Equal(Jpeg);
+
+        // Geçici kapatılan site markasını da kapatır; sayfa Vetinity görünümüne döner.
+        await OkJsonAsync(await SendAsync(HttpMethod.Post, $"{ctx.Url}/close", ctx.Token));
+        ShouldBeUnbranded(await BookingBrandingAsync(code));
+        await ShouldFailAsync(await BookingLogoAsync(code), HttpStatusCode.NotFound, "OnlineBooking.NotFound");
+    }
+
+    [Fact]
+    public async Task Booking_Page_Should_Ignore_Stock_Logo_And_Malformed_Color()
+    {
+        var ctx = await SeedAsync();
+        var code = await EnableBookingAsync(ctx);
+        await PublishNewSiteAsync(ctx, BrandConfig("stock:logo/ornek.png", "kırmızı"));
+
+        ShouldBeUnbranded(await BookingBrandingAsync(code));
+        await ShouldFailAsync(await BookingLogoAsync(code), HttpStatusCode.NotFound, "OnlineBooking.NotFound");
+        await ShouldFailAsync(await BookingLogoAsync("olmayankod12"), HttpStatusCode.NotFound, "OnlineBooking.NotFound");
+    }
+
+    [Fact]
+    public void Booking_Logo_Should_Use_Site_Image_Rate_Limit_Not_Strict_Link_Limit()
+        => typeof(PortalOnlineBookingController)
+            .GetMethod(nameof(PortalOnlineBookingController.GetLogo))!
+            .GetCustomAttribute<EnableRateLimitingAttribute>()!.PolicyName
+            .Should().Be(RateLimitingExtensions.PublicSiteImagePolicy);
 
     // ---------- en yakın müsait saat (TIER-017) ----------
 

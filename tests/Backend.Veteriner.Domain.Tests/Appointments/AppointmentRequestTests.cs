@@ -48,6 +48,9 @@ public sealed class AppointmentRequestTests
     [InlineData("veteriner-bul", AppointmentRequestChannel.VetFinder)]
     [InlineData(" Veteriner-Bul ", AppointmentRequestChannel.VetFinder)]
     [InlineData("veteriner bul", AppointmentRequestChannel.ClinicLink)]
+    [InlineData("dis-site", AppointmentRequestChannel.ExternalSite)]
+    [InlineData(" DIS-SITE ", AppointmentRequestChannel.ExternalSite)]
+    [InlineData("dış-site", AppointmentRequestChannel.ClinicLink)]
     [InlineData("2", AppointmentRequestChannel.ClinicLink)]
     [InlineData("https://example.com/kampanya", AppointmentRequestChannel.ClinicLink)]
     public void CreateFromLink_Should_Accept_Only_Allowed_Channel_Token_Else_Clinic_Link(string? token, AppointmentRequestChannel expected)
@@ -77,6 +80,7 @@ public sealed class AppointmentRequestTests
         ((int)AppointmentRequestChannel.OwnerPortal).Should().Be(2);
         ((int)AppointmentRequestChannel.Phone).Should().Be(3);
         ((int)AppointmentRequestChannel.VetFinder).Should().Be(4);
+        ((int)AppointmentRequestChannel.ExternalSite).Should().Be(5);
     }
 
     [Theory]

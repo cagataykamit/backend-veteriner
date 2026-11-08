@@ -39,6 +39,17 @@ public sealed class PublicSiteRecordByIdSpec : Specification<ClinicSite, PublicS
     }
 }
 
+/// <summary>Online randevu sayfasının marka okuması (APPT-022): kliniğin sitesi, aynı alanlarla.</summary>
+public sealed class PublicSiteRecordByClinicSpec : Specification<ClinicSite, PublicSiteRecord>
+{
+    public PublicSiteRecordByClinicSpec(Guid tenantId, Guid clinicId)
+    {
+        Query.AsNoTracking();
+        Query.Where(x => x.TenantId == tenantId && x.ClinicId == clinicId);
+        Query.Select(x => new PublicSiteRecord(x.Id, x.TenantId, x.ClinicId, x.Slug, x.IsTemporarilyClosed, x.PublishedVersionNumber));
+    }
+}
+
 /// <summary>Herkese açık görsel ucu: yalnız başvuru listesi okunur, yapılandırma yüklenmez.</summary>
 public sealed class ClinicSiteVersionReferencedImagesSpec : Specification<ClinicSiteVersion, string>
 {

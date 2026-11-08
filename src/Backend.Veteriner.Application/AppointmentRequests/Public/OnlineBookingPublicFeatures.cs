@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Appointments.Availability;
 using Backend.Veteriner.Application.Clinics.OnlineBooking;
+using Backend.Veteriner.Application.ClinicSites;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.AppointmentRequests;
 using Backend.Veteriner.Domain.Shared;
@@ -10,6 +11,12 @@ namespace Backend.Veteriner.Application.AppointmentRequests.Public;
 
 /// <summary>Kliniğe özel bağlantı sayfası (kimliksiz; ADR-042 K1). Kod geçersiz/kapalıysa 404 <c>OnlineBooking.NotFound</c>.</summary>
 public sealed record GetOnlineBookingPageQuery(string BookingCode) : IRequest<Result<OnlineBookingPageDto>>;
+
+/// <summary>
+/// Bağlantı sayfasının logosu (APPT-022): kliniğin yayındaki sitesinin logosu. Site yoksa, kapalıysa ya da logo yoksa 404
+/// <c>OnlineBooking.NotFound</c> (sebep ayırt edilmez).
+/// </summary>
+public sealed record GetOnlineBookingLogoQuery(string BookingCode) : IRequest<Result<ClinicSiteImageContent>>;
 
 /// <summary>Bağlantıdan müsait saatler (online sınırlar uygulanır; hekim bilgisi dönmez).</summary>
 public sealed record GetOnlineBookingAvailabilityQuery(string BookingCode, Guid? ReasonId, DateOnly? From, int Days)
@@ -87,19 +94,50 @@ public sealed class GetOnlineBookingPageQueryHandler : IRequestHandler<GetOnline
 {
     private readonly OnlineBookingClinicResolver _resolver;
     private readonly AppointmentRequestIntake _intake;
+    private readonly OnlineBookingBrandReader _brand;
 
-    public GetOnlineBookingPageQueryHandler(OnlineBookingClinicResolver resolver, AppointmentRequestIntake intake)
+    public GetOnlineBookingPageQueryHandler(OnlineBookingClinicResolver resolver, AppointmentRequestIntake intake, OnlineBookingBrandReader brand)
     {
         _resolver = resolver;
         _intake = intake;
+        _brand = brand;
     }
 
     public async ValueTask<Result<OnlineBookingPageDto>> Handle(GetOnlineBookingPageQuery request, CancellationToken ct)
     {
         var scope = await _resolver.ResolveByCodeAsync(request.BookingCode, ct);
-        return scope.IsSuccess
-            ? Result<OnlineBookingPageDto>.Success(await _intake.GetPageAsync(scope.Value!, ct))
-            : Result<OnlineBookingPageDto>.Failure(scope.Error);
+        if (!scope.IsSuccess)
+            return Result<OnlineBookingPageDto>.Failure(scope.Error);
+
+        var page = await _intake.GetPageAsync(scope.Value!, ct);
+        var brand = await _brand.ReadAsync(scope.Value!, ct);
+        return Result<OnlineBookingPageDto>.Success(page with { Branding = new OnlineBookingBrandingDto(brand.AccentColor, brand.Logo is not null) });
+    }
+}
+
+public sealed class GetOnlineBookingLogoQueryHandler : IRequestHandler<GetOnlineBookingLogoQuery, Result<ClinicSiteImageContent>>
+{
+    private readonly OnlineBookingClinicResolver _resolver;
+    private readonly OnlineBookingBrandReader _brand;
+    private readonly ClinicSiteImageContentReader _reader;
+
+    public GetOnlineBookingLogoQueryHandler(OnlineBookingClinicResolver resolver, OnlineBookingBrandReader brand, ClinicSiteImageContentReader reader)
+    {
+        _resolver = resolver;
+        _brand = brand;
+        _reader = reader;
+    }
+
+    public async ValueTask<Result<ClinicSiteImageContent>> Handle(GetOnlineBookingLogoQuery request, CancellationToken ct)
+    {
+        var scope = await _resolver.ResolveByCodeAsync(request.BookingCode, ct);
+        if (!scope.IsSuccess)
+            return Result<ClinicSiteImageContent>.Failure(scope.Error);
+
+        var brand = await _brand.ReadAsync(scope.Value!, ct);
+        return brand.Logo is null
+            ? Result<ClinicSiteImageContent>.Failure(OnlineBookingClinicResolver.NotFoundCode, OnlineBookingClinicResolver.NotFoundMessage)
+            : await _reader.OpenAsync(brand.Logo, ct);
     }
 }
 

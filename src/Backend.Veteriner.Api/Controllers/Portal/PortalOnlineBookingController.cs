@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
+using Backend.Veteriner.Api.Middleware;
 using Backend.Veteriner.Application.AppointmentRequests;
 using Backend.Veteriner.Application.AppointmentRequests.Portal;
 using Backend.Veteriner.Application.AppointmentRequests.Public;
@@ -36,6 +37,18 @@ public sealed class PortalOnlineBookingController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetPage([FromRoute] string bookingCode, CancellationToken ct)
         => (await _mediator.Send(new GetOnlineBookingPageQuery(bookingCode), ct)).ToActionResult(this);
+
+    /// <summary>
+    /// Kliniğin yayındaki sitesinin logosu (APPT-022); sayfa yanıtında <c>branding.hasLogo</c> doğruysa vardır. Görsel olduğundan
+    /// site görseliyle aynı hız sınırı ve önbellek başlıkları; bağlantı uçlarının sıkı sınırını tüketmez.
+    /// </summary>
+    [HttpGet("logo")]
+    [EnableRateLimiting(RateLimitingExtensions.PublicSiteImagePolicy)]
+    [Produces("application/octet-stream", "application/problem+json")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetLogo([FromRoute] string bookingCode, CancellationToken ct)
+        => (await _mediator.Send(new GetOnlineBookingLogoQuery(bookingCode), ct)).ToPublicImage(this);
 
     /// <summary>
     /// Bir neden için müsait saatler (İstanbul günü <c>from</c>, en çok 14 gün). <c>reasonId</c> boşsa "Diğer / emin değilim":
