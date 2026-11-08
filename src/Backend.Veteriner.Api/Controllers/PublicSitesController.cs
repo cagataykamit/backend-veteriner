@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Api.Middleware;
+using Backend.Veteriner.Application.AppointmentRequests;
 using Backend.Veteriner.Application.ClinicSites;
 using Backend.Veteriner.Application.ClinicSites.Public;
 using Mediator;
@@ -33,6 +34,17 @@ public sealed class PublicSitesController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Get([FromRoute] string slug, CancellationToken ct)
         => (await _mediator.Send(new GetPublicSiteQuery(slug), ct)).ToActionResult(this);
+
+    /// <summary>
+    /// En yakın müsait saatler (TIER-017): yalnız gün ve başlangıç. Kapalı site, kapalı online randevu ya da gösterimi kapatılmış
+    /// klinikte boş liste. Site JSON'u gibi önbellek başlığı taşımaz: dolan saat gecikmesiz düşer.
+    /// </summary>
+    [HttpGet("next-available-slots")]
+    [ProducesResponseType(typeof(PublicSiteNextSlotsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetNextAvailableSlots([FromRoute] string slug, [FromQuery] int? count, CancellationToken ct)
+        => (await _mediator.Send(new GetPublicSiteNextSlotsQuery(slug, count ?? AppointmentRequestIntake.DefaultNextSlotCount), ct)).ToActionResult(this);
 
     /// <summary>Yayındaki sürümün başvurduğu görsel; taslak görseli ve kapalı sitenin görseli 404.</summary>
     [HttpGet("images/{imageId:guid}")]

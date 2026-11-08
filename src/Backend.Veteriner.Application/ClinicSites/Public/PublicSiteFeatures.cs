@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.AppointmentRequests;
 using Backend.Veteriner.Application.Clinics.Contracts.Dtos;
 using Backend.Veteriner.Application.Clinics.OnlineBooking;
 using Backend.Veteriner.Application.Clinics.Specs;
@@ -7,6 +8,7 @@ using Backend.Veteriner.Application.OwnerPortal;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.ClinicSites;
 using Backend.Veteriner.Domain.Shared;
+using FluentValidation;
 using Mediator;
 using Microsoft.Extensions.Options;
 
@@ -17,6 +19,12 @@ public sealed record GetPublicSiteQuery(string Slug) : IRequest<Result<PublicSit
 
 /// <summary>Yayındaki sürümün başvurduğu görsel (kimliksiz). Taslak görseli ve kapalı sitenin görseli 404.</summary>
 public sealed record GetPublicSiteImageQuery(string Slug, Guid ImageId) : IRequest<Result<ClinicSiteImageContent>>;
+
+/// <summary>
+/// Kliniğin online randevuya açtığı en yakın müsait saatler (kimliksiz; TIER-017; docs/ONLINE_APPOINTMENT_API_CONTRACT.md §12).
+/// Yalnız gün ve saat döner.
+/// </summary>
+public sealed record GetPublicSiteNextSlotsQuery(string Slug, int Count) : IRequest<Result<PublicSiteNextSlotsDto>>;
 
 public sealed class GetPublicSiteQueryHandler : IRequestHandler<GetPublicSiteQuery, Result<PublicSiteDto>>
 {
@@ -97,6 +105,52 @@ public sealed class GetPublicSiteQueryHandler : IRequestHandler<GetPublicSiteQue
                 clinic.Email,
                 hours.Select(h => new ClinicWorkingHourDto(h.DayOfWeek, h.IsClosed, h.OpensAt, h.ClosesAt, h.BreakStartsAt, h.BreakEndsAt)).ToList()),
             booking));
+    }
+}
+
+public sealed class GetPublicSiteNextSlotsQueryValidator : AbstractValidator<GetPublicSiteNextSlotsQuery>
+{
+    public GetPublicSiteNextSlotsQueryValidator()
+        => RuleFor(x => x.Count).InclusiveBetween(1, AppointmentRequestIntake.MaxNextSlotCount);
+}
+
+/// <summary>
+/// Site kapısı (<see cref="PublicSiteResolver"/>) ve online randevu kapısı (<see cref="OnlineBookingClinicResolver"/>) ardından
+/// talep akışının müsaitliği. Olmayan site 404; kapalı site, kapalı online randevu ya da gösterimi kapatılmış klinik boş liste.
+/// </summary>
+public sealed class GetPublicSiteNextSlotsQueryHandler : IRequestHandler<GetPublicSiteNextSlotsQuery, Result<PublicSiteNextSlotsDto>>
+{
+    private static readonly PublicSiteNextSlotsDto None = new([]);
+
+    private readonly PublicSiteResolver _siteResolver;
+    private readonly OnlineBookingClinicResolver _bookingResolver;
+    private readonly AppointmentRequestIntake _intake;
+
+    public GetPublicSiteNextSlotsQueryHandler(
+        PublicSiteResolver siteResolver,
+        OnlineBookingClinicResolver bookingResolver,
+        AppointmentRequestIntake intake)
+    {
+        _siteResolver = siteResolver;
+        _bookingResolver = bookingResolver;
+        _intake = intake;
+    }
+
+    public async ValueTask<Result<PublicSiteNextSlotsDto>> Handle(GetPublicSiteNextSlotsQuery request, CancellationToken ct)
+    {
+        var resolved = await _siteResolver.ResolveAsync(request.Slug, ct);
+        if (!resolved.IsSuccess)
+            return Result<PublicSiteNextSlotsDto>.Failure(resolved.Error);
+        var scope = resolved.Value!;
+
+        if (scope.Status == PublicSiteStatus.Closed)
+            return Result<PublicSiteNextSlotsDto>.Success(None);
+
+        var booking = await _bookingResolver.ResolveByClinicAsync(scope.Site.TenantId, scope.Clinic.Id, ct);
+        if (!booking.IsSuccess)
+            return Result<PublicSiteNextSlotsDto>.Success(None);
+
+        return Result<PublicSiteNextSlotsDto>.Success(new PublicSiteNextSlotsDto(await _intake.GetNextSlotsAsync(booking.Value!, request.Count, ct)));
     }
 }
 
