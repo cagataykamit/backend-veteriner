@@ -18,7 +18,7 @@ namespace Backend.Veteriner.Application.Tenants.Commands.AssignMemberClinic;
 /// </list>
 /// Idempotent: ilişki zaten varsa kayıt eklenmez, <c>AlreadyAssigned = true</c> döner.
 /// Read-only / cancelled tenant durumunda merkezi <c>TenantSubscriptionWriteGuardBehavior</c> bu command'ı önce keser.
-/// Permission cache invalidation yapılmaz: clinic membership permission setini değiştirmez.
+/// Atama sonrası <see cref="IPermissionCacheInvalidator"/> çağrılır (SEC-002): üyenin eldeki erişim token'ı geçersiz sayılır.
 /// </summary>
 public sealed class AssignTenantMemberClinicCommandHandler
     : IRequestHandler<AssignTenantMemberClinicCommand, Result<AssignTenantMemberClinicResultDto>>
@@ -28,6 +28,7 @@ public sealed class AssignTenantMemberClinicCommandHandler
     private readonly IUserTenantRepository _userTenantRepo;
     private readonly IReadRepository<Clinic> _clinicsRead;
     private readonly IUserClinicRepository _userClinics;
+    private readonly IPermissionCacheInvalidator _cache;
     private readonly IUnitOfWork _uow;
     private readonly TimeProvider _timeProvider;
 
@@ -37,6 +38,7 @@ public sealed class AssignTenantMemberClinicCommandHandler
         IUserTenantRepository userTenantRepo,
         IReadRepository<Clinic> clinicsRead,
         IUserClinicRepository userClinics,
+        IPermissionCacheInvalidator cache,
         IUnitOfWork uow,
         TimeProvider timeProvider)
     {
@@ -45,6 +47,7 @@ public sealed class AssignTenantMemberClinicCommandHandler
         _userTenantRepo = userTenantRepo;
         _clinicsRead = clinicsRead;
         _userClinics = userClinics;
+        _cache = cache;
         _uow = uow;
         _timeProvider = timeProvider;
     }
@@ -110,6 +113,8 @@ public sealed class AssignTenantMemberClinicCommandHandler
         var entity = new UserClinic(request.MemberId, request.ClinicId, utcNow);
         await _userClinics.AddAsync(entity, ct);
         await _uow.SaveChangesAsync(ct);
+
+        _cache.InvalidateUser(request.MemberId);
 
         return Result<AssignTenantMemberClinicResultDto>.Success(new AssignTenantMemberClinicResultDto(
             request.MemberId,

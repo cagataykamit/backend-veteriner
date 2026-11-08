@@ -46,6 +46,7 @@ Kapsam: yalnız statik kod okuma (`C:\Users\DELL\source\repos\Veteriner`, `main`
 - Etki: yetkisi alınan kullanıcı en fazla 60 dk daha eski yetkisini kullanır; "yalnız yönetici" işlemleri (`*.Correct`) dahil. Refresh yeniden okur (`RefreshCommandHandler.cs:~110`).
 - Öneri: süreyi kısalt (ör. 15 dk) ya da kritik düzeltme komutlarında `ICurrentUserPermissionChecker` ile DB doğrulaması. Çaba: küçük-orta. Ürün kararı.
 - **Kısmi önlem (2026-10-13):** Production'da `RevokeSessionsOnPermissionChange=true`; yetkisi değişenin refresh token'ları düşer, ancak mevcut access token süresi (60 dk) bitene kadar geçerli kalır. Token ömrü/DB doğrulaması açık (`SECURITY_CONFIGURATION.md`).
+- **Kapandı (SEC-002, 2026-11-09, tek API süreci varsayımıyla):** izin değişim damgası. Rol, rolün izinleri, izin tanımı, kiracı üyeliği ya da klinik ataması değişince kullanıcıya bellekte damga yazılır; damgadan önce üretilmiş access token 401 alır, frontend sessizce yeniler ve güncel izinle devam eder. Access token ömrü 30 dk. Çok süreçli kurulumda damga paylaşılmaz, gecikme en çok 30 dk olur; o gün damga paylaşılan önbelleğe ya da veritabanına taşınmalı (`SECURITY_CONFIGURATION.md` "İzin değişim damgası").
 
 ### Düşük
 

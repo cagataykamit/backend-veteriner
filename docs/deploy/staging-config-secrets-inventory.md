@@ -112,7 +112,7 @@ DbMigrator çalıştırırken API ile **aynı** Command/Query connection string 
 |---|---|---|---|---|
 | `Jwt__Issuer` | Hayır | `Backend.Veteriner` | API | `appsettings.json` default |
 | `Jwt__Audience` | Hayır | `Backend.Veteriner.Audience` | API | Production şablonu farklı audience kullanabilir |
-| `Jwt__ExpMinutes` | Hayır | `60` | API | Access token süresi (dakika) |
+| `Jwt__ExpMinutes` | Hayır | `30` | API | Access token süresi (dakika; SEC-002) |
 | `Jwt__RefreshExpDays` | Hayır | `7` | API | Refresh token ömrü (gün) |
 | `RateLimiting__Enabled` | Hayır | `true` | API | `appsettings.Staging.json` overlay'de **true** |
 | `RateLimiting__GlobalPermitLimit` | Hayır | `200` | API | Base `appsettings.json` |
@@ -186,7 +186,7 @@ Config section: `Jwt` (`JwtOptions` — `Issuer`, `Audience`, `Key`, `ExpMinutes
   "Issuer": "Backend.Veteriner",
   "Audience": "Backend.Veteriner.Audience",
   "Key": "",
-  "ExpMinutes": 60,
+  "ExpMinutes": 30,
   "RefreshExpDays": 7
 }
 ```

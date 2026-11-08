@@ -15,7 +15,7 @@ namespace Backend.Veteriner.Application.Tests.Tenants.Handlers;
 /// Assign: pasif klinik reddedilir (Clinics.Inactive). Idempotent → AlreadyAssigned=true, repo yazmaz, commit yok.
 /// Remove: self-protect Clinics.SelfClinicRemoveForbidden. Pasif klinik remove akışını engellemez.
 /// Idempotent → AlreadyRemoved=true, repo silmez, commit yok.
-/// Permission cache invalidation yapılmaz: clinic membership permission setini değiştirmez.
+/// Gerçek değişiklikte (commit sonrası) üye için IPermissionCacheInvalidator çağrılır (SEC-002); idempotent yolda çağrılmaz.
 /// </summary>
 public sealed class TenantMemberClinicAssignmentHandlersTests
 {
@@ -25,15 +25,16 @@ public sealed class TenantMemberClinicAssignmentHandlersTests
     private readonly Mock<IUserTenantRepository> _userTenantRepo = new();
     private readonly Mock<IReadRepository<Clinic>> _clinicsRead = new();
     private readonly Mock<IUserClinicRepository> _userClinics = new();
+    private readonly Mock<IPermissionCacheInvalidator> _cache = new();
     private readonly Mock<IUnitOfWork> _uow = new();
 
     private AssignTenantMemberClinicCommandHandler CreateAssignHandler()
         => new(_tenantContext.Object, _permissions.Object, _userTenantRepo.Object,
-               _clinicsRead.Object, _userClinics.Object, _uow.Object, TimeProvider.System);
+               _clinicsRead.Object, _userClinics.Object, _cache.Object, _uow.Object, TimeProvider.System);
 
     private RemoveTenantMemberClinicCommandHandler CreateRemoveHandler()
         => new(_tenantContext.Object, _clientContext.Object, _permissions.Object, _userTenantRepo.Object,
-               _clinicsRead.Object, _userClinics.Object, _uow.Object);
+               _clinicsRead.Object, _userClinics.Object, _cache.Object, _uow.Object);
 
     private static Clinic BuildClinic(Guid id, Guid tenantId, string name = "Merkez Klinik", bool active = true)
     {
@@ -176,6 +177,7 @@ public sealed class TenantMemberClinicAssignmentHandlersTests
             It.Is<UserClinic>(e => e.UserId == mid && e.ClinicId == cid),
             It.IsAny<CancellationToken>()), Times.Once);
         _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _cache.Verify(x => x.InvalidateUser(mid), Times.Once);
     }
 
     [Fact]
@@ -198,6 +200,7 @@ public sealed class TenantMemberClinicAssignmentHandlersTests
 
         _userClinics.Verify(x => x.AddAsync(It.IsAny<UserClinic>(), It.IsAny<CancellationToken>()), Times.Never);
         _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+        _cache.Verify(x => x.InvalidateUser(It.IsAny<Guid>()), Times.Never);
     }
 
     // -------------------------------------------------------------------
@@ -328,6 +331,7 @@ public sealed class TenantMemberClinicAssignmentHandlersTests
 
         _userClinics.Verify(x => x.RemoveAsync(mid, cid, It.IsAny<CancellationToken>()), Times.Once);
         _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _cache.Verify(x => x.InvalidateUser(mid), Times.Once);
     }
 
     [Fact]
@@ -376,5 +380,6 @@ public sealed class TenantMemberClinicAssignmentHandlersTests
 
         _userClinics.Verify(x => x.RemoveAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
         _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+        _cache.Verify(x => x.InvalidateUser(It.IsAny<Guid>()), Times.Never);
     }
 }

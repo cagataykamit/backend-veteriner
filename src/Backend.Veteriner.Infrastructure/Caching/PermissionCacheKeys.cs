@@ -7,4 +7,6 @@ namespace Backend.Veteriner.Infrastructure.Caching;
 internal static class PermissionCacheKeys
 {
     public static string UserPermissions(Guid userId) => $"user:perms:{userId}";
+
+    public static string UserPermissionChangeStamp(Guid userId) => $"user:perms-changed:{userId}";
 }
