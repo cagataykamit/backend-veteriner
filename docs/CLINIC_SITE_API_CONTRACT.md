@@ -194,6 +194,8 @@ Yanıtta her alan bulunur, duruma uymayanlar `null` olur. `slug` istekteki adres
 
 **Randevu (K11):** kapalıysa `isEnabled=false` ve kod boş; düğme `clinic.phone`'a döner. Açıksa düğme ADR-042 talep akışına gider
 (`bookingUrl`, ONLINE_APPOINTMENT_API_CONTRACT.md §5). Kod site üzerinden görünür; koruma kod doğrulama ve hız sınırına dayanır.
+En yakın müsait saatler ayrı uçtadır: `GET /api/v1/public/sites/{slug}/next-available-slots` (TIER-017,
+ONLINE_APPOINTMENT_API_CONTRACT.md §12); site JSON'u değişmedi.
 
 **Klinik alanları (K8)** okuma anında klinik kaydından gelir: klinik kaydı değişince yeniden yayın gerekmez.
 
@@ -228,7 +230,7 @@ Motor başvuruyu çözer: `site-image:{id}` → `/api/v1/public/sites/{slug}/ima
 | 409 | `ClinicSites.ImageInUse` | `usedIn` |
 | 409 | `ClinicSites.ClinicInactive` | Pasif klinikte yayın |
 | 413, 415, 409, 503 | `Files.*` | §5 |
-| 429 | `RateLimit.Exceeded` | `public-site`, `public-site-image` |
+| 429 | `RateLimit.Exceeded` | `public-site` (en yakın saat ucu dahil), `public-site-image` |
 
 ## 8. Migration
 
