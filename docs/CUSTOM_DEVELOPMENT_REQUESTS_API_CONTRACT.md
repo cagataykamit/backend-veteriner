@@ -35,7 +35,7 @@ Received (Alındı) → InReview (İnceleniyor) → Planned (Planlandı) → Com
 | `Planned → Completed` | |
 | Diğer her şey | 409 `CustomDevelopment.InvalidStatusTransition`; kapanmış talep (`OutOfScope`, `Completed`) değişmez |
 
-`responseNote` her geçişte isteğe bağlıdır (en çok 1000), kliniğe görünür; boş gelirse önceki not kalır. Kural tek yerde: `CustomDevelopmentRequest.ChangeStatus`.
+`responseNote` her geçişte isteğe bağlıdır (en çok 1000), kliniğe görünür; boş gelirse önceki not kalır. Kural tek yerde: `CustomDevelopmentRequest.NextStatuses` ve `ChangeStatus`.
 
 **Açık talep** = `Received`, `InReview`, `Planned` (`CustomDevelopmentRequest.OpenStatuses`).
 
@@ -86,7 +86,7 @@ Politika `PlatformAdmin` (JWT'de `platform_admin = true`), `[PlatformTenantScope
 | `GET /?status=&openOnly=false&page=1&pageSize=50` | 200 `PagedResult<AdminCustomDevelopmentRequestDto>`; `status` tek durum, `openOnly=true` yalnız açıklar; `pageSize` en çok 200; sıra açılış zamanı azalan |
 | `POST /{id}/status` | 200 `AdminCustomDevelopmentRequestDto` |
 
-`AdminCustomDevelopmentRequestDto`: `{ "tenantId": "…", "tenantName": "…", "request": CustomDevelopmentRequestDto }`.
+`AdminCustomDevelopmentRequestDto`: `{ "tenantId": "…", "tenantName": "…", "request": CustomDevelopmentRequestDto, "nextStatuses": ["Planned", "OutOfScope"] }`. `nextStatuses` geçerli sonraki durumlardır (`CustomDevelopmentRequest.NextStatuses`, §2 tablosunun tek yeri); kapanmış talepte boş. Panel akışı kopyalamaz, düğmeleri buradan çizer.
 
 `POST /{id}/status` gövdesi: `{ "status": "OutOfScope", "decisionReason": "…", "responseNote": "…" }`. Hatalar: `CustomDevelopment.NotFound` (404), `CustomDevelopment.InvalidStatusTransition` (409), `CustomDevelopment.Validation` (400), `CustomDevelopment.ConcurrencyConflict` (409; `MutationSequence` belirteci). Destek işlemidir: kiracının abonelik yazma kapısına takılmaz (`IIgnoreTenantWriteSubscriptionGuard`).
 

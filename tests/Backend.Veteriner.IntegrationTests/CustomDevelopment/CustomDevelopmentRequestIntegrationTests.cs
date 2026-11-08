@@ -241,6 +241,7 @@ public sealed class CustomDevelopmentRequestIntegrationTests : IClassFixture<Cus
         var rowA = rows.Single(r => r.GetProperty("request").GetProperty("id").GetGuid() == idA);
         rowA.GetProperty("tenantId").GetGuid().Should().Be(a.TenantId);
         rowA.GetProperty("tenantName").GetString().Should().Be(a.TenantName);
+        rowA.GetProperty("nextStatuses").EnumerateArray().Select(s => s.GetString()).Should().Equal("InReview");
         rows.Should().Contain(r => r.GetProperty("request").GetProperty("id").GetGuid() == idB);
 
         // Akış dışı geçiş ve gerekçesiz kapsam dışı reddedilir.
@@ -249,6 +250,7 @@ public sealed class CustomDevelopmentRequestIntegrationTests : IClassFixture<Cus
         await ShouldFailAsync(await ChangeStatusAsync(admin, idA, "OutOfScope"), HttpStatusCode.BadRequest, CustomDevelopmentRequest.ValidationCode);
         var changed = await OkJsonAsync(await ChangeStatusAsync(admin, idA, "OutOfScope", $"Muhasebe programı işi {SecretText}"));
         changed.GetProperty("request").GetProperty("status").GetString().Should().Be("OutOfScope");
+        changed.GetProperty("nextStatuses").GetArrayLength().Should().Be(0, "kapanmış talep değişmez");
         await ShouldFailAsync(await ChangeStatusAsync(admin, Guid.NewGuid(), "InReview"), HttpStatusCode.NotFound, "CustomDevelopment.NotFound");
 
         var byStatus = await OkJsonAsync(await SendAsync(HttpMethod.Get, $"{AdminUrl}?status=OutOfScope&pageSize=200", admin));

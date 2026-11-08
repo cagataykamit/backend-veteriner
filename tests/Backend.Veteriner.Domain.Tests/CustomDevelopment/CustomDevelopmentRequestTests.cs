@@ -104,6 +104,15 @@ public sealed class CustomDevelopmentRequestTests
     }
 
     [Fact]
+    public void NextStatuses_Should_Be_Empty_For_Closed_Requests()
+    {
+        CustomDevelopmentRequest.NextStatuses(CustomDevelopmentRequestStatus.InReview)
+            .Should().Equal(CustomDevelopmentRequestStatus.Planned, CustomDevelopmentRequestStatus.OutOfScope);
+        CustomDevelopmentRequest.NextStatuses(CustomDevelopmentRequestStatus.OutOfScope).Should().BeEmpty();
+        CustomDevelopmentRequest.NextStatuses(CustomDevelopmentRequestStatus.Completed).Should().BeEmpty();
+    }
+
+    [Fact]
     public void OutOfScope_Should_Require_Reason_And_Close_Request()
     {
         var request = InStatus(CustomDevelopmentRequestStatus.InReview);

@@ -11,8 +11,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.CustomDevelopment;
 
-/// <summary>Platform yöneticisi satırı: talep ve sahibi kiracı.</summary>
-public sealed record AdminCustomDevelopmentRequestDto(Guid TenantId, string TenantName, CustomDevelopmentRequestDto Request);
+/// <summary>Platform yöneticisi satırı: talep, sahibi kiracı ve geçerli sonraki durumlar (akış domain'de, kapanmış talepte boş).</summary>
+public sealed record AdminCustomDevelopmentRequestDto(
+    Guid TenantId,
+    string TenantName,
+    CustomDevelopmentRequestDto Request,
+    IReadOnlyList<string> NextStatuses);
 
 /// <summary>
 /// GET /api/v1/admin/custom-development-requests (yalnız platform yöneticisi, kiracılar arası). Yeniden eskiye; <c>status</c> verilirse
@@ -98,7 +102,9 @@ internal static class CustomDevelopmentAdminRules
             : (await tenants.ListAsync(new CustomDevelopmentTenantNamesSpec(tenantIds), ct)).ToDictionary(t => t.Id, t => t.Name);
         var dtos = await CustomDevelopmentRequestRules.ToDtosAsync(users, requests, ct);
 
-        return requests.Select((r, i) => new AdminCustomDevelopmentRequestDto(r.TenantId, names.GetValueOrDefault(r.TenantId) ?? "", dtos[i]))
+        return requests.Select((r, i) => new AdminCustomDevelopmentRequestDto(
+                r.TenantId, names.GetValueOrDefault(r.TenantId) ?? "", dtos[i],
+                CustomDevelopmentRequest.NextStatuses(r.Status).Select(s => s.ToString()).ToList()))
             .ToList();
     }
 }

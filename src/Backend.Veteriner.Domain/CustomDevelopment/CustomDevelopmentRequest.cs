@@ -141,14 +141,7 @@ public sealed class CustomDevelopmentRequest : ITenantOwned
         if (userId == Guid.Empty)
             return Result.Failure(ValidationCode, "Kullanıcı geçersiz.");
 
-        var allowed = (Status, target) switch
-        {
-            (CustomDevelopmentRequestStatus.Received, CustomDevelopmentRequestStatus.InReview) => true,
-            (CustomDevelopmentRequestStatus.InReview, CustomDevelopmentRequestStatus.Planned or CustomDevelopmentRequestStatus.OutOfScope) => true,
-            (CustomDevelopmentRequestStatus.Planned, CustomDevelopmentRequestStatus.Completed) => true,
-            _ => false,
-        };
-        if (!allowed)
+        if (!NextStatuses(Status).Contains(target))
             return Result.Failure("CustomDevelopment.InvalidStatusTransition", $"Talep {Status} durumundan {target} durumuna geçemez.");
 
         var reason = string.IsNullOrWhiteSpace(decisionReason) ? null : decisionReason.Trim();
@@ -173,6 +166,16 @@ public sealed class CustomDevelopmentRequest : ITenantOwned
         MutationSequence++;
         return Result.Success();
     }
+
+    /// <summary>Durum akışının tek yeri; platform ekranı geçerli sonraki durumları buradan alır. Kapanmış talepte boş.</summary>
+    public static IReadOnlyList<CustomDevelopmentRequestStatus> NextStatuses(CustomDevelopmentRequestStatus from)
+        => from switch
+        {
+            CustomDevelopmentRequestStatus.Received => [CustomDevelopmentRequestStatus.InReview],
+            CustomDevelopmentRequestStatus.InReview => [CustomDevelopmentRequestStatus.Planned, CustomDevelopmentRequestStatus.OutOfScope],
+            CustomDevelopmentRequestStatus.Planned => [CustomDevelopmentRequestStatus.Completed],
+            _ => [],
+        };
 
     private static Result<CustomDevelopmentRequest> Invalid(string message)
         => Result<CustomDevelopmentRequest>.Failure(ValidationCode, message);
