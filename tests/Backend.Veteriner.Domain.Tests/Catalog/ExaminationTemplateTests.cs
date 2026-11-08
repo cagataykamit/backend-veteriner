@@ -156,4 +156,58 @@ public sealed class ExaminationTemplateTests
         ExaminationTemplate.CheckLineProduct(service).IsSuccess.Should().BeTrue();
         ExaminationTemplate.CheckLineProduct(narcotic).IsSuccess.Should().BeTrue();
     }
+
+    [Fact]
+    public void SelectLinesForApply_Should_Return_All_Lines_When_No_Selection()
+    {
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+        var template = Tenant(lines: [new ExaminationTemplateLineDraft(a, 1m), new ExaminationTemplateLineDraft(b, 2m)]);
+
+        template.SelectLinesForApply(null).Value!.Should().Equal(
+            new ExaminationTemplateLineDraft(a, 1m), new ExaminationTemplateLineDraft(b, 2m));
+    }
+
+    [Fact]
+    public void SelectLinesForApply_Should_Keep_Template_Order_Exclude_Missing_And_Use_Given_Quantity()
+    {
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+        var c = Guid.NewGuid();
+        var template = Tenant(lines:
+            [new ExaminationTemplateLineDraft(a, 1m), new ExaminationTemplateLineDraft(b, 2m), new ExaminationTemplateLineDraft(c, 3m)]);
+
+        var selected = template.SelectLinesForApply(
+            [new ExaminationTemplateLineDraft(c, 0.5m), new ExaminationTemplateLineDraft(a, 4m)]);
+
+        selected.Value!.Should().Equal(new ExaminationTemplateLineDraft(a, 4m), new ExaminationTemplateLineDraft(c, 0.5m));
+        template.Lines.Select(l => l.Quantity).Should().Equal(1m, 2m, 3m);
+        template.SelectLinesForApply([]).Value!.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(0.0001)]
+    [InlineData(100001)]
+    public void SelectLinesForApply_Should_Reject_Invalid_Quantity(decimal quantity)
+    {
+        var a = Guid.NewGuid();
+        var template = Tenant(lines: [new ExaminationTemplateLineDraft(a, 1m)]);
+
+        template.SelectLinesForApply([new ExaminationTemplateLineDraft(a, quantity)]).Error.Code
+            .Should().Be(ExaminationTemplate.ValidationCode);
+    }
+
+    [Fact]
+    public void SelectLinesForApply_Should_Reject_Unknown_And_Duplicate_Product()
+    {
+        var a = Guid.NewGuid();
+        var template = Tenant(lines: [new ExaminationTemplateLineDraft(a, 1m)]);
+
+        template.SelectLinesForApply([new ExaminationTemplateLineDraft(Guid.NewGuid(), 1m)]).Error.Code
+            .Should().Be("ExaminationTemplates.LineNotInTemplate");
+        template.SelectLinesForApply([new ExaminationTemplateLineDraft(a, 1m), new ExaminationTemplateLineDraft(a, 2m)]).Error.Code
+            .Should().Be(ExaminationTemplate.ValidationCode);
+    }
 }

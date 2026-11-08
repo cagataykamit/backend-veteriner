@@ -173,7 +173,7 @@ public sealed class ExaminationsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new ApplyExaminationTemplateCommand(id, body.TemplateId, body.RowVersion), ct);
+        var result = await _mediator.Send(new ApplyExaminationTemplateCommand(id, body.TemplateId, body.RowVersion, body.Lines), ct);
         return result.ToActionResult(this);
     }
 

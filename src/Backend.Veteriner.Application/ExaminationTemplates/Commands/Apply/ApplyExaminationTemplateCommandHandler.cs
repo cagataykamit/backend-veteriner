@@ -98,7 +98,12 @@ public sealed class ApplyExaminationTemplateCommandHandler
         if (!prefill.IsSuccess)
             return Fail(prefill.Error);
 
-        var lines = template.Lines.OrderBy(l => l.SortOrder).ToList();
+        var selected = template.SelectLinesForApply(
+            request.Lines?.Select(l => new ExaminationTemplateLineDraft(l.ProductId, l.Quantity)).ToList());
+        if (!selected.IsSuccess)
+            return Fail(selected.Error);
+
+        var lines = selected.Value!;
         var products = await ExaminationTemplateLineResolver.ResolveAsync(
             _products, tenantId, lines.Select(l => l.ProductId).ToList(), ct);
         if (!products.IsSuccess)
@@ -118,8 +123,10 @@ public sealed class ApplyExaminationTemplateCommandHandler
         }
 
         // Fiyatlı paket (EXAM-007): önce tek paket kalemi; stoklu satırlar ona bağlanır, hizmet satırları ayrı kalem doğurmaz.
+        // Satır hariç tutulsa ya da miktarı değişse de fiyat sabittir (EXAM-013; gerekirse ücrete çevirirken düzenlenir).
+        // Hiç satır uygulanmıyorsa (yalnız metin) paket kalemi de doğmaz.
         Guid? packageSuggestionId = null;
-        if (template.PackagePrice.HasValue)
+        if (template.PackagePrice.HasValue && lines.Count > 0)
         {
             var package = ChargeSuggestion.ForExaminationPackage(examination, template, nowUtc);
             if (!package.IsSuccess)
@@ -176,6 +183,9 @@ public sealed class ApplyExaminationTemplateCommandHandler
 
             services.Add(new AppliedServiceLineDto(product.Id, product.Name, product.Unit, line.Quantity, suggestionId, packageSuggestionId.HasValue));
         }
+
+        // Son stoklu satırdan sonra eklenen hizmet ve paket kalemleri burada kaydedilir (yalnız hizmet içeren seçimde de).
+        await _chargeSuggestions.SaveChangesAsync(ct);
 
         var text = prefill.Value!;
         return Result<ExaminationTemplateApplyResultDto>.Success(new ExaminationTemplateApplyResultDto(
