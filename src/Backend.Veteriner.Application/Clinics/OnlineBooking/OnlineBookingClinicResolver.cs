@@ -19,6 +19,9 @@ public sealed record OnlineBookingScope(Guid TenantId, Guid ClinicId, Clinic Cli
 /// </summary>
 public sealed class OnlineBookingClinicResolver
 {
+    public const string NotFoundCode = "OnlineBooking.NotFound";
+    public const string NotFoundMessage = "Online randevu sayfası bulunamadı.";
+
     private readonly IReadRepository<ClinicOnlineBookingSettings> _settings;
     private readonly IReadRepository<Clinic> _clinics;
     private readonly IReadRepository<Tenant> _tenants;
@@ -101,5 +104,5 @@ public sealed class OnlineBookingClinicResolver
     }
 
     private static Result<OnlineBookingScope> NotFound()
-        => Result<OnlineBookingScope>.Failure("OnlineBooking.NotFound", "Online randevu sayfası bulunamadı.");
+        => Result<OnlineBookingScope>.Failure(NotFoundCode, NotFoundMessage);
 }

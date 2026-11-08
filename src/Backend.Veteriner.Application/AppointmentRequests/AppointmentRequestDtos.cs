@@ -9,7 +9,10 @@ namespace Backend.Veteriner.Application.AppointmentRequests;
 /// </summary>
 public sealed record OnlineBookingReasonDto(Guid? Id, string Name, int DurationMinutes, bool RequiresNote);
 
-/// <summary>Bağlantı/portal talep sayfası: klinik iletişim bilgisi, talep sınırları ve nedenler.</summary>
+/// <summary>
+/// Bağlantı/portal talep sayfası: klinik iletişim bilgisi, talep sınırları ve nedenler. <see cref="Branding"/> yalnız kliniğe özel
+/// bağlantıda dolar (APPT-022); portal ucunda <c>null</c>.
+/// </summary>
 public sealed record OnlineBookingPageDto(
     string ClinicName,
     string ClinicCity,
@@ -18,7 +21,14 @@ public sealed record OnlineBookingPageDto(
     int MinLeadMinutes,
     int MaxAdvanceDays,
     int MaxPendingRequests,
-    IReadOnlyList<OnlineBookingReasonDto> Reasons);
+    IReadOnlyList<OnlineBookingReasonDto> Reasons,
+    OnlineBookingBrandingDto? Branding = null);
+
+/// <summary>
+/// Bağlantı sayfasının markası, kliniğin yayındaki sitesinden (APPT-022). <see cref="AccentColor"/> <c>#rrggbb</c> ya da boş;
+/// <see cref="HasLogo"/> doğruysa logo <c>GET …/booking/{kod}/logo</c> ucundadır.
+/// </summary>
+public sealed record OnlineBookingBrandingDto(string? AccentColor, bool HasLogo);
 
 /// <summary>Talep oluşturma yanıtı; talep kesin randevu değildir.</summary>
 /// <remarks>Portal ve bağlantı yüzeyinde <c>status</c> metindir (portal sözleşmesi §1, §13.4).</remarks>
