@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Domain.AppointmentRequests;
+using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Notifications;
 using Backend.Veteriner.Domain.OwnerPortal;
 
@@ -41,6 +42,9 @@ public interface IUserNotificationPublisher
 
     /// <summary>Portaldan KVKK veri talebi geldi (PORTAL-007/009): kliniğe erişen portal yönetim yetkisi olanlara.</summary>
     Task PortalDataRequestCreatedAsync(OwnerDataRequest request, string clientName, CancellationToken ct);
+
+    /// <summary>Sahip randevuyu hatırlatma bağlantısından iptal etti (TIER-019): kliniğe erişen randevu iptal yetkisi olanlara.</summary>
+    Task AppointmentCancelledByOwnerAsync(Appointment appointment, string petName, CancellationToken ct);
 }
 
 public sealed class UserNotificationPublisher : IUserNotificationPublisher
@@ -123,6 +127,30 @@ public sealed class UserNotificationPublisher : IUserNotificationPublisher
                 $"{OwnerPortal.OwnerPortalEmails.DataRequestTypeLabel(request.Type)} · son yanıt {FormatLocal(request.DueAtUtc)}",
                 PortalDataRequestTarget,
                 request.Id,
+                utcNow), ct);
+        }
+    }
+
+    public async Task AppointmentCancelledByOwnerAsync(Appointment appointment, string petName, CancellationToken ct)
+    {
+        var userIds = await _recipients.ListAsync(
+            appointment.TenantId,
+            appointment.ClinicId,
+            PermissionCatalog.Appointments.Cancel,
+            TenantWideClaimNames.All,
+            ct);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        foreach (var userId in userIds)
+        {
+            await _notifications.AddAsync(UserNotification.Create(
+                appointment.TenantId,
+                appointment.ClinicId,
+                userId,
+                UserNotificationType.AppointmentCancelledByOwner,
+                $"Sahip randevuyu iptal etti: {petName}",
+                $"{FormatLocal(appointment.ScheduledAtUtc)} · e-postadaki bağlantıdan",
+                AppointmentTarget,
+                appointment.Id,
                 utcNow), ct);
         }
     }

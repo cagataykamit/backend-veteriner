@@ -191,7 +191,8 @@ public static class ResultExtensions
 
         // Portal veri talebi, gelen kutusu, klinik portal ayarı ve WhatsApp bağlantısı (PORTAL-007/009/010): durum çakışması.
         // Push cihaz kaydı (MOBILE-003): hesabın push tercihi kapalı.
-        if (normalized is "portal.push.disabled")
+        // Hatırlatma bağlantısı (TIER-019): klinik bağlantıdan iptali kapattı.
+        if (normalized is "portal.push.disabled" or "appointmentlinks.canceldisabled")
         {
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }

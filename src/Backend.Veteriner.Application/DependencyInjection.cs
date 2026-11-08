@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.AppointmentRequests.Staff;
 using Backend.Veteriner.Application.Appointments;
 using Backend.Veteriner.Application.Notifications;
 using Backend.Veteriner.Application.Appointments.Availability;
+using Backend.Veteriner.Application.Appointments.OwnerLinks;
 using Backend.Veteriner.Application.Clinics.OnlineBooking;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.ClinicSites;
@@ -67,6 +68,9 @@ public static class DependencyInjection
         services.AddScoped<AppointmentAssignment>();
         services.AddScoped<AppointmentAvailabilityService>();
         services.AddScoped<OnlineBookingClinicResolver>();
+        services.AddScoped<AppointmentOwnerLinkIssuer>();
+        services.AddScoped<AppointmentOwnerLinkResolver>();
+        services.AddScoped<AppointmentOwnerLinkActions>();
         services.AddScoped<ClinicSiteAddressBook>();
         services.AddScoped<ClinicSiteImageContentReader>();
         services.AddScoped<PublicSiteResolver>();

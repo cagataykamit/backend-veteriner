@@ -63,6 +63,7 @@ public sealed class AutomatedReminderRulesProcessorTests : IAsyncLifetime
             db,
             IntegrationTestDbContexts.TenantScopeOf(db),
             _email,
+            TestAppointmentOwnerLinks.Issuer(),
             Options.Create(new ReminderProcessorOptions { Enabled = true, IntervalMinutes = 5, BatchSize = 100, WindowToleranceMinutes = 10 }),
             NullLogger<ReminderProcessorService>.Instance,
             TimeProvider.System);

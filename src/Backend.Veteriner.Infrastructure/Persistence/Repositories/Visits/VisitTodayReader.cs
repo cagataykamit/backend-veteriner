@@ -105,7 +105,8 @@ public sealed class VisitTodayReader : IVisitTodayReader
                     v.PreparedExaminationTemplateId,
                     v.PreparedExaminationTemplateId != null
                         ? _db.ExaminationTemplates.Where(t => t.Id == v.PreparedExaminationTemplateId).Select(t => t.Name).FirstOrDefault()
-                        : null))
+                        : null,
+                    a != null ? a.OwnerConfirmedAtUtc : null))
             .Take(request.MaxItems + 1)
             .ToListAsync(ct);
     }
@@ -154,7 +155,8 @@ public sealed class VisitTodayReader : IVisitTodayReader
                         : null,
                     null,
                     null,
-                    null))
+                    null,
+                    a.OwnerConfirmedAtUtc))
             .Take(request.MaxItems + 1)
             .ToListAsync(ct);
     }
@@ -247,7 +249,8 @@ public sealed class VisitTodayReader : IVisitTodayReader
         string? AppointmentReasonName,
         string? ArrivalReason,
         Guid? PreparedExaminationTemplateId,
-        string? PreparedExaminationTemplateName)
+        string? PreparedExaminationTemplateName,
+        DateTime? OwnerConfirmedAtUtc)
     {
         /// <summary>Satırı tekil tanımlar: Visit satırı Visit kimliğiyle, planlı satır randevu kimliğiyle.</summary>
         public string Key => VisitId.HasValue ? $"v:{VisitId}" : $"a:{AppointmentId}";
@@ -281,6 +284,7 @@ public sealed class VisitTodayReader : IVisitTodayReader
                 ArrivalReason = ArrivalReason,
                 PreparedExaminationTemplateId = PreparedExaminationTemplateId,
                 PreparedExaminationTemplateName = PreparedExaminationTemplateName,
+                OwnerConfirmedAtUtc = OwnerConfirmedAtUtc,
             };
     }
 }

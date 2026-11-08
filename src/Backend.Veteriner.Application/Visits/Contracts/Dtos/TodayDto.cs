@@ -63,6 +63,9 @@ public sealed record TodayItemDto(
     public Guid? PreparedExaminationTemplateId { get; init; }
 
     public string? PreparedExaminationTemplateName { get; init; }
+
+    /// <summary>Sahip hatırlatma bağlantısıyla geleceğini onayladı (TIER-019); randevusuz satırda null. Durumu değiştirmez.</summary>
+    public DateTime? OwnerConfirmedAtUtc { get; init; }
 }
 
 public sealed record TodayHospitalizationDto(
