@@ -13,6 +13,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu backlog `TIER-001`, A
 | `OwnerPortal` | yok | var | var |
 | `PortalAppointmentRequests` | yok | var | var |
 | `MultiClinic` | yok | yok | var |
+| `Waitlist` (TIER-018, `WAITLIST_API_CONTRACT.md`) | yok | var | var |
 
 | Konu | Kural |
 |---|---|
