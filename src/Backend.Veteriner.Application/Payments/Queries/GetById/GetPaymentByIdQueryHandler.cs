@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.CashRegisters;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -6,6 +7,7 @@ using Backend.Veteriner.Application.Payments.Contracts.Dtos;
 using Backend.Veteriner.Application.Payments.ReadModels;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
+using Backend.Veteriner.Domain.CashRegisters;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
@@ -27,6 +29,7 @@ public sealed class GetPaymentByIdQueryHandler
     private readonly IReadRepository<Payment> _payments;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
+    private readonly IReadRepository<CashRegister>? _registers;
     private readonly IPaymentGetByIdReadModelReader _getByIdReadModelReader;
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly ILogger<GetPaymentByIdQueryHandler>? _logger;
@@ -44,7 +47,8 @@ public sealed class GetPaymentByIdQueryHandler
         IPaymentGetByIdReadModelReader getByIdReadModelReader,
         IOptions<QueryReadModelsOptions> queryReadModelsOptions,
         ILogger<GetPaymentByIdQueryHandler>? logger = null,
-        IPaymentPetCountReader? petCountReader = null)
+        IPaymentPetCountReader? petCountReader = null,
+        IReadRepository<CashRegister>? registers = null)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -54,6 +58,7 @@ public sealed class GetPaymentByIdQueryHandler
         _payments = payments;
         _pets = pets;
         _clients = clients;
+        _registers = registers;
         _getByIdReadModelReader = getByIdReadModelReader;
         _queryReadModelsOptions = queryReadModelsOptions.Value;
         _logger = logger;
@@ -136,6 +141,11 @@ public sealed class GetPaymentByIdQueryHandler
             petCount = PaymentPetCount.Resolve(p.PetId, counts.GetValueOrDefault(p.Id));
         }
 
+        var register = _registers is null
+            ? null
+            : (await CashRegisterRules.LoadForPaymentsAsync(_registers, tenantId, [(p.Id, p.ClinicId, p.Method, p.CashRegisterId)], ct))
+                .GetValueOrDefault(p.Id);
+
         var dto = new PaymentDetailDto(
             p.Id,
             p.TenantId,
@@ -154,7 +164,9 @@ public sealed class GetPaymentByIdQueryHandler
             p.AllocatedAmount,
             p.UnallocatedAmount,
             petCount,
-            p.CreditedAmount);
+            p.CreditedAmount,
+            register?.Id,
+            register?.Name);
         return Result<PaymentDetailDto>.Success(dto);
     }
 

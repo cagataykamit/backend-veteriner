@@ -10,4 +10,5 @@ public sealed record PaymentListRow(
     decimal Amount,
     string Currency,
     PaymentMethod Method,
-    DateTime PaidAtUtc);
+    DateTime PaidAtUtc,
+    Guid? CashRegisterId = null);

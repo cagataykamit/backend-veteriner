@@ -62,6 +62,7 @@ public sealed class PaymentsListFilteredPagedSpec : Specification<Payment, Payme
             p.Amount,
             p.Currency,
             p.Method,
-            p.PaidAtUtc));
+            p.PaidAtUtc,
+            p.CashRegisterId));
     }
 }

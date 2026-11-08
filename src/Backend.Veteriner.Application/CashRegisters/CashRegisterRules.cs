@@ -58,6 +58,18 @@ public sealed class CashRegistersByClinicSpec : Specification<CashRegister>
     }
 }
 
+public sealed class CashRegistersByClinicsSpec : Specification<CashRegister>
+{
+    public CashRegistersByClinicsSpec(Guid tenantId, IReadOnlyCollection<Guid> clinicIds)
+    {
+        Query.AsNoTracking();
+        Query.Where(r => r.TenantId == tenantId && clinicIds.Contains(r.ClinicId));
+    }
+}
+
+/// <summary>Nakit ödemenin kasası; <c>Id</c> boşsa klinikte henüz Ana kasa kaydı yoktur.</summary>
+public sealed record PaymentCashRegister(Guid? Id, string Name);
+
 public sealed class CashRegisterByIdSpec : Specification<CashRegister>
 {
     public CashRegisterByIdSpec(Guid tenantId, Guid id) => Query.Where(r => r.TenantId == tenantId && r.Id == id);
@@ -232,6 +244,30 @@ internal static class CashRegisterRules
         var cash = await cashEvents.SumAsync(filter, ct);
         var amounts = await movements.ListAsync(new CashMovementAmountsSpec(tenantId, clinicId, register?.Id, from, to), ct);
         return CashRegisterTotalsDto.From(cash.NetAmount, amounts);
+    }
+
+    /// <summary>
+    /// Nakit ödemelerin kasası (ödeme kimliğine göre; nakit dışı ödeme yer almaz): kayıtlı kasa, boşsa kliniğin Ana kasası. Tek toplu sorgu.
+    /// </summary>
+    public static async Task<IReadOnlyDictionary<Guid, PaymentCashRegister>> LoadForPaymentsAsync(
+        IReadRepositoryBase<CashRegister> registers,
+        Guid tenantId,
+        IEnumerable<(Guid Id, Guid ClinicId, Domain.Payments.PaymentMethod Method, Guid? CashRegisterId)> payments,
+        CancellationToken ct)
+    {
+        var cash = payments.Where(p => p.Method == Domain.Payments.PaymentMethod.Cash).ToList();
+        if (cash.Count == 0)
+            return new Dictionary<Guid, PaymentCashRegister>();
+
+        var clinicRegisters = await registers.ListAsync(
+            new CashRegistersByClinicsSpec(tenantId, cash.Select(p => p.ClinicId).Distinct().ToArray()), ct);
+        var byId = clinicRegisters.ToDictionary(r => r.Id);
+        var mainByClinic = clinicRegisters.Where(r => r.IsMain).ToDictionary(r => r.ClinicId);
+
+        return cash.DistinctBy(p => p.Id).ToDictionary(p => p.Id, p =>
+            (p.CashRegisterId is { } id && byId.TryGetValue(id, out var register)) || mainByClinic.TryGetValue(p.ClinicId, out register)
+                ? new PaymentCashRegister(register.Id, register.Name)
+                : new PaymentCashRegister(null, CashRegister.MainName));
     }
 
     public static Error MovementNotFound() => new("CashMovements.NotFound", "Kasa hareketi bulunamadı.");
