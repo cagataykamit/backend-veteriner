@@ -131,7 +131,7 @@ public sealed partial class DailyTransactionsReportIntegrationTests : IClassFixt
         var receivedB = report.Items.Single(i => i.Kind == DailyTransactionKind.Payment && i.ReferenceId == payB);
         receivedB.IsVoided.Should().BeTrue();
         receivedB.PerformedByUserId.Should().Be(env.UserId);
-        receivedB.PerformedByName.Should().NotBeNullOrEmpty();
+        receivedB.PerformedByName.Should().StartWith("dtr-user-").And.NotContain("@", "görünen ad yoksa e-postanın @ öncesi (kasa raporuyla aynı kural)");
         report.Items.Single(i => i.ReferenceId == payA && i.Kind == DailyTransactionKind.Payment).IsVoided.Should().BeFalse();
         var first = report.Items.First();
         first.ClientName.Should().Be("Aylin Acar");

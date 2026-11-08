@@ -87,7 +87,7 @@ Yanıt `DailyTransactionsReportResultDto`:
 | `isDirectSale` | bool | K-D6-3 |
 | `isVoided` | bool | Kaydın **şu anki** durumu iptal (ör. dünkü tahsilat bugün iptal edildiyse dünkü satırda `true`) |
 | `reason` | string? | İptal/düzeltme gerekçesi |
-| `performedByUserId`, `performedByName` | guid?, string? | K-D6-5; ad `DisplayName` yoksa e-posta |
+| `performedByUserId`, `performedByName` | guid?, string? | K-D6-5; ad `DisplayName`, yoksa e-postanın `@` öncesi (`UserDisplayName`; 2026-11-09 öncesi e-postanın tamamıydı). Kasa raporu ve kasa hareketleriyle aynı kural |
 | `clinicId` | guid | |
 
 Sıralama: `occurredAtUtc` artan, sonra `kind`, sonra `referenceId`. Örnek: 10:00 ücret 600 TL, 10:30 nakit tahsilat 600 TL, 16:00 yönetici tahsilatı iptal → döküm 3 satır; toplamlar `grossCharge 600, collected 600, voidedCollection 600, netCollected 0`; iptal satırı `reason` taşır.

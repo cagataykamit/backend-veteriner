@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Application.Reports.Registers.Examinations;
+using Backend.Veteriner.Application.Users.Common;
 using Backend.Veteriner.Domain.Examinations;
 using Microsoft.EntityFrameworkCore;
 
@@ -121,7 +122,8 @@ public sealed class ExaminationRegisterReader : IRegisterReader<ExaminationRegis
             ? []
             : await _db.Users.AsNoTracking()
                 .Where(u => veterinarianIds.Contains(u.Id))
-                .ToDictionaryAsync(u => u.Id, u => u.DisplayName ?? u.Email, ct);
+                .Select(u => new { u.Id, u.DisplayName, u.Email })
+                .ToDictionaryAsync(u => u.Id, u => UserDisplayName.Resolve(u.DisplayName, u.Email), ct);
 
         var items = rows.Select((r, i) => new ExaminationRegisterItemDto(
             request.Skip + i + 1,
