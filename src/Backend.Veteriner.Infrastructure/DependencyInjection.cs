@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Application.Payments.Queries;
 using Backend.Veteriner.Application.Pets.IntegrationEvents;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
+using Backend.Veteriner.Infrastructure.DataExports;
 using Backend.Veteriner.Infrastructure.AppointmentRequests;
 using Backend.Veteriner.Application.Notifications;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.Clinics;
@@ -414,6 +415,17 @@ public static class DependencyInjection
         services.Configure<ImportMaintenanceOptions>(configuration.GetSection(ImportMaintenanceOptions.SectionName));
         services.AddSingleton<ImportMaintenanceProcessor>();
         services.AddHostedService<ImportMaintenanceHostedService>();
+
+        // Tüm veri dışa aktarma (DATA_EXPORT_API_CONTRACT.md; iş kuyruğu = DataExportJobs, kira + süre dolumu bakımı).
+        services.Configure<DataExportWorkerOptions>(configuration.GetSection(DataExportWorkerOptions.SectionName));
+        services.AddScoped<DataExportPackageWriter>();
+        services.AddSingleton(sp => new DataExportProcessor(
+            sp.GetRequiredService<IServiceScopeFactory>(),
+            sp.GetRequiredService<IFileStorage>(),
+            sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<ILogger<DataExportProcessor>>(),
+            DataExportProcessor.NewWorkerId()));
+        services.AddHostedService<DataExportHostedService>();
 
         // ===== Dosya katmanı (IMAGING_API_CONTRACT.md): yerel disk deposu, imzalı URL, tarama yeri (v1'de yok), yarım yükleme temizliği =====
         services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));

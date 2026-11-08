@@ -309,6 +309,12 @@ public static class PermissionCatalog
         public const string Manage = "AppointmentRequests.Manage";
     }
 
+    /// <summary>Kiracının tüm verisini tek pakette dışa aktarma (veri taşınabilirliği; DATA_EXPORT_API_CONTRACT.md). Yalnız Admin ve Owner.</summary>
+    public static class DataExport
+    {
+        public const string Manage = "DataExport.Manage";
+    }
+
     public static class Admin
     {
         public const string Diagnostics = "Admin.Diagnostics";
@@ -482,6 +488,8 @@ public static class PermissionCatalog
         new(OwnerPortal.Manage, "Hasta sahibi portalı daveti gönderme/iptal etme, bağ durumunu görme ve erişimi kapatma yetkisi", "OwnerPortal"),
 
         new(AppointmentRequests.Manage, "Online randevu taleplerini görme, onaylama ve reddetme yetkisi", "AppointmentRequests"),
+
+        new(DataExport.Manage, "Kiracının tüm verisini dışa aktarma paketini isteme, durumunu görme ve indirme yetkisi", "DataExport"),
 
         new(Admin.Diagnostics, "Tanılama ve yönetim kontrollerine erişim yetkisi", "Diagnostics"),
 

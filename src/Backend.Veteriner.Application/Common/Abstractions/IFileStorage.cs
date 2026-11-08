@@ -1,7 +1,7 @@
 namespace Backend.Veteriner.Application.Common.Abstractions;
 
 /// <summary>
-/// Dosya içeriği deposu (IMAGING_API_CONTRACT.md §2). Anahtarı yalnız sunucu üretir (<c>StoredFile.BuildStorageKey</c>);
+/// Dosya içeriği deposu (IMAGING_API_CONTRACT.md §2). Anahtarı yalnız sunucu üretir (<c>StoredFile.BuildStorageKey</c>, <c>DataExportJob.BuildStorageKey</c>);
 /// uygulama anahtarı kök altında çözmeli, kök dışını reddetmeli ve var olan içeriği ezmemelidir. v1 uygulaması yerel disktir;
 /// buluta geçiş yalnız yeni bir uygulama ister. Depo yapılandırılmamış veya erişilemiyorsa
 /// <see cref="FileStorageUnavailableException"/> fırlatılır.

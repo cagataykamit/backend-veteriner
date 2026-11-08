@@ -1,4 +1,5 @@
 using Backend.Veteriner.Domain.Catalog;
+using Backend.Veteriner.Domain.DataExports;
 using Backend.Veteriner.Domain.DemoRequests;
 using Backend.Veteriner.Domain.AppointmentRequests;
 using Backend.Veteriner.Domain.Appointments;
@@ -175,6 +176,7 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<ReminderDispatchLog> ReminderDispatchLogs => Set<ReminderDispatchLog>();
     public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();
     public DbSet<ImportBatchRow> ImportBatchRows => Set<ImportBatchRow>();
+    public DbSet<DataExportJob> DataExportJobs => Set<DataExportJob>();
 
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<Product> Products => Set<Product>();
