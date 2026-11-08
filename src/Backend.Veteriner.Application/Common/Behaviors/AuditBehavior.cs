@@ -30,7 +30,11 @@ public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
         "PreviousToken",
 
         // KVKK veri talebi metni ve kliniğin yanıtı kişisel/sağlık bilgisi taşıyabilir (PORTAL-007); denetimde yalnız tür ve durum kalır.
-        "RequestText", "ResponseNote"
+        "RequestText", "ResponseNote",
+
+        // Özel geliştirme talebi (TIER-010): serbest metinler yanlışlıkla kişisel ya da hasta verisi taşıyabilir; denetimde yalnız tür,
+        // öncelik ve durum kalır. "RequestText" ve "ResponseNote" yukarıda.
+        "RequestTitle", "RequestTarget", "DecisionReason"
     };
 
     /// <summary>

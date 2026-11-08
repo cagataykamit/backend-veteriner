@@ -52,6 +52,12 @@ public static class PermissionCatalog
         public const string Manage = "ApiKeys.Manage";
     }
 
+    /// <summary>Size özel geliştirme talepleri (TIER-010): kiracının taleplerini listeleme ve yeni talep açma tek izinde.</summary>
+    public static class CustomDevelopmentRequests
+    {
+        public const string Manage = "CustomDevelopmentRequests.Manage";
+    }
+
     public static class Clinics
     {
         public const string Read = "Clinics.Read";
@@ -336,6 +342,8 @@ public static class PermissionCatalog
         new(Subscriptions.Manage, "Kiracı abonelik checkout/aktivasyon yönetimi yetkisi", "Subscriptions"),
 
         new(ApiKeys.Manage, "Dış API anahtarı oluşturma, listeleme ve iptal etme yetkisi", "ApiKeys"),
+
+        new(CustomDevelopmentRequests.Manage, "Size özel geliştirme taleplerini görüntüleme ve yeni talep açma yetkisi", "CustomDevelopmentRequests"),
 
         new(Clinics.Read, "Klinikleri listeleme ve görüntüleme yetkisi", "Clinics"),
         new(Clinics.Create, "Klinik oluşturma yetkisi", "Clinics"),
