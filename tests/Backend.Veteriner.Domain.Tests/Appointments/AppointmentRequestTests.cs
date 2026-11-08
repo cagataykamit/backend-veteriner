@@ -16,7 +16,7 @@ public sealed class AppointmentRequestTests
     private static AppointmentRequest NewLink(string phone = "05551234567", string? petName = "Pamuk", DateTime? start = null)
     {
         var result = AppointmentRequest.CreateFromLink(
-            TenantId, ClinicId, new PetText(petName, "Kedi", null), Reason, start ?? Start, " Ayşe ", " Ayse@Example.COM ", phone, null, Now);
+            TenantId, ClinicId, null, new PetText(petName, "Kedi", null), Reason, start ?? Start, " Ayşe ", " Ayse@Example.COM ", phone, null, Now);
         result.IsSuccess.Should().BeTrue(result.Error.Message);
         return result.Value!;
     }
@@ -39,12 +39,51 @@ public sealed class AppointmentRequestTests
     }
 
     [Theory]
+    [InlineData("site", AppointmentRequestChannel.ClinicSite)]
+    [InlineData(" SITE ", AppointmentRequestChannel.ClinicSite)]
+    [InlineData(null, AppointmentRequestChannel.ClinicLink)]
+    [InlineData("", AppointmentRequestChannel.ClinicLink)]
+    [InlineData("portal", AppointmentRequestChannel.ClinicLink)]
+    [InlineData("telefon", AppointmentRequestChannel.ClinicLink)]
+    [InlineData("veteriner-bul", AppointmentRequestChannel.ClinicLink)]
+    [InlineData("2", AppointmentRequestChannel.ClinicLink)]
+    [InlineData("https://example.com/kampanya", AppointmentRequestChannel.ClinicLink)]
+    public void CreateFromLink_Should_Accept_Only_Allowed_Channel_Token_Else_Clinic_Link(string? token, AppointmentRequestChannel expected)
+    {
+        var result = AppointmentRequest.CreateFromLink(
+            TenantId, ClinicId, token, new PetText("Pamuk", null, null), Reason, Start, "Ayşe", "a@example.com", "05551234567", null, Now);
+
+        result.IsSuccess.Should().BeTrue(result.Error.Message);
+        result.Value!.Channel.Should().Be(expected);
+        result.Value.Source.Should().Be(AppointmentRequestSource.Link);
+    }
+
+    [Fact]
+    public void CreateFromPortal_Should_Set_Owner_Portal_Channel()
+    {
+        var result = AppointmentRequest.CreateFromPortal(
+            TenantId, ClinicId, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, Reason, Start, "Ayşe", "a@example.com", null, null, Now);
+
+        result.Value!.Channel.Should().Be(AppointmentRequestChannel.OwnerPortal);
+    }
+
+    [Fact]
+    public void Channel_Numeric_Values_Should_Stay_Stable()
+    {
+        ((int)AppointmentRequestChannel.ClinicLink).Should().Be(0);
+        ((int)AppointmentRequestChannel.ClinicSite).Should().Be(1);
+        ((int)AppointmentRequestChannel.OwnerPortal).Should().Be(2);
+        ((int)AppointmentRequestChannel.Phone).Should().Be(3);
+        ((int)AppointmentRequestChannel.VetFinder).Should().Be(4);
+    }
+
+    [Theory]
     [InlineData("123", "Pamuk")]
     [InlineData("05551234567", null)]
     public void CreateFromLink_Should_Reject_Invalid_Phone_Or_Missing_Pet(string phone, string? petName)
     {
         var result = AppointmentRequest.CreateFromLink(
-            TenantId, ClinicId, new PetText(petName, null, null), Reason, Start, "Ayşe", "a@example.com", phone, null, Now);
+            TenantId, ClinicId, null, new PetText(petName, null, null), Reason, Start, "Ayşe", "a@example.com", phone, null, Now);
         result.IsSuccess.Should().BeFalse();
         result.Error!.Code.Should().Be("AppointmentRequests.Validation");
     }
@@ -65,7 +104,7 @@ public sealed class AppointmentRequestTests
     public void Create_Should_Reject_Reason_Of_Another_Clinic()
     {
         var other = AppointmentReason.Create(TenantId, Guid.NewGuid(), "Aşı", 30, true, 0, [], Now);
-        AppointmentRequest.CreateFromLink(TenantId, ClinicId, new PetText("P", null, null), other, Start, "A", "a@example.com", "05551234567", null, Now)
+        AppointmentRequest.CreateFromLink(TenantId, ClinicId, null, new PetText("P", null, null), other, Start, "A", "a@example.com", "05551234567", null, Now)
             .IsSuccess.Should().BeFalse();
     }
 
@@ -75,7 +114,7 @@ public sealed class AppointmentRequestTests
     public void Create_Without_Reason_Should_Require_Note(string? note)
     {
         var link = AppointmentRequest.CreateFromLink(
-            TenantId, ClinicId, new PetText("Pamuk", null, null), null, Start, "Ayşe", "a@example.com", "05551234567", note, Now);
+            TenantId, ClinicId, null, new PetText("Pamuk", null, null), null, Start, "Ayşe", "a@example.com", "05551234567", note, Now);
         link.IsSuccess.Should().BeFalse();
         link.Error!.Code.Should().Be("AppointmentRequests.NoteRequired");
 
@@ -88,7 +127,7 @@ public sealed class AppointmentRequestTests
     public void Create_Without_Reason_Should_Use_Other_Reason_Name_And_Duration()
     {
         var result = AppointmentRequest.CreateFromLink(
-            TenantId, ClinicId, new PetText("Pamuk", null, null), null, Start, "Ayşe", "a@example.com", "05551234567", " Topallıyor ", Now);
+            TenantId, ClinicId, null, new PetText("Pamuk", null, null), null, Start, "Ayşe", "a@example.com", "05551234567", " Topallıyor ", Now);
 
         result.IsSuccess.Should().BeTrue(result.Error.Message);
         result.Value!.ReasonId.Should().BeNull();

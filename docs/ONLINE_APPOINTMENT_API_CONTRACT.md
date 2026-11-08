@@ -11,7 +11,7 @@ Tüm saatler UTC ISO-8601 taşınır; gösterim ve müsaitlik hesabı İstanbul 
 | `AppointmentReason` | Klinik başına neden: ad, varsayılan süre (5–240 dk), online'da görünür, sıra, aktif, uygun hekimler (boş = tüm hekimler). |
 | `Appointment` (+alan) | `reasonId?`, `veterinarianUserId?` eklendi. Hekim bazlı çakışma: `Appointments.VeterinarianTimeConflict` (409). |
 | `ClinicOnlineBookingSettings` | Açık/kapalı (**varsayılan kapalı**), `minLeadMinutes` (0–10080, varsayılan 120), `maxAdvanceDays` (1–180, varsayılan 30), 12 karakterlik bağlantı kodu. |
-| `AppointmentRequest` | Durum: `0 Pending`, `1 Approved`, `2 Rejected`, `3 Cancelled`, `4 Expired`. Kaynak: `0 Portal`, `1 Link`. İletişim anlığı + durum geçmişi. |
+| `AppointmentRequest` | Durum: `0 Pending`, `1 Approved`, `2 Rejected`, `3 Cancelled`, `4 Expired`. Giriş kapısı (`source`): `0 Portal`, `1 Link`. Kaynak (`channel`, §14): `0 ClinicLink`, `1 ClinicSite`, `2 OwnerPortal`, `3 Phone`, `4 VetFinder`, eski talepte `null`. İletişim anlığı + durum geçmişi. |
 | `ClinicAppointmentRequestEmailTemplate` | Tür: `0 Received`, `1 Approved`, `2 Rescheduled`, `3 Rejected`. Yoksa Vetinity varsayılanı. |
 | `UserNotification` | Tür: `0 AppointmentRequestCreated`, `1 AppointmentRequestCancelled`, `2 AppointmentAssigned`. |
 
@@ -63,6 +63,7 @@ Klinikte hekim yoksa klinik tek kaynaktır. **Bekleyen talepler saati bloke etme
 | Uç | Açıklama |
 |---|---|
 | `GET ?clinicId&status&fromUtc&toUtc&page&pageSize` | `PagedResult<AppointmentRequestListItemDto>`; `pageSize` ≤ 500. Aktif klinik bağlamı varsa o klinik; yoksa erişilen klinikler. Bekleyenler en yakın saat önce, diğerleri en yeni önce. Takvim katmanı: `status=Pending&fromUtc&toUtc`. Atanmamış klinik `clinicId` ile 403. |
+| `GET /channel-summary?from&to&clinicId` | Kaynağa göre özet (§14). |
 | `GET /{id}` | `AppointmentRequestDetailDto`; kapsam dışı 404 `AppointmentRequests.NotFound`. |
 | `GET /{id}/email-preview?kind&scheduledAtUtc&rejectionReason` | `{ kind, subject, body }` — gönderilecek metin (düzenlenebilir). |
 | `POST /{id}/approve` | Gövde aşağıda; yanıt güncel detay. |
@@ -70,8 +71,8 @@ Klinikte hekim yoksa klinik tek kaynaktır. **Bekleyen talepler saati bloke etme
 
 ```json
 // AppointmentRequestListItemDto
-// reasonId null ise "Diğer / emin değilim" talebi (§11)
-{ "id": "…", "clinicId": "…", "status": 0, "source": 1, "reasonId": "…", "reasonName": "Aşı",
+// reasonId null ise "Diğer / emin değilim" talebi (§11); channel null ise kaynak bilinmiyor (§14)
+{ "id": "…", "clinicId": "…", "status": 0, "source": 1, "channel": 1, "reasonId": "…", "reasonName": "Aşı",
   "requestedStartUtc": "…", "durationMinutes": 30, "contactName": "Ayşe Yılmaz", "contactEmail": "ayse@…",
   "contactPhone": "905551234567", "clientId": null, "clientName": null, "petId": null, "petName": "Pamuk",
   "createdAtUtc": "…", "appointmentId": null }
@@ -112,8 +113,9 @@ salt okunur ise sebep ayırt edilmeden 404 `OnlineBooking.NotFound`.
 
 ```json
 { "email": "…", "verificationCode": "123456", "contactName": "…", "phone": "05551234567",
-  "petName": "Pamuk", "petSpecies": "Kedi", "petBreed": "Tekir", "reasonId": "…", "requestedStartUtc": "…", "note": "…" }
-// reasonId null/yoksa "Diğer": note zorunlu (§11)
+  "petName": "Pamuk", "petSpecies": "Kedi", "petBreed": "Tekir", "reasonId": "…", "requestedStartUtc": "…", "note": "…",
+  "channel": "site" }
+// reasonId null/yoksa "Diğer": note zorunlu (§11). channel isteğe bağlı kaynak değeri (§14)
 ```
 
 Kurallar: saat müsait listede olmalı (409 `AppointmentRequests.SlotUnavailable`); aynı e-posta + klinik için en fazla 3
@@ -180,6 +182,10 @@ Paylaşılan veritabanına uygulanmadı.
 `AddOnlineBookingShowNextAvailableSlots` (§12) — `ClinicOnlineBookingSettings.ShowNextAvailableSlots` (`bit`, mevcut satırlar
 `1`). Yalnız yerel geliştirme veritabanına uygulandı; paylaşılan ya da üretim veritabanına uygulanmadı.
 
+`AddAppointmentRequestChannel` (§14) — `AppointmentRequests.Channel` (`int` nullable; mevcut satırlar `NULL` = bilinmiyor, geriye
+dönük doldurma yok) ve özet için `IX_AppointmentRequests_TenantId_ClinicId_CreatedAtUtc`. Yalnız yerel geliştirme veritabanına
+uygulandı; paylaşılan ya da üretim veritabanına uygulanmadı.
+
 ## 11. Ek (2026-11-03): "Diğer / emin değilim" (ADR-042 ek md. 1-2)
 
 Sistem her klinikte sağlar; klinik tanımlamaz, kapatamaz. Ad ve süre tek yerde: `AppointmentRequest.OtherReasonName`,
@@ -236,3 +242,46 @@ ayrı bir liste ucu ve önbellek kararı orada verilir; bu uç kart için çağr
 Randevu hatırlatma e-postasındaki tek kullanımlık "onayla / iptal et" bağlantısı ve portalın kimliksiz `/randevu-yanit` sayfası
 ayrı sözleşmededir: `APPOINTMENT_OWNER_LINK_API_CONTRACT.md` (uçlar `/api/portal/v1/appointment-link/*`, hız sınırı `portal-auth`).
 Bildirim merkezine yeni tür: `AppointmentCancelledByOwner` (sayısal `4`; hedef `Appointment`).
+
+## 14. Ek (2026-11-08): talep kaynağı ve kaynak özeti (TIER-016)
+
+Klinik talebin nereden geldiğini ve vitrinin ne getirdiğini sayıyla görür. Kaynak **istatistiktir**: talep kuralları (müsaitlik,
+bekleyen talep sınırı, doğrulama kodu, onay) kaynağa bakmaz. Kişisel veri değildir; yönlendiren sayfa adresi, IP ya da tarayıcı
+bilgisi saklanmaz. Paket kilidi yoktur.
+
+**Değerler (`AppointmentRequestChannel`, JSON'da sayı, stabil):**
+
+| Sayı | Ad | Panel etiketi | Kim üretir |
+|---|---|---|---|
+| `0` | `ClinicLink` | Klinik bağlantısı | §5 bağlantı ucu; `channel` yok, boş ya da izinli değil |
+| `1` | `ClinicSite` | Kendi sitesi | §5 bağlantı ucu, `channel: "site"` (site bağlantıya `?kaynak=site` ekler) |
+| `2` | `OwnerPortal` | Portal | §6 portal ucu, her zaman (gövdede kaynak alanı yok; gönderilse yok sayılır) |
+| `3` | `Phone` | Telefon / elle | Henüz üretilmez: personelin talep girdiği bir yol yok |
+| `4` | `VetFinder` | Veteriner bul | Henüz üretilmez: sayfa TIER-015 ile gelir; değeri o zaman izinli listeye eklenir |
+| `null` | — | Bilinmiyor | TIER-016 öncesi talepler (geriye dönük doldurulmaz) |
+
+**Kural (tek yer: `AppointmentRequestChannels.ForLink`, domain):** §5 `POST /requests` gövdesindeki `channel` serbest metin olarak
+saklanmaz. Yalnız izinli değer (`site`, büyük/küçük harf ve baş/son boşluk önemsiz) eşlenir; bilinmeyen, boş, sayı ya da başka kapının
+değeri (`portal`, `telefon`, `veteriner-bul`) `0 ClinicLink` olur ve talep **reddedilmez**. Değer kimliksiz istemciden geldiği için
+kötüye kullanılabilir (ör. doğrudan bağlantı `site` diye gösterilebilir); bu yalnız özetteki sayıları etkiler.
+
+**Akış:** site Randevu bağlantısına `?kaynak=site` ekler (TIER-017 `?saat=` ile birlikte olabilir). Portal `/randevu/{kod}` formu
+adresteki `kaynak` değerini olduğu gibi `channel` alanına koyar; doğrulamayı sunucu yapar.
+
+### `GET /api/v1/appointment-requests/channel-summary?from=2026-11-01&to=2026-11-30&clinicId=`
+
+`AppointmentRequests.Manage`. Kapsam §4 kuyruğuyla aynı (aktif klinik bağlamı; yoksa erişilen klinikler; atanmamış `clinicId` 403).
+`from`/`to` İstanbul takvim günleri, ikisi de dahil, **talebin oluşturulma tarihine** göre. Tarih aralığı kuralı raporlarla aynı
+(`RegisterReportFilter.RangeError`: zorunlu, sıralı, en çok 366 gün; aksi 400 `Registers.DateRangeInvalid` / `Registers.RangeTooLong`).
+
+```json
+{ "from": "2026-11-01", "to": "2026-11-30",
+  "rows": [ { "channel": 0, "total": 2, "approved": 0 }, { "channel": 1, "total": 5, "approved": 3 },
+            { "channel": 2, "total": 1, "approved": 1 }, { "channel": null, "total": 4, "approved": 2 } ],
+  "total": 12, "approved": 6 }
+```
+
+Satırlar kaynak sayısına göre sıralı, `null` (bilinmiyor) sonda; dönemde talebi olmayan kaynak satırı dönmez. `approved` o
+taleplerden bugün `Approved` durumunda olanlardır (onaylanıp randevusu sonra iptal edilen talep `Approved` kalır).
+
+§4 liste ve detay (`summary`) satırına `channel` (sayı ya da `null`) eklendi; `source` (giriş kapısı) değişmedi.

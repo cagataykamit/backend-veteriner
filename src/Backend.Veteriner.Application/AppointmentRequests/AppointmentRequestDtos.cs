@@ -44,13 +44,14 @@ public sealed record PortalAppointmentRequestDto(
 
 /// <summary>
 /// Personel kuyruğu satırı; <see cref="PetName"/> kayıtlı hayvanın adı ya da sahibin yazdığı ad. <see cref="ReasonId"/> boşsa
-/// "Diğer / emin değilim" talebi.
+/// "Diğer / emin değilim" talebi. <see cref="Channel"/> boşsa kaynak bilinmiyor (TIER-016 öncesi talep).
 /// </summary>
 public sealed record AppointmentRequestListItemDto(
     Guid Id,
     Guid ClinicId,
     AppointmentRequestStatus Status,
     AppointmentRequestSource Source,
+    AppointmentRequestChannel? Channel,
     Guid? ReasonId,
     string ReasonName,
     DateTime RequestedStartUtc,
@@ -64,6 +65,16 @@ public sealed record AppointmentRequestListItemDto(
     string? PetName,
     DateTime CreatedAtUtc,
     Guid? AppointmentId);
+
+/// <summary>Kaynak özeti satırı (TIER-016); <see cref="Channel"/> boşsa "bilinmiyor". <see cref="Approved"/> bugün onaylı olanlar.</summary>
+public sealed record AppointmentRequestChannelSummaryRowDto(AppointmentRequestChannel? Channel, int Total, int Approved);
+
+public sealed record AppointmentRequestChannelSummaryDto(
+    DateOnly From,
+    DateOnly To,
+    IReadOnlyList<AppointmentRequestChannelSummaryRowDto> Rows,
+    int Total,
+    int Approved);
 
 public sealed record AppointmentRequestHistoryDto(
     AppointmentRequestStatus? FromStatus,

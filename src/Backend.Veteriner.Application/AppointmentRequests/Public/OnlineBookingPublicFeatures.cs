@@ -29,7 +29,8 @@ public sealed record RequestOnlineBookingCodeCommand(string BookingCode, string 
 /// <summary>
 /// Bağlantıdan talep: e-posta koduyla doğrulanmadan talep oluşmaz (ADR-042 K1). Müşteri/hasta/hesap oluşmaz; talep iletişim
 /// anlığı taşır. Saat müsait listede olmalı; aynı e-posta + klinik için en fazla 3 bekleyen talep. Neden boşsa "Diğer / emin
-/// değilim": not zorunlu, kural domain'de (<see cref="AppointmentRequest.NoteRequiredCode"/>).
+/// değilim": not zorunlu, kural domain'de (<see cref="AppointmentRequest.NoteRequiredCode"/>). <see cref="Channel"/> formun
+/// taşıdığı kaynak değeri (TIER-016); izinli değilse klinik bağlantısı sayılır, talep reddedilmez.
 /// </summary>
 public sealed record CreateOnlineBookingRequestCommand(
     string BookingCode,
@@ -42,7 +43,8 @@ public sealed record CreateOnlineBookingRequestCommand(
     string? PetBreed,
     Guid? ReasonId,
     DateTime RequestedStartUtc,
-    string? Note)
+    string? Note,
+    string? Channel)
     : IRequest<Result<AppointmentRequestCreatedDto>>, IAuditableRequest
 {
     public string AuditAction => "AppointmentRequest.Create.Link";
@@ -198,6 +200,7 @@ public sealed class CreateOnlineBookingRequestCommandHandler
         var created = AppointmentRequest.CreateFromLink(
             scope.TenantId,
             scope.ClinicId,
+            request.Channel,
             new PetText(request.PetName, request.PetSpecies, request.PetBreed),
             reason.Value,
             startUtc,

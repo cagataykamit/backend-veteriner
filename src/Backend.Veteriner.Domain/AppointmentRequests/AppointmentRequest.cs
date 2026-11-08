@@ -40,6 +40,9 @@ public sealed class AppointmentRequest : AggregateRoot, ITenantOwned, IClinicSco
     public Guid TenantId { get; private set; }
     public Guid ClinicId { get; private set; }
     public AppointmentRequestSource Source { get; private set; }
+
+    /// <summary>Kaynak (TIER-016); TIER-016 öncesi taleplerde boş ("bilinmiyor").</summary>
+    public AppointmentRequestChannel? Channel { get; private set; }
     public AppointmentRequestStatus Status { get; private set; }
 
     /// <summary>Boşsa "Diğer / emin değilim" (<see cref="OtherReasonName"/>).</summary>
@@ -113,17 +116,19 @@ public sealed class AppointmentRequest : AggregateRoot, ITenantOwned, IClinicSco
             return Invalid("Portal hesabı ve müşteri zorunludur.");
 
         return Create(
-            tenantId, clinicId, AppointmentRequestSource.Portal, ownerAccountId, clientId, petId, petText, reason,
+            tenantId, clinicId, AppointmentRequestSource.Portal, AppointmentRequestChannel.OwnerPortal, ownerAccountId, clientId, petId, petText, reason,
             requestedStartUtc, contactName, contactEmail, contactPhone, note, utcNow, AppointmentRequestActorKind.Owner);
     }
 
     /// <summary>
     /// Bağlantı talebi: kimliksiz kişi, hayvan yalnız serbest metin; e-posta doğrulaması uygulama katmanında yapılmıştır. Neden
-    /// boşsa "Diğer / emin değilim" (not zorunlu).
+    /// boşsa "Diğer / emin değilim" (not zorunlu). Kaynak <paramref name="channelToken"/> değerinden
+    /// (<see cref="AppointmentRequestChannels.ForLink"/>); bilinmeyen değer klinik bağlantısıdır.
     /// </summary>
     public static Result<AppointmentRequest> CreateFromLink(
         Guid tenantId,
         Guid clinicId,
+        string? channelToken,
         PetText petText,
         AppointmentReason? reason,
         DateTime requestedStartUtc,
@@ -137,7 +142,7 @@ public sealed class AppointmentRequest : AggregateRoot, ITenantOwned, IClinicSco
             return Invalid("Telefon zorunludur.");
 
         return Create(
-            tenantId, clinicId, AppointmentRequestSource.Link, null, null, null, petText, reason,
+            tenantId, clinicId, AppointmentRequestSource.Link, AppointmentRequestChannels.ForLink(channelToken), null, null, null, petText, reason,
             requestedStartUtc, contactName, contactEmail, contactPhone, note, utcNow, AppointmentRequestActorKind.Owner);
     }
 
@@ -225,6 +230,7 @@ public sealed class AppointmentRequest : AggregateRoot, ITenantOwned, IClinicSco
         Guid tenantId,
         Guid clinicId,
         AppointmentRequestSource source,
+        AppointmentRequestChannel channel,
         Guid? ownerAccountId,
         Guid? clientId,
         Guid? petId,
@@ -287,6 +293,7 @@ public sealed class AppointmentRequest : AggregateRoot, ITenantOwned, IClinicSco
             TenantId = tenantId,
             ClinicId = clinicId,
             Source = source,
+            Channel = channel,
             Status = AppointmentRequestStatus.Pending,
             ReasonId = reason?.Id,
             ReasonName = reason?.Name ?? OtherReasonName,

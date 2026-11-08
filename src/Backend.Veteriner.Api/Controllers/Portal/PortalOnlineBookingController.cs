@@ -82,7 +82,8 @@ public sealed class PortalOnlineBookingController : ControllerBase
             body.PetBreed,
             body.ReasonId,
             body.RequestedStartUtc,
-            body.Note), ct);
+            body.Note,
+            body.Channel), ct);
         return result.IsSuccess ? StatusCode(StatusCodes.Status201Created, result.Value) : result.ToActionResult(this);
     }
 }
@@ -197,6 +198,9 @@ public sealed class OnlineBookingRequestBody
 
     public DateTime RequestedStartUtc { get; init; }
     public string? Note { get; init; }
+
+    /// <summary>Kaynak değeri (bağlantının <c>?kaynak=</c> parametresi; izinli: <c>site</c>). Bilinmeyen ya da boş: klinik bağlantısı.</summary>
+    public string? Channel { get; init; }
 }
 
 public sealed class PortalAppointmentRequestBody
