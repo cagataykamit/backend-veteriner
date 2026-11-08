@@ -56,6 +56,20 @@ public sealed class ClinicWorkingHour : ITenantOwned
         };
     }
 
+    /// <summary>
+    /// Verilen yerel (İstanbul) anda klinik açık mı — tek yer (TIER-015 "şu an açık"): o günün satırı açık işaretli, an açılışla
+    /// kapanış arasında [açılış, kapanış) ve molada değil. Satırı olmayan gün kapalı sayılır; varsayılan program kullanılmaz,
+    /// gösterilen bilgi kliniğin kendi verdiği bilgidir.
+    /// </summary>
+    public static bool IsOpenAt(IEnumerable<ClinicWorkingHour> week, DateTime localTime)
+    {
+        var time = TimeOnly.FromDateTime(localTime);
+        return week.Any(h => h.DayOfWeek == localTime.DayOfWeek
+                             && !h.IsClosed
+                             && h.OpensAt <= time && time < h.ClosesAt
+                             && !(h.BreakStartsAt <= time && time < h.BreakEndsAt));
+    }
+
     private static void ValidateSchedule(
         bool isClosed,
         TimeOnly? opensAt,
