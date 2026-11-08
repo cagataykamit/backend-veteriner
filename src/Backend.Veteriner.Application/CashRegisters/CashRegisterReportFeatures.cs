@@ -73,7 +73,7 @@ internal sealed class CashRegisterReportLoader
     public static readonly RegisterExportSpec<CashRegisterReportExportRow> ExportSpec = new(
     [
         RegisterColumn<CashRegisterReportExportRow>.CalendarDate(null, "Tarih", r => r.Date),
-        RegisterColumn<CashRegisterReportExportRow>.Time(null, "Saat", r => r.AtUtc),
+        RegisterColumn<CashRegisterReportExportRow>.Time(null, "Tarih ve saat", r => r.AtUtc),
         RegisterColumn<CashRegisterReportExportRow>.Text(null, "Kasa", r => r.Register),
         RegisterColumn<CashRegisterReportExportRow>.Text(null, "Hareket", r => r.Movement),
         RegisterColumn<CashRegisterReportExportRow>.Text(null, "Açıklama", r => r.Description),

@@ -35,7 +35,7 @@ public interface IPerformanceBreakdownReader
 
     Task<PerformanceActivityDto> ReadActivityAsync(FinanceEventFilter filter, CancellationToken ct = default);
 
-    Task<IReadOnlyDictionary<Guid, string>> LoadUserNamesAsync(IReadOnlyCollection<Guid> userIds, CancellationToken ct = default);
+    Task<IReadOnlyDictionary<Guid, string?>> LoadUserNamesAsync(IReadOnlyCollection<Guid> userIds, CancellationToken ct = default);
 
     Task<IReadOnlyDictionary<Guid, string>> LoadSpeciesNamesAsync(IReadOnlyCollection<Guid> speciesIds, CancellationToken ct = default);
 }
@@ -153,7 +153,7 @@ public sealed class GetPerformanceBreakdownsQueryHandler : IRequestHandler<GetPe
             byVeterinarian = ids
                 .Select(id => new VeterinarianBreakdownDto(
                     id,
-                    id is { } v ? names.GetValueOrDefault(v, "Kullanıcı") : UnassignedName,
+                    id is { } v ? names.GetValueOrDefault(v) ?? "Kullanıcı" : UnassignedName,
                     examinations?.Where(e => e.VeterinarianUserId == id).Sum(e => e.Count),
                     charges?.Where(c => c.VeterinarianUserId == id).Sum(c => c.NetAmount)))
                 .OrderByDescending(r => r.NetChargeAmount ?? 0m)

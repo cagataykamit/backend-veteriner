@@ -99,10 +99,10 @@ aktif klinik bağlamı dışı dahil), `CashMovements.AlreadyVoided` (409), `Cas
 | `cashRegisterId`, `cashRegisterName` | Kasası boş nakitte Ana kasa adı |
 | `description` | Müşteri adı (+ iptal/iade gerekçesi); tür adı ya da "Hedef/Kaynak: kasa" (+ açıklama) |
 | `inAmount`, `outAmount`, `balance` | Yürüyen bakiye satırdan sonradır; son satırın bakiyesi `closingBalance` |
-| `performedByName` | Tahsilatta alan, iptal/iadede yapan, harekette kaydeden |
+| `performedByName` | Tahsilatta alan, iptal/iadede yapan, harekette kaydeden. Tüm satırlarda aynı kural (`UserDisplayName`): görünen ad, yoksa e-postanın `@` öncesi (e-postanın tamamı yazılmaz) |
 
 İptal edilmiş kasa hareketleri rapora girmez; tahsilat iptali (gün sonu kuralı) iptal anında eksi satırdır. Satır sınırı 50.000
-(`CashRegisters.TooManyRows`, 400). Dosya: Tarih, Saat, Kasa, Hareket, Açıklama, Giriş, Çıkış, Bakiye, İşlemi Yapan; ilk satır "Devreden
+(`CashRegisters.TooManyRows`, 400). Dosya: Tarih (iş günü), Tarih ve saat (`atUtc`, İstanbul `dd.MM.yyyy HH:mm`; eski adı "Saat"), Kasa, Hareket, Açıklama, Giriş, Çıkış, Bakiye, İşlemi Yapan; ilk satır "Devreden
 bakiye", son satır "Dönem sonu bakiye"; ad `kasa-hareketleri-{damga}.csv|xlsx` (rapor deseni).
 
 ## 4) Ödemede ve iadede kasa (mevcut uçlar, geriye uyumlu)
@@ -120,6 +120,12 @@ bakiye", son satır "Dönem sonu bakiye"; ad `kasa-hareketleri-{damga}.csv|xlsx`
 - Ödeme düzeltmesinde (`PUT /payments/{id}`) yöntem nakitten çıkarsa ya da klinik değişirse kasa bağı kalkar (nakitse Ana kasaya düşer). Kasa
   değiştirme bu dilimde yok; yanlış kasa iptal ve yeni ödemeyle düzeltilir.
 - Ödeme iptali ve kredi iadesi kendi kasasından düşer.
+
+**Okumada kasa (2026-11-09, geriye uyumlu, isteğe bağlı alanlar):** `GET /api/v1/payments/{id}` (`PaymentDetailDto`) ve `GET /api/v1/payments`
+(`PaymentListItemDto`) yanıtlarına `cashRegisterId?`, `cashRegisterName?` eklendi. Yalnız nakit ödemede doludur: kayıtlı kasa, kasası boşsa
+kliniğin Ana kasası (Ana kasa kaydı yoksa `cashRegisterId` boş, ad "Ana kasa"). Kart ve havalede ikisi de `null`. Kural tek yerde
+(`CashRegisterRules.LoadForPaymentsAsync`, sayfa başına tek toplu sorgu). Query DB okuma yolunda (bayrak kapalı) `null`. Pasif kasanın adı da
+yazılır. Ek izin gerekmez (`Payments.Read`).
 
 ## 5) Denetim
 

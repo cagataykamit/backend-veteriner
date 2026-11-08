@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.CashRegisters;
 using Backend.Veteriner.Application.Clients.ReadModels;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
@@ -10,6 +11,7 @@ using Backend.Veteriner.Application.Payments.ReadModels;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Application.Pets.ReadModels;
 using Backend.Veteriner.Application.Pets.Specs;
+using Backend.Veteriner.Domain.CashRegisters;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
@@ -37,6 +39,7 @@ public sealed class GetPaymentsListQueryHandler
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly ILogger<GetPaymentsListQueryHandler> _logger;
     private readonly IPaymentPetCountReader? _petCountReader;
+    private readonly IReadRepository<CashRegister>? _registers;
 
     public GetPaymentsListQueryHandler(
         ITenantContext tenantContext,
@@ -50,7 +53,8 @@ public sealed class GetPaymentsListQueryHandler
         IPaymentsListReadModelReader paymentsListReadModelReader,
         IOptions<QueryReadModelsOptions> queryReadModelsOptions,
         ILogger<GetPaymentsListQueryHandler>? logger = null,
-        IPaymentPetCountReader? petCountReader = null)
+        IPaymentPetCountReader? petCountReader = null,
+        IReadRepository<CashRegister>? registers = null)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -64,6 +68,7 @@ public sealed class GetPaymentsListQueryHandler
         _queryReadModelsOptions = queryReadModelsOptions.Value;
         _logger = logger ?? NullLogger<GetPaymentsListQueryHandler>.Instance;
         _petCountReader = petCountReader;
+        _registers = registers;
     }
 
     public async ValueTask<Result<PagedResult<PaymentListItemDto>>> Handle(
@@ -256,11 +261,19 @@ public sealed class GetPaymentsListQueryHandler
         if (petCounts is not null)
             MarkStep("petCounts");
 
+        var registers = _registers is null
+            ? null
+            : await CashRegisterRules.LoadForPaymentsAsync(
+                _registers, tenantId, rows.Select(r => (r.Id, r.ClinicId, r.Method, r.CashRegisterId)), ct);
+        if (registers is not null)
+            MarkStep("cashRegisters");
+
         var items = rows
             .Select(p =>
             {
                 var clientName = clientNameById.TryGetValue(p.ClientId, out var cn) ? cn : string.Empty;
                 var petName = p.PetId is { } pid && petNameById.TryGetValue(pid, out var pn) ? pn : string.Empty;
+                var register = registers?.GetValueOrDefault(p.Id);
 
                 return new PaymentListItemDto(
                     p.Id,
@@ -273,7 +286,9 @@ public sealed class GetPaymentsListQueryHandler
                     p.Currency,
                     p.Method,
                     p.PaidAtUtc,
-                    petCounts is null ? null : PaymentPetCount.Resolve(p.PetId, petCounts.GetValueOrDefault(p.Id)));
+                    petCounts is null ? null : PaymentPetCount.Resolve(p.PetId, petCounts.GetValueOrDefault(p.Id)),
+                    register?.Id,
+                    register?.Name);
             })
             .ToList();
 

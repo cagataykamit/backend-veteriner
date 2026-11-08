@@ -2,7 +2,7 @@ using Backend.Veteriner.Domain.Payments;
 
 namespace Backend.Veteriner.Application.Payments.Contracts.Dtos;
 
-/// <summary>GET /payments/{id} yanıtı. <see cref="PetId"/>, <see cref="AppointmentId"/>, <see cref="ExaminationId"/>, <see cref="Notes"/> null olabilir.</summary>
+/// <summary>GET /payments/{id} yanıtı. <see cref="PetId"/>, <see cref="AppointmentId"/>, <see cref="ExaminationId"/>, <see cref="Notes"/> null olabilir. <see cref="CashRegisterName"/> yalnız nakitte dolu (kasası boşsa Ana kasa); Query DB yolunda null.</summary>
 public sealed record PaymentDetailDto(
     Guid Id,
     Guid TenantId,
@@ -21,4 +21,6 @@ public sealed record PaymentDetailDto(
     decimal? AllocatedAmount = null,
     decimal? UnallocatedAmount = null,
     int? PetCount = null,
-    decimal? CreditedAmount = null);
+    decimal? CreditedAmount = null,
+    Guid? CashRegisterId = null,
+    string? CashRegisterName = null);

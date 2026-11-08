@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Application.Reports.Registers.Prescriptions;
+using Backend.Veteriner.Application.Users.Common;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Infrastructure.Persistence.Repositories.Reports;
@@ -81,7 +82,8 @@ public sealed class PrescriptionRegisterReader : IRegisterReader<PrescriptionReg
             ? []
             : await _db.Users.AsNoTracking()
                 .Where(u => veterinarianIds.Contains(u.Id))
-                .ToDictionaryAsync(u => u.Id, u => u.DisplayName ?? u.Email, ct);
+                .Select(u => new { u.Id, u.DisplayName, u.Email })
+                .ToDictionaryAsync(u => u.Id, u => UserDisplayName.Resolve(u.DisplayName, u.Email), ct);
 
         var entries = rows.Select((r, i) => new PrescriptionRegisterEntryDto(
             request.Skip + i + 1,

@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.CashCounts;
 using Backend.Veteriner.Application.CashRegisters;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Payments.Contracts.Dtos;
 using Backend.Veteriner.Application.Reports.DailyTransactions;
 using Backend.Veteriner.Domain.CashRegisters;
 using Backend.Veteriner.Domain.Clinics;
@@ -286,9 +287,65 @@ public sealed partial class DailyTransactionsReportIntegrationTests
         csv.StatusCode.Should().Be(HttpStatusCode.OK);
         var text = await csv.Content.ReadAsStringAsync();
         text.Should().Contain("Devreden bakiye").And.Contain("Dönem sonu bakiye").And.Contain("Giden aktarım");
+        text.Should().Contain("Tarih ve saat").And.NotContain(";Saat;", "ikinci sütun tarih de içerir");
         var xlsx = await manager.GetAsync($"{Registers}/report/export-xlsx?{range}");
         xlsx.StatusCode.Should().Be(HttpStatusCode.OK);
         xlsx.Content.Headers.ContentType!.MediaType.Should().Contain("spreadsheet");
+    }
+
+    [Fact]
+    public async Task Payment_Read_Should_Carry_The_Cash_Register_And_Report_Should_Name_Users_Alike()
+    {
+        var env = await SeedTenantAsync();
+        await SetPlanAsync(env.TenantId, SubscriptionPlanCode.Pro);
+        var manager = await env.NewHttpForAnotherUserAsync(CashManagerPermissions);
+        var drawer = await PostOkAsync<CashRegisterDto>(manager, Registers, new { clinicId = env.ClinicId, code = "K2", name = "Arka kasa" });
+        var main = (await manager.GetFromJsonAsync<List<CashRegisterDto>>($"{Registers}?clinicId={env.ClinicId}"))!.Single(r => r.IsMain);
+        var category = await PostOkAsync<CashMovementCategoryDto>(manager, $"{Movements}/categories", new { name = $"Masraf-{Guid.NewGuid():N}"[..14] });
+        var a = await env.SeedClientAsync("Kasa Adı");
+
+        var legacyCash = await env.PayAsync(a, await env.SeedChargeAsync(a, 100m, EarlierToday(TimeSpan.FromMinutes(40))), 100m, PaymentMethod.Cash, EarlierToday(TimeSpan.FromMinutes(35)));
+        var drawerCash = await PayToRegisterAsync(env, a, 60m, PaymentMethod.Cash, drawer.Id);
+        var card = await env.PayAsync(a, await env.SeedChargeAsync(a, 40m, EarlierToday(TimeSpan.FromMinutes(30))), 40m, PaymentMethod.Card, EarlierToday(TimeSpan.FromMinutes(25)));
+        await PostOkAsync<CashMovementDto>(manager, Movements, new
+        {
+            clinicId = env.ClinicId, cashRegisterId = main.Id, direction = "In", businessDate = Today, amount = 10m, categoryId = category.Id,
+        });
+
+        async Task<PaymentDetailDto> DetailAsync(Guid id) => (await manager.GetFromJsonAsync<PaymentDetailDto>($"/api/v1/payments/{id}"))!;
+        var legacy = await DetailAsync(legacyCash);
+        legacy.CashRegisterId.Should().Be(main.Id, "kasası boş nakit kliniğin Ana kasasınındır");
+        legacy.CashRegisterName.Should().Be(CashRegister.MainName);
+        (await DetailAsync(drawerCash)).CashRegisterName.Should().Be("Arka kasa");
+        var cardDetail = await DetailAsync(card);
+        cardDetail.CashRegisterId.Should().BeNull("kart kasaya bağlanmaz");
+        cardDetail.CashRegisterName.Should().BeNull();
+
+        var list = (await manager.GetFromJsonAsync<PagedResult<PaymentListItemDto>>($"/api/v1/payments?clinicId={env.ClinicId}&page=1&pageSize=50"))!;
+        list.Items.Single(p => p.Id == legacyCash).CashRegisterName.Should().Be(CashRegister.MainName);
+        list.Items.Single(p => p.Id == drawerCash).CashRegisterId.Should().Be(drawer.Id);
+        list.Items.Single(p => p.Id == card).CashRegisterName.Should().BeNull();
+
+        // İşlemi yapan: tahsilat ve kasa hareketi aynı kural (görünen ad, yoksa e-postanın @ öncesi; e-posta yazılmaz).
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var collector = await db.Users.SingleAsync(u => u.Id == env.UserId);
+            collector.SetDisplayName("Resepsiyon Ayşe", DateTime.UtcNow).IsSuccess.Should().BeTrue();
+            await db.SaveChangesAsync();
+        }
+
+        var report = (await manager.GetFromJsonAsync<CashRegisterReportDto>(
+            $"{Registers}/report?from={Today:yyyy-MM-dd}&to={Today:yyyy-MM-dd}&clinicId={env.ClinicId}"))!;
+        report.Rows.Where(r => r.Kind == CashRegisterReportRowKind.Collection).Should().HaveCount(2)
+            .And.OnlyContain(r => r.PerformedByName == "Resepsiyon Ayşe");
+        var movementBy = report.Rows.Single(r => r.Kind == CashRegisterReportRowKind.In).PerformedByName;
+        movementBy.Should().StartWith("dtr-user-").And.NotContain("@");
+
+        var daily = await env.GetAsync<DailyTransactionsReportResultDto>(
+            $"{Daily}?{Range(Today, Today)}&clinicId={env.ClinicId}&pageSize=200");
+        daily.Items.Where(i => i.Kind == DailyTransactionKind.Payment).Should().OnlyContain(i => i.PerformedByName == "Resepsiyon Ayşe");
+        daily.Items.Where(i => i.Kind == DailyTransactionKind.Charge).Should().OnlyContain(i => i.PerformedByName == null || !i.PerformedByName.Contains('@'));
     }
 
     [Fact]

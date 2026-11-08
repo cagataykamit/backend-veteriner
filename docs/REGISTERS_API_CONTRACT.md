@@ -103,7 +103,7 @@ Sıralama: `examinedAtUtc`, `createdAtUtc`, `id` artan.
 
 ## 4) Hekim adı kuralı (tek yerde)
 
-`veterinarianName`: muayenenin geliş (Visit) kaydındaki **sorumlu hekim** (`ResponsibleVeterinarianUserId`); geliş yoksa veya sorumlu hekim atanmamışsa **null** (boş). Muayeneyi kesinleştiren kullanıcı **yedek değildir** (karar 2026-10-14: admin/resepsiyon kesinleştirince resmî defterde hekim yerine o kişi görünüyordu). Ad: kullanıcının `DisplayName` değeri, yoksa e-postası. Reçete defterinde aynı kural, reçetenin bağlı olduğu muayene üzerinden uygulanır; muayenesiz reçetede hekim **boş**tur (reçetede hekim alanı yok; bölüm 7).
+`veterinarianName`: muayenenin geliş (Visit) kaydındaki **sorumlu hekim** (`ResponsibleVeterinarianUserId`); geliş yoksa veya sorumlu hekim atanmamışsa **null** (boş). Muayeneyi kesinleştiren kullanıcı **yedek değildir** (karar 2026-10-14: admin/resepsiyon kesinleştirince resmî defterde hekim yerine o kişi görünüyordu). Ad: kullanıcının `DisplayName` değeri, yoksa e-postanın `@` öncesi (`UserDisplayName`, tüm ekran ve dosyalarda tek kural; 2026-11-09 öncesi e-postanın tamamıydı). Reçete defterinde aynı kural, reçetenin bağlı olduğu muayene üzerinden uygulanır; muayenesiz reçetede hekim **boş**tur (reçetede hekim alanı yok; bölüm 7).
 
 ## 5) Reçete defteri: `GET /api/v1/reports/registers/prescriptions`
 

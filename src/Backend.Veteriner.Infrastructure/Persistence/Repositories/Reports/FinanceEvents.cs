@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Backend.Veteriner.Application.Reports.DailyTransactions;
+using Backend.Veteriner.Application.Users.Common;
 using Backend.Veteriner.Domain.Payments;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -368,7 +369,8 @@ internal static class FinanceEvents
             : await db.Pets.AsNoTracking().Where(p => petIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, p => p.Name, ct);
         var users = userIds.Count == 0
             ? []
-            : await db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.DisplayName ?? u.Email, ct);
+            : await db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).Select(u => new { u.Id, u.DisplayName, u.Email })
+                .ToDictionaryAsync(u => u.Id, u => UserDisplayName.Resolve(u.DisplayName, u.Email), ct);
 
         return new FinanceEventNames(clients, pets, users);
     }
@@ -377,7 +379,7 @@ internal static class FinanceEvents
 internal sealed record FinanceEventNames(
     IReadOnlyDictionary<Guid, string> Clients,
     IReadOnlyDictionary<Guid, string> Pets,
-    IReadOnlyDictionary<Guid, string> Users)
+    IReadOnlyDictionary<Guid, string?> Users)
 {
     public string Client(Guid id) => Clients.GetValueOrDefault(id, string.Empty);
     public string? Pet(Guid? id) => id is { } v ? Pets.GetValueOrDefault(v) : null;

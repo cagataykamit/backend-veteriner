@@ -48,6 +48,7 @@ Sıralama: hekim ve kalem net ciroya göre azalan; tür muayene sayısına göre
 |---|---|
 | Net ciro | Gün sonu dökümünün mali olay kaynağı (`FinanceEvents`): dönemde oluşan ücret + , dönemde iptal edilen ücret −. Bu yüzden her kırılımın toplamı `daily-transactions` `totals.netChargeAmount`'a eşittir (entegrasyon testiyle sabit) |
 | Hekim ataması | Ücret: bağlı ziyaretin sorumlu hekimi; ziyaret yoksa bağlı muayenenin kuralı; ikisi de yoksa **atanmamış** (muayenesiz satış dahil). Muayene: ziyaretin sorumlu hekimi; ziyaretsiz muayenede kesinleştiren kullanıcı; kesinleşmemişse atanmamış. Veri modeli değişmedi |
+| Hekim adı | `UserDisplayName`: görünen ad, yoksa e-postanın `@` öncesi (gün sonu ve kasa raporuyla aynı kural; 2026-11-09 öncesi e-postanın tamamıydı) |
 | Muayene sayısı | Muayene raporuyla aynı: muayene tarihi aralıkta, durumdan bağımsız |
 | Kalem | Ücret satırı ürün/hizmet kimliği taşımaz; gruplama açıklama metni ve satır türüyle yapılır. Aynı hizmet farklı yazılmışsa ayrı satır olur |
 | Tür | Ücretteki ya da muayenedeki hayvanın türü; hayvansız ücret "Hayvan yok" |

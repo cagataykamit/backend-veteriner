@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Reports.DailyTransactions;
 using Backend.Veteriner.Application.Reports.Performance.Breakdowns;
+using Backend.Veteriner.Application.Users.Common;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Infrastructure.Persistence.Repositories.Reports;
@@ -94,10 +95,11 @@ public sealed class PerformanceBreakdownReader : IPerformanceBreakdownReader
         return new PerformanceActivityDto(visitCount, clientCount);
     }
 
-    public async Task<IReadOnlyDictionary<Guid, string>> LoadUserNamesAsync(IReadOnlyCollection<Guid> userIds, CancellationToken ct = default)
+    public async Task<IReadOnlyDictionary<Guid, string?>> LoadUserNamesAsync(IReadOnlyCollection<Guid> userIds, CancellationToken ct = default)
         => userIds.Count == 0
-            ? new Dictionary<Guid, string>()
-            : await _db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.DisplayName ?? u.Email, ct);
+            ? new Dictionary<Guid, string?>()
+            : await _db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).Select(u => new { u.Id, u.DisplayName, u.Email })
+                .ToDictionaryAsync(u => u.Id, u => UserDisplayName.Resolve(u.DisplayName, u.Email), ct);
 
     public async Task<IReadOnlyDictionary<Guid, string>> LoadSpeciesNamesAsync(IReadOnlyCollection<Guid> speciesIds, CancellationToken ct = default)
         => speciesIds.Count == 0
