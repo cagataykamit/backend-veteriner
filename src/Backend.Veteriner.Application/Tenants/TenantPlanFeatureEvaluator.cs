@@ -16,16 +16,32 @@ namespace Backend.Veteriner.Application.Tenants;
 public sealed class TenantPlanFeatureEvaluator
 {
     public const string FeatureNotInPlanCode = "Subscriptions.FeatureNotInPlan";
+    public const string PlanLimitsExceededCode = "Subscriptions.PlanLimitsExceeded";
 
     private readonly IReadRepository<TenantSubscription> _subscriptions;
     private readonly IReadRepository<Clinic> _clinics;
+    private readonly IReadRepository<UserTenant> _userTenants;
+    private readonly IReadRepository<TenantInvite> _invites;
+    private readonly TimeProvider _timeProvider;
     private readonly Dictionary<Guid, TenantSubscription?> _subscriptionsByTenant = [];
 
-    public TenantPlanFeatureEvaluator(IReadRepository<TenantSubscription> subscriptions, IReadRepository<Clinic> clinics)
+    public TenantPlanFeatureEvaluator(
+        IReadRepository<TenantSubscription> subscriptions,
+        IReadRepository<Clinic> clinics,
+        IReadRepository<UserTenant> userTenants,
+        IReadRepository<TenantInvite> invites,
+        TimeProvider timeProvider)
     {
         _subscriptions = subscriptions;
         _clinics = clinics;
+        _userTenants = userTenants;
+        _invites = invites;
+        _timeProvider = timeProvider;
     }
+
+    /// <summary>Paketin aktif klinik sınırı: <see cref="PlanFeature.MultiClinic"/> yoksa 1, varsa sınırsız (<c>null</c>).</summary>
+    public static int? MaxActiveClinics(SubscriptionPlanCode plan)
+        => SubscriptionPlanCatalog.Allows(plan, PlanFeature.MultiClinic) ? null : 1;
 
     /// <summary>Abonelik için özellik açık mı; <c>access-state</c> da aynı kuraldan okur.</summary>
     public static bool IsEnabled(TenantSubscription subscription, PlanFeature feature)
@@ -59,6 +75,27 @@ public sealed class TenantPlanFeatureEvaluator
             : allowed;
     }
 
+    /// <summary>Hedef paket kiracının bugünkü aktif klinik ve kullanıcı sayısına sığıyor mu (ADR-035 2026-11-08, seçenek A).</summary>
+    public async Task<SubscriptionPlanFit> GetPlanFitAsync(Guid tenantId, SubscriptionPlanCode target, CancellationToken ct)
+    {
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var activeClinics = await _clinics.CountAsync(new ActiveClinicsByTenantCountSpec(tenantId), ct);
+        var members = await _userTenants.CountAsync(new UserTenantsByTenantCountSpec(tenantId), ct);
+        var pendingInvites = await _invites.CountAsync(new PendingTenantInvitesByTenantCountSpec(tenantId, now), ct);
+        return new SubscriptionPlanFit(
+            target, MaxActiveClinics(target), SubscriptionPlanCatalog.GetMaxUsers(target), activeClinics, members, pendingInvites);
+    }
+
+    /// <summary>
+    /// Paket değişikliği (planlı düşürme, denemede değişim, ücretliye geçiş, dönem sonu uygulama) hedef pakete sığmıyorsa 409
+    /// <see cref="PlanLimitsExceededCode"/>; yanıtta sınırlar, bugünkü sayılar ve fazlalar yazar. Veri silinmez.
+    /// </summary>
+    public async Task<Result> EnsureFitsPlanAsync(Guid tenantId, SubscriptionPlanCode target, CancellationToken ct)
+    {
+        var fit = await GetPlanFitAsync(tenantId, target, ct);
+        return fit.Fits ? Result.Success() : Result.Failure(PlanLimitsExceeded(fit));
+    }
+
     private async Task<TenantSubscription?> GetSubscriptionAsync(Guid tenantId, CancellationToken ct)
     {
         if (_subscriptionsByTenant.TryGetValue(tenantId, out var cached))
@@ -77,5 +114,21 @@ public sealed class TenantPlanFeatureEvaluator
                 ["feature"] = feature.ToString(),
                 ["currentPlanCode"] = current is { } code ? SubscriptionPlanCatalog.ToApiCode(code) : null,
                 ["requiredPlanCode"] = SubscriptionPlanCatalog.ToApiCode(SubscriptionPlanCatalog.MinimumPlanFor(feature)),
+            });
+
+    private static Error PlanLimitsExceeded(SubscriptionPlanFit fit)
+        => new(
+            PlanLimitsExceededCode,
+            "Seçilen paket mevcut kullanımınıza sığmıyor; önce fazla klinikleri pasife alın ya da kullanıcıları çıkarın.",
+            new Dictionary<string, object?>
+            {
+                ["targetPlanCode"] = SubscriptionPlanCatalog.ToApiCode(fit.TargetPlanCode),
+                ["maxActiveClinics"] = fit.MaxActiveClinics,
+                ["maxUsers"] = fit.MaxUsers,
+                ["activeClinicCount"] = fit.ActiveClinicCount,
+                ["memberCount"] = fit.MemberCount,
+                ["pendingInviteCount"] = fit.PendingInviteCount,
+                ["excessClinicCount"] = fit.ExcessClinicCount,
+                ["excessUserCount"] = fit.ExcessUserCount,
             });
 }

@@ -27,6 +27,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
     private readonly ILogger<GetTenantSubscriptionSummaryQueryHandler> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly IOptions<BillingOptions> _billingOptions;
+    private readonly TenantPlanFeatureEvaluator _planFeatures;
 
     public GetTenantSubscriptionSummaryQueryHandler(
         ITenantContext tenantContext,
@@ -37,6 +38,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
         TenantSubscriptionEffectiveWriteEvaluator effectiveWriteEvaluator,
         TimeProvider timeProvider,
         IOptions<BillingOptions> billingOptions,
+        TenantPlanFeatureEvaluator planFeatures,
         ILogger<GetTenantSubscriptionSummaryQueryHandler>? logger = null)
     {
         _tenantContext = tenantContext;
@@ -48,6 +50,7 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
         _logger = logger ?? NullLogger<GetTenantSubscriptionSummaryQueryHandler>.Instance;
         _timeProvider = timeProvider;
         _billingOptions = billingOptions;
+        _planFeatures = planFeatures;
     }
 
     public async ValueTask<Result<TenantSubscriptionSummaryDto>> Handle(
@@ -152,6 +155,25 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
                 pending.Reason);
         }
 
+        // Dönem sonunda sığmadığı için uygulanmayan düşürme (ADR-035 2026-11-08): en son kayıt ise nedeni bugünkü sayılarla döner.
+        PendingSubscriptionPlanChangeDto? rejectedDto = null;
+        if (pending is null
+            && await _planChanges.FirstOrDefaultAsync(new LatestPlanChangeByTenantSpec(request.TenantId), ct) is { Status: SubscriptionPlanChangeStatus.Rejected } rejected)
+        {
+            var fit = await _planFeatures.GetPlanFitAsync(request.TenantId, rejected.TargetPlanCode, ct);
+            rejectedDto = new PendingSubscriptionPlanChangeDto(
+                rejected.Id,
+                SubscriptionPlanCatalog.ToApiCode(rejected.CurrentPlanCode),
+                SubscriptionPlanCatalog.ToApiCode(rejected.TargetPlanCode),
+                rejected.ChangeType,
+                rejected.Status,
+                rejected.RequestedAtUtc,
+                rejected.EffectiveAtUtc,
+                rejected.Reason,
+                SubscriptionPlanFitDto.From(fit));
+        }
+        MarkStep("rejectedPlanChangeLookup");
+
         var dto = new TenantSubscriptionSummaryDto(
             tenant.Id,
             tenant.Name,
@@ -169,7 +191,8 @@ public sealed class GetTenantSubscriptionSummaryQueryHandler
             period.PeriodEndUtc,
             pendingDto,
             available,
-            sub.BillingPeriod.ToString());
+            sub.BillingPeriod.ToString(),
+            rejectedDto);
 
         _logger.LogInformation(
             "Tenant subscription summary generated. TenantId={TenantId} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",

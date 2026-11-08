@@ -28,6 +28,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
     private readonly IBillingCheckoutProviderResolver _checkoutProviderResolver;
     private readonly ICheckoutPaymentReconciler _paymentReconciler;
     private readonly ISalesPartnerDiscountBilling _partnerDiscounts;
+    private readonly TenantPlanFeatureEvaluator _planFeatures;
     private readonly ILogger<StartSubscriptionCheckoutCommandHandler> _logger;
     private readonly TimeProvider _timeProvider;
 
@@ -44,6 +45,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         IBillingCheckoutProviderResolver checkoutProviderResolver,
         ICheckoutPaymentReconciler paymentReconciler,
         ISalesPartnerDiscountBilling partnerDiscounts,
+        TenantPlanFeatureEvaluator planFeatures,
         ILogger<StartSubscriptionCheckoutCommandHandler> logger,
         TimeProvider timeProvider)
     {
@@ -59,6 +61,7 @@ public sealed class StartSubscriptionCheckoutCommandHandler
         _checkoutProviderResolver = checkoutProviderResolver;
         _paymentReconciler = paymentReconciler;
         _partnerDiscounts = partnerDiscounts;
+        _planFeatures = planFeatures;
         _logger = logger;
         _timeProvider = timeProvider;
     }
@@ -156,6 +159,12 @@ public sealed class StartSubscriptionCheckoutCommandHandler
                     "Downgrade için checkout açılmaz; plan değişikliği schedule edilmelidir.");
             }
         }
+
+        // Seçenek A (ADR-035 2026-11-08): hedef paket aktif klinik ve kullanıcı sayısına sığmalı. Denemede paket değişimi ve
+        // ücretliye geçiş (yenileme dahil) aynı kuraldan geçer; denemede açılmış fazla klinik silinmez, ödeme öncesi azaltılır.
+        var fits = await _planFeatures.EnsureFitsPlanAsync(request.TenantId, targetPlanCode, ct);
+        if (!fits.IsSuccess)
+            return Result<SubscriptionCheckoutSessionDto>.Failure(fits.Error);
 
         var openPlanChange = await _planChangesRead.FirstOrDefaultAsync(new OpenScheduledPlanChangeByTenantSpec(request.TenantId), ct);
         if (openPlanChange is not null)

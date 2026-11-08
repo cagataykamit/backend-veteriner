@@ -10,8 +10,14 @@ namespace Backend.Veteriner.Application.Tests.Tenants;
 /// <summary>Sahte depolarla paket kuralı; handler testleri kuralın gerçek kodundan geçer.</summary>
 internal static class PlanFeatureTestFactory
 {
-    /// <summary>Ücretli (Active) abonelik; <paramref name="trialing"/> ise deneme.</summary>
-    public static TenantPlanFeatureEvaluator ForPlan(SubscriptionPlanCode? plan, Clinic? activeClinic = null, bool trialing = false)
+    /// <summary>Ücretli (Active) abonelik; <paramref name="trialing"/> ise deneme. Sayılar paket sığma kontrolü içindir.</summary>
+    public static TenantPlanFeatureEvaluator ForPlan(
+        SubscriptionPlanCode? plan,
+        Clinic? activeClinic = null,
+        bool trialing = false,
+        int activeClinicCount = 0,
+        int memberCount = 0,
+        int pendingInviteCount = 0)
     {
         TenantSubscription? subscription = null;
         if (plan is { } code)
@@ -29,6 +35,17 @@ internal static class PlanFeatureTestFactory
         clinics
             .Setup(r => r.FirstOrDefaultAsync(It.IsAny<ISpecification<Clinic>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(activeClinic);
-        return new TenantPlanFeatureEvaluator(subscriptions.Object, clinics.Object);
+        clinics
+            .Setup(r => r.CountAsync(It.IsAny<ISpecification<Clinic>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(activeClinicCount);
+        var userTenants = new Mock<IReadRepository<UserTenant>>();
+        userTenants
+            .Setup(r => r.CountAsync(It.IsAny<ISpecification<UserTenant>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(memberCount);
+        var invites = new Mock<IReadRepository<TenantInvite>>();
+        invites
+            .Setup(r => r.CountAsync(It.IsAny<ISpecification<TenantInvite>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(pendingInviteCount);
+        return new TenantPlanFeatureEvaluator(subscriptions.Object, clinics.Object, userTenants.Object, invites.Object, TimeProvider.System);
     }
 }

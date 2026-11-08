@@ -59,6 +59,18 @@ public sealed class ScheduledSubscriptionPlanChange : AggregateRoot, ITenantOwne
         CancelledAtUtc = NormalizeUtc(utcNow);
     }
 
+    /// <summary>
+    /// Vadesinde hedef pakete sığmayan düşürme uygulanmaz (ADR-035 2026-11-08, seçenek A); abonelik mevcut pakette kalır, kiracı
+    /// sınıra indikten sonra yeniden planlar.
+    /// </summary>
+    public void Reject()
+    {
+        if (Status != SubscriptionPlanChangeStatus.Scheduled)
+            return;
+
+        Status = SubscriptionPlanChangeStatus.Rejected;
+    }
+
     public void MarkApplied(DateTime utcNow)
     {
         if (Status != SubscriptionPlanChangeStatus.Scheduled)

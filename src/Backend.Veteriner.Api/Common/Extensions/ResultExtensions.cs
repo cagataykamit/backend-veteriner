@@ -210,7 +210,8 @@ public static class ResultExtensions
         }
 
         // Açık oturumun ödemesi sağlayıcıda alınmış, aktivasyon bekleniyor: yeni ödeme başlatılmaz (durum çakışması).
-        if (normalized is "subscriptions.checkoutalreadypaid")
+        // Hedef paket aktif klinik ve kullanıcı sayısına sığmıyor (ADR-035 2026-11-08, seçenek A): önce kullanım azaltılmalı.
+        if (normalized is "subscriptions.checkoutalreadypaid" or "subscriptions.planlimitsexceeded")
         {
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }

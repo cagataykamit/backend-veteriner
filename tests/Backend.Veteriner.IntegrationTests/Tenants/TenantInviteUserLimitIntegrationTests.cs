@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -8,16 +9,18 @@ using Backend.Veteriner.Application.LegalAcceptances;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
+using Backend.Veteriner.Infrastructure.Billing;
 using Backend.Veteriner.Infrastructure.Persistence;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Backend.IntegrationTests.Tenants;
 
 /// <summary>
 /// Paket kullanıcı sınırı (WEB-007: Basic 3, Pro 5, Premium 15): davet oluşturma üye + bekleyen daveti, kabul üye sayısını
-/// sayar. Sınırı aşan üyeler kalır; paket düşürme üye sayısına bakmaz (yeni kısıt yok, davranış burada sabitlenir).
+/// sayar. Sınırı aşan üyeler kalır; paket düşürme üye + bekleyen davet ve aktif klinik sayısına bakar (ADR-035 2026-11-08, seçenek A).
 /// </summary>
 public sealed class TenantInviteUserLimitIntegrationTests : IClassFixture<CustomWebApplicationFactory>
 {
@@ -177,24 +180,151 @@ public sealed class TenantInviteUserLimitIntegrationTests : IClassFixture<Custom
         (await db.UserTenants.AsNoTracking().CountAsync(ut => ut.TenantId == seeded.TenantId)).Should().Be(5);
     }
 
-    [Fact]
-    public async Task ScheduleDowngrade_Should_Not_Check_Member_Count()
+    private async Task<HttpResponseMessage> ScheduleDowngradeAsync(Seeded s, string target)
     {
-        var seeded = await SeedTenantAsync(SubscriptionPlanCode.Pro, memberCount: 4);
-        var token = await IntegrationTestAuthHelper.IssueUserAccessTokenAsync(_factory.Services, seeded.OwnerEmail, [PermissionCatalog.Subscriptions.Manage]);
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/tenants/{seeded.TenantId}/subscription-plan-change/downgrade")
+        var token = await IntegrationTestAuthHelper.IssueUserAccessTokenAsync(_factory.Services, s.OwnerEmail, [PermissionCatalog.Subscriptions.Manage]);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/tenants/{s.TenantId}/subscription-plan-change/downgrade")
         {
-            Content = JsonContent.Create(new { targetPlanCode = "Basic" }),
+            Content = JsonContent.Create(new { targetPlanCode = target }),
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return await _client.SendAsync(request);
+    }
 
-        var response = await _client.SendAsync(request);
+    private async Task<int> CountPlanChangesAsync(Guid tenantId)
+    {
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.ScheduledSubscriptionPlanChanges.AsNoTracking().CountAsync(c => c.TenantId == tenantId);
+    }
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    /// <summary>Seçenek A (ADR-035 2026-11-08): üye sayısı hedef pakete sığmıyorsa düşürme reddedilir; üyeler silinmez.</summary>
+    [Fact]
+    public async Task ScheduleDowngrade_Should_Reject_When_Members_Exceed_Target_Limit()
+    {
+        var seeded = await SeedTenantAsync(SubscriptionPlanCode.Pro, memberCount: 4);
+
+        var response = await ScheduleDowngradeAsync(seeded, "Basic");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        json.GetProperty("code").GetString().Should().Be("Subscriptions.PlanLimitsExceeded");
+        json.GetProperty("targetPlanCode").GetString().Should().Be("Basic");
+        json.GetProperty("maxActiveClinics").GetInt32().Should().Be(1);
+        json.GetProperty("maxUsers").GetInt32().Should().Be(3);
+        json.GetProperty("activeClinicCount").GetInt32().Should().Be(1);
+        json.GetProperty("memberCount").GetInt32().Should().Be(4);
+        json.GetProperty("pendingInviteCount").GetInt32().Should().Be(0);
+        json.GetProperty("excessClinicCount").GetInt32().Should().Be(0);
+        json.GetProperty("excessUserCount").GetInt32().Should().Be(1);
+        (await CountPlanChangesAsync(seeded.TenantId)).Should().Be(0);
+
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await db.UserTenants.AsNoTracking().CountAsync(ut => ut.TenantId == seeded.TenantId)).Should().Be(4);
+    }
+
+    [Fact]
+    public async Task ScheduleDowngrade_Should_Count_Pending_Invites_And_Excess_Clinics()
+    {
+        var seeded = await SeedTenantAsync(SubscriptionPlanCode.Premium, memberCount: 3);
+        (await CreateInviteAsync(seeded)).StatusCode.Should().Be(HttpStatusCode.OK);
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Clinics.Add(new Clinic(seeded.TenantId, "İkinci Şube", "Bursa"));
+            await db.SaveChangesAsync();
+        }
+
+        var response = await ScheduleDowngradeAsync(seeded, "Basic");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        json.GetProperty("activeClinicCount").GetInt32().Should().Be(2);
+        json.GetProperty("pendingInviteCount").GetInt32().Should().Be(1);
+        json.GetProperty("excessClinicCount").GetInt32().Should().Be(1);
+        json.GetProperty("excessUserCount").GetInt32().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ScheduleDowngrade_Should_Accept_When_Usage_Fits_Target()
+    {
+        var seeded = await SeedTenantAsync(SubscriptionPlanCode.Pro, memberCount: 3);
+
+        var response = await ScheduleDowngradeAsync(seeded, "Basic");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         (await db.ScheduledSubscriptionPlanChanges.AsNoTracking().SingleAsync(c => c.TenantId == seeded.TenantId)).TargetPlanCode
             .Should().Be(SubscriptionPlanCode.Basic);
-        (await db.UserTenants.AsNoTracking().CountAsync(ut => ut.TenantId == seeded.TenantId)).Should().Be(4);
     }
+
+    /// <summary>
+    /// Dönem sonu yeniden kontrol (çalışma varsayımı): planlandıktan sonra sınır aşıldıysa düşürme uygulanmaz, kiracı mevcut pakette
+    /// kalır, abonelik özeti nedeni bugünkü sayılarla döner.
+    /// </summary>
+    [Fact]
+    public async Task Due_Downgrade_Should_Be_Rejected_When_Usage_Grew_After_Scheduling()
+    {
+        var seeded = await SeedTenantAsync(SubscriptionPlanCode.Pro, memberCount: 3);
+        (await ScheduleDowngradeAsync(seeded, "Basic")).StatusCode.Should().Be(HttpStatusCode.OK);
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Clinics.Add(new Clinic(seeded.TenantId, "Sonradan Şube", "Bursa"));
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE ScheduledSubscriptionPlanChanges SET EffectiveAtUtc = {DateTime.UtcNow.AddMinutes(-1)} WHERE TenantId = {seeded.TenantId}");
+            await db.SaveChangesAsync();
+        }
+
+        await ProcessDuePlanChangesAsync();
+
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (await db.ScheduledSubscriptionPlanChanges.AsNoTracking().SingleAsync(c => c.TenantId == seeded.TenantId)).Status
+                .Should().Be(SubscriptionPlanChangeStatus.Rejected);
+            (await db.TenantSubscriptions.AsNoTracking().SingleAsync(s => s.TenantId == seeded.TenantId)).PlanCode
+                .Should().Be(SubscriptionPlanCode.Pro);
+        }
+
+        var token = await IntegrationTestAuthHelper.IssueUserAccessTokenAsync(_factory.Services, seeded.OwnerEmail, [PermissionCatalog.Subscriptions.Read]);
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/tenants/{seeded.TenantId}/subscription-summary");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var summary = await (await _client.SendAsync(request)).Content.ReadFromJsonAsync<JsonElement>();
+        summary.GetProperty("pendingPlanChange").ValueKind.Should().Be(JsonValueKind.Null);
+        var rejected = summary.GetProperty("rejectedPlanChange");
+        rejected.GetProperty("targetPlanCode").GetString().Should().Be("Basic");
+        rejected.GetProperty("fit").GetProperty("excessClinicCount").GetInt32().Should().Be(1);
+        rejected.GetProperty("fit").GetProperty("excessUserCount").GetInt32().Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Due_Downgrade_Should_Apply_When_Usage_Still_Fits()
+    {
+        var seeded = await SeedTenantAsync(SubscriptionPlanCode.Pro, memberCount: 2);
+        (await ScheduleDowngradeAsync(seeded, "Basic")).StatusCode.Should().Be(HttpStatusCode.OK);
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE ScheduledSubscriptionPlanChanges SET EffectiveAtUtc = {DateTime.UtcNow.AddMinutes(-1)} WHERE TenantId = {seeded.TenantId}");
+        }
+
+        await ProcessDuePlanChangesAsync();
+
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (await db.ScheduledSubscriptionPlanChanges.AsNoTracking().SingleAsync(c => c.TenantId == seeded.TenantId)).Status
+                .Should().Be(SubscriptionPlanChangeStatus.Applied);
+            (await db.TenantSubscriptions.AsNoTracking().SingleAsync(s => s.TenantId == seeded.TenantId)).PlanCode
+                .Should().Be(SubscriptionPlanCode.Basic);
+        }
+    }
+
+    private Task ProcessDuePlanChangesAsync()
+        => _factory.Services.GetServices<IHostedService>().OfType<ScheduledPlanChangeProcessorHostedService>().Single()
+            .ProcessDueOnceAsync(CancellationToken.None);
 }
