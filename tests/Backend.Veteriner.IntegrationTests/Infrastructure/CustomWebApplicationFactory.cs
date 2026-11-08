@@ -27,7 +27,9 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<global::
             {
                 ["ConnectionStrings:DefaultConnection"] = IntegrationTestDatabaseGuard.DedicatedConnectionString,
                 ["ConnectionStrings:SqlServer"] = IntegrationTestDatabaseGuard.DedicatedConnectionString,
-                ["ConnectionStrings:QueryConnection"] = IntegrationTestDatabaseGuard.DedicatedQueryConnectionString
+                ["ConnectionStrings:QueryConnection"] = IntegrationTestDatabaseGuard.DedicatedQueryConnectionString,
+                // TIER-020: e-postadaki .ics bağlantısının kökü (makinedeki appsettings'ten bağımsız).
+                ["App:BaseUrl"] = TestAppointmentOwnerLinks.ApiBaseUrl
             }.Concat(IntegrationTestAppConfiguration.RateLimitingDisabled));
         });
 

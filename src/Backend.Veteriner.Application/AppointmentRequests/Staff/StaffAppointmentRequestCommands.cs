@@ -91,6 +91,7 @@ public sealed class ApproveAppointmentRequestCommandHandler
     private readonly IReadRepository<Pet> _pets;
     private readonly AppointmentAvailabilityService _availability;
     private readonly AppointmentRequestEmailComposer _emails;
+    private readonly IRepository<AppointmentOwnerLink> _ownerLinks;
     private readonly IClientContext _clientContext;
     private readonly ISender _sender;
     private readonly TimeProvider _timeProvider;
@@ -102,6 +103,7 @@ public sealed class ApproveAppointmentRequestCommandHandler
         IReadRepository<Pet> pets,
         AppointmentAvailabilityService availability,
         AppointmentRequestEmailComposer emails,
+        IRepository<AppointmentOwnerLink> ownerLinks,
         IClientContext clientContext,
         ISender sender,
         TimeProvider timeProvider)
@@ -112,6 +114,7 @@ public sealed class ApproveAppointmentRequestCommandHandler
         _pets = pets;
         _availability = availability;
         _emails = emails;
+        _ownerLinks = ownerLinks;
         _clientContext = clientContext;
         _sender = sender;
         _timeProvider = timeProvider;
@@ -173,12 +176,17 @@ public sealed class ApproveAppointmentRequestCommandHandler
         if (!created.IsSuccess)
             return Result<AppointmentRequestDetailDto>.Failure(created.Error);
 
-        var approved = r.Approve(created.Value, clientId.Value, pet.Id, startUtc, vetId, userId, _timeProvider.GetUtcNow().UtcDateTime);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var approved = r.Approve(created.Value, clientId.Value, pet.Id, startUtc, vetId, userId, utcNow);
         if (!approved.IsSuccess)
             return Result<AppointmentRequestDetailDto>.Failure(approved.Error);
 
+        // TIER-020: onay e-postasında "takvime ekle" (Google Takvim ve .ics bağlantısı).
+        var calendar = await _emails.CalendarAsync(r, created.Value, startUtc, duration, utcNow, ct);
         var kind = r.WasRescheduled ? AppointmentRequestEmailKind.Rescheduled : AppointmentRequestEmailKind.Approved;
-        await _emails.SendAsync(r, kind, ToMessage(request.Email), ct);
+        await _emails.SendAsync(r, kind, ToMessage(request.Email), calendar.EmailLines, ct);
+        if (calendar.Link is not null)
+            await _ownerLinks.AddAsync(calendar.Link, ct);
 
         try
         {
@@ -240,7 +248,7 @@ public sealed class RejectAppointmentRequestCommandHandler
         if (!rejected.IsSuccess)
             return Result<AppointmentRequestDetailDto>.Failure(rejected.Error);
 
-        await _emails.SendAsync(r, AppointmentRequestEmailKind.Rejected, ApproveAppointmentRequestCommandHandler.ToMessage(request.Email), ct);
+        await _emails.SendAsync(r, AppointmentRequestEmailKind.Rejected, ApproveAppointmentRequestCommandHandler.ToMessage(request.Email), null, ct);
 
         try
         {

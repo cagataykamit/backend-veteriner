@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Backend.IntegrationTests.Infrastructure;
+using Backend.Veteriner.Application.Appointments.OwnerLinks;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Domain.AppointmentRequests;
 using Backend.Veteriner.Domain.Appointments;
@@ -65,6 +66,18 @@ public sealed partial class OwnerPortalIntegrationTests
         approved.GetProperty("history").GetArrayLength().Should().Be(2);
         (await LastEmailSubjectToAsync(email.ToLowerInvariant())).Should().Contain("randevunuzu onayladı");
 
+        // TIER-020: onay e-postasında Google Takvim ve .ics bağlantısı; .ics kimliksiz uçtan iner.
+        var approvedBody = await LastEmailBodyToAsync(email.ToLowerInvariant());
+        approvedBody.Should().Contain("Google Takvim: https://calendar.google.com/calendar/render?action=TEMPLATE")
+            .And.Contain($"&dates={slots[0]:yyyyMMdd'T'HHmmss'Z'}/");
+        const string icsPrefix = "Diğer takvimler (.ics dosyası): ";
+        var icsUrl = approvedBody!.Split('\n').Single(l => l.StartsWith(icsPrefix, StringComparison.Ordinal))[icsPrefix.Length..];
+        icsUrl.Should().Contain($"/{AppointmentOwnerLinkUrls.CalendarFilePath}?token=");
+        var ics = await _factory.CreateClient().GetAsync(new Uri(icsUrl).PathAndQuery);
+        ics.StatusCode.Should().Be(HttpStatusCode.OK, await ics.Content.ReadAsStringAsync());
+        ics.Content.Headers.ContentType!.MediaType.Should().Be("text/calendar");
+        (await ics.Content.ReadAsStringAsync()).Should().Contain($"DTSTART:{slots[0]:yyyyMMdd'T'HHmmss'Z'}").And.Contain("Hayvan: Pamuk");
+
         await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -73,6 +86,9 @@ public sealed partial class OwnerPortalIntegrationTests
             appointment.ScheduledAtUtc.Should().Be(slots[0]);
             appointment.ReasonId.Should().Be(b.ReasonId);
             appointment.Status.Should().Be(AppointmentStatus.Scheduled);
+            var calendarLink = await db.AppointmentOwnerLinks.AsNoTracking().SingleAsync(l => l.AppointmentId == appointmentId);
+            calendarLink.Purpose.Should().Be(AppointmentOwnerLinkPurpose.Calendar, "onay e-postasında yalnız takvim bağlantısı; onayla/iptal yok");
+            calendarLink.ExpiresAtUtc.Should().Be(slots[0]);
         }
 
         var again = await SendAsync(HttpMethod.Post, $"/api/v1/appointment-requests/{first}/approve", b.Staff.Token, new { clientId, petId });

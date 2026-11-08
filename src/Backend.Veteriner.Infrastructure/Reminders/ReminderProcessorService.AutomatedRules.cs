@@ -327,7 +327,7 @@ public sealed partial class ReminderProcessorService
             _logger.LogWarning(ex, "Automated reminder enqueue failed. Tenant={TenantId} DedupeKey={DedupeKey}", log.TenantId, log.DedupeKey);
         }
 
-        await TryInsertLogAsync(log, ct, detachOutboxMessageIdOnConflict: log.OutboxMessageId, detachLinkOnConflict: optOutLink);
+        await TryInsertLogAsync(log, ct, detachOutboxMessageIdOnConflict: log.OutboxMessageId, detachLinksOnConflict: optOutLink is null ? null : [optOutLink]);
     }
 
     private async Task<(string Email, string Name, string PetName)> LoadPetRecipientAsync(Guid tenantId, Guid petId, CancellationToken ct)

@@ -4,6 +4,7 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.OwnerPortal;
 using Backend.Veteriner.Application.OwnerPortal.Contracts;
+using Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalAppointmentCalendar;
 using Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalAppointments;
 using Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalBalance;
 using Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalClinic;
@@ -85,6 +86,24 @@ public sealed class PortalLinkRecordsController : ControllerBase
             scope ?? PortalAppointmentScope.Upcoming,
             page ?? 1,
             pageSize ?? OwnerPortalPaging.DefaultPageSize), ct);
+
+    /// <summary>"Takvime ekle" (TIER-020): planlı ve saati gelmemiş randevunun .ics dosyası; değilse 404.</summary>
+    [HttpGet("appointments/{appointmentId:guid}/calendar.ics")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetAppointmentCalendar([FromRoute] Guid linkId, [FromRoute] Guid appointmentId, CancellationToken ct)
+    {
+        if (!this.TryGetOwnerAccountId(out var ownerAccountId, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetPortalAppointmentCalendarQuery(ownerAccountId, linkId, appointmentId), ct);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        Response.Headers.CacheControl = "no-store";
+        return File(result.Value!.Content, result.Value.ContentType, result.Value.FileName);
+    }
 
     /// <summary>Bağın kliniğindeki bakiye (yalnız tutar/durum).</summary>
     [HttpGet("balance")]

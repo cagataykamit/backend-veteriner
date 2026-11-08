@@ -99,6 +99,10 @@ hekim tanımlı ama hepsi doluysa 409 `AppointmentRequests.SlotUnavailable`. Mü
 Beklemede olmayan talep 409 `AppointmentRequests.NotPending`; eşzamanlı karar 409 `AppointmentRequests.ConcurrencyConflict`.
 Her geçiş geçmişe ve denetim kaydına (`AppointmentRequest.Approve/Reject/...`) yazılır.
 
+Takvime ekle (TIER-020): `Approved` ve `Rescheduled` e-postasının sonuna (şablon ya da düzenlenen metinden sonra) Google
+Takvim ve .ics bağlantısı eklenir; `email-preview` bu satırları göstermez. Takvim bağlantısı onayla aynı transaction'da
+yazılır ve yalnız takvim dosyası verir. Ayrıntı `APPOINTMENT_OWNER_LINK_API_CONTRACT.md` §8.
+
 ## 5. Kliniğe özel bağlantı (kimliksiz) — `/api/portal/v1/booking/{bookingCode}`
 
 IP başına hız sınırı `portal-auth` (10 istek/dk). Kod bilinmiyor, online randevu kapalı, klinik/kiracı pasif ya da abonelik

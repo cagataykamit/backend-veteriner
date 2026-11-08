@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Appointments.Calendar;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Auditing;
@@ -12,16 +13,24 @@ namespace Backend.Veteriner.Application.Appointments.OwnerLinks;
 
 /// <summary>
 /// Bağlantı sayfası: asgari veri — klinik adı, randevu saati, hayvan adı ve iptalin açık olup olmadığı. Telefon, not, teşhis
-/// ve sahip bilgisi dönmez.
+/// ve sahip bilgisi dönmez. <see cref="GoogleCalendarUrl"/> (TIER-020) takvim etkinliğini taşır: kliniğin adresi ve telefonu
+/// (kliniğin herkese açık iletişim bilgisi) ve hayvan adı.
 /// </summary>
 public sealed record AppointmentOwnerLinkPageDto(
     string ClinicName,
     DateTime ScheduledAtUtc,
     string PetName,
-    bool CancelEnabled);
+    bool CancelEnabled,
+    string GoogleCalendarUrl);
 
 /// <summary>Bağlantı sayfası (kimliksiz; TIER-019). Durumu değiştirmez.</summary>
 public sealed record GetAppointmentOwnerLinkQuery(string Token) : IRequest<Result<AppointmentOwnerLinkPageDto>>;
+
+/// <summary>
+/// Takvim dosyası (kimliksiz; TIER-020): yanıt ya da takvim bağlantısıyla .ics. Okumadır: durumu değiştirmez, bağlantıyı
+/// tüketmez, denetime yazılmaz. Süre randevu saatinde dolar; iptal edilen ya da yeniden zamanlanan randevuda 404.
+/// </summary>
+public sealed record GetAppointmentCalendarByOwnerLinkQuery(string Token) : IRequest<Result<AppointmentCalendarFile>>;
 
 /// <summary>Sahip geleceğini onaylar: randevu durumu değişmez, onay zamanı yazılır, bağlantı kapanır.</summary>
 public sealed record ConfirmAppointmentByOwnerLinkCommand(string Token) : IRequest<Result>;
@@ -61,7 +70,30 @@ public sealed class GetAppointmentOwnerLinkQueryHandler
             s.Clinic.Name,
             s.Appointment.ScheduledAtUtc,
             s.PetName,
-            s.CancelLinkEnabled));
+            s.CancelLinkEnabled,
+            AppointmentCalendar.GoogleUrl(s.CalendarEvent())));
+    }
+}
+
+public sealed class GetAppointmentCalendarByOwnerLinkQueryHandler
+    : IRequestHandler<GetAppointmentCalendarByOwnerLinkQuery, Result<AppointmentCalendarFile>>
+{
+    private readonly AppointmentOwnerLinkResolver _resolver;
+    private readonly TimeProvider _timeProvider;
+
+    public GetAppointmentCalendarByOwnerLinkQueryHandler(AppointmentOwnerLinkResolver resolver, TimeProvider timeProvider)
+    {
+        _resolver = resolver;
+        _timeProvider = timeProvider;
+    }
+
+    public async ValueTask<Result<AppointmentCalendarFile>> Handle(GetAppointmentCalendarByOwnerLinkQuery request, CancellationToken ct)
+    {
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var scope = await _resolver.ResolveForCalendarAsync(request.Token, utcNow, ct);
+        return scope.IsSuccess
+            ? Result<AppointmentCalendarFile>.Success(AppointmentCalendar.File(scope.Value!.CalendarEvent(), utcNow))
+            : Result<AppointmentCalendarFile>.Failure(scope.Error);
     }
 }
 

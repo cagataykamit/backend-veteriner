@@ -67,6 +67,10 @@ public sealed record PortalPetVaccinationsDto(
     IReadOnlyList<PortalVaccinationHistoryItemDto> History,
     IReadOnlyList<PortalUpcomingVaccinationDto> Upcoming);
 
+/// <summary>
+/// Randevu satırı. <see cref="GoogleCalendarUrl"/> (TIER-020) yalnız takvime eklenebilen randevuda (planlı ve saati gelmemiş)
+/// doludur; .ics aynı koşulla <c>GET appointments/{id}/calendar.ics</c>'ten alınır.
+/// </summary>
 public sealed record PortalAppointmentDto(
     Guid AppointmentId,
     Guid PetId,
@@ -76,7 +80,8 @@ public sealed record PortalAppointmentDto(
     DateTime ScheduledAtUtc,
     int DurationMinutes,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] AppointmentType AppointmentType,
-    [property: JsonConverter(typeof(JsonStringEnumConverter))] AppointmentStatus Status);
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] AppointmentStatus Status,
+    string? GoogleCalendarUrl = null);
 
 /// <summary>Bakiye: yalnız tutar/durum (ADR-031 AK-9), bağın kliniğiyle sınırlı.</summary>
 public sealed record PortalBalanceDto(

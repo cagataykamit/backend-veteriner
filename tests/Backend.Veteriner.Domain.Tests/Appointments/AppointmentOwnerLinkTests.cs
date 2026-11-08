@@ -111,6 +111,40 @@ public sealed class AppointmentOwnerLinkTests
     }
 
     [Fact]
+    public void Calendar_Link_Should_Give_Calendar_But_Never_Actions()
+    {
+        var appointment = Scheduled();
+        var calendar = AppointmentOwnerLink.Create(
+            appointment.TenantId, appointment.ClinicId, appointment.Id, new string('b', 64), appointment.ScheduledAtUtc, Now,
+            AppointmentOwnerLinkPurpose.Calendar);
+
+        calendar.Purpose.Should().Be(AppointmentOwnerLinkPurpose.Calendar);
+        calendar.ExpiresAtUtc.Should().Be(appointment.ScheduledAtUtc, "süre randevu saatinde dolar");
+        calendar.IsCalendarUsableFor(appointment, Now).Should().BeTrue();
+        calendar.IsUsableFor(appointment, Now).Should().BeFalse("takvim tokeni eylem yapamaz");
+        calendar.IsCalendarUsableFor(appointment, appointment.ScheduledAtUtc).Should().BeFalse("süre doldu");
+        LinkFor(appointment).Purpose.Should().Be(AppointmentOwnerLinkPurpose.Respond, "varsayılan yanıt bağlantısı");
+    }
+
+    [Fact]
+    public void Confirmed_Respond_Link_Should_Still_Give_Calendar_Until_Cancel_Or_Reschedule()
+    {
+        var appointment = Scheduled();
+        var link = LinkFor(appointment);
+
+        link.MarkUsed(AppointmentOwnerLinkAction.Confirm, Now);
+        link.IsCalendarUsableFor(appointment, Now).Should().BeTrue("takvim okumadır; onaydan sonra da alınır");
+
+        var rescheduled = Scheduled();
+        var rescheduledLink = LinkFor(rescheduled);
+        rescheduled.RescheduleTo(rescheduled.ScheduledAtUtc.AddHours(1));
+        rescheduledLink.IsCalendarUsableFor(rescheduled, Now).Should().BeFalse("eski bağlantı geçersiz");
+
+        appointment.Cancel().IsSuccess.Should().BeTrue();
+        link.IsCalendarUsableFor(appointment, Now).Should().BeFalse("iptal randevuda red");
+    }
+
+    [Fact]
     public void ConfirmByOwner_Should_Keep_Status_Set_Time_Once_And_Advance_Sequence()
     {
         var appointment = Scheduled();

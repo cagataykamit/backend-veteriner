@@ -131,8 +131,11 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned, IC
     }
 
     /// <summary>Sahip bağlantıyla yanıt verebilir: randevu planlı ve saati gelmemiş (TIER-019; kural tek yer).</summary>
-    public bool CanOwnerRespond(DateTime nowUtc)
-        => Status == AppointmentStatus.Scheduled && ScheduledAtUtc > NormalizeUtc(nowUtc);
+    public bool CanOwnerRespond(DateTime nowUtc) => CanOwnerRespond(Status, ScheduledAtUtc, nowUtc);
+
+    /// <summary>Aynı kural, okuma projeksiyonları için (portal "takvime ekle", TIER-020).</summary>
+    public static bool CanOwnerRespond(AppointmentStatus status, DateTime scheduledAtUtc, DateTime nowUtc)
+        => status == AppointmentStatus.Scheduled && NormalizeUtc(scheduledAtUtc) > NormalizeUtc(nowUtc);
 
     /// <summary>Sahip geleceğini onayladı (TIER-019). Durum değişmez. Zaten onaylıysa değişiklik olmadan başarı (idempotent).</summary>
     public Result ConfirmByOwner(DateTime nowUtc)

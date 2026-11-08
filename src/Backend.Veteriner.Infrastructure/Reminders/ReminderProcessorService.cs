@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Appointments.Calendar;
 using Backend.Veteriner.Application.Appointments.OwnerLinks;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.OwnerPortal.MarketingOptOut;
@@ -176,7 +177,7 @@ public sealed partial class ReminderProcessorService
                     && l.SourceEntityId == a.Id
                     && l.DedupeKey.EndsWith(dedupeSuffix)))
             .OrderBy(a => a.ScheduledAtUtc)
-            .Select(a => new AppointmentReminderCandidateRow(a.Id, a.ClinicId, a.PetId, a.ScheduledAtUtc, a.AppointmentType))
+            .Select(a => new AppointmentReminderCandidateRow(a.Id, a.ClinicId, a.PetId, a.ScheduledAtUtc, a.DurationMinutes, a.AppointmentType))
             .Take(batchSize)
             .ToListAsync(ct);
 
@@ -203,7 +204,7 @@ public sealed partial class ReminderProcessorService
         var clinicRows = await _db.Clinics
             .AsNoTracking()
             .Where(c => c.TenantId == tenantId && clinicIds.Contains(c.Id))
-            .Select(c => new ClinicContactRow(c.Id, c.Name, c.Phone))
+            .Select(c => new ClinicContactRow(c.Id, c.Name, c.Phone, c.Address, c.District, c.City))
             .ToListAsync(ct);
         var clinicById = clinicRows.ToDictionary(x => x.ClinicId);
 
@@ -274,11 +275,23 @@ public sealed partial class ReminderProcessorService
                 continue;
             }
 
-            // TIER-019: e-postada tek kullanımlık "onayla / iptal et" bağlantısı; bağlantı e-posta ve günlükle aynı kayıtta yazılır.
-            AppointmentOwnerLink? ownerLink = null;
+            // TIER-019: e-postada tek kullanımlık "onayla / iptal et" bağlantısı; TIER-020: "takvime ekle" (Google Takvim ve
+            // .ics bağlantısı). Bağlantılar e-posta ve günlükle aynı kayıtta yazılır.
+            var links = new List<AppointmentOwnerLink>(2);
             try
             {
                 var issued = _ownerLinks.Issue(tenantId, candidate.ClinicId, candidate.AppointmentId, candidate.ScheduledAtUtc, nowUtc);
+                var calendarLink = _ownerLinks.IssueCalendar(tenantId, candidate.ClinicId, candidate.AppointmentId, candidate.ScheduledAtUtc, nowUtc);
+                var calendarEvent = AppointmentCalendarEvent.Create(
+                    candidate.AppointmentId,
+                    candidate.ScheduledAtUtc,
+                    candidate.DurationMinutes,
+                    clinicName,
+                    clinic?.Address,
+                    clinic?.District,
+                    clinic?.City,
+                    clinic?.Phone,
+                    pet?.Name);
                 var body = AppointmentReminderEmail.Body(
                     recipientName,
                     petName,
@@ -286,7 +299,8 @@ public sealed partial class ReminderProcessorService
                     FormatForDisplay(candidate.ScheduledAtUtc),
                     issued,
                     cancelLinkEnabled: !cancelLinkDisabledClinicIds.Contains(candidate.ClinicId),
-                    clinic?.Phone);
+                    clinic?.Phone,
+                    AppointmentCalendar.EmailLines(AppointmentCalendar.GoogleUrl(calendarEvent), calendarLink?.IcsUrl));
 
                 var outboxMessageId = await _reminderEmailOutboxEnqueuer.EnqueueReminderEmailAsync(
                     recipientEmail,
@@ -295,8 +309,10 @@ public sealed partial class ReminderProcessorService
                     isHtml: false,
                     ct);
                 log.MarkEnqueued(nowUtc, outboxMessageId);
-                ownerLink = issued.Link;
-                _db.AppointmentOwnerLinks.Add(ownerLink);
+                links.Add(issued.Link);
+                if (calendarLink is not null)
+                    links.Add(calendarLink.Link);
+                _db.AppointmentOwnerLinks.AddRange(links);
             }
             catch (Exception ex)
             {
@@ -304,7 +320,7 @@ public sealed partial class ReminderProcessorService
                 _logger.LogWarning(ex, "Appointment reminder enqueue failed. Tenant={TenantId} Appointment={AppointmentId}", tenantId, candidate.AppointmentId);
             }
 
-            if (await TryInsertLogAsync(log, ct, detachOutboxMessageIdOnConflict: log.OutboxMessageId, detachLinkOnConflict: ownerLink))
+            if (await TryInsertLogAsync(log, ct, detachOutboxMessageIdOnConflict: log.OutboxMessageId, detachLinksOnConflict: links))
                 dedupeSet.Add(dedupeKey);
         }
     }
@@ -591,7 +607,7 @@ public sealed partial class ReminderProcessorService
         ReminderDispatchLog log,
         CancellationToken ct,
         Guid? detachOutboxMessageIdOnConflict = null,
-        object? detachLinkOnConflict = null)
+        IReadOnlyCollection<object>? detachLinksOnConflict = null)
     {
         try
         {
@@ -610,9 +626,9 @@ public sealed partial class ReminderProcessorService
                     outboxEntry.State = EntityState.Detached;
             }
 
-            // Aynı iletinin bağlantısı (randevu onayla/iptal ya da ticari ileti reddi) tekrar engelinde yazılmaz.
-            if (detachLinkOnConflict is not null)
-                _db.Entry(detachLinkOnConflict).State = EntityState.Detached;
+            // Aynı iletinin bağlantıları (randevu onayla/iptal ve takvim ya da ticari ileti reddi) tekrar engelinde yazılmaz.
+            foreach (var link in detachLinksOnConflict ?? [])
+                _db.Entry(link).State = EntityState.Detached;
 
             _logger.LogDebug("Reminder dedupe conflict skipped. Tenant={TenantId} DedupeKey={DedupeKey}", log.TenantId, log.DedupeKey);
             return false;
@@ -661,6 +677,7 @@ public sealed partial class ReminderProcessorService
         Guid ClinicId,
         Guid PetId,
         DateTime ScheduledAtUtc,
+        int DurationMinutes,
         AppointmentType AppointmentType);
 
     private sealed record VaccinationReminderCandidateRow(
@@ -695,5 +712,5 @@ public sealed partial class ReminderProcessorService
     private sealed record PetClientRow(Guid PetId, Guid ClientId, string Name);
     private sealed record ClientRecipientRow(Guid ClientId, string FullName, string? Email);
     private sealed record ClinicNameRow(Guid ClinicId, string Name);
-    private sealed record ClinicContactRow(Guid ClinicId, string Name, string? Phone);
+    private sealed record ClinicContactRow(Guid ClinicId, string Name, string? Phone, string? Address, string? District, string City);
 }

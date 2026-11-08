@@ -9,10 +9,18 @@ public enum AppointmentOwnerLinkAction
     Cancel = 1
 }
 
+/// <summary>Bağlantının amacı (TIER-020): yanıt bağlantısı takvim dosyasını da verir; takvim bağlantısı yalnız dosyayı verir.</summary>
+public enum AppointmentOwnerLinkPurpose
+{
+    Respond = 0,
+    Calendar = 1
+}
+
 /// <summary>
 /// Randevu hatırlatmasındaki "onayla / iptal et" bağlantısı (TIER-019). Tek bağlantı iki eylemi de taşır; ham token yalnız
 /// e-postada bulunur, depoda SHA-256 özeti tutulur. Süre randevu saatinde dolar ve tek kullanımlıktır: bir eylem bağlantıyı
 /// kapatır, aynı randevunun diğer bağlantıları da kapanır. Randevu yeniden zamanlanırsa bağlantı geçersizdir (saat eşleşmez).
+/// "Takvime ekle" (TIER-020) aynı tokeni kullanır: takvim dosyası okumadır, tek kullanım kuralı ona uygulanmaz.
 /// </summary>
 public sealed class AppointmentOwnerLink : ITenantOwned
 {
@@ -23,6 +31,9 @@ public sealed class AppointmentOwnerLink : ITenantOwned
     public Guid ClinicId { get; private set; }
     public Guid AppointmentId { get; private set; }
     public string TokenHash { get; private set; } = default!;
+
+    /// <summary>Takvim bağlantısı adreste (GET) taşındığı için eylem yapamaz; eylem yalnız yanıt bağlantısıyladır.</summary>
+    public AppointmentOwnerLinkPurpose Purpose { get; private set; }
 
     /// <summary>Gönderim anındaki randevu saati; bağlantı bu ana kadar ve randevu bu saatte kaldıkça geçerlidir.</summary>
     public DateTime ExpiresAtUtc { get; private set; }
@@ -41,8 +52,11 @@ public sealed class AppointmentOwnerLink : ITenantOwned
         Guid appointmentId,
         string tokenHash,
         DateTime appointmentStartUtc,
-        DateTime utcNow)
+        DateTime utcNow,
+        AppointmentOwnerLinkPurpose purpose = AppointmentOwnerLinkPurpose.Respond)
     {
+        if (!Enum.IsDefined(purpose))
+            throw new ArgumentOutOfRangeException(nameof(purpose));
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
         if (clinicId == Guid.Empty)
@@ -63,18 +77,27 @@ public sealed class AppointmentOwnerLink : ITenantOwned
             ClinicId = clinicId,
             AppointmentId = appointmentId,
             TokenHash = tokenHash,
+            Purpose = purpose,
             ExpiresAtUtc = expires,
             CreatedAtUtc = now,
         };
     }
 
     /// <summary>
-    /// Kullanılabilir: kapanmamış, bu randevunun bağlantısı, randevu hâlâ gönderimdeki saatte ve sahip yanıtı alabilir
-    /// (<see cref="Appointment.CanOwnerRespond"/>; saat geçmişse süre de dolmuştur).
+    /// Eylem (onayla / iptal et) için kullanılabilir: yanıt bağlantısı, kapanmamış ve <see cref="IsCalendarUsableFor"/>.
     /// </summary>
     public bool IsUsableFor(Appointment appointment, DateTime utcNow)
-        => ClosedAtUtc is null
-           && appointment.Id == AppointmentId
+        => Purpose == AppointmentOwnerLinkPurpose.Respond
+           && ClosedAtUtc is null
+           && IsCalendarUsableFor(appointment, utcNow);
+
+    /// <summary>
+    /// Takvim dosyası için kullanılabilir (her iki amaç): bu randevunun bağlantısı, randevu hâlâ gönderimdeki saatte ve sahip
+    /// yanıtı alabilir (<see cref="Appointment.CanOwnerRespond"/>; saat geçmişse süre de dolmuştur). Onayla kapanan bağlantı
+    /// takvim dosyasını vermeye devam eder; iptal edilen ya da yeniden zamanlanan randevuda geçersizdir.
+    /// </summary>
+    public bool IsCalendarUsableFor(Appointment appointment, DateTime utcNow)
+        => appointment.Id == AppointmentId
            && appointment.TenantId == TenantId
            && appointment.ScheduledAtUtc == ExpiresAtUtc
            && appointment.CanOwnerRespond(utcNow);

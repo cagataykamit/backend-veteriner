@@ -1,9 +1,11 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Application.AppointmentRequests;
 using Backend.Veteriner.Application.Appointments.Availability;
+using Backend.Veteriner.Application.Appointments.OwnerLinks;
 using Backend.Veteriner.Application.Clinics.OnlineBooking;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Notifications;
 using Backend.Veteriner.Domain.AppointmentRequests;
@@ -11,6 +13,7 @@ using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Pets;
 using AwesomeAssertions;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Moq;
 
@@ -51,7 +54,12 @@ public sealed class AppointmentRequestNextSlotsTests
             new Mock<IReadRepository<ClinicAppointmentRequestEmailTemplate>>().Object,
             new Mock<IReadRepository<Clinic>>().Object,
             new Mock<IReadRepository<Pet>>().Object,
-            new Mock<IEmailSender>().Object);
+            new Mock<IEmailSender>().Object,
+            new AppointmentOwnerLinkIssuer(
+                new Mock<IOwnerPortalSecretGenerator>().Object,
+                new Mock<ITokenHashService>().Object,
+                Options.Create(new OwnerPortalOptions()),
+                Options.Create(new AppOptions())));
         return new AppointmentRequestIntake(
             new Mock<IReadRepository<AppointmentReason>>().Object,
             new Mock<IReadRepository<AppointmentRequest>>().Object,

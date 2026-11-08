@@ -378,6 +378,10 @@ Tüm durumlar döner (`Scheduled`, `Completed`, `Cancelled`, `NoShow`).
 
 `appointmentType`: `Examination`, `Vaccination`, `Checkup`, `Surgery`, `Grooming`, `Consultation`, `Other`. Randevu notu dönmez.
 
+Takvime ekle (TIER-020): satırda `googleCalendarUrl` (planlı ve saati gelmemiş randevuda dolu, diğerlerinde `null`) ve
+`GET /links/{linkId}/appointments/{appointmentId}/calendar.ics` (.ics; değilse 404 `Portal.Appointments.NotFound`).
+Ayrıntı `APPOINTMENT_OWNER_LINK_API_CONTRACT.md` §8.
+
 ### 6.5 `GET /links/{linkId}/balance` ve `/payments`
 
 Yalnız tutar/durum (AK-9); online ödeme yok. **Bağın kliniğiyle sınırlıdır**; iptal edilmiş ücret ve ödeme sayılmaz. Hesap klinik panelindeki müşteri bakiyesiyle **aynı kuraldır** (`ClientBalanceTotals`, `GET /api/v1/clients/{id}/balance` ile ortak):
