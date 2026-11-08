@@ -45,6 +45,12 @@ public enum AppointmentRequestChannel
 
     /// <summary>Veteriner bul (TIER-015); sayfa randevu bağlantısına <c>?kaynak=veteriner-bul</c> ekler.</summary>
     VetFinder = 4,
+
+    /// <summary>
+    /// Kliniğin Vetinity dışındaki sitesine koyduğu düğme ya da gömme kodu (APPT-020/021); panelin verdiği kod bağlantıya
+    /// <c>?kaynak=dis-site</c> ekler.
+    /// </summary>
+    ExternalSite = 5,
 }
 
 /// <summary>
@@ -60,11 +66,15 @@ public static class AppointmentRequestChannels
     /// <summary>Veteriner bul kartından gelen bağlantının değeri (TIER-015).</summary>
     public const string VetFinderToken = "veteriner-bul";
 
+    /// <summary>Panelin verdiği HTML düğme ve gömme kodunun değeri (APPT-020/021).</summary>
+    public const string ExternalSiteToken = "dis-site";
+
     public static AppointmentRequestChannel ForLink(string? token)
         => token?.Trim().ToLowerInvariant() switch
         {
             ClinicSiteToken => AppointmentRequestChannel.ClinicSite,
             VetFinderToken => AppointmentRequestChannel.VetFinder,
+            ExternalSiteToken => AppointmentRequestChannel.ExternalSite,
             _ => AppointmentRequestChannel.ClinicLink,
         };
 }

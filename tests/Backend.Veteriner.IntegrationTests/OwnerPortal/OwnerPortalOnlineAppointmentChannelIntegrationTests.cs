@@ -68,6 +68,19 @@ public sealed partial class OwnerPortalIntegrationTests
     }
 
     [Fact]
+    public async Task External_Site_Token_Should_Be_Counted_As_External_Site()
+    {
+        var b = await SetupBookingAsync();
+        var slots = await PublicSlotsAsync(b);
+
+        // APPT-020/021: paneldeki düğme ve gömme kodu bağlantıya ?kaynak=dis-site ekler.
+        var id = await CreateLinkRequestWithChannelAsync(b, slots[0], UniqueEmail(), "dis-site");
+
+        (await GetRequestAsync(b.Staff, id)).GetProperty("summary").GetProperty("channel").GetInt32()
+            .Should().Be((int)AppointmentRequestChannel.ExternalSite);
+    }
+
+    [Fact]
     public async Task Channel_Should_Be_Decided_By_Server_Old_Request_Unknown_And_Summary_Counted_By_Channel()
     {
         var b = await SetupBookingAsync();
