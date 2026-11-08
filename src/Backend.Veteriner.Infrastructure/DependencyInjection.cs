@@ -265,6 +265,9 @@ public static class DependencyInjection
         // Permission cache invalidation (rol/permission değişince cache düşürmek için)
         services.AddScoped<IPermissionCacheInvalidator, PermissionCacheInvalidator>();
 
+        // İzin değişim damgası (SEC-002): süreç belleğinde, tek API süreci varsayımı
+        services.AddSingleton<PermissionChangeStamps>();
+
         // Global species/breed katalog liste cache
         services.AddSingleton<CatalogListCache>();
         services.AddSingleton<ICatalogListCache>(sp => sp.GetRequiredService<CatalogListCache>());

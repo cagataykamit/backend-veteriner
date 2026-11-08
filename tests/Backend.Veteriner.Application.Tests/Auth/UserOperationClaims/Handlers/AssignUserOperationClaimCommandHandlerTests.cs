@@ -14,10 +14,11 @@ public sealed class AssignUserOperationClaimCommandHandlerTests
     private readonly Mock<IUserReadRepository> _users = new();
     private readonly Mock<IOperationClaimReadRepository> _operationClaims = new();
     private readonly Mock<IUserOperationClaimRepository> _userOperationClaims = new();
+    private readonly Mock<IPermissionCacheInvalidator> _cache = new();
     private readonly Mock<IUnitOfWork> _uow = new();
 
     private AssignUserOperationClaimCommandHandler CreateHandler()
-        => new(_users.Object, _operationClaims.Object, _userOperationClaims.Object, _uow.Object);
+        => new(_users.Object, _operationClaims.Object, _userOperationClaims.Object, _cache.Object, _uow.Object);
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_UserNotFound()
@@ -89,6 +90,7 @@ public sealed class AssignUserOperationClaimCommandHandlerTests
         result.Error.Code.Should().Be("UserOperationClaims.Duplicate");
         _userOperationClaims.Verify(r => r.AddAsync(It.IsAny<UserOperationClaim>(), It.IsAny<CancellationToken>()), Times.Never);
         _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+        _cache.Verify(c => c.InvalidateUser(It.IsAny<Guid>()), Times.Never);
     }
 
     [Fact]
@@ -126,6 +128,7 @@ public sealed class AssignUserOperationClaimCommandHandlerTests
         captured.OperationClaimId.Should().Be(claimId);
 
         _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _cache.Verify(c => c.InvalidateUser(userId), Times.Once);
     }
 }
 

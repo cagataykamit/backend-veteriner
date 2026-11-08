@@ -19,8 +19,8 @@ namespace Backend.Veteriner.Application.Tenants.Commands.RemoveMemberClinic;
 /// </list>
 /// Idempotent: ilişki yoksa remove çağrılmaz, <c>AlreadyRemoved = true</c> döner.
 /// Read-only / cancelled tenant durumunda merkezi <c>TenantSubscriptionWriteGuardBehavior</c> bu command'ı önce keser.
-/// Permission cache invalidation yapılmaz: clinic membership permission setini değiştirmez.
-/// Son-klinik koruması ve session/refresh revoke bu fazda kapsam dışıdır.
+/// Kaldırma sonrası <see cref="IPermissionCacheInvalidator"/> çağrılır (SEC-002): üyenin eldeki erişim token'ı geçersiz sayılır.
+/// Son-klinik koruması bu fazda kapsam dışıdır.
 /// </summary>
 public sealed class RemoveTenantMemberClinicCommandHandler
     : IRequestHandler<RemoveTenantMemberClinicCommand, Result<RemoveTenantMemberClinicResultDto>>
@@ -31,6 +31,7 @@ public sealed class RemoveTenantMemberClinicCommandHandler
     private readonly IUserTenantRepository _userTenantRepo;
     private readonly IReadRepository<Clinic> _clinicsRead;
     private readonly IUserClinicRepository _userClinics;
+    private readonly IPermissionCacheInvalidator _cache;
     private readonly IUnitOfWork _uow;
 
     public RemoveTenantMemberClinicCommandHandler(
@@ -40,6 +41,7 @@ public sealed class RemoveTenantMemberClinicCommandHandler
         IUserTenantRepository userTenantRepo,
         IReadRepository<Clinic> clinicsRead,
         IUserClinicRepository userClinics,
+        IPermissionCacheInvalidator cache,
         IUnitOfWork uow)
     {
         _tenantContext = tenantContext;
@@ -48,6 +50,7 @@ public sealed class RemoveTenantMemberClinicCommandHandler
         _userTenantRepo = userTenantRepo;
         _clinicsRead = clinicsRead;
         _userClinics = userClinics;
+        _cache = cache;
         _uow = uow;
     }
 
@@ -109,6 +112,8 @@ public sealed class RemoveTenantMemberClinicCommandHandler
 
         await _userClinics.RemoveAsync(request.MemberId, request.ClinicId, ct);
         await _uow.SaveChangesAsync(ct);
+
+        _cache.InvalidateUser(request.MemberId);
 
         return Result<RemoveTenantMemberClinicResultDto>.Success(new RemoveTenantMemberClinicResultDto(
             request.MemberId,

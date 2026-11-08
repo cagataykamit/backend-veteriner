@@ -2,6 +2,7 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Api.Health;
 using Backend.Veteriner.Api.Middleware;
 using Backend.Veteriner.Application.Common.Constants;
+using Backend.Veteriner.Infrastructure.Caching;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning.ApiExplorer;
@@ -19,6 +20,9 @@ public static class WebApplicationExtensions
 {
     public static Task<WebApplication> ConfigureBackendAsync(this WebApplication app)
     {
+        // SEC-002: süreç başlangıç damgası ilk istekte değil, açılışta alınsın.
+        app.Services.GetRequiredService<PermissionChangeStamps>();
+
         app.UseForwardedHeaders();
 
         app.UseSerilogRequestLogging();

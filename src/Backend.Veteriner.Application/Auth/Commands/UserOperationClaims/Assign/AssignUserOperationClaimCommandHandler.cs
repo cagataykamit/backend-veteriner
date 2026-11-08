@@ -12,17 +12,20 @@ public sealed class AssignUserOperationClaimCommandHandler
     private readonly IUserReadRepository _users;
     private readonly IOperationClaimReadRepository _operationClaims;
     private readonly IUserOperationClaimRepository _repo;
+    private readonly IPermissionCacheInvalidator _cache;
     private readonly IUnitOfWork _uow;
 
     public AssignUserOperationClaimCommandHandler(
         IUserReadRepository users,
         IOperationClaimReadRepository operationClaims,
         IUserOperationClaimRepository repo,
+        IPermissionCacheInvalidator cache,
         IUnitOfWork uow)
     {
         _users = users;
         _operationClaims = operationClaims;
         _repo = repo;
+        _cache = cache;
         _uow = uow;
     }
 
@@ -43,6 +46,8 @@ public sealed class AssignUserOperationClaimCommandHandler
         var entity = new UserOperationClaim(request.UserId, request.OperationClaimId);
         await _repo.AddAsync(entity, ct);
         await _uow.SaveChangesAsync(ct);
+
+        _cache.InvalidateUser(request.UserId);
 
         return Result<Guid>.Success(entity.Id);
     }

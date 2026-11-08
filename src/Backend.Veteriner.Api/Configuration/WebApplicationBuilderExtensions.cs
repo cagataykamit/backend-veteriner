@@ -196,6 +196,12 @@ public static class WebApplicationBuilderExtensions
                     NameClaimType = JwtRegisteredClaimNames.Sub,
                     RoleClaimType = "role"
                 };
+
+                // SEC-002: izinleri token üretildikten sonra değişen kullanıcının eski token'ı reddedilir.
+                opt.Events = new JwtBearerEvents
+                {
+                    OnTokenValidated = PermissionChangeStampValidation.OnTokenValidated
+                };
             })
             // Hasta sahibi portalı (ADR-031 K6): ayrı şema, ayrı hedef kitle. Yalnız portal politikası bu şemayı kullanır.
             .AddJwtBearer(OwnerPortalAuth.Scheme, opt =>
