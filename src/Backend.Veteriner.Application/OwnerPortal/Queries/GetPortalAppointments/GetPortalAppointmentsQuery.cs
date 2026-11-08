@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Appointments.Calendar;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.OwnerPortal.Access;
@@ -86,23 +87,32 @@ public sealed class GetPortalAppointmentsQueryHandler
 
         var petNames = pets.ToDictionary(p => p.Id, p => p.Name);
         var clinicIds = rows.Select(r => r.ClinicId).Distinct().ToArray();
-        var clinicNames = clinicIds.Length == 0
-            ? new Dictionary<Guid, string>()
+        var clinics = clinicIds.Length == 0
+            ? new Dictionary<Guid, Clinic>()
             : (await _clinics.ListAsync(new PortalClinicsByIdsSpec(clinicIds), ct))
                 .Where(c => c.TenantId == scope.TenantId)
-                .ToDictionary(c => c.Id, c => c.Name);
+                .ToDictionary(c => c.Id);
 
         var items = rows
-            .Select(r => new PortalAppointmentDto(
-                r.Id,
-                r.PetId,
-                petNames.GetValueOrDefault(r.PetId, string.Empty),
-                r.ClinicId,
-                clinicNames.GetValueOrDefault(r.ClinicId),
-                r.ScheduledAtUtc,
-                r.DurationMinutes,
-                r.AppointmentType,
-                r.Status))
+            .Select(r =>
+            {
+                var clinic = clinics.GetValueOrDefault(r.ClinicId);
+                var petName = petNames.GetValueOrDefault(r.PetId, string.Empty);
+                return new PortalAppointmentDto(
+                    r.Id,
+                    r.PetId,
+                    petName,
+                    r.ClinicId,
+                    clinic?.Name,
+                    r.ScheduledAtUtc,
+                    r.DurationMinutes,
+                    r.AppointmentType,
+                    r.Status,
+                    // TIER-020: takvime eklenebilen randevu (sahip yanıtıyla aynı kural).
+                    clinic is not null && Appointment.CanOwnerRespond(r.Status, r.ScheduledAtUtc, nowUtc)
+                        ? AppointmentCalendar.GoogleUrl(AppointmentCalendarEvent.Create(r.Id, r.ScheduledAtUtc, r.DurationMinutes, clinic, petName))
+                        : null);
+            })
             .ToArray();
 
         return Result<PagedResult<PortalAppointmentDto>>.Success(

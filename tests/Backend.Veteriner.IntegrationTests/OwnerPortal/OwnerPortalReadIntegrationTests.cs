@@ -232,10 +232,16 @@ public sealed partial class OwnerPortalIntegrationTests
         first.GetProperty("clinicName").GetString().Should().NotBeNullOrEmpty();
         upcomingAppts.GetProperty("items")[1].GetProperty("status").GetString().Should().Be("Cancelled");
 
+        // TIER-020: takvime ekle yalnız planlı ve saati gelmemiş randevuda
+        first.GetProperty("googleCalendarUrl").GetString().Should().StartWith("https://calendar.google.com/calendar/render?action=TEMPLATE&")
+            .And.Contain("Pamuk");
+        upcomingAppts.GetProperty("items")[1].GetProperty("googleCalendarUrl").ValueKind.Should().Be(JsonValueKind.Null);
+
         var (pastAppts, _) = await GetOkAsync($"/api/portal/v1/links/{link}/appointments?scope=PAST&page=1&pageSize=50", token);
         pastAppts.GetProperty("items").EnumerateArray().Select(a => a.GetProperty("appointmentId").GetGuid())
             .Should().Equal(f.PastAppointmentId);
         pastAppts.GetProperty("items")[0].GetProperty("status").GetString().Should().Be("Completed");
+        pastAppts.GetProperty("items")[0].GetProperty("googleCalendarUrl").ValueKind.Should().Be(JsonValueKind.Null);
 
         var (paged, _) = await GetOkAsync($"/api/portal/v1/links/{link}/appointments?scope=upcoming&page=2&pageSize=1", token);
         paged.GetProperty("items").EnumerateArray().Select(a => a.GetProperty("appointmentId").GetGuid()).Should().Equal(f.CancelledAppointmentId);
@@ -273,6 +279,32 @@ public sealed partial class OwnerPortalIntegrationTests
             audits.Should().Contain(a => a.Action == "Portal.Read.Vaccinations" && a.TargetId!.EndsWith($"PetId={f.DeceasedPetId}"));
             audits.Should().OnlyContain(a => a.RequestPayload == null
                 || (!a.RequestPayload.Contains("Pamuk") && !a.RequestPayload.Contains(Secret) && !a.RequestPayload.Contains("1500")));
+        }
+    }
+
+    [Fact]
+    public async Task Appointment_Calendar_File_Should_Be_Given_Only_For_Own_Upcoming_Scheduled_Appointment()
+    {
+        // TIER-020: Randevularım'daki ".ics indir"; not girmez, sebep ayırt edilmez.
+        var f = await SeedReadFixtureAsync();
+        var token = f.Portal.AccessToken;
+        var link = f.Portal.LinkId;
+
+        var ics = await SendAsync(HttpMethod.Get, $"/api/portal/v1/links/{link}/appointments/{f.UpcomingAppointmentId}/calendar.ics", token);
+        var icsText = await ics.Content.ReadAsStringAsync();
+        ics.StatusCode.Should().Be(HttpStatusCode.OK, icsText);
+        ics.Content.Headers.ContentType!.MediaType.Should().Be("text/calendar");
+        icsText.Should().StartWith("BEGIN:VCALENDAR").And.Contain("Hayvan: Pamuk").And.NotContain(Secret, "not girmez");
+
+        Guid otherPetAppointmentId;
+        await using (var scope = _factory.Services.CreateSystemScope())
+            otherPetAppointmentId = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Appointments.AsNoTracking()
+                .Where(a => a.PetId == f.OtherClientPetId).Select(a => a.Id).SingleAsync();
+        foreach (var notCalendar in new[] { f.CancelledAppointmentId, f.PastAppointmentId, otherPetAppointmentId, Guid.NewGuid() })
+        {
+            var rejected = await SendAsync(HttpMethod.Get, $"/api/portal/v1/links/{link}/appointments/{notCalendar}/calendar.ics", token);
+            rejected.StatusCode.Should().Be(HttpStatusCode.NotFound, notCalendar.ToString());
+            (await IntegrationTestProblemDetails.ReadCodeAsync(rejected)).Should().Be("Portal.Appointments.NotFound");
         }
     }
 

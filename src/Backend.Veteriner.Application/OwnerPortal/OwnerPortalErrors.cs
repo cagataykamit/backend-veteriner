@@ -26,6 +26,11 @@ public static class OwnerPortalErrors
     /// <summary>Hayvan bağın müşterisine ait değil (başka müşteri/kiracı ya da hiç yok; ayırt edilmez).</summary>
     public static readonly Error PetNotFound = new("Portal.Pets.NotFound", "Kayıt bulunamadı.");
 
+    /// <summary>
+    /// Randevu bağın müşterisinin değil ya da takvime eklenemez (planlı değil, saati geçmiş); ayırt edilmez (TIER-020).
+    /// </summary>
+    public static readonly Error AppointmentNotFound = new("Portal.Appointments.NotFound", "Kayıt bulunamadı.");
+
     public static readonly Error RefreshTokenReused = new(
         "Portal.Auth.Unauthorized.RefreshTokenReused",
         "Oturum jetonu tekrar kullanıldı; güvenlik için tüm oturumlar kapatıldı. Yeniden giriş yapın.");
