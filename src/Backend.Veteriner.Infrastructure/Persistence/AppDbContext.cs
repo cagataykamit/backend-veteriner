@@ -8,6 +8,7 @@ using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Authorization;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.ClinicSites;
+using Backend.Veteriner.Domain.VetFinder;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Domain.CashCounts;
@@ -112,6 +113,7 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<ClinicSiteVersion> ClinicSiteVersions => Set<ClinicSiteVersion>();
     public DbSet<ClinicSiteAddress> ClinicSiteAddresses => Set<ClinicSiteAddress>();
     public DbSet<ClinicSiteImage> ClinicSiteImages => Set<ClinicSiteImage>();
+    public DbSet<ClinicVetFinderListing> ClinicVetFinderListings => Set<ClinicVetFinderListing>();
     public DbSet<ClinicPortalSettings> ClinicPortalSettings => Set<ClinicPortalSettings>();
     public DbSet<ClinicReminderRule> ClinicReminderRules => Set<ClinicReminderRule>();
     public DbSet<ClinicKvkkFormTemplate> ClinicKvkkFormTemplates => Set<ClinicKvkkFormTemplate>();
