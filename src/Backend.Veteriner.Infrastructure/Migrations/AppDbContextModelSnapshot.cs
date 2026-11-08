@@ -2434,6 +2434,21 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<int?>("MigrationDays")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MigrationFee")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MigrationSourceProgram")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MigrationTimes")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MigrationVolume")
+                        .HasColumnType("int");
+
                     b.Property<long>("MutationSequence")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
@@ -2485,6 +2500,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.ToTable("CustomDevelopmentRequests", null, t =>
                         {
+                            t.HasCheckConstraint("CK_CustomDevelopmentRequests_Migration_Details", "([TargetKind] = 3 AND [MigrationSourceProgram] IS NOT NULL AND [MigrationVolume] IS NOT NULL AND [MigrationDays] IS NOT NULL AND [MigrationTimes] IS NOT NULL AND [MigrationFee] IS NOT NULL) OR ([TargetKind] <> 3 AND [MigrationSourceProgram] IS NULL AND [MigrationVolume] IS NULL AND [MigrationDays] IS NULL AND [MigrationTimes] IS NULL AND [MigrationFee] IS NULL)");
+
                             t.HasCheckConstraint("CK_CustomDevelopmentRequests_OutOfScope_Reason", "[Status] <> 3 OR [DecisionReason] IS NOT NULL");
                         });
                 });
@@ -3134,6 +3151,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .IsRequired()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
+
+                    b.Property<int>("SourceProfile")
+                        .HasColumnType("int");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
