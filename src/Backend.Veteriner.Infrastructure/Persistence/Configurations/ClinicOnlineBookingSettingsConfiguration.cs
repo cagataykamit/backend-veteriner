@@ -17,6 +17,9 @@ public sealed class ClinicOnlineBookingSettingsConfiguration : IEntityTypeConfig
         b.Property(x => x.IsEnabled).IsRequired();
         b.Property(x => x.MinLeadMinutes).IsRequired();
         b.Property(x => x.MaxAdvanceDays).IsRequired();
+        // Varsayılan açık (TIER-017); mevcut satırlar migration'da açık başlar. Model varsayılanı yok: EF yanlış değerini yazsın.
+        b.Property(x => x.ShowNextAvailableSlots).IsRequired();
+        b.Ignore(x => x.PublishesNextAvailableSlots);
         b.Property(x => x.BookingCode)
             .IsRequired()
             .HasMaxLength(ClinicOnlineBookingSettings.BookingCodeLength)

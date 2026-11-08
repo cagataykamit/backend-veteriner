@@ -4,7 +4,8 @@ namespace Backend.Veteriner.Domain.Clinics;
 
 /// <summary>
 /// Kliniğin online randevu talebi ayarları (ADR-042 K3/K6): açık/kapalı (varsayılan kapalı), en erken/en geç talep sınırı ve
-/// kliniğe özel bağlantı kodu (APPT-002). Kod rastgele ve tahmin edilemez; yeniden üretilince eski bağlantı kapanır.
+/// kliniğe özel bağlantı kodu (APPT-002) ve en yakın müsait saatlerin herkese açık gösterimi (TIER-017). Kod rastgele ve tahmin
+/// edilemez; yeniden üretilince eski bağlantı kapanır.
 /// Kiracı + klinik benzersizdir; kod tüm kiracılarda benzersizdir.
 /// </summary>
 public sealed class ClinicOnlineBookingSettings : ITenantOwned
@@ -25,6 +26,15 @@ public sealed class ClinicOnlineBookingSettings : ITenantOwned
 
     /// <summary>Talep edilen saat şimdiden en fazla bu kadar gün sonra olabilir.</summary>
     public int MaxAdvanceDays { get; private set; }
+
+    /// <summary>
+    /// En yakın müsait saatler herkese açık yüzeylerde (klinik sitesi, ileride Veteriner bul kartı) gösterilsin mi (TIER-017).
+    /// Varsayılan açık; online randevu kapalıyken etkisizdir (<see cref="PublishesNextAvailableSlots"/>).
+    /// </summary>
+    public bool ShowNextAvailableSlots { get; private set; }
+
+    /// <summary>Herkese açık en yakın saat yalnız online randevu açık ve klinik kapatmadıysa görünür — tek yer.</summary>
+    public bool PublishesNextAvailableSlots => IsEnabled && ShowNextAvailableSlots;
 
     public string BookingCode { get; private set; } = default!;
     public DateTime BookingCodeGeneratedAtUtc { get; private set; }
@@ -48,6 +58,7 @@ public sealed class ClinicOnlineBookingSettings : ITenantOwned
             IsEnabled = false,
             MinLeadMinutes = DefaultMinLeadMinutes,
             MaxAdvanceDays = DefaultMaxAdvanceDays,
+            ShowNextAvailableSlots = true,
             BookingCode = ValidateCode(bookingCode),
             BookingCodeGeneratedAtUtc = utcNow,
             CreatedAtUtc = utcNow,
@@ -65,6 +76,15 @@ public sealed class ClinicOnlineBookingSettings : ITenantOwned
         MaxAdvanceDays = maxAdvanceDays;
         UpdatedAtUtc = utcNow;
         return Result.Success();
+    }
+
+    public void SetShowNextAvailableSlots(bool show, DateTime utcNow)
+    {
+        if (ShowNextAvailableSlots == show)
+            return;
+
+        ShowNextAvailableSlots = show;
+        UpdatedAtUtc = utcNow;
     }
 
     /// <summary>Yeni bağlantı kodu; eski kod artık hiçbir kliniği çözmez.</summary>

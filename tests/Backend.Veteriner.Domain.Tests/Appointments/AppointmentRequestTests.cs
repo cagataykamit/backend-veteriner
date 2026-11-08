@@ -174,4 +174,23 @@ public sealed class AppointmentRequestTests
         var act = () => settings.RegenerateCode("kisa", Now);
         act.Should().Throw<ArgumentException>();
     }
+
+    [Fact]
+    public void Next_Available_Slots_Should_Be_Shown_By_Default_Only_While_Online_Booking_Is_Enabled()
+    {
+        var settings = ClinicOnlineBookingSettings.Create(TenantId, ClinicId, "abcdefghjkmn", Now);
+        settings.ShowNextAvailableSlots.Should().BeTrue("varsayılan açık (TIER-017)");
+        settings.PublishesNextAvailableSlots.Should().BeFalse("online randevu kapalı");
+
+        settings.Update(true, 120, 30, Now).IsSuccess.Should().BeTrue();
+        settings.PublishesNextAvailableSlots.Should().BeTrue();
+
+        settings.SetShowNextAvailableSlots(false, Now.AddHours(1));
+        settings.PublishesNextAvailableSlots.Should().BeFalse("klinik gösterimi kapattı");
+        settings.UpdatedAtUtc.Should().Be(Now.AddHours(1));
+
+        settings.Update(false, 120, 30, Now.AddHours(2)).IsSuccess.Should().BeTrue();
+        settings.SetShowNextAvailableSlots(true, Now.AddHours(3));
+        settings.PublishesNextAvailableSlots.Should().BeFalse("online randevu kapalıyken gösterim etkisiz");
+    }
 }

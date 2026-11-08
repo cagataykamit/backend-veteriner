@@ -7,13 +7,15 @@ namespace Backend.Veteriner.Application.Clinics.OnlineBooking;
 
 /// <summary>
 /// Online randevu ayarları. Kayıt yoksa varsayılan (kapalı, kod yok) döner; kod ilk kayıtta veya yeniden üretimde oluşur.
-/// <see cref="BookingUrl"/> portal alan adında <c>/randevu/{kod}</c>.
+/// <see cref="BookingUrl"/> portal alan adında <c>/randevu/{kod}</c>. <see cref="ShowNextAvailableSlots"/> en yakın müsait saatlerin
+/// herkese açık gösterimi (TIER-017; varsayılan açık, online randevu kapalıyken etkisiz).
 /// </summary>
 public sealed record ClinicOnlineBookingSettingsDto(
     Guid ClinicId,
     bool IsEnabled,
     int MinLeadMinutes,
     int MaxAdvanceDays,
+    bool ShowNextAvailableSlots,
     string? BookingCode,
     string? BookingUrl,
     DateTime? BookingCodeGeneratedAtUtc);
@@ -31,6 +33,7 @@ public static class ClinicOnlineBookingMapping
                 false,
                 ClinicOnlineBookingSettings.DefaultMinLeadMinutes,
                 ClinicOnlineBookingSettings.DefaultMaxAdvanceDays,
+                true,
                 null,
                 null,
                 null)
@@ -39,6 +42,7 @@ public static class ClinicOnlineBookingMapping
                 row.IsEnabled,
                 row.MinLeadMinutes,
                 row.MaxAdvanceDays,
+                row.ShowNextAvailableSlots,
                 row.BookingCode,
                 BookingLink(portal, app, row.BookingCode),
                 row.BookingCodeGeneratedAtUtc);
