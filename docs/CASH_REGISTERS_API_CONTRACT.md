@@ -113,7 +113,7 @@ bakiye", son satır "Dönem sonu bakiye"; ad `kasa-hareketleri-{damga}.csv|xlsx`
 | `POST /api/v1/sales` → `payment` | `cashRegisterId?` |
 | `POST /api/v1/clients/{clientId}/credits/{creditId}/refund` | `cashRegisterId?` |
 
-- Yalnız nakitte anlamlıdır. Verilmezse kliniğin Ana kasası (kaydı yoksa boş bırakılır; okuma kuralıyla yine Ana kasa). Eski istek değişmeden çalışır.
+- Yalnız nakitte anlamlıdır. Verilmezse alan boş kalır ve okuma kuralıyla kliniğin Ana kasasıdır; eski istek değişmeden ve ek sorgu olmadan çalışır.
 - Verilen kasa aynı klinikte ve aktif olmalı (`CashRegisters.NotFound` 404, `CashRegisters.Inactive` 409). Ana kasa dışındaki kasa
   `CashManagement` ister (Temel'de ya da paket düşünce 403); Ana kasa her pakette.
 - `requestId` parmak izine `cashRegisterId` yalnız verildiğinde girer (eski kayıtların tekrar isteği bozulmaz).

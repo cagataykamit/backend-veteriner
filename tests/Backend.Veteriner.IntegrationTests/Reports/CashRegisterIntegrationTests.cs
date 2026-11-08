@@ -175,7 +175,7 @@ public sealed partial class DailyTransactionsReportIntegrationTests
             clinicId = env.ClinicId, cashRegisterId = main.Id, direction = "In", businessDate = Today, amount = 5m, categoryId = Guid.NewGuid(),
         })).StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-        // Eski istek (cashRegisterId yok) Ana kasaya yazılır.
+        // Eski istek (cashRegisterId yok) bugünkü gibi yazılır; kasası boş nakit Ana kasanındır.
         var legacy = await env.PayAsync(a, await env.SeedChargeAsync(a, 70m, EarlierToday(TimeSpan.FromMinutes(5))), 70m, PaymentMethod.Cash, EarlierToday(TimeSpan.FromMinutes(4)));
         (await manager.GetAsync($"{Registers}?clinicId={env.ClinicId}")).StatusCode.Should().Be(HttpStatusCode.OK);
         (await manager.GetAsync($"{Registers}/report?from={Today:yyyy-MM-dd}&to={Today:yyyy-MM-dd}&clinicId={env.ClinicId}")).StatusCode
@@ -183,7 +183,9 @@ public sealed partial class DailyTransactionsReportIntegrationTests
 
         await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        (await db.Payments.SingleAsync(p => p.Id == legacy)).CashRegisterId.Should().Be(main.Id);
+        (await db.Payments.SingleAsync(p => p.Id == legacy)).CashRegisterId.Should().BeNull();
+        var day = (await manager.GetFromJsonAsync<CashCountDayDto>($"/api/v1/cash-counts/day?date={Today:yyyy-MM-dd}&clinicId={env.ClinicId}&cashRegisterId={main.Id}"))!;
+        day.Cash.CollectedAmount.Should().Be(110m, "Ana kasaya seçilerek 40 ve kasasız 70 nakit");
     }
 
     [Fact]

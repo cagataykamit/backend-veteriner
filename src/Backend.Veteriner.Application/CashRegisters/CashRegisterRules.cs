@@ -169,8 +169,9 @@ internal static class CashRegisterRules
     }
 
     /// <summary>
-    /// Nakit tahsilat ya da iadede kasa: verilmezse Ana kasa (kaydı yoksa boş; okuma kuralıyla yine Ana kasa). Verilen kasa aynı
-    /// klinikte ve aktif olmalı; Ana kasa dışındaki kasa kasa yönetimi paketini ister (paket düşünce yeni işlem yalnız Ana kasaya).
+    /// Nakit tahsilat ya da iadede kasa: verilmezse boş kalır, okuma kuralıyla kliniğin Ana kasasıdır (eski istek bugünkü gibi çalışır,
+    /// ek sorgu yok). Verilen kasa aynı klinikte ve aktif olmalı; Ana kasa dışındaki kasa kasa yönetimi paketini ister (paket düşünce
+    /// yeni işlem yalnız Ana kasaya).
     /// </summary>
     public static async Task<Result<Guid?>> ResolveForCashAsync(
         IReadRepositoryBase<CashRegister> registers,
@@ -180,6 +181,9 @@ internal static class CashRegisterRules
         Guid? cashRegisterId,
         CancellationToken ct)
     {
+        if (cashRegisterId is null)
+            return Result<Guid?>.Success(null);
+
         var resolved = await ResolveAsync(registers, tenantId, clinicId, cashRegisterId, ct);
         if (!resolved.IsSuccess)
             return Result<Guid?>.Failure(resolved.Error);
