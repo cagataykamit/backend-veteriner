@@ -11,6 +11,7 @@ public sealed class AddPermissionToClaimCommandHandlerTests
     private readonly Mock<IOperationClaimPermissionRepository> _repo = new();
     private readonly Mock<IPermissionCacheInvalidator> _cache = new();
     private readonly Mock<IRefreshTokenRepository> _refreshRepo = new();
+    private readonly Mock<IUnitOfWork> _uow = new();
 
     private AddPermissionToClaimCommandHandler CreateHandler(bool revokeSessions = false)
     {
@@ -22,7 +23,8 @@ public sealed class AddPermissionToClaimCommandHandlerTests
             _repo.Object,
             _cache.Object,
             _refreshRepo.Object,
-            opt);
+            opt,
+            _uow.Object);
     }
 
     [Fact]
@@ -64,6 +66,7 @@ public sealed class AddPermissionToClaimCommandHandlerTests
         await handler.Handle(cmd, CancellationToken.None);
 
         _repo.Verify(r => r.AddAsync(claimId, permissionId, It.IsAny<CancellationToken>()), Times.Once);
+        _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         _cache.Verify(c => c.InvalidateUsers(userIds), Times.Once);
         _refreshRepo.Verify(r => r.RevokeAllByUserAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }

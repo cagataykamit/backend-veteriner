@@ -19,17 +19,20 @@ namespace Backend.Veteriner.Application.Auth.Commands.OperationClaimPermissions.
         private readonly IPermissionCacheInvalidator _cacheInvalidator;
         private readonly IRefreshTokenRepository _refreshRepo;
         private readonly PermissionChangeOptions _opt;
+        private readonly IUnitOfWork _uow;
 
         public AddPermissionToClaimCommandHandler(
             IOperationClaimPermissionRepository repo,
             IPermissionCacheInvalidator cacheInvalidator,
             IRefreshTokenRepository refreshRepo,
-            IOptions<PermissionChangeOptions> opt)
+            IOptions<PermissionChangeOptions> opt,
+            IUnitOfWork uow)
         {
             _repo = repo;
             _cacheInvalidator = cacheInvalidator;
             _refreshRepo = refreshRepo;
             _opt = opt.Value;
+            _uow = uow;
         }
 
         public async ValueTask<Unit> Handle(AddPermissionToClaimCommand cmd, CancellationToken ct)
@@ -41,7 +44,10 @@ namespace Backend.Veteriner.Application.Auth.Commands.OperationClaimPermissions.
             var exists = await _repo.ExistsAsync(cmd.OperationClaimId, cmd.PermissionId, ct);
 
             if (!exists)
+            {
                 await _repo.AddAsync(cmd.OperationClaimId, cmd.PermissionId, ct);
+                await _uow.SaveChangesAsync(ct);
+            }
 
             // ------------------------------------------------------
             // 2) Bu role sahip kullan�c�lar� bul

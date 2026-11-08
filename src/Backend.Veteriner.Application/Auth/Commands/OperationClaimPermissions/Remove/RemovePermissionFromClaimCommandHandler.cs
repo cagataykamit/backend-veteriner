@@ -24,6 +24,7 @@ namespace Backend.Veteriner.Application.Auth.Commands.OperationClaimPermissions.
         private readonly IPermissionCacheInvalidator _cacheInvalidator;
         private readonly IRefreshTokenRepository _refreshRepo;
         private readonly PermissionChangeOptions _opt;
+        private readonly IUnitOfWork _uow;
 
         /// <summary>
         /// Constructor injection:
@@ -36,12 +37,14 @@ namespace Backend.Veteriner.Application.Auth.Commands.OperationClaimPermissions.
             IOperationClaimPermissionRepository repo,
             IPermissionCacheInvalidator cacheInvalidator,
             IRefreshTokenRepository refreshRepo,
-            IOptions<PermissionChangeOptions> opt)
+            IOptions<PermissionChangeOptions> opt,
+            IUnitOfWork uow)
         {
             _repo = repo;
             _cacheInvalidator = cacheInvalidator;
             _refreshRepo = refreshRepo;
             _opt = opt.Value;
+            _uow = uow;
         }
 
         /// <summary>
@@ -55,6 +58,7 @@ namespace Backend.Veteriner.Application.Auth.Commands.OperationClaimPermissions.
         {
             // 1) Rol�permission ili�kisini kald�r
             await _repo.RemoveAsync(cmd.OperationClaimId, cmd.PermissionId, ct);
+            await _uow.SaveChangesAsync(ct);
 
             // 2) Bu role sahip kullan�c�lar� bul
             var userIds = await _repo
