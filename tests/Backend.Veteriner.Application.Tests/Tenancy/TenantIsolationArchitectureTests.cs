@@ -39,6 +39,7 @@ public sealed class TenantIsolationArchitectureTests
         ["Backend.Veteriner.Application/Appointments/OwnerLinks/AppointmentOwnerLinkResolver.cs"] = "Hatırlatma onayla/iptal bağlantısı token ile aranır",
         ["Backend.Veteriner.Application/OwnerPortal/MarketingOptOut/MarketingOptOutLinkResolver.cs"] = "Ticari ileti ret bağlantısı token ile aranır",
         ["Backend.Veteriner.Application/ClinicSites/ClinicSiteAddressBook.cs"] = "Site adresi tüm kiracılarda benzersiz; adres kiracılar arası aranır",
+        ["Backend.Veteriner.Application/VetFinder/Public/VetFinderDirectory.cs"] = "Veteriner bul: listelenmeyi açmış klinikler tüm kiracılardan okunur",
         // Platform yönetimi
         ["Backend.Veteriner.Api/Controllers/SalesPartnersAdminController.cs"] = "Satış ortakları (platform yöneticisi)",
         ["Backend.Veteriner.Api/Controllers/BillingAdminController.cs"] = "Çift ödemeler ve iadeler (platform yöneticisi)",

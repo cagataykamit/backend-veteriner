@@ -233,9 +233,9 @@ klinik kimliği dönmez.
 Site saat seçilince bağlantıya `?saat={startUtc}` ekler; form neden seçilince o saat o nedenin müsait listesindeyse seçili gelir,
 değilse kişi başka saat seçer (talep yine §5 kurallarıyla, `requestedStartUtc` müsait listede olmalı).
 
-**Veteriner bul kartı (TIER-015, yazılmadı):** kart klinik kimliğinden aynı yolu kullanmalıdır: `OnlineBookingClinicResolver.ResolveByClinicAsync`
-→ `AppointmentRequestIntake.GetNextSlotsAsync`, aynı `NextAvailableSlotDto` biçimi. Kart çok sayıda kliniği tek istekte döneceği için
-ayrı bir liste ucu ve önbellek kararı orada verilir; bu uç kart için çağrılmamalıdır.
+**Veteriner bul kartı (TIER-015):** kart aynı yolu kullanır (`OnlineBookingClinicResolver.ResolveByClinicAsync` →
+`AppointmentRequestIntake.GetNextSlotsAsync`, aynı `NextAvailableSlotDto` biçimi) ama kendi ucundan: `GET /api/v1/public/vet-finder/next-slots`
+(VET_FINDER_API_CONTRACT.md §5; bir istekte bir sayfa kart, klinik başına 60 sn sunucu önbelleği). Bu uç kart için çağrılmaz.
 
 ## 13. Ek (2026-11-08): hatırlatmada onayla / iptal et (TIER-019)
 
@@ -257,12 +257,12 @@ bilgisi saklanmaz. Paket kilidi yoktur.
 | `1` | `ClinicSite` | Kendi sitesi | §5 bağlantı ucu, `channel: "site"` (site bağlantıya `?kaynak=site` ekler) |
 | `2` | `OwnerPortal` | Portal | §6 portal ucu, her zaman (gövdede kaynak alanı yok; gönderilse yok sayılır) |
 | `3` | `Phone` | Telefon / elle | Henüz üretilmez: personelin talep girdiği bir yol yok |
-| `4` | `VetFinder` | Veteriner bul | Henüz üretilmez: sayfa TIER-015 ile gelir; değeri o zaman izinli listeye eklenir |
+| `4` | `VetFinder` | Veteriner bul | §5 bağlantı ucu, `channel: "veteriner-bul"` (kart bağlantıya `?kaynak=veteriner-bul` ekler; VET_FINDER_API_CONTRACT.md §6) |
 | `null` | — | Bilinmiyor | TIER-016 öncesi talepler (geriye dönük doldurulmaz) |
 
 **Kural (tek yer: `AppointmentRequestChannels.ForLink`, domain):** §5 `POST /requests` gövdesindeki `channel` serbest metin olarak
-saklanmaz. Yalnız izinli değer (`site`, büyük/küçük harf ve baş/son boşluk önemsiz) eşlenir; bilinmeyen, boş, sayı ya da başka kapının
-değeri (`portal`, `telefon`, `veteriner-bul`) `0 ClinicLink` olur ve talep **reddedilmez**. Değer kimliksiz istemciden geldiği için
+saklanmaz. Yalnız izinli değer (`site`, `veteriner-bul`; büyük/küçük harf ve baş/son boşluk önemsiz) eşlenir; bilinmeyen, boş, sayı ya
+da başka kapının değeri (`portal`, `telefon`) `0 ClinicLink` olur ve talep **reddedilmez**. Değer kimliksiz istemciden geldiği için
 kötüye kullanılabilir (ör. doğrudan bağlantı `site` diye gösterilebilir); bu yalnız özetteki sayıları etkiler.
 
 **Akış:** site Randevu bağlantısına `?kaynak=site` ekler (TIER-017 `?saat=` ile birlikte olabilir). Portal `/randevu/{kod}` formu

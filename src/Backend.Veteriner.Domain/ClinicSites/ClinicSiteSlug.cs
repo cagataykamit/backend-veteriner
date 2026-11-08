@@ -1,6 +1,5 @@
-using System.Globalization;
-using System.Text;
 using System.Text.RegularExpressions;
+using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Domain.ClinicSites;
 
@@ -14,7 +13,7 @@ public enum ClinicSiteSlugCheck
 
 /// <summary>
 /// Sitenin <c>vetinity.com/k/{adres}</c> parçası (ADR-045 K10): küçük harf, rakam ve tire; ayrılmış sözcükler alınamaz.
-/// Öneri klinik adından Türkçe harfleri dönüştürerek üretilir. Kural tek yerde yaşar.
+/// Öneri klinik adından <see cref="TurkishSlug"/> ile üretilir. Kural tek yerde yaşar.
 /// </summary>
 public static partial class ClinicSiteSlug
 {
@@ -54,7 +53,7 @@ public static partial class ClinicSiteSlug
     /// <summary>Klinik adından geçerli bir aday; benzersizlik denetlenmez (bkz. uygulama katmanındaki adres defteri).</summary>
     public static string Suggest(string? clinicName)
     {
-        var slug = Trim(Transliterate(clinicName));
+        var slug = Trim(TurkishSlug.From(clinicName));
         if (slug.Length < MinLength)
             slug = slug.Length == 0 ? $"{FallbackBase}-sitesi" : $"{FallbackBase}-{slug}";
         return ReservedWords.Contains(slug) ? $"{slug}-sitesi" : slug;
@@ -63,39 +62,6 @@ public static partial class ClinicSiteSlug
     /// <summary><c>{taban}-{sıra}</c> adayı; taban gerekirse kısaltılır, sonuç <see cref="MaxLength"/> içinde kalır.</summary>
     public static string WithSuffix(string slug, string suffix)
         => $"{Trim(slug, MaxLength - suffix.Length - 1)}-{suffix}";
-
-    private static string Transliterate(string? value)
-    {
-        var mapped = new StringBuilder(value?.Length ?? 0);
-        foreach (var ch in value ?? string.Empty)
-        {
-            mapped.Append(ch switch
-            {
-                'ç' or 'Ç' => 'c',
-                'ğ' or 'Ğ' => 'g',
-                'ı' or 'I' or 'İ' => 'i',
-                'ö' or 'Ö' => 'o',
-                'ş' or 'Ş' => 's',
-                'ü' or 'Ü' => 'u',
-                _ => char.ToLowerInvariant(ch),
-            });
-        }
-
-        // Kalan aksanlı harfler tabanına iner (é → e); harf ya da rakam olmayan her şey tek tireye düşer.
-        var result = new StringBuilder(mapped.Length);
-        foreach (var ch in mapped.ToString().Normalize(NormalizationForm.FormD))
-        {
-            if (CharUnicodeInfo.GetUnicodeCategory(ch) == UnicodeCategory.NonSpacingMark)
-                continue;
-
-            if (ch is >= 'a' and <= 'z' or >= '0' and <= '9')
-                result.Append(ch);
-            else if (result.Length > 0 && result[^1] != '-')
-                result.Append('-');
-        }
-
-        return result.ToString();
-    }
 
     private static string Trim(string slug, int maxLength = MaxLength)
         => (slug.Length > maxLength ? slug[..maxLength] : slug).Trim('-');
