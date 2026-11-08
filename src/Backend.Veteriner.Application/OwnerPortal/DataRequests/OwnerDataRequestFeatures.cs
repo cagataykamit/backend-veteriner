@@ -199,7 +199,7 @@ public sealed class GetPortalDataRequestsQueryHandler : IRequestHandler<GetPorta
 
     public async ValueTask<Result<IReadOnlyList<PortalDataRequestDto>>> Handle(GetPortalDataRequestsQuery request, CancellationToken ct)
     {
-        var scope = await _access.ResolveLinkAsync(request.OwnerAccountId, request.LinkId, ct);
+        var scope = await _access.ResolveLinkForOwnerRightsAsync(request.OwnerAccountId, request.LinkId, ct);
         if (!scope.IsSuccess)
             return Result<IReadOnlyList<PortalDataRequestDto>>.Failure(scope.Error);
 
@@ -235,7 +235,7 @@ public sealed class CreatePortalDataRequestCommandHandler : IRequestHandler<Crea
 
     public async ValueTask<Result<PortalDataRequestDto>> Handle(CreatePortalDataRequestCommand request, CancellationToken ct)
     {
-        var scope = await _access.ResolveLinkAsync(request.OwnerAccountId, request.LinkId, ct);
+        var scope = await _access.ResolveLinkForOwnerRightsAsync(request.OwnerAccountId, request.LinkId, ct);
         if (!scope.IsSuccess)
             return Result<PortalDataRequestDto>.Failure(scope.Error);
         var s = scope.Value!;
@@ -278,7 +278,7 @@ public sealed class CancelPortalDataRequestCommandHandler : IRequestHandler<Canc
 
     public async ValueTask<Result> Handle(CancelPortalDataRequestCommand request, CancellationToken ct)
     {
-        var scope = await _access.ResolveLinkAsync(request.OwnerAccountId, request.LinkId, ct);
+        var scope = await _access.ResolveLinkForOwnerRightsAsync(request.OwnerAccountId, request.LinkId, ct);
         if (!scope.IsSuccess)
             return Result.Failure(scope.Error);
 

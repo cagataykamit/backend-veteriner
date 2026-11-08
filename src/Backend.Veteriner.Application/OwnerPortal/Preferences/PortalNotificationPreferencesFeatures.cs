@@ -162,7 +162,7 @@ public sealed class GetPortalLinkNotificationPreferencesQueryHandler
 
     public async ValueTask<Result<PortalLinkNotificationPreferencesDto>> Handle(GetPortalLinkNotificationPreferencesQuery request, CancellationToken ct)
     {
-        var scope = await _access.ResolveLinkAsync(request.OwnerAccountId, request.LinkId, ct);
+        var scope = await _access.ResolveLinkForOwnerRightsAsync(request.OwnerAccountId, request.LinkId, ct);
         if (!scope.IsSuccess)
             return Result<PortalLinkNotificationPreferencesDto>.Failure(scope.Error);
 
@@ -196,7 +196,7 @@ public sealed class UpdatePortalLinkNotificationPreferencesCommandHandler
 
     public async ValueTask<Result<PortalLinkNotificationPreferencesDto>> Handle(UpdatePortalLinkNotificationPreferencesCommand request, CancellationToken ct)
     {
-        var scope = await _access.ResolveLinkAsync(request.OwnerAccountId, request.LinkId, ct);
+        var scope = await _access.ResolveLinkForOwnerRightsAsync(request.OwnerAccountId, request.LinkId, ct);
         if (!scope.IsSuccess)
             return Result<PortalLinkNotificationPreferencesDto>.Failure(scope.Error);
 

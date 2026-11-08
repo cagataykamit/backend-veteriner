@@ -106,7 +106,7 @@ public sealed partial class OwnerPortalIntegrationTests
     }
 
     [Fact]
-    public async Task Downgrade_Should_Keep_Existing_Link_And_Close_New_Portal_Use()
+    public async Task Downgrade_Should_Close_Reads_On_Existing_Link_But_Keep_Owner_Rights()
     {
         var staff = await SeedPlanTenantAsync(SubscriptionPlanCode.Pro);
         var session = await InviteAndAcceptAsync(staff);
@@ -115,13 +115,35 @@ public sealed partial class OwnerPortalIntegrationTests
 
         await ChangePlanAsync(staff.TenantId, SubscriptionPlanCode.Basic);
 
-        // Mevcut bağ açık: okuma ve KVKK talebi.
-        (await SendAsync(HttpMethod.Get, $"/api/portal/v1/links/{session.LinkId}/pets", session.AccessToken))
-            .StatusCode.Should().Be(HttpStatusCode.OK);
+        // Okuma uçları kapalı; yanıt sahiplik kuralıyla aynı (paket bilgisi portala çıkmaz).
+        foreach (var path in new[] { "pets", "appointments", "balance", "clinic" })
+        {
+            var read = await SendAsync(HttpMethod.Get, $"/api/portal/v1/links/{session.LinkId}/{path}", session.AccessToken);
+            read.StatusCode.Should().Be(HttpStatusCode.NotFound, path);
+            (await IntegrationTestProblemDetails.ReadCodeAsync(read)).Should().Be("Portal.Links.NotFound");
+        }
+
+        // Sahip hakları açık: KVKK talebi, tercihler, hesap silme kodu.
         (await SendAsync(HttpMethod.Post, $"/api/portal/v1/links/{session.LinkId}/data-requests", session.AccessToken, new { type = "Access", message = "Kayıtlarımı istiyorum" }))
             .StatusCode.Should().Be(HttpStatusCode.Created);
+        (await SendAsync(HttpMethod.Get, $"/api/portal/v1/links/{session.LinkId}/data-requests", session.AccessToken))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        (await SendAsync(HttpMethod.Get, $"/api/portal/v1/links/{session.LinkId}/notification-preferences", session.AccessToken))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        (await SendAsync(HttpMethod.Get, $"/api/portal/v1/links/{session.LinkId}/reminder-preferences", session.AccessToken))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        (await SendAsync(HttpMethod.Post, "/api/portal/v1/me/deletion-code", session.AccessToken))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
         var me = await (await SendAsync(HttpMethod.Get, "/api/portal/v1/me", session.AccessToken)).Content.ReadFromJsonAsync<JsonElement>();
-        me.GetProperty("links").EnumerateArray().Single().GetProperty("isClinicPortalEnabled").GetBoolean().Should().BeTrue();
+        var link = me.GetProperty("links").EnumerateArray().Single();
+        link.GetProperty("isClinicPortalEnabled").GetBoolean().Should().BeTrue();
+        link.GetProperty("isPortalServiceAvailable").GetBoolean().Should().BeFalse();
+
+        // Veri silinmez: yükseltince okuma geri gelir.
+        await ChangePlanAsync(staff.TenantId, SubscriptionPlanCode.Pro);
+        (await SendAsync(HttpMethod.Get, $"/api/portal/v1/links/{session.LinkId}/pets", session.AccessToken))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        await ChangePlanAsync(staff.TenantId, SubscriptionPlanCode.Basic);
 
         // Yeni kullanım kapalı: yeni davet reddedilir, bekleyen davet yeni bağ açamaz.
         var newClient = await SeedClientAsync(staff.TenantId);

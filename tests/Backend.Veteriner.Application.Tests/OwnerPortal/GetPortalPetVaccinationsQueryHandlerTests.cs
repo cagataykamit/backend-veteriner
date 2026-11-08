@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.OwnerPortal.Access;
 using Backend.Veteriner.Application.OwnerPortal.Contracts;
 using Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalPetVaccinations;
 using Backend.Veteriner.Application.OwnerPortal.Specs;
+using Backend.Veteriner.Application.Tests.Tenants;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.OwnerPortal;
@@ -55,7 +56,8 @@ public sealed class GetPortalPetVaccinationsQueryHandlerTests
         var access = new OwnerPortalAccess(
             accounts.Object, links.Object, tenants.Object,
             new Mock<IReadRepository<Clinic>>().Object, Mock.Of<ITenantScope>(), new Mock<IReadRepository<Client>>().Object,
-            new ClinicPortalGate(new Mock<IReadRepository<ClinicPortalSettings>>().Object));
+            new ClinicPortalGate(new Mock<IReadRepository<ClinicPortalSettings>>().Object),
+            PlanFeatureTestFactory.ForPlan(SubscriptionPlanCode.Pro));
         return new GetPortalPetVaccinationsQueryHandler(
             access, _pets.Object, _vaccinations.Object, new OwnerPortalTestFixture.FixedClock(utcNow));
     }

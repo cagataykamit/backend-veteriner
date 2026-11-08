@@ -41,7 +41,9 @@ public sealed partial class OwnerPortalIntegrationTests
             var firstPet = new Pet(staff.TenantId, first.ClientId, "Birinci", speciesId);
             var secondPet = new Pet(otherTenant.Id, otherClient.Id, "İkinci", speciesId);
             var link = OwnerAccountClientLink.Create(accountId, otherTenant.Id, otherClinic.Id, otherClient.Id, Guid.NewGuid(), now);
-            db.AddRange(otherTenant, otherClinic, otherClient, firstPet, secondPet, link);
+            // Bağ kapsamlı okuma paketin portalına bağlıdır (ADR-035 2026-11-08); ikinci kiracı portal içeren pakette.
+            var otherSubscription = TenantSubscription.StartTrial(otherTenant.Id, SubscriptionPlanCode.Pro, now, 14);
+            db.AddRange(otherTenant, otherClinic, otherClient, firstPet, secondPet, link, otherSubscription);
             await db.SaveChangesAsync();
 
             secondLinkId = link.Id;

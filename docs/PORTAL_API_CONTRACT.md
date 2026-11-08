@@ -71,7 +71,7 @@ Müşteri kartındaki "Portal" bölümü: bağ durumu ve davet listesi (son 20 d
 }
 ```
 
-- `canInvite`: müşteri davet kuralına uyuyor **ve** aktif bağı yok. Değilse `inviteBlockedCode` (`OwnerPortal.ClientEmailMissing`, `OwnerPortal.ClientOptedOut`, `OwnerPortal.ClientNotInvitable`, `OwnerPortal.AlreadyLinked`). Paket portalı içermiyorsa önce `Subscriptions.FeatureNotInPlan`: yeni davet (§4.2) 403, bekleyen davetin önizleme ve kabulü (§5.2, §5.3) 404; mevcut bağ açık kalır (`PLAN_FEATURES_API_CONTRACT.md`).
+- `canInvite`: müşteri davet kuralına uyuyor **ve** aktif bağı yok. Değilse `inviteBlockedCode` (`OwnerPortal.ClientEmailMissing`, `OwnerPortal.ClientOptedOut`, `OwnerPortal.ClientNotInvitable`, `OwnerPortal.AlreadyLinked`). Paket portalı içermiyorsa önce `Subscriptions.FeatureNotInPlan`: yeni davet (§4.2) 403, bekleyen davetin önizleme ve kabulü (§5.2, §5.3) 404; mevcut bağda okuma kapanır, sahip hakları açık kalır (§12.1, `PLAN_FEATURES_API_CONTRACT.md`).
 - Davet `status`: `Pending`, `Accepted`, `Revoked`, `Expired` (bekleyen ama süresi geçmiş; hesaplanır).
 - Bağ `closeReason`: kapalı bağda `ClinicClosed` (personel kapattı) ya da `OwnerAccountDeleted` (hasta sahibi hesabını sildi, §5.10); aktif bağda `null`. Silinen hesabın bağında `accountEmail` `null` döner; tarih `closedAtUtc`'dir.
 
@@ -564,6 +564,19 @@ Denetim: `PortalInbox.DataRequest.UpdateStatus`, hedef `DataRequestId=…;Status
   - `GET /me` → o bağ `links[]`'te kalır, `"isClinicPortalEnabled": false` taşır. Bağ kapsamlı tüm uçlar 404 `Portal.Links.NotFound` (tek yer `OwnerPortalAccess.ResolveLinkAsync`; sahiplik kuralıyla aynı yanıt). İstemci kapalı bağ için kliniğe başvurma mesajı gösterir.
   - Hatırlatma e-postaları etkilenmez (portal değil, kliniğin kendi iletişimidir).
 - Denetim: `OwnerPortal.ClinicSettings.Update`, hedef `ClinicId=…;IsEnabled=…`.
+
+### 12.1 Portalsız pakette mevcut bağ (ADR-035 2026-11-08 kullanıcı kararı, TIER-001 §4)
+
+Kiracının paketinde `OwnerPortal` yoksa (Temel; düşürme sonrası dahil) mevcut bağ silinmez, kısmen kapanır. Yükseltince her şey geri gelir.
+
+| Uç grubu | Durum |
+|---|---|
+| Okuma ve hizmet: `clinic`, `pets`, `pets/{id}`, `pets/{id}/vaccinations`, `appointments`, `balance`, `payments`, bağ üzerinden `booking` ve `appointment-requests` | 404 `Portal.Links.NotFound` (sahiplik kuralıyla aynı; paket adı ve sebep portala çıkmaz). Tek yer `OwnerPortalAccess.ResolveLinkAsync` |
+| Sahip hakları: `data-requests` (liste, oluşturma, geri çekme), `notification-preferences`, `reminder-preferences`, `clinic-disclosure` | Açık. Tek yer `OwnerPortalAccess.ResolveLinkForOwnerRightsAsync` (klinik portalı kapatmışsa §12 kuralı aynen geçerli) |
+| Hesap düzeyi: `me`, `me/notification-preferences`, `me/deletion-code`, `DELETE me`, oturum uçları | Açık (bağdan bağımsız) |
+
+- `GET /me` bağ öğesine `"isPortalServiceAvailable": false` eklenir (alan yoksa `true` sayılır). İstemci okuma sayfalarının yerine sade bir not gösterir ("kliniğiniz bu hizmeti şu an sunmuyor; bilgi için kliniğinize başvurun"); veri talebi, tercihler ve hesap silme açık kalır. Ticari bilgi (paket adı) gösterilmez.
+- Kliniğe özel kimliksiz online randevu bağlantısı (`booking/{bookingCode}`) her pakette açıktır (ADR-042); bu kuraldan etkilenmez.
 
 ## 13) Bildirim türü × kanal kuralı (PORTAL-010; ADR-031 K7)
 

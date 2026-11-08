@@ -30,7 +30,7 @@ public sealed class GetPortalReminderPreferencesQueryHandler
 
     public async ValueTask<Result<PortalReminderPreferencesDto>> Handle(GetPortalReminderPreferencesQuery request, CancellationToken ct)
     {
-        var scope = await _access.ResolveLinkAsync(request.OwnerAccountId, request.LinkId, ct);
+        var scope = await _access.ResolveLinkForOwnerRightsAsync(request.OwnerAccountId, request.LinkId, ct);
         if (!scope.IsSuccess)
             return Result<PortalReminderPreferencesDto>.Failure(scope.Error);
 

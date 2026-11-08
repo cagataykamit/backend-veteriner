@@ -48,7 +48,7 @@ public sealed class GetPortalClinicDisclosureQueryHandler
 
     public async ValueTask<Result<PortalClinicDisclosureDto>> Handle(GetPortalClinicDisclosureQuery request, CancellationToken ct)
     {
-        var scopeResult = await _access.ResolveLinkAsync(request.OwnerAccountId, request.LinkId, ct);
+        var scopeResult = await _access.ResolveLinkForOwnerRightsAsync(request.OwnerAccountId, request.LinkId, ct);
         if (!scopeResult.IsSuccess)
             return Result<PortalClinicDisclosureDto>.Failure(scopeResult.Error);
         var scope = scopeResult.Value!;
