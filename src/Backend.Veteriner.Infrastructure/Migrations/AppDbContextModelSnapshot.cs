@@ -2131,6 +2131,50 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("ClinicKvkkFormTemplates", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Clinics.ClinicMarketingSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeclarationVersion")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("DeclaredAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("DeclaredByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("TenantId", "ClinicId")
+                        .IsUnique();
+
+                    b.ToTable("ClinicMarketingSettings", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Clinics.ClinicOnlineBookingSettings", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3466,6 +3510,44 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("UserNotifications", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.OwnerPortal.MarketingOptOutLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("OwnerAccountClientLinkId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime?>("UsedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerAccountClientLinkId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "OwnerAccountClientLinkId");
+
+                    b.ToTable("MarketingOptOutLinks", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.OwnerPortal.OwnerAccount", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3546,6 +3628,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("MarketingConsentAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("MarketingOptOutAtUtc")
                         .HasColumnType("datetime2");
 
                     b.Property<Guid>("OwnerAccountId")
@@ -6558,6 +6643,15 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Clinics.ClinicMarketingSettings", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Clinics.ClinicOnlineBookingSettings", b =>
                 {
                     b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
@@ -6644,6 +6738,15 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasOne("Backend.Veteriner.Domain.Imports.ImportBatch", null)
                         .WithMany()
                         .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.OwnerPortal.MarketingOptOutLink", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.OwnerPortal.OwnerAccountClientLink", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerAccountClientLinkId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

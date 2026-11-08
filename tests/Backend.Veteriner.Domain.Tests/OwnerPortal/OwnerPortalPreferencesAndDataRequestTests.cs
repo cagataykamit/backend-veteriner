@@ -23,8 +23,33 @@ public sealed class OwnerPortalPreferencesAndDataRequestTests
         link.SetMarketingConsent(true, Now.AddHours(1)).Should().BeFalse();
         link.MarketingConsentAtUtc.Should().Be(Now);
 
-        link.SetMarketingConsent(false, Now).Should().BeTrue();
+        link.MarketingOptOutAtUtc.Should().BeNull();
+        link.SetMarketingConsent(false, Now.AddHours(2)).Should().BeTrue();
         link.MarketingConsentAtUtc.Should().BeNull();
+        link.MarketingOptOutAtUtc.Should().Be(Now.AddHours(2), "ret zamanı tutulur (ADR-046 K4)");
+        link.SetMarketingConsent(false, Now.AddHours(3)).Should().BeFalse();
+        link.MarketingOptOutAtUtc.Should().Be(Now.AddHours(2));
+    }
+
+    [Fact]
+    public void Clinic_Marketing_Gate_Is_Closed_By_Default_And_Opens_Only_With_Declaration()
+    {
+        ClinicMarketingSettings.IsOpen(null).Should().BeFalse();
+        var userId = Guid.NewGuid();
+        var settings = ClinicMarketingSettings.Create(Guid.NewGuid(), Guid.NewGuid(), Now);
+
+        settings.Enable(declarationAccepted: false, userId, Now).Error.Code.Should().Be(ClinicMarketingSettings.DeclarationRequiredCode);
+        ClinicMarketingSettings.IsOpen(settings).Should().BeFalse();
+
+        settings.Enable(declarationAccepted: true, userId, Now.AddMinutes(1)).IsSuccess.Should().BeTrue();
+        ClinicMarketingSettings.IsOpen(settings).Should().BeTrue();
+        settings.DeclaredAtUtc.Should().Be(Now.AddMinutes(1));
+        settings.DeclaredByUserId.Should().Be(userId);
+        settings.DeclarationVersion.Should().Be(ClinicMarketingSettings.CurrentDeclarationVersion);
+
+        settings.Disable(userId, Now.AddMinutes(2));
+        ClinicMarketingSettings.IsOpen(settings).Should().BeFalse();
+        settings.DeclaredAtUtc.Should().Be(Now.AddMinutes(1), "kapatınca son beyan kayıtta kalır");
     }
 
     [Fact]
@@ -93,13 +118,14 @@ public sealed class OwnerPortalPreferencesAndDataRequestTests
     [InlineData(OwnerNotificationType.DataRequestAnswered, OwnerNotificationChannel.WhatsAppLink, OwnerNotificationChannelMode.Disabled)]
     [InlineData(OwnerNotificationType.VaccinationReminder, OwnerNotificationChannel.Email, OwnerNotificationChannelMode.Preference)]
     [InlineData(OwnerNotificationType.VaccinationReminder, OwnerNotificationChannel.WhatsAppLink, OwnerNotificationChannelMode.StaffManual)]
-    [InlineData(OwnerNotificationType.Marketing, OwnerNotificationChannel.Email, OwnerNotificationChannelMode.Disabled)]
+    [InlineData(OwnerNotificationType.Marketing, OwnerNotificationChannel.Email, OwnerNotificationChannelMode.Preference)]
     [InlineData(OwnerNotificationType.Marketing, OwnerNotificationChannel.Push, OwnerNotificationChannelMode.Disabled)]
     [InlineData(OwnerNotificationType.FollowUpReminder, OwnerNotificationChannel.Email, OwnerNotificationChannelMode.Preference)]
     [InlineData(OwnerNotificationType.DebtReminder, OwnerNotificationChannel.Email, OwnerNotificationChannelMode.Preference)]
     [InlineData(OwnerNotificationType.DebtReminder, OwnerNotificationChannel.Push, OwnerNotificationChannelMode.Disabled)]
     [InlineData(OwnerNotificationType.DebtReminder, OwnerNotificationChannel.WhatsAppLink, OwnerNotificationChannelMode.Disabled)]
-    [InlineData(OwnerNotificationType.NoReturnReminder, OwnerNotificationChannel.Email, OwnerNotificationChannelMode.Disabled)]
+    [InlineData(OwnerNotificationType.NoReturnReminder, OwnerNotificationChannel.Email, OwnerNotificationChannelMode.Preference)]
+    [InlineData(OwnerNotificationType.NoReturnReminder, OwnerNotificationChannel.Push, OwnerNotificationChannelMode.Disabled)]
     public void Channel_Policy_Matrix(OwnerNotificationType type, OwnerNotificationChannel channel, OwnerNotificationChannelMode expected)
         => OwnerNotificationChannelPolicy.ModeOf(type, channel, pushConfigured: false).Should().Be(expected);
 
@@ -114,8 +140,11 @@ public sealed class OwnerPortalPreferencesAndDataRequestTests
             .Should().BeTrue();
         OwnerNotificationChannelPolicy.ShouldSend(OwnerNotificationType.AppointmentReminder, OwnerNotificationChannel.Email, false, false)
             .Should().BeFalse();
-        OwnerNotificationChannelPolicy.ShouldSend(OwnerNotificationType.Marketing, OwnerNotificationChannel.Email, true, true)
+        // Ticari ileti onayla gider; kliniğin ticari ileti kapısı çağıranda denetlenir (ADR-046).
+        OwnerNotificationChannelPolicy.ShouldSend(OwnerNotificationType.Marketing, OwnerNotificationChannel.Email, true, false)
             .Should().BeFalse();
+        OwnerNotificationChannelPolicy.ShouldSend(OwnerNotificationType.Marketing, OwnerNotificationChannel.Email, true, true)
+            .Should().BeTrue();
         OwnerNotificationChannelPolicy.ShouldSend(OwnerNotificationType.AppointmentReminder, OwnerNotificationChannel.WhatsAppLink, true, true)
             .Should().BeFalse();
     }

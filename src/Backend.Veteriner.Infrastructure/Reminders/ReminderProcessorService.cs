@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Appointments.OwnerLinks;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.OwnerPortal.MarketingOptOut;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
@@ -21,6 +22,7 @@ public sealed partial class ReminderProcessorService
     private readonly ITenantScope _tenantScope;
     private readonly IReminderEmailOutboxEnqueuer _reminderEmailOutboxEnqueuer;
     private readonly AppointmentOwnerLinkIssuer _ownerLinks;
+    private readonly MarketingOptOutLinkIssuer _optOutLinks;
     private readonly ReminderProcessorOptions _options;
     private readonly ILogger<ReminderProcessorService> _logger;
     private readonly TimeProvider _timeProvider;
@@ -30,6 +32,7 @@ public sealed partial class ReminderProcessorService
         ITenantScope tenantScope,
         IReminderEmailOutboxEnqueuer reminderEmailOutboxEnqueuer,
         AppointmentOwnerLinkIssuer ownerLinks,
+        MarketingOptOutLinkIssuer optOutLinks,
         IOptions<ReminderProcessorOptions> options,
         ILogger<ReminderProcessorService> logger,
         TimeProvider timeProvider)
@@ -38,6 +41,7 @@ public sealed partial class ReminderProcessorService
         _tenantScope = tenantScope;
         _reminderEmailOutboxEnqueuer = reminderEmailOutboxEnqueuer;
         _ownerLinks = ownerLinks;
+        _optOutLinks = optOutLinks;
         _options = options.Value;
         _logger = logger;
         _timeProvider = timeProvider;
@@ -300,7 +304,7 @@ public sealed partial class ReminderProcessorService
                 _logger.LogWarning(ex, "Appointment reminder enqueue failed. Tenant={TenantId} Appointment={AppointmentId}", tenantId, candidate.AppointmentId);
             }
 
-            if (await TryInsertLogAsync(log, ct, detachOutboxMessageIdOnConflict: log.OutboxMessageId, detachOwnerLinkOnConflict: ownerLink))
+            if (await TryInsertLogAsync(log, ct, detachOutboxMessageIdOnConflict: log.OutboxMessageId, detachLinkOnConflict: ownerLink))
                 dedupeSet.Add(dedupeKey);
         }
     }
@@ -587,7 +591,7 @@ public sealed partial class ReminderProcessorService
         ReminderDispatchLog log,
         CancellationToken ct,
         Guid? detachOutboxMessageIdOnConflict = null,
-        AppointmentOwnerLink? detachOwnerLinkOnConflict = null)
+        object? detachLinkOnConflict = null)
     {
         try
         {
@@ -606,8 +610,9 @@ public sealed partial class ReminderProcessorService
                     outboxEntry.State = EntityState.Detached;
             }
 
-            if (detachOwnerLinkOnConflict is not null)
-                _db.Entry(detachOwnerLinkOnConflict).State = EntityState.Detached;
+            // Aynı iletinin bağlantısı (randevu onayla/iptal ya da ticari ileti reddi) tekrar engelinde yazılmaz.
+            if (detachLinkOnConflict is not null)
+                _db.Entry(detachLinkOnConflict).State = EntityState.Detached;
 
             _logger.LogDebug("Reminder dedupe conflict skipped. Tenant={TenantId} DedupeKey={DedupeKey}", log.TenantId, log.DedupeKey);
             return false;

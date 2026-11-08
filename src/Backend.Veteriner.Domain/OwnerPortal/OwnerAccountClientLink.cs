@@ -34,6 +34,9 @@ public sealed class OwnerAccountClientLink : ITenantOwned
     /// <summary>Ticari ileti onayı zamanı; boş = onay yok.</summary>
     public DateTime? MarketingConsentAtUtc { get; private set; }
 
+    /// <summary>Son ticari ileti reddi (portal tercihi ya da iletideki ret bağlantısı); yeniden onayda silinmez (ADR-046 K4).</summary>
+    public DateTime? MarketingOptOutAtUtc { get; private set; }
+
     private OwnerAccountClientLink() { }
 
     public static OwnerAccountClientLink Create(
@@ -98,9 +101,9 @@ public sealed class OwnerAccountClientLink : ITenantOwned
         => DisclosureAcknowledgedAtUtc ??= ToUtc(utcNow);
 
     /// <summary>
-    /// Ticari elektronik ileti onayı (ETK m.6; PORTAL-007): bağ başına, klinik veri sorumlusu. Onay zamanı yazılır, geri çekmede
-    /// boşalır (kanıt denetim kaydındadır). Gönderim politika sabitiyle kapalıdır (<c>OwnerNotificationChannelPolicy</c>).
-    /// Değer değişmediyse <c>false</c>.
+    /// Ticari elektronik ileti onayı (ETK m.6; PORTAL-007): bağ başına, klinik veri sorumlusu. Onay zamanı yazılır; ret (geri çekme)
+    /// onayı boşaltır ve ret zamanını yazar (ADR-046 K4). Gönderim ayrıca kliniğin ticari ileti kapısına bağlıdır
+    /// (<c>ClinicMarketingSettings</c>). Değer değişmediyse <c>false</c>.
     /// </summary>
     public bool SetMarketingConsent(bool consented, DateTime utcNow)
     {
@@ -108,6 +111,8 @@ public sealed class OwnerAccountClientLink : ITenantOwned
             return false;
 
         MarketingConsentAtUtc = consented ? ToUtc(utcNow) : null;
+        if (!consented)
+            MarketingOptOutAtUtc = ToUtc(utcNow);
         return true;
     }
 

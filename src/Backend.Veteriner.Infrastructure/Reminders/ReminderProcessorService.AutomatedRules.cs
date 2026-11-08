@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.OwnerPortal.MarketingOptOut;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
@@ -25,8 +26,10 @@ public sealed partial class ReminderProcessorService
         DailyEmailBudget dailyBudget,
         CancellationToken ct)
     {
-        // Ticari ileti gönderimi merkezi olarak kapalıyken kural açık olsa da aday aranmaz (OwnerNotificationChannelPolicy).
-        if (!ClinicReminderRuleDefinition.Of(rule.RuleType).SendingAvailable)
+        // Ticari ileti yalnız kliniğin ticari ileti kapısı açıkken aranır (ADR-046); hatırlatmalar kapıdan bağımsızdır.
+        if (ClinicReminderRuleDefinition.Of(rule.RuleType).IsMarketing
+            && !await _db.ClinicMarketingSettings.AsNoTracking()
+                .AnyAsync(s => s.TenantId == rule.TenantId && s.ClinicId == rule.ClinicId && s.IsEnabled, ct))
             return;
 
         if (!await _db.Clinics.AsNoTracking().AnyAsync(c => c.Id == rule.ClinicId && c.IsActive, ct))
@@ -192,17 +195,11 @@ public sealed partial class ReminderProcessorService
     }
 
     /// <summary>
-    /// Son gelişin üzerinden N gün geçen, planlı randevusu olmayan hayvan. Ticari ileti sayılır: yalnız bu klinikte aktif portal bağında ticari
-    /// ileti onayı veren sahibe gider; gönderim merkezi anahtar açılana dek hiç çalışmaz (<see cref="ProcessAutomatedRuleAsync"/>).
+    /// Son gelişin üzerinden N gün geçen, planlı randevusu olmayan hayvan. Ticari ileti sayılır (ADR-046): yalnız kliniğin ticari ileti
+    /// kapısı açıkken (<see cref="ProcessAutomatedRuleAsync"/>) ve yalnız bu klinikte aktif portal bağında ticari ileti onayı veren sahibe
+    /// gider. Her iletide konu satırında nitelik, kliniğin adı ve ret bağlantısı bulunur (<see cref="NoReturnMarketingEmail"/>).
     /// Son geliş kiracı genelindedir: başka şubeye gelen hayvan "dönmedi" sayılmaz.
     /// </summary>
-    public async Task ProcessNoReturnRuleAsync(
-        ClinicReminderRule rule,
-        DateTime nowUtc,
-        int batchSize,
-        CancellationToken ct)
-        => await ProcessNoReturnRuleAsync(rule, nowUtc, batchSize, DailyEmailBudget.Unlimited, ct);
-
     private async Task ProcessNoReturnRuleAsync(
         ClinicReminderRule rule,
         DateTime nowUtc,
@@ -251,7 +248,25 @@ public sealed partial class ReminderProcessorService
         foreach (var candidate in candidates)
         {
             var recipient = await LoadPetRecipientAsync(tenantId, candidate.PetId, ct);
-            var clinicName = await LoadClinicNameAsync(tenantId, clinicId, ct);
+            var clinic = await _db.Clinics
+                .AsNoTracking()
+                .Where(c => c.TenantId == tenantId && c.Id == clinicId)
+                .Select(c => new { c.Name, c.Phone })
+                .FirstOrDefaultAsync(ct);
+            var consentedLinkId = await _db.OwnerAccountClientLinks
+                .AsNoTracking()
+                .Where(l => l.TenantId == tenantId
+                    && l.ClinicId == clinicId
+                    && l.Status == OwnerAccountClientLinkStatus.Active
+                    && l.MarketingConsentAtUtc != null
+                    && _db.Pets.Any(p => p.Id == candidate.PetId && p.ClientId == l.ClientId))
+                .Select(l => l.Id)
+                .FirstOrDefaultAsync(ct);
+            if (consentedLinkId == Guid.Empty)
+                continue;
+
+            var optOut = _optOutLinks.Issue(tenantId, clinicId, consentedLinkId, nowUtc);
+            var clinicName = clinic?.Name ?? "Klinik";
             var log = new ReminderDispatchLog(
                 tenantId,
                 clinicId,
@@ -268,10 +283,12 @@ public sealed partial class ReminderProcessorService
 
             await EnqueueAutomatedEmailAsync(
                 log,
-                "Sizi görmeyeli uzun zaman oldu",
-                $"Sayın {recipient.Name},\n{recipient.PetName} son olarak {FormatDateForDisplay(candidate.ArrivedAtUtc)} tarihinde {clinicName} kliniğine geldi. Kontrol için randevu almak isterseniz kliniğinizle görüşebilirsiniz.{OptOutFooter}",
+                NoReturnMarketingEmail.Subject(clinicName),
+                NoReturnMarketingEmail.Body(
+                    recipient.Name, recipient.PetName, clinicName, FormatDateForDisplay(candidate.ArrivedAtUtc), clinic?.Phone, optOut.Url),
                 dailyBudget,
-                ct);
+                ct,
+                optOut.Link);
         }
     }
 
@@ -280,7 +297,8 @@ public sealed partial class ReminderProcessorService
         string subject,
         string body,
         DailyEmailBudget dailyBudget,
-        CancellationToken ct)
+        CancellationToken ct,
+        MarketingOptOutLink? optOutLink = null)
     {
         if (string.IsNullOrWhiteSpace(log.RecipientEmail))
         {
@@ -300,6 +318,8 @@ public sealed partial class ReminderProcessorService
         {
             var outboxMessageId = await _reminderEmailOutboxEnqueuer.EnqueueReminderEmailAsync(log.RecipientEmail, subject, body, isHtml: false, ct);
             log.MarkEnqueued(log.CreatedAtUtc, outboxMessageId);
+            if (optOutLink is not null)
+                _db.MarketingOptOutLinks.Add(optOutLink);
         }
         catch (Exception ex)
         {
@@ -307,7 +327,7 @@ public sealed partial class ReminderProcessorService
             _logger.LogWarning(ex, "Automated reminder enqueue failed. Tenant={TenantId} DedupeKey={DedupeKey}", log.TenantId, log.DedupeKey);
         }
 
-        await TryInsertLogAsync(log, ct, detachOutboxMessageIdOnConflict: log.OutboxMessageId);
+        await TryInsertLogAsync(log, ct, detachOutboxMessageIdOnConflict: log.OutboxMessageId, detachLinkOnConflict: optOutLink);
     }
 
     private async Task<(string Email, string Name, string PetName)> LoadPetRecipientAsync(Guid tenantId, Guid petId, CancellationToken ct)

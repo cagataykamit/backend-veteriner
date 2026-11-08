@@ -1,7 +1,9 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Reminders.Marketing;
 using Backend.Veteriner.Application.Tenants;
+using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Reminders;
 using Backend.Veteriner.Domain.Shared;
 using FluentValidation;
@@ -11,7 +13,8 @@ namespace Backend.Veteriner.Application.Reminders.Rules;
 
 /// <summary>
 /// Kliniğin otomatik hatırlatıcı kuralı (TIER-003; docs/AUTOMATED_REMINDERS_API_CONTRACT.md). Kayıt yoksa kapalı ve varsayılan gün.
-/// <see cref="SendingAvailable"/> <c>false</c>: ticari ileti gönderimi merkezi olarak kapalı, kural açılsa da e-posta gitmez.
+/// <see cref="SendingAvailable"/> <c>false</c>: ticari ileti kuralı ve kliniğin ticari ileti kapısı kapalı; kural açılsa da e-posta gitmez
+/// (ADR-046). Hatırlatma kurallarında her zaman <c>true</c>.
 /// </summary>
 public sealed record ClinicReminderRuleDto(
     string RuleType,
@@ -23,7 +26,8 @@ public sealed record ClinicReminderRuleDto(
     bool SendingAvailable,
     DateTime? UpdatedAtUtc);
 
-public sealed record ClinicReminderRulesDto(Guid ClinicId, IReadOnlyList<ClinicReminderRuleDto> Rules);
+/// <summary>Kurallar ve kliniğin ticari ileti kapısı (ADR-046; <c>NoReturn</c> yalnız kapı açıkken gönderir).</summary>
+public sealed record ClinicReminderRulesDto(Guid ClinicId, IReadOnlyList<ClinicReminderRuleDto> Rules, ClinicMarketingGateDto MarketingGate);
 
 public sealed record GetClinicReminderRulesQuery(Guid ClinicId) : IRequest<Result<ClinicReminderRulesDto>>;
 
@@ -71,7 +75,7 @@ internal static class ClinicReminderRuleMapping
         => Enum.TryParse(value?.Trim(), ignoreCase: true, out type) && Enum.IsDefined(type);
 
     /// <summary>Tüm kurallar katalog sırasıyla döner; kaydı olmayan kural kapalı ve varsayılan gündedir.</summary>
-    public static ClinicReminderRulesDto ToDto(Guid clinicId, IReadOnlyCollection<ClinicReminderRule> rows)
+    public static ClinicReminderRulesDto ToDto(Guid clinicId, IReadOnlyCollection<ClinicReminderRule> rows, ClinicMarketingSettings? marketing)
         => new(
             clinicId,
             ClinicReminderRuleDefinition.All
@@ -85,21 +89,24 @@ internal static class ClinicReminderRuleMapping
                         d.DefaultDays,
                         d.MinDays,
                         d.MaxDays,
-                        d.SendingAvailable,
+                        !d.IsMarketing || ClinicMarketingSettings.IsOpen(marketing),
                         row?.UpdatedAtUtc);
                 })
-                .ToArray());
+                .ToArray(),
+            ClinicMarketingGateDto.From(marketing));
 }
 
 public sealed class GetClinicReminderRulesQueryHandler : IRequestHandler<GetClinicReminderRulesQuery, Result<ClinicReminderRulesDto>>
 {
     private readonly ClinicDefinitionAccess _access;
     private readonly IReadRepository<ClinicReminderRule> _rules;
+    private readonly ClinicMarketingGate _marketing;
 
-    public GetClinicReminderRulesQueryHandler(ClinicDefinitionAccess access, IReadRepository<ClinicReminderRule> rules)
+    public GetClinicReminderRulesQueryHandler(ClinicDefinitionAccess access, IReadRepository<ClinicReminderRule> rules, ClinicMarketingGate marketing)
     {
         _access = access;
         _rules = rules;
+        _marketing = marketing;
     }
 
     public async ValueTask<Result<ClinicReminderRulesDto>> Handle(GetClinicReminderRulesQuery request, CancellationToken ct)
@@ -109,7 +116,8 @@ public sealed class GetClinicReminderRulesQueryHandler : IRequestHandler<GetClin
             return Result<ClinicReminderRulesDto>.Failure(access.Error);
 
         var rows = await _rules.ListAsync(new ClinicReminderRulesByClinicSpec(access.Value, request.ClinicId), ct);
-        return Result<ClinicReminderRulesDto>.Success(ClinicReminderRuleMapping.ToDto(request.ClinicId, rows));
+        var marketing = await _marketing.GetAsync(access.Value, request.ClinicId, ct);
+        return Result<ClinicReminderRulesDto>.Success(ClinicReminderRuleMapping.ToDto(request.ClinicId, rows, marketing));
     }
 }
 
@@ -119,6 +127,7 @@ public sealed class UpdateClinicReminderRulesCommandHandler : IRequestHandler<Up
     private readonly IClientContext _clientContext;
     private readonly IRepository<ClinicReminderRule> _rules;
     private readonly TenantPlanFeatureEvaluator _planFeatures;
+    private readonly ClinicMarketingGate _marketing;
     private readonly TimeProvider _timeProvider;
 
     public UpdateClinicReminderRulesCommandHandler(
@@ -126,12 +135,14 @@ public sealed class UpdateClinicReminderRulesCommandHandler : IRequestHandler<Up
         IClientContext clientContext,
         IRepository<ClinicReminderRule> rules,
         TenantPlanFeatureEvaluator planFeatures,
+        ClinicMarketingGate marketing,
         TimeProvider timeProvider)
     {
         _access = access;
         _clientContext = clientContext;
         _rules = rules;
         _planFeatures = planFeatures;
+        _marketing = marketing;
         _timeProvider = timeProvider;
     }
 
@@ -176,6 +187,7 @@ public sealed class UpdateClinicReminderRulesCommandHandler : IRequestHandler<Up
         }
 
         await _rules.SaveChangesAsync(ct);
-        return Result<ClinicReminderRulesDto>.Success(ClinicReminderRuleMapping.ToDto(request.ClinicId, rows));
+        var marketing = await _marketing.GetAsync(tenantId, request.ClinicId, ct);
+        return Result<ClinicReminderRulesDto>.Success(ClinicReminderRuleMapping.ToDto(request.ClinicId, rows, marketing));
     }
 }

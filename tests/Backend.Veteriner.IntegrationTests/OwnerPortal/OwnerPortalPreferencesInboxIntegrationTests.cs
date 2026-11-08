@@ -49,7 +49,7 @@ public sealed partial class OwnerPortalIntegrationTests
         var body = await updated.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("marketingConsented").GetBoolean().Should().BeTrue();
         body.GetProperty("marketingConsentedAtUtc").ValueKind.Should().NotBe(JsonValueKind.Null);
-        body.GetProperty("marketingSendingEnabled").GetBoolean().Should().BeFalse("İYS/ETK görüşü gelene dek ticari gönderim kapalı");
+        body.GetProperty("marketingSendingEnabled").GetBoolean().Should().BeFalse("kliniğin ticari ileti kapısı varsayılan kapalı (ADR-046)");
         body.GetProperty("remindersOptedOut").GetBoolean().Should().BeTrue();
 
         var withdrawn = await (await SendAsync(HttpMethod.Put, url, portal.AccessToken, new { marketingConsented = false }))
@@ -194,9 +194,11 @@ public sealed partial class OwnerPortalIntegrationTests
         reminder.GetProperty("channels").EnumerateArray()
             .Single(c => c.GetProperty("channel").GetString() == "WhatsAppLink")
             .GetProperty("mode").GetString().Should().Be("StaffManual");
-        rules.EnumerateArray().Single(r => r.GetProperty("type").GetString() == "Marketing")
-            .GetProperty("channels").EnumerateArray()
-            .Should().OnlyContain(c => c.GetProperty("mode").GetString() == "Disabled");
+        // Ticari ileti yalnız e-postadır: onaya bağlı, ayrıca kliniğin ticari ileti kapısı (ADR-046).
+        var marketing = rules.EnumerateArray().Single(r => r.GetProperty("type").GetString() == "Marketing")
+            .GetProperty("channels").EnumerateArray().ToDictionary(c => c.GetProperty("channel").GetString()!, c => c.GetProperty("mode").GetString());
+        marketing["Email"].Should().Be("Preference");
+        marketing.Where(c => c.Key != "Email").Should().OnlyContain(c => c.Value == "Disabled");
 
         var client = new Backend.Veteriner.Domain.Clients.Client(staff.TenantId, "WhatsApp Sahip", DateTime.UtcNow, "0532 123 45 67", $"wa-{Guid.NewGuid():N}@example.com");
         await using (var scope = _factory.Services.CreateSystemScope())

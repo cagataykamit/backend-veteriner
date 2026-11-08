@@ -12,7 +12,7 @@ public enum ClinicReminderRuleType
     /// <summary>Ödenmemiş en eski ücretin üzerinden N gün geçince.</summary>
     Debt = 1,
 
-    /// <summary>Son gelişin üzerinden N gün geçti, planlı randevu yok. Ticari ileti sayılabilir; onay ve gönderim anahtarı ister.</summary>
+    /// <summary>Son gelişin üzerinden N gün geçti, planlı randevu yok. Ticari ileti; onay ve kliniğin ticari ileti kapısını ister.</summary>
     NoReturn = 2,
 }
 
@@ -33,9 +33,8 @@ public sealed record ClinicReminderRuleDefinition(
 
     public static ClinicReminderRuleDefinition Of(ClinicReminderRuleType type) => All.First(d => d.Type == type);
 
-    /// <summary>E-posta bugün gönderilebilir mi; ticari ileti gönderimi kapalıyken <c>false</c>.</summary>
-    public bool SendingAvailable => OwnerNotificationChannelPolicy.ModeOf(NotificationType, OwnerNotificationChannel.Email, pushConfigured: false)
-        != OwnerNotificationChannelMode.Disabled;
+    /// <summary>Ticari ileti mi; öyleyse gönderim kliniğin ticari ileti kapısına ve sahibin onayına bağlıdır (ADR-046).</summary>
+    public bool IsMarketing => OwnerNotificationChannelPolicy.CategoryOf(NotificationType) == OwnerNotificationCategory.Marketing;
 }
 
 /// <summary>

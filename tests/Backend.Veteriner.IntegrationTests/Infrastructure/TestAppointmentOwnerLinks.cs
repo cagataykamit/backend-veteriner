@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Appointments.OwnerLinks;
 using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.OwnerPortal.MarketingOptOut;
 using Backend.Veteriner.Infrastructure.Security;
 using Microsoft.Extensions.Options;
 
@@ -11,6 +12,14 @@ public static class TestAppointmentOwnerLinks
     public const string PortalBaseUrl = "https://portal.test";
 
     public static AppointmentOwnerLinkIssuer Issuer()
+        => new(
+            new OwnerPortalSecretGenerator(),
+            new Sha256TokenHashService(),
+            Options.Create(new OwnerPortalOptions { PortalBaseUrl = PortalBaseUrl }),
+            Options.Create(new AppOptions()));
+
+    /// <summary>Ticari ileti ret bağlantısı (ADR-046); aynı portal kökü.</summary>
+    public static MarketingOptOutLinkIssuer MarketingOptOutIssuer()
         => new(
             new OwnerPortalSecretGenerator(),
             new Sha256TokenHashService(),

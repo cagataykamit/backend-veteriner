@@ -7,6 +7,7 @@ using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Reminders.Commands.UpdateSettings;
 using Backend.Veteriner.Application.Reminders.Contracts.Dtos;
 using Backend.Veteriner.Application.Reminders.Contracts.Requests;
+using Backend.Veteriner.Application.Reminders.Marketing;
 using Backend.Veteriner.Application.Reminders.Queries.GetLogs;
 using Backend.Veteriner.Application.Reminders.Queries.GetSettings;
 using Backend.Veteriner.Application.Reminders.Rules;
@@ -18,6 +19,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace Backend.Veteriner.Api.Controllers;
 
 public sealed record UpdateClinicReminderRulesBody(IReadOnlyList<ClinicReminderRuleUpdate>? Rules);
+
+public sealed record UpdateClinicMarketingGateBody(bool IsEnabled, bool IysDeclarationAccepted);
 
 [ApiController]
 [ApiVersion("1.0")]
@@ -99,6 +102,25 @@ public sealed class RemindersController : ControllerBase
             return problem!;
 
         return (await _mediator.Send(new UpdateClinicReminderRulesCommand(clinicId, body.Rules), ct)).ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Kliniğin ticari ileti kapısı (ADR-046). Açmak İYS beyanını ister (400 <c>Reminders.MarketingGate.Validation.DeclarationRequired</c>);
+    /// beyan ve kapatma denetim kaydına yazılır. Kapı kuralların GET yanıtında (<c>marketingGate</c>) okunur.
+    /// </summary>
+    [HttpPut("clinics/{clinicId:guid}/marketing-gate")]
+    [Authorize(Policy = PermissionCatalog.Reminders.Manage)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(ClinicMarketingGateDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> PutMarketingGate([FromRoute] Guid clinicId, [FromBody] UpdateClinicMarketingGateBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        return (await _mediator.Send(new UpdateClinicMarketingGateCommand(clinicId, body.IsEnabled, body.IysDeclarationAccepted), ct)).ToActionResult(this);
     }
 
     [HttpGet("logs")]
