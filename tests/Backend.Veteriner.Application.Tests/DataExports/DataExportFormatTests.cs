@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.DataExports;
 using Backend.Veteriner.Domain.DataExports;
+using Backend.Veteriner.Domain.Pets;
 using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.DataExports;
@@ -50,6 +51,16 @@ public sealed class DataExportFormatTests
     [InlineData("=1+2", "=1+2")]
     public void Quote_Should_Only_Escape_Delimiter_Quote_And_Line_Breaks(string value, string expected)
         => DataExportFormat.Quote(value).Should().Be(expected);
+
+    [Fact]
+    public void Flags_Code_Should_Write_Empty_For_No_Flags_And_Comma_List_Otherwise()
+    {
+        var column = DataExportColumn<PetAlertFlags>.Code("Uyarilar", "Uyarılar.", f => f);
+
+        DataExportFormat.Cells(column.Kind, column.Value(PetAlertFlags.None)).Should().Equal(string.Empty);
+        DataExportFormat.Cells(column.Kind, column.Value(PetAlertFlags.Allergy | PetAlertFlags.Aggressive)).Should().Equal("Allergy, Aggressive");
+        column.Description.Should().NotContain("None");
+    }
 
     [Fact]
     public void Code_Column_Description_Should_List_Possible_Values()

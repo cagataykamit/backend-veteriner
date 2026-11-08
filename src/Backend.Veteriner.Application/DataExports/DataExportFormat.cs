@@ -42,11 +42,18 @@ public sealed record DataExportColumn<TRow>(string Name, string Description, Dat
     public static DataExportColumn<TRow> Instant(string name, string description, Func<TRow, DateTime?> value)
         => new(name, description, DataExportColumnKind.Instant, row => value(row));
 
-    /// <summary>Sabit kod (durum, tür): enum adı; olası değerler açıklamaya eklenir.</summary>
+    /// <summary>
+    /// Sabit kod (durum, tür): enum adı; olası değerler açıklamaya eklenir. Bayrak kümesinde (<see cref="FlagsAttribute"/>)
+    /// boş küme boş hücredir, birden çok bayrak virgülle yazılır.
+    /// </summary>
     public static DataExportColumn<TRow> Code<TEnum>(string name, string description, Func<TRow, TEnum?> value)
         where TEnum : struct, Enum
-        => new(name, $"{description} Değerler: {string.Join(", ", Enum.GetNames<TEnum>())}.", DataExportColumnKind.Code,
-            row => value(row) is { } code ? code.ToString() : null);
+    {
+        var isFlags = typeof(TEnum).IsDefined(typeof(FlagsAttribute), inherit: false);
+        var names = Enum.GetValues<TEnum>().Where(v => !isFlags || Convert.ToInt64(v) != 0).Select(v => v.ToString());
+        return new(name, $"{description} Değerler: {string.Join(", ", names)}.", DataExportColumnKind.Code,
+            row => value(row) is { } code && !(isFlags && Convert.ToInt64(code) == 0) ? code.ToString() : null);
+    }
 
     /// <inheritdoc cref="Code{TEnum}(string, string, Func{TRow, TEnum?})"/>
     public static DataExportColumn<TRow> Code<TEnum>(string name, string description, Func<TRow, TEnum> value)
