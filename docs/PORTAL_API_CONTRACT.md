@@ -490,7 +490,7 @@ Migration: **`AddPortalPreferencesDataRequestsAndSettings`** (`OwnerAccounts.Pus
 ```
 
 - Hatırlatma alanları §5.11 ile **aynı alan ve kural** (`Client.RemindersOptedOut`, `Client.SetRemindersOptedOutByOwner`). `reminder-preferences` uçları aynen kalır.
-- `marketing…`: ticari elektronik ileti onayı (ETK m.6, İYS). Bağ başına (`OwnerAccountClientLinks.MarketingConsentAtUtc`; klinik veri sorumlusudur). Geri çekme sütunu boşaltır, kanıt denetim kaydındadır. **Gönderim bu sürümde kapalıdır:** `marketingSendingEnabled` her zaman `false` (sabit `OwnerNotificationChannelPolicy.MarketingSendingEnabled`; İYS kaydı ve hukuki görüş sonrası tek yerden açılır — HUKUKI C5/C6). Ticari ileti gönderen bir özellik yoktur; yalnız kod hazırlığıdır.
+- `marketing…`: ticari elektronik ileti onayı (ETK m.6, İYS). Bağ başına (`OwnerAccountClientLinks.MarketingConsentAtUtc`; klinik veri sorumlusudur). Geri çekme sütunu boşaltır ve ret zamanını `MarketingOptOutAtUtc`'ye yazar (ADR-046 K4); kanıt denetim kaydındadır. `marketingSendingEnabled`: bağın kliniğinde ticari ileti kapısı açık mı (`ClinicMarketingSettings`, varsayılan kapalı; ADR-046, `AUTOMATED_REMINDERS_API_CONTRACT.md` §2). Bugün ticari ileti gönderen tek özellik "uzun süredir gelmedi" (`NoReturn`) kuralıdır; her iletide kimliksiz ret bağlantısı (`/ticari-ileti-ret`) bulunur.
 - `PUT` gövdesi kısmi: `{ "remindersOptedOut": true|false|null, "marketingConsented": true|false|null }` — `null`/yok = dokunma; ikisi de yoksa 400. Hatırlatma açma KVKK Ret'te 409 `Clients.RemindersKvkkDeclined`. Yanıt 200, GET şekli. Denetim `Portal.NotificationPreferences.Update`, hedef `OwnerAccountId=…;LinkId=…`.
 
 | Kod | HTTP |
@@ -586,7 +586,7 @@ Tek yer: `Domain/Notifications/OwnerNotificationChannelPolicy`. Her tür bir **k
 |---|---|---|---|---|
 | `Transactional` | `PortalInvite`, `SignInCode`, `PasswordResetCode`, `AccountDeletionCode`, `AccountDeleted`, `AppointmentRequestReceived`, `AppointmentRequestApproved`, `AppointmentRequestRescheduled`, `AppointmentRequestRejected`, `DataRequestAnswered` | `Always` (tercihle kapanmaz) | Kodlar ve davet: `Disabled` (gizli bilgi push'a yazılmaz); diğerleri `Preference` | Davet: `StaffManual`; diğerleri `Disabled` |
 | `Reminder` | `AppointmentReminder`, `VaccinationReminder` | `Preference` (`Client.AcceptsReminders`) | `Preference` | `StaffManual` |
-| `Marketing` | `Marketing` | `Preference` + `MarketingSendingEnabled` (şimdilik `false` → `Disabled`) | `Disabled` | `Disabled` |
+| `Marketing` | `Marketing`, `NoReturnReminder` | `Preference` (bağdaki onay) + kliniğin ticari ileti kapısı (çağıranda denetlenir, varsayılan kapalı; ADR-046) | `Disabled` | `Disabled` |
 
 Kanallar (`OwnerNotificationChannel`): `Email` (mevcut outbox/MailKit hattı), `Push` (`IPushNotificationSender` → outbox → `IPushNotificationProvider`; FCM anahtarı yokken `NotConfiguredPushNotificationProvider`, `IsConfigured=false`, gönderim yok; §14), `WhatsAppLink` (yalnız personelin açtığı `wa.me` bağlantısı; sistem göndermez, teslim durumu yoktur — AK-6). `Preference` modlu push, sağlayıcı yokken `NotConfigured` raporlanır.
 
@@ -622,6 +622,7 @@ Kanallar (`OwnerNotificationChannel`): `Email` (mevcut outbox/MailKit hattı), `
 | GET/PUT | `/api/v1/clinics/{clinicId}/portal-settings` | Personel + `Clinics.Read`/`Clinics.Update` |
 | GET | `/api/v1/portal-notification-rules` | Personel + `Clinics.Read` |
 | GET | `/api/v1/clients/{clientId}/whatsapp-link` | Personel + `Clients.Read` |
+| POST | `/api/portal/v1/marketing-opt-out/preview`, `/api/portal/v1/marketing-opt-out/confirm` (ticari ileti reddi, ADR-046; `AUTOMATED_REMINDERS_API_CONTRACT.md` §2) | Kimliksiz, gövdede token, `portal-auth` hız sınırı |
 
 ### 13.4 Düzeltme: portal randevu talebi `status`
 
