@@ -63,4 +63,10 @@ public enum PlanFeature
     /// düşünce anahtarlar silinmez, istekleri 403 döner; anahtar listesi ve iptal her pakette açık.
     /// </summary>
     ExternalApi = 9,
+
+    /// <summary>
+    /// Size özel geliştirmeler (TIER-010; docs/CUSTOM_DEVELOPMENT_REQUESTS_API_CONTRACT.md): Vetinity içinde kalan ekran, rapor ve çıktı
+    /// düzenlemesi için yeni talep açma. Paket düşünce talepler silinmez; liste her pakette açık.
+    /// </summary>
+    CustomDevelopment = 10,
 }
