@@ -69,4 +69,10 @@ public enum PlanFeature
     /// düzenlemesi için yeni talep açma. Paket düşünce talepler silinmez; liste her pakette açık.
     /// </summary>
     CustomDevelopment = 10,
+
+    /// <summary>
+    /// Bekleme listesi (TIER-018; docs/WAITLIST_API_CONTRACT.md): listeye ekleme, sıra, boşalan saate otomatik ya da elle teklif.
+    /// Paket düşünce kayıtlar silinmez; liste ve kayıt geçmişi her pakette okunur, açık teklifin kabul bağlantısı kapanır.
+    /// </summary>
+    Waitlist = 11,
 }
