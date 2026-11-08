@@ -8,7 +8,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: TIER-019 (bağımlılık APPT-013/0
   - Token: 256 bit rastgele, URL güvenli (portal davetiyle aynı üretici). Depoda yalnız **SHA-256 özeti** (`TokenHash`, benzersiz); ham token yalnız e-postadadır.
   - Randevuya bağlıdır (`AppointmentId`, `TenantId`). Süre **randevu saatinde** dolar (`ExpiresAtUtc` = gönderimdeki `scheduledAtUtc`).
   - **Tek kullanımlık:** bir eylem bağlantıyı kapatır (`ClosedAtUtc`, `UsedAction`); aynı randevunun diğer açık bağlantıları da kapanır. Kapanan bağlantıyla diğer eylem de yapılamaz.
-  - Randevu yeniden zamanlanırsa bağlantı geçersizdir (saat eşleşmez); yeni saat için yeni hatırlatma gerekir.
+  - Randevu yeniden zamanlanırsa bağlantı geçersizdir (saat eşleşmez); yeni saat için yeni bağlantılı hatırlatma bir kez gider (§2).
 - **Randevu:** `ownerConfirmedAtUtc` (yeni, boş olabilir). Sahip onayladığında yazılır; **durum değişmez**. Randevu saati değişince temizlenir.
 - **Klinik ayarı:** `ClinicAppointmentSettings.ownerCancelLinkEnabled` (varsayılan **açık**; kayıt yoksa da açık). "Onayla" her zaman açıktır.
 
@@ -19,6 +19,7 @@ Randevu hatırlatmasına iki satır eklenir: `{PortalBaseUrl}/randevu-yanit?toke
 - İptal kapalıysa iptal adresi yerine "Gelemeyecekseniz iptal için lütfen kliniği arayın[: telefon]" satırı çıkar.
 - Metin hizmet bilgilendirmesidir, ticari ileti değildir (HUKUKI-ONAY-LISTESI A4 varsayımı); tanıtım içermez.
 - Bağlantı, e-posta (outbox) ve gönderim günlüğüyle aynı kayıtta yazılır; tekrar engeli (dedupe) çakışmasında bağlantı da yazılmaz.
+- Tekrar engeli randevu, randevu saati ve hatırlatma ayarına (`hoursBefore`) bağlıdır: anahtar `appointment:{id}:at:{saat, yyyyMMddHHmmssfffffff UTC}:hours-before:{n}`; aday sorgusu günlüğün `ScheduledForUtc` alanını randevu saatiyle karşılaştırır (anahtara saat eklenmeden önceki günlükler de böyle eşleşir, yeniden gönderilmez). Yeniden zamanlanan randevuya yeni saat için bir hatırlatma gider, yeni onayla/iptal ve takvim bağlantılarını taşır; eski saatin günlüğü silinmez. Aynı saate geri alınan randevuya o saatin hatırlatması yeniden gitmez. Pencere kuralı aynıdır: yeni saat gelecekte ve `şimdi + hoursBefore` içindeyse hatırlatma anı geçmiş olsa da gider; geçmişteyse gitmez.
 - Paket kilidi yoktur (randevu hatırlatması Temel'dedir).
 
 ## 3) Uçlar (kimliksiz) — `/api/portal/v1/appointment-link`
@@ -114,7 +115,7 @@ Diğer takvimler (.ics dosyası): {App:BaseUrl}/api/portal/v1/appointment-link/c
 
 - Token mevcut TIER-019 deseni ve tablosudur (`AppointmentOwnerLinks`); ikinci mekanizma yoktur. Yeni alan `Purpose`: `0 Respond` (onayla/iptal; takvimi de verir), `1 Calendar` (yalnız takvim). Takvim tokeni GET adresinde taşındığı için ayrı üretilir ve **eylem yapamaz**: onayla/iptal tokeni API istek adresine hiç girmez.
 - Hatırlatma e-postası iki bağlantı yazar (yanıt + takvim); onay e-postası yalnız takvim bağlantısı yazar (onay e-postasında onayla/iptal yoktur). Bağlantılar e-postayla aynı kayıtta yazılır; tekrar engelinde hiçbiri yazılmaz.
-- Süre randevu saatinde dolar (`ExpiresAtUtc`). Yeniden zamanlanan, iptal edilen, tamamlanan randevuda geçersizdir (TIER-019 kuralı).
+- Süre randevu saatinde dolar (`ExpiresAtUtc`). Yeniden zamanlanan, iptal edilen, tamamlanan randevuda geçersizdir (TIER-019 kuralı); yeniden zamanlanan randevunun yeni hatırlatması yeni takvim bağlantısını taşır (§2).
 - Takvim okumadır: **tek kullanım kuralı uygulanmaz**; onayla kapanmış yanıt bağlantısı da takvim dosyasını vermeye devam eder. Bir eylem takvim bağlantısını kapatmaz.
 - `App:BaseUrl` (API kökü, ör. `https://api.vetinity.com`) boşsa takvim bağlantısı üretilmez; e-postada yalnız Google satırı kalır. Üretim ortamında bu ayar verilmelidir.
 - Onay e-postasında takvim satırları şablonun (ya da personelin düzenlediği metnin) sonuna eklenir; personel bunları düzenlemez. `GET /appointment-requests/{id}/email-preview` bu satırları göstermez.
@@ -143,5 +144,5 @@ Hata: `404 AppointmentLinks.NotFound` (sebep ayırt edilmez; §3 ile aynı kapı
 
 ### 8.8 Bilinen sınır
 
-- Yeniden zamanlanan randevuya yeni hatırlatma gitmez (TIER-019 boşluğu sürüyor); eski takvim bağlantısı geçersizdir, sahip yeni saati portaldan ekleyebilir.
+- Yeniden zamanlanan randevuya yeni saat için bir hatırlatma gider (§2); eski takvim bağlantısı geçersizdir. Yeni saat hatırlatma penceresinin dışındaysa (`şimdi + hoursBefore`'dan uzak) hatırlatma pencere gelince gider; o zamana kadar sahip yeni saati portaldan ekleyebilir. Yeniden zamanlama ayrıca anlık bildirim e-postası göndermez.
 - Takvim tokeni e-postanın outbox yükünde durur (§7 ile aynı).
