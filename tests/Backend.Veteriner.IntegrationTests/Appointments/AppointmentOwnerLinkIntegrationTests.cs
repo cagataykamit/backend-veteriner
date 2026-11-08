@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.IntegrationTests.OnlineAppointments;
+using Backend.Veteriner.Application.Appointments.Calendar;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.OwnerLinks;
 using Backend.Veteriner.Application.Auth;
@@ -46,8 +47,10 @@ public sealed class AppointmentOwnerLinkIntegrationTests : IClassFixture<CustomW
             var response = await anonymous.PostAsJsonAsync(PreviewUrl, new { token });
             response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
             var page = await response.Content.ReadFromJsonAsync<JsonElement>();
-            page.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo("clinicName", "scheduledAtUtc", "petName", "cancelEnabled");
+            page.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo("clinicName", "scheduledAtUtc", "petName", "cancelEnabled", "googleCalendarUrl");
             page.GetProperty("petName").GetString().Should().Be("Boncuk");
+            page.GetProperty("googleCalendarUrl").GetString().Should().StartWith("https://calendar.google.com/calendar/render?action=TEMPLATE&")
+                .And.Contain("Boncuk");
             page.GetProperty("cancelEnabled").GetBoolean().Should().BeTrue("varsayılan açık");
         }
 
@@ -232,6 +235,122 @@ public sealed class AppointmentOwnerLinkIntegrationTests : IClassFixture<CustomW
         state.Links.Should().OnlyContain(l => l.ClosedAtUtc == null, "reddedilen iptal bağlantıyı tüketmez");
 
         (await anonymous.PostAsJsonAsync(ConfirmUrl, new { token })).StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    // ---------- TIER-020: takvime ekle ----------
+
+    [Fact]
+    public async Task Calendar_File_Should_Not_Change_State_And_Still_Work_After_Confirm()
+    {
+        var ctx = await OnlineAppointmentTestContext.CreateAsync(_factory);
+        var at = DateTime.UtcNow.AddDays(1);
+        var (appointmentId, token) = await SeedLinkAsync(ctx, at, petName: "Boncuk");
+        var before = await LoadAsync(appointmentId);
+        var anonymous = _factory.CreateClient();
+
+        for (var i = 0; i < 2; i++)
+        {
+            var ics = await anonymous.PostAsJsonAsync(CalendarPostUrl, new { token });
+            await ShouldBeIcsAsync(ics, appointmentId, before.Appointment.ScheduledAtUtc, "Boncuk");
+            (await anonymous.GetAsync($"{CalendarGetUrl}?token={Uri.EscapeDataString(token)}")).StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        var after = await LoadAsync(appointmentId);
+        after.Appointment.MutationSequence.Should().Be(before.Appointment.MutationSequence, "GET/POST takvim durum değiştirmez");
+        after.Appointment.OwnerConfirmedAtUtc.Should().BeNull();
+        after.Links.Should().OnlyContain(l => l.ClosedAtUtc == null, "takvim bağlantıyı tüketmez");
+
+        (await anonymous.PostAsJsonAsync(ConfirmUrl, new { token })).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        await ShouldBeIcsAsync(await anonymous.PostAsJsonAsync(CalendarPostUrl, new { token }), appointmentId, before.Appointment.ScheduledAtUtc, "Boncuk");
+    }
+
+    [Fact]
+    public async Task Calendar_Token_Should_Not_Allow_Actions_And_Should_Be_Rejected_When_Cancelled_Rescheduled_Or_Expired()
+    {
+        var ctx = await OnlineAppointmentTestContext.CreateAsync(_factory);
+        var (cancelledId, _) = await SeedLinkAsync(ctx, DateTime.UtcNow.AddDays(1));
+        var cancelledToken = await SeedCalendarLinkAsync(ctx, cancelledId);
+        var (rescheduledId, _) = await SeedLinkAsync(ctx, DateTime.UtcNow.AddDays(1));
+        var rescheduledToken = await SeedCalendarLinkAsync(ctx, rescheduledId);
+        var (expiredId, _) = await SeedLinkAsync(ctx, DateTime.UtcNow.AddDays(1));
+        var expiredToken = await SeedCalendarLinkAsync(ctx, expiredId);
+        var anonymous = _factory.CreateClient();
+
+        (await anonymous.GetAsync($"{CalendarGetUrl}?token={Uri.EscapeDataString(cancelledToken)}")).StatusCode.Should().Be(HttpStatusCode.OK);
+        foreach (var url in new[] { PreviewUrl, ConfirmUrl, CancelUrl })
+        {
+            var response = await anonymous.PostAsJsonAsync(url, new { token = cancelledToken });
+            response.StatusCode.Should().Be(HttpStatusCode.NotFound, $"takvim tokeni eylem yapamaz: {url}");
+        }
+
+        (await LoadAsync(cancelledId)).Appointment.Status.Should().Be(AppointmentStatus.Scheduled);
+
+        await UpdateAppointmentAsync(cancelledId, a => a.Cancel());
+        await UpdateAppointmentAsync(rescheduledId, a => a.RescheduleTo(a.ScheduledAtUtc.AddHours(2)));
+        var past = DateTime.UtcNow.AddMinutes(-5);
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.Appointments.Where(a => a.Id == expiredId).ExecuteUpdateAsync(s => s.SetProperty(a => a.ScheduledAtUtc, past));
+            await db.AppointmentOwnerLinks.Where(l => l.AppointmentId == expiredId).ExecuteUpdateAsync(s => s.SetProperty(l => l.ExpiresAtUtc, past));
+        }
+
+        foreach (var token in new[] { cancelledToken, rescheduledToken, expiredToken, "bilinmeyen-token", "" })
+        {
+            var get = await anonymous.GetAsync($"{CalendarGetUrl}?token={Uri.EscapeDataString(token)}");
+            get.StatusCode.Should().Be(HttpStatusCode.NotFound, token);
+            (await IntegrationTestProblemDetails.ReadCodeAsync(get)).Should().Be(AppointmentOwnerLinkResolver.NotFoundCode);
+            (await anonymous.PostAsJsonAsync(CalendarPostUrl, new { token })).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        }
+    }
+
+    [Fact]
+    public async Task Calendar_File_Should_Carry_Minimal_Data_Only()
+    {
+        var ctx = await OnlineAppointmentTestContext.CreateAsync(_factory);
+        var (appointmentId, token) = await SeedLinkAsync(ctx, DateTime.UtcNow.AddDays(1), petName: "Zeytin");
+        await UpdateAppointmentAsync(appointmentId, a => a.UpdateDetails(
+            a.ClinicId, a.PetId, a.ScheduledAtUtc, 45, AppointmentType.Checkup, "Teşhis: gizli not"));
+
+        var response = await _factory.CreateClient().PostAsJsonAsync(CalendarPostUrl, new { token });
+        var text = await response.Content.ReadAsStringAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, text);
+        text.Should().Contain("Hayvan: Zeytin").And.Contain("randevusu");
+        text.Should().NotContain("Teşhis").And.NotContain("gizli not").And.NotContain(appointmentId.ToString("D"));
+        text.Should().NotContain("sahip-", "sahip e-postası girmez");
+        var start = (await LoadAsync(appointmentId)).Appointment.ScheduledAtUtc;
+        text.Should().Contain($"DTEND:{start.AddMinutes(45):yyyyMMdd'T'HHmmss'Z'}", "randevu süresi");
+    }
+
+    private const string CalendarGetUrl = "/" + AppointmentOwnerLinkUrls.CalendarFilePath;
+    private const string CalendarPostUrl = "/api/portal/v1/appointment-link/calendar";
+
+    private static async Task ShouldBeIcsAsync(HttpResponseMessage response, Guid appointmentId, DateTime startUtc, string petName)
+    {
+        var text = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, text);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("text/calendar");
+        response.Content.Headers.ContentType.CharSet.Should().Be("utf-8");
+        response.Content.Headers.ContentDisposition!.FileName.Should().Contain(".ics");
+        response.Headers.CacheControl!.NoStore.Should().BeTrue();
+        text.Should().StartWith("BEGIN:VCALENDAR\r\n").And.Contain($"UID:{AppointmentCalendar.UidFor(appointmentId)}\r\n")
+            .And.Contain($"DTSTART:{startUtc:yyyyMMdd'T'HHmmss'Z'}\r\n").And.Contain($"Hayvan: {petName}");
+    }
+
+    /// <summary>E-postadaki takvim bağlantısıyla aynı üretici; ham token .ics adresinden okunur.</summary>
+    private async Task<string> SeedCalendarLinkAsync(OnlineAppointmentTestContext ctx, Guid appointmentId)
+    {
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var appointment = await db.Appointments.SingleAsync(a => a.Id == appointmentId);
+        var issued = scope.ServiceProvider.GetRequiredService<AppointmentOwnerLinkIssuer>()
+            .IssueCalendar(ctx.TenantId, ctx.ClinicId, appointment.Id, appointment.ScheduledAtUtc, DateTime.UtcNow);
+        issued.Should().NotBeNull("testte API kökü ayarlı");
+        db.AppointmentOwnerLinks.Add(issued!.Link);
+        await db.SaveChangesAsync();
+        issued.IcsUrl.Should().StartWith($"{TestAppointmentOwnerLinks.ApiBaseUrl}{CalendarGetUrl}?token=");
+        return Uri.UnescapeDataString(issued.IcsUrl[(issued.IcsUrl.IndexOf("token=", StringComparison.Ordinal) + "token=".Length)..]);
     }
 
     private sealed record State(Appointment Appointment, IReadOnlyList<AppointmentOwnerLink> Links);

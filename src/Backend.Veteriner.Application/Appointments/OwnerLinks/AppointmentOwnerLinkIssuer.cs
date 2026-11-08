@@ -41,7 +41,26 @@ public sealed class AppointmentOwnerLinkIssuer
             AppointmentOwnerLinkUrls.Page(_portal, _app, rawToken, AppointmentOwnerLinkAction.Confirm),
             AppointmentOwnerLinkUrls.Page(_portal, _app, rawToken, AppointmentOwnerLinkAction.Cancel));
     }
+
+    /// <summary>
+    /// "Takvime ekle" (TIER-020): .ics indiren kimliksiz uca giden takvim bağlantısı. Aynı token deseni ve tablo; amaç
+    /// <see cref="AppointmentOwnerLinkPurpose.Calendar"/> olduğundan eylem yapamaz. API kökü (<c>App:BaseUrl</c>) boşsa
+    /// bağlantı üretilmez (<c>null</c>); e-postada yalnız Google Takvim bağlantısı kalır.
+    /// </summary>
+    public IssuedAppointmentCalendarLink? IssueCalendar(Guid tenantId, Guid clinicId, Guid appointmentId, DateTime appointmentStartUtc, DateTime utcNow)
+    {
+        if (string.IsNullOrWhiteSpace(_app.BaseUrl))
+            return null;
+
+        var rawToken = _secrets.CreateToken();
+        var link = AppointmentOwnerLink.Create(
+            tenantId, clinicId, appointmentId, _hash.ComputeSha256(rawToken), appointmentStartUtc, utcNow, AppointmentOwnerLinkPurpose.Calendar);
+        return new IssuedAppointmentCalendarLink(link, AppointmentOwnerLinkUrls.CalendarFile(_app, rawToken));
+    }
 }
+
+/// <summary>Yeni takvim bağlantısı (izlenmez; çağıran e-postayla aynı kayıtta ekler) ve .ics adresi.</summary>
+public sealed record IssuedAppointmentCalendarLink(AppointmentOwnerLink Link, string IcsUrl);
 
 /// <summary>
 /// Bağlantı sayfası portalın kimliksiz sayfasıdır: <c>{PortalBaseUrl}/randevu-yanit?token=…&amp;islem=onayla|iptal</c>.
@@ -53,9 +72,16 @@ public static class AppointmentOwnerLinkUrls
     public const string ConfirmActionValue = "onayla";
     public const string CancelActionValue = "iptal";
 
+    /// <summary>Kimliksiz .ics ucu (API kökünden; <c>PortalAppointmentLinkController</c>).</summary>
+    public const string CalendarFilePath = "api/portal/v1/appointment-link/calendar.ics";
+
     public static string Page(OwnerPortalOptions portal, AppOptions app, string rawToken, AppointmentOwnerLinkAction action)
         => $"{OwnerPortalEmails.PortalRoot(portal, app)}/{PagePath}?token={Uri.EscapeDataString(rawToken)}"
            + $"&islem={(action == AppointmentOwnerLinkAction.Cancel ? CancelActionValue : ConfirmActionValue)}";
+
+    /// <summary><c>{App:BaseUrl}/api/portal/v1/appointment-link/calendar.ics?token=…</c>; GET yalnız dosya döner.</summary>
+    public static string CalendarFile(AppOptions app, string rawToken)
+        => $"{app.BaseUrl.TrimEnd('/')}/{CalendarFilePath}?token={Uri.EscapeDataString(rawToken)}";
 }
 
 /// <summary>
@@ -73,7 +99,8 @@ public static class AppointmentReminderEmail
         string whenText,
         IssuedAppointmentOwnerLink links,
         bool cancelLinkEnabled,
-        string? clinicPhone)
+        string? clinicPhone,
+        string calendarLines)
     {
         var body =
             $"Sayın {recipientName},\n" +
@@ -86,6 +113,7 @@ public static class AppointmentReminderEmail
                 ? "Gelemeyecekseniz iptal için lütfen kliniği arayın.\n\n"
                 : $"Gelemeyecekseniz iptal için lütfen kliniği arayın: {clinicPhone.Trim()}\n\n";
 
-        return body + "Bağlantılar randevu saatine kadar geçerlidir ve yalnız bir kez kullanılabilir.";
+        // TIER-020: takvim satırları (Google Takvim ve .ics; AppointmentCalendar.EmailLines).
+        return body + "Onay ve iptal bağlantıları randevu saatine kadar geçerlidir ve yalnız bir kez kullanılabilir.\n\n" + calendarLines;
     }
 }

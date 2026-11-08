@@ -1,4 +1,5 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Appointments.Calendar;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -19,7 +20,12 @@ public sealed record AppointmentOwnerLinkScope(
     Appointment Appointment,
     Clinic Clinic,
     string PetName,
-    bool CancelLinkEnabled);
+    bool CancelLinkEnabled)
+{
+    /// <summary>Takvim etkinliği (TIER-020; asgari veri kuralı <see cref="AppointmentCalendarEvent"/>'te).</summary>
+    public AppointmentCalendarEvent CalendarEvent()
+        => AppointmentCalendarEvent.Create(Appointment.Id, Appointment.ScheduledAtUtc, Appointment.DurationMinutes, Clinic, PetName);
+}
 
 /// <summary>
 /// Hatırlatma bağlantısının kapısı — tek yer (TIER-019). Ham token özetiyle kiracılar arası aranır, isteğin geri kalanı
@@ -66,7 +72,18 @@ public sealed class AppointmentOwnerLinkResolver
         _subscription = subscription;
     }
 
-    public async Task<Result<AppointmentOwnerLinkScope>> ResolveAsync(string? rawToken, DateTime utcNow, CancellationToken ct)
+    /// <summary>Eylem ve sayfa bilgisi: yalnız açık yanıt bağlantısı (<see cref="AppointmentOwnerLink.IsUsableFor"/>).</summary>
+    public Task<Result<AppointmentOwnerLinkScope>> ResolveAsync(string? rawToken, DateTime utcNow, CancellationToken ct)
+        => ResolveCoreAsync(rawToken, utcNow, forCalendar: false, ct);
+
+    /// <summary>
+    /// Takvim dosyası (TIER-020): yanıt ya da takvim bağlantısı; onayla kapanmış bağlantı da geçerlidir
+    /// (<see cref="AppointmentOwnerLink.IsCalendarUsableFor"/>). Diğer kapılar ve tek 404 aynıdır.
+    /// </summary>
+    public Task<Result<AppointmentOwnerLinkScope>> ResolveForCalendarAsync(string? rawToken, DateTime utcNow, CancellationToken ct)
+        => ResolveCoreAsync(rawToken, utcNow, forCalendar: true, ct);
+
+    private async Task<Result<AppointmentOwnerLinkScope>> ResolveCoreAsync(string? rawToken, DateTime utcNow, bool forCalendar, CancellationToken ct)
     {
         var token = rawToken?.Trim();
         if (string.IsNullOrEmpty(token) || token.Length > MaxTokenLength)
@@ -75,7 +92,7 @@ public sealed class AppointmentOwnerLinkResolver
         AppointmentOwnerLink? link;
         using (_tenantScope.AsSystem())
             link = await _links.FirstOrDefaultAsync(new AppointmentOwnerLinkByTokenHashSpec(_hash.ComputeSha256(token)), ct);
-        if (link is null || link.ClosedAtUtc is not null)
+        if (link is null || (!forCalendar && link.ClosedAtUtc is not null))
             return NotFound();
 
         // İsteğin geri kalanı bağlantının kiracısına bağlanır; kapsam istekle biter.
@@ -86,7 +103,8 @@ public sealed class AppointmentOwnerLinkResolver
             return NotFound();
 
         var appointment = await _appointments.FirstOrDefaultAsync(new AppointmentByIdSpec(link.TenantId, link.AppointmentId), ct);
-        if (appointment is null || !link.IsUsableFor(appointment, utcNow))
+        if (appointment is null
+            || !(forCalendar ? link.IsCalendarUsableFor(appointment, utcNow) : link.IsUsableFor(appointment, utcNow)))
             return NotFound();
 
         var clinic = await _clinics.FirstOrDefaultAsync(new ClinicByIdSpec(link.TenantId, appointment.ClinicId), ct);
@@ -114,9 +132,12 @@ public sealed class AppointmentOwnerLinkByTokenHashSpec : Specification<Appointm
         => Query.Where(x => x.TokenHash == tokenHash);
 }
 
-/// <summary>Randevunun açık bağlantıları (izlenir; bir eylem hepsini kapatır).</summary>
+/// <summary>Randevunun açık yanıt bağlantıları (izlenir; bir eylem hepsini kapatır). Takvim bağlantısı eylemle kapanmaz.</summary>
 public sealed class OpenAppointmentOwnerLinksByAppointmentSpec : Specification<AppointmentOwnerLink>
 {
     public OpenAppointmentOwnerLinksByAppointmentSpec(Guid tenantId, Guid appointmentId)
-        => Query.Where(x => x.TenantId == tenantId && x.AppointmentId == appointmentId && x.ClosedAtUtc == null);
+        => Query.Where(x => x.TenantId == tenantId
+                            && x.AppointmentId == appointmentId
+                            && x.Purpose == AppointmentOwnerLinkPurpose.Respond
+                            && x.ClosedAtUtc == null);
 }

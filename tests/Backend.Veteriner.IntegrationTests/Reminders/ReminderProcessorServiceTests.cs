@@ -1,4 +1,5 @@
 using Backend.IntegrationTests.Infrastructure;
+using Backend.Veteriner.Application.Appointments.OwnerLinks;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
@@ -146,7 +147,7 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         else
             body.Should().NotContain("islem=iptal").And.Contain("iptal için lütfen kliniği arayın");
 
-        var link = await db.AppointmentOwnerLinks.AsNoTracking().SingleAsync();
+        var link = await db.AppointmentOwnerLinks.AsNoTracking().SingleAsync(l => l.Purpose == AppointmentOwnerLinkPurpose.Respond);
         link.AppointmentId.Should().Be(appt.Id);
         link.ExpiresAtUtc.Should().Be(appt.ScheduledAtUtc);
         link.ClosedAtUtc.Should().BeNull();
@@ -155,9 +156,20 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         body.Should().NotContain(link.TokenHash);
         link.TokenHash.Should().Be(new Sha256TokenHashService().ComputeSha256(Uri.UnescapeDataString(rawToken)));
 
+        // TIER-020: Google Takvim ve ayrı takvim tokeniyle .ics bağlantısı (onay tokeni adreste API'ye gitmez).
+        body.Should().Contain("Google Takvim: https://calendar.google.com/calendar/render?action=TEMPLATE&text=Klinik%20randevusu")
+            .And.Contain($"&dates={appt.ScheduledAtUtc:yyyyMMdd'T'HHmmss'Z'}/{appt.ScheduledAtUtc.AddMinutes(30):yyyyMMdd'T'HHmmss'Z'}");
+        var calendarToken = System.Text.RegularExpressions.Regex
+            .Match(body, $"{TestAppointmentOwnerLinks.ApiBaseUrl}/{AppointmentOwnerLinkUrls.CalendarFilePath}\\?token=([^&\\s]+)").Groups[1].Value;
+        calendarToken.Should().NotBeEmpty().And.NotBe(rawToken);
+        var calendarLink = await db.AppointmentOwnerLinks.AsNoTracking().SingleAsync(l => l.Purpose == AppointmentOwnerLinkPurpose.Calendar);
+        calendarLink.AppointmentId.Should().Be(appt.Id);
+        calendarLink.ExpiresAtUtc.Should().Be(appt.ScheduledAtUtc);
+        calendarLink.TokenHash.Should().Be(new Sha256TokenHashService().ComputeSha256(Uri.UnescapeDataString(calendarToken)));
+
         // Aynı hatırlatma ikinci turda gitmez; yeni bağlantı da oluşmaz.
         await CreateService(db, email).ProcessOnceAsync(CancellationToken.None);
-        (await db.AppointmentOwnerLinks.CountAsync()).Should().Be(1);
+        (await db.AppointmentOwnerLinks.CountAsync()).Should().Be(2);
     }
 
     [Fact]

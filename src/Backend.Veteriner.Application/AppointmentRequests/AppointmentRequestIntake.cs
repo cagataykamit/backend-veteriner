@@ -149,7 +149,7 @@ public sealed class AppointmentRequestIntake
     public async Task<AppointmentRequestCreatedDto> SubmitAsync(AppointmentRequest request, CancellationToken ct)
     {
         await _requestsWrite.AddAsync(request, ct);
-        await _emails.SendAsync(request, AppointmentRequestEmailKind.Received, null, ct);
+        await _emails.SendAsync(request, AppointmentRequestEmailKind.Received, null, null, ct);
         await _notifications.AppointmentRequestCreatedAsync(request, ct);
         await _requestsWrite.SaveChangesAsync(ct);
         return new AppointmentRequestCreatedDto(request.Id, request.Status, request.RequestedStartUtc);

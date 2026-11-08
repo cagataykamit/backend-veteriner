@@ -135,7 +135,11 @@ public sealed partial class OwnerPortalIntegrationTests
         return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
     }
 
-    private async Task<string?> LastEmailSubjectToAsync(string email)
+    private Task<string?> LastEmailSubjectToAsync(string email) => LastEmailFieldToAsync(email, "subject");
+
+    private Task<string?> LastEmailBodyToAsync(string email) => LastEmailFieldToAsync(email, "body");
+
+    private async Task<string?> LastEmailFieldToAsync(string email, string field)
     {
         await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -148,7 +152,7 @@ public sealed partial class OwnerPortalIntegrationTests
         {
             using var doc = JsonDocument.Parse(payload);
             foreach (var p in doc.RootElement.EnumerateObject())
-                if (string.Equals(p.Name, "subject", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(p.Name, field, StringComparison.OrdinalIgnoreCase))
                     return p.Value.GetString();
         }
 
