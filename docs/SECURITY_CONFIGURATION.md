@@ -11,6 +11,9 @@ Ayarlar `appsettings.{Environment}.json` veya ortam değişkeniyle verilir (iç 
 
 Tüm yanıtlara `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` ve `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` (Swagger yolu hariç) eklenir. HSTS Development dışında açıktır (`UseHsts`).
 
+Portal ve panel statik dosyalardır, başlıklarını API değil yayın sunucusu verir. Gömmeye yalnız portalın `/randevu/*` yolu açıktır
+(APPT-021); başlık kuralı ve tıklama tuzağı değerlendirmesi ONLINE_APPOINTMENT_API_CONTRACT.md §15'tedir.
+
 ## Yerel geliştirme ayarları
 
 `src/Backend.Veteriner.Api/appsettings.Development.json` artık git'te izlenmez (`.gitignore`). Başlangıç noktası: `appsettings.Development.json.example`. Gizli değerler (bağlantı dizesi parolası, ödeme sağlayıcı anahtarları, JWT anahtarı) `dotnet user-secrets` ile verilir:
