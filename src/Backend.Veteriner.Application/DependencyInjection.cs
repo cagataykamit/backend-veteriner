@@ -114,6 +114,15 @@ public static class DependencyInjection
         services.AddScoped<StockBatchResolver>();
         services.AddScoped<ExpiredStockReader>();
         services.AddScoped<SaleDtoAssembler>();
+
+        // e-belge (ADR-036 Dilim 3–4): sağlayıcı seçimi, şifreli kimlik bilgisi geçidi, taslak, gönderim ve bağlantı.
+        services.AddScoped<EDocuments.Providers.IEDocumentProviderResolver, EDocuments.Providers.EDocumentProviderResolver>();
+        services.AddScoped<EDocuments.EDocumentProviderGateway>();
+        services.AddScoped<EDocuments.EDocumentAccess>();
+        services.AddScoped<EDocuments.EDocumentDraftBuilder>();
+        services.AddScoped<EDocuments.EDocumentSender>();
+        services.AddScoped<EDocuments.EDocumentActionRunner>();
+        services.AddScoped<EDocuments.Connections.EDocumentConnectionService>();
         services.AddScoped<RegisterReportRunner>();
 
         // Hasta sahibi portalı (ADR-031): sahiplik kontrolü, davet çözümü, oturum ve kod.
