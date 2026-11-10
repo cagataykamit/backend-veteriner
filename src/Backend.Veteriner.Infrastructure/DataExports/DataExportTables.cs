@@ -23,6 +23,7 @@ using Backend.Veteriner.Domain.Reminders;
 using Backend.Veteriner.Domain.Sales;
 using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Vaccinations;
+using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Visits;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -332,6 +333,29 @@ public static class DataExportTables
                 DataExportColumn<Vaccination>.Instant("Olusturma", "Kayıt zamanı.", x => x.CreatedAtUtc),
             ]),
 
+        new DataExportTable<ImportedClinicalRecord>("eski-program-kayitlari.csv", "Eski program kayıtları (içe aktarılmış klinik geçmiş, salt okunur)",
+            (db, t) => db.ImportedClinicalRecords.Where(x => x.TenantId == t),
+            [
+                DataExportColumn<ImportedClinicalRecord>.Id("Id", "Kayıt kimliği.", x => x.Id),
+                DataExportColumn<ImportedClinicalRecord>.Id("KlinikId", ClinicRef, x => x.ClinicId),
+                DataExportColumn<ImportedClinicalRecord>.Id("HastaId", PetRef, x => x.PetId),
+                DataExportColumn<ImportedClinicalRecord>.Id("MusteriId", ClientRef, x => x.ClientId),
+                DataExportColumn<ImportedClinicalRecord>.Date("Tarih", "Kaydın tarihi.", x => x.RecordedOn),
+                DataExportColumn<ImportedClinicalRecord>.Text("KayitTuru", "Kayıt türü.", x => x.RecordType),
+                DataExportColumn<ImportedClinicalRecord>.Text("Sikayet", "Şikâyet.", x => x.Complaint),
+                DataExportColumn<ImportedClinicalRecord>.Text("Anamnez", "Anamnez.", x => x.History),
+                DataExportColumn<ImportedClinicalRecord>.Text("Bulgular", "Bulgular.", x => x.Findings),
+                DataExportColumn<ImportedClinicalRecord>.Text("Tani", "Tanı.", x => x.Diagnosis),
+                DataExportColumn<ImportedClinicalRecord>.Text("Tedavi", "Tedavi.", x => x.Treatment),
+                DataExportColumn<ImportedClinicalRecord>.Text("Recete", "Reçete (metin).", x => x.Prescription),
+                DataExportColumn<ImportedClinicalRecord>.Text("LabSonuc", "Laboratuvar sonucu (metin).", x => x.LabResults),
+                DataExportColumn<ImportedClinicalRecord>.Text("Not", "Not.", x => x.Notes),
+                DataExportColumn<ImportedClinicalRecord>.Text("Hekim", "Hekim adı (eski program).", x => x.VeterinarianName),
+                DataExportColumn<ImportedClinicalRecord>.Number("Kilo", "Kilo (kg).", x => x.WeightKg),
+                DataExportColumn<ImportedClinicalRecord>.Number("Ates", "Ateş (°C).", x => x.TemperatureC),
+                DataExportColumn<ImportedClinicalRecord>.Instant("Olusturma", "İçe aktarma zamanı.", x => x.CreatedAtUtc),
+            ]),
+
         new DataExportTable<Administration>("uygulamalar.csv", "İlaç / malzeme uygulamaları",
             (db, t) => db.Administrations.Where(x => x.TenantId == t),
             [
@@ -458,6 +482,24 @@ public static class DataExportTables
                 DataExportColumn<Charge>.Id("KaydedenId", UserRef, x => x.CreatedByUserId),
                 DataExportColumn<Charge>.Instant("Iptal", "İptal zamanı.", x => x.VoidedAtUtc),
                 DataExportColumn<Charge>.Text("IptalNedeni", "İptal gerekçesi.", x => x.VoidReason),
+                DataExportColumn<Charge>.Id("IceAktarmaPartisiId", "Devir bakiyesiyse içe aktarma partisi (eski programdan).", x => x.ImportBatchId),
+            ]),
+
+        new DataExportTable<ImportedAccountEntry>("eski-program-hareketleri.csv", "Eski program hesap hareketleri (içe aktarılmış, salt okunur; bakiyeyi etkilemez)",
+            (db, t) => db.ImportedAccountEntries.Where(x => x.TenantId == t),
+            [
+                DataExportColumn<ImportedAccountEntry>.Id("Id", "Hareket kimliği.", x => x.Id),
+                DataExportColumn<ImportedAccountEntry>.Id("KlinikId", ClinicRef, x => x.ClinicId),
+                DataExportColumn<ImportedAccountEntry>.Id("MusteriId", ClientRef, x => x.ClientId),
+                DataExportColumn<ImportedAccountEntry>.Date("Tarih", "Hareket tarihi.", x => x.OccurredOn),
+                DataExportColumn<ImportedAccountEntry>.Code("Tur", "Borç (Debit) veya tahsilat (Credit).", x => x.Kind),
+                DataExportColumn<ImportedAccountEntry>.Number("Tutar", "Tutar.", x => x.Amount),
+                DataExportColumn<ImportedAccountEntry>.Text("ParaBirimi", Currency, x => x.Currency),
+                DataExportColumn<ImportedAccountEntry>.Text("Aciklama", "Açıklama.", x => x.Description),
+                DataExportColumn<ImportedAccountEntry>.Text("OdemeSekli", "Ödeme şekli (eski program metni).", x => x.PaymentMethod),
+                DataExportColumn<ImportedAccountEntry>.Text("BelgeNo", "Fatura/makbuz numarası.", x => x.DocumentNumber),
+                DataExportColumn<ImportedAccountEntry>.Text("HastaAdi", "Hasta adı (eski program metni).", x => x.PetName),
+                DataExportColumn<ImportedAccountEntry>.Instant("Olusturma", "İçe aktarma zamanı.", x => x.CreatedAtUtc),
             ]),
 
         new DataExportTable<Payment>("odemeler.csv", "Ödemeler (tahsilatlar)",

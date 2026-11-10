@@ -18,6 +18,7 @@ public static class PetTimelineConstants
         PetRecordKind.Vaccination,
         PetRecordKind.Hospitalization,
         PetRecordKind.Administration,
-        PetRecordKind.Imaging
+        PetRecordKind.Imaging,
+        PetRecordKind.ImportedClinicalRecord
     ];
 }

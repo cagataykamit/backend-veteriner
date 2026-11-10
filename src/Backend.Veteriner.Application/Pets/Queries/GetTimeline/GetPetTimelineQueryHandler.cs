@@ -112,7 +112,7 @@ public sealed class GetPetTimelineQueryHandler
                 r.Summary,
                 r.Status,
                 r.IsVoided,
-                new PetTimelineLinkRefDto(r.Kind, r.SourceId),
+                r.Kind == PetRecordKind.ImportedClinicalRecord ? null : new PetTimelineLinkRefDto(r.Kind, r.SourceId),
                 r.Kind == PetRecordKind.Visit && visitExaminationIds.TryGetValue(r.SourceId, out var examinationId) ? examinationId : r.RelatedExaminationId,
                 r.RelatedVisitId,
                 r.RelatedAppointmentId,

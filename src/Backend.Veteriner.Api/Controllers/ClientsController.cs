@@ -16,6 +16,7 @@ using Backend.Veteriner.Application.Clients.Queries.GetPaymentSummary;
 using Backend.Veteriner.Application.Clients.Queries.GetRecentSummary;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.ImportedRecords;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Shared;
 using System.Text.Json.Serialization;
@@ -251,6 +252,29 @@ public sealed class ClientsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetClientBalanceQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Eski program hareketleri (ADR-048 T4): içe aktarılmış salt okunur borç/tahsilat geçmişi ve bilgi amaçlı toplamlar.
+    /// Bakiyeyi, kasayı ve raporları etkilemez. Bkz. docs/IMPORT_API_CONTRACT.md §12.8.
+    /// </summary>
+    [HttpGet("{id:guid}/imported-account-entries")]
+    [Authorize(Policy = PermissionCatalog.Charges.Read)]
+    [ProducesResponseType(typeof(ImportedAccountEntriesPageDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetImportedAccountEntries(
+        [FromRoute] Guid id,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = ImportedRecordPaging.DefaultPageSize,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+        Response.Headers.CacheControl = "no-store";
+        var result = await _mediator.Send(new GetClientImportedAccountEntriesQuery(id, page, pageSize), ct);
         return result.ToActionResult(this);
     }
 
