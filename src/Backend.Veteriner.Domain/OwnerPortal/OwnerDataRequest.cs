@@ -41,7 +41,7 @@ public sealed class OwnerDataRequest : ITenantOwned, IClinicScoped
     public const int MessageMaxLength = 2000;
     public const int ResponseNoteMaxLength = 2000;
 
-    /// <summary>Yanıt süresi: başvurudan itibaren 30 gün (KVKK m.13; çalışma varsayımı, hukukçu farklı derse tek yer).</summary>
+    /// <summary>Yanıt süresi: başvurudan itibaren 30 gün (KVKK m.13; süre değişirse tek yer).</summary>
     public const int ResponseDueDays = 30;
 
     /// <summary>Bir bağda aynı anda açık (Open/InProgress) en fazla talep.</summary>

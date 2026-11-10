@@ -6,8 +6,8 @@ namespace Backend.Veteriner.Application.LegalAcceptances;
 
 /// <summary>
 /// Hukuki belgelerin güncel sürümleri ve kabul kuralı — tek yer (ADR-029).
-/// Bir sürüm değiştirilince o belgeyi gerektiren herkes yeniden kabul eder. "0.x" taslak sürümdür
-/// (hukuki onay bekliyor; ürün deposu <c>legal/</c>).
+/// Bir sürüm değiştirilince o belgeyi gerektiren herkes yeniden kabul eder. 1.0: hukukçu incelemesi beklenmeden
+/// yürürlüğe alınan metinler (2026-11-09 kullanıcı kararı; ürün deposu <c>legal/</c>).
 /// </summary>
 public static class LegalDocumentCatalog
 {
@@ -15,11 +15,11 @@ public static class LegalDocumentCatalog
     public static IReadOnlyDictionary<LegalDocumentType, string> CurrentVersions { get; } =
         new Dictionary<LegalDocumentType, string>
         {
-            [LegalDocumentType.Terms] = "0.1",
-            [LegalDocumentType.Privacy] = "0.1",
-            [LegalDocumentType.DataProcessing] = "0.1",
-            [LegalDocumentType.PortalTerms] = "0.1",
-            [LegalDocumentType.PortalPrivacy] = "0.1",
+            [LegalDocumentType.Terms] = "1.0",
+            [LegalDocumentType.Privacy] = "1.0",
+            [LegalDocumentType.DataProcessing] = "1.0",
+            [LegalDocumentType.PortalTerms] = "1.0",
+            [LegalDocumentType.PortalPrivacy] = "1.0",
         };
 
     public static string CurrentVersion(LegalDocumentType documentType) => CurrentVersions[documentType];

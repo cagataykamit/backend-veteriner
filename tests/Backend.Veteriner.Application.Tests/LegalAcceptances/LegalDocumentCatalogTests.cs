@@ -61,8 +61,8 @@ public sealed class LegalDocumentCatalogTests
     {
         var submitted = new[]
         {
-            new LegalDocumentAcceptanceInput(LegalDocumentType.Terms, "0.1"),
-            new LegalDocumentAcceptanceInput(LegalDocumentType.Privacy, " 0.1 "),
+            new LegalDocumentAcceptanceInput(LegalDocumentType.Terms, "1.0"),
+            new LegalDocumentAcceptanceInput(LegalDocumentType.Privacy, " 1.0 "),
             new LegalDocumentAcceptanceInput(LegalDocumentType.DataProcessing, "0.0"),
         };
 
@@ -75,7 +75,7 @@ public sealed class LegalDocumentCatalogTests
     {
         var result = LegalDocumentCatalog.EnsureAcceptsCurrent(
             [LegalDocumentType.Terms, LegalDocumentType.Privacy],
-            [new LegalDocumentAcceptanceInput(LegalDocumentType.Terms, "0.1")]);
+            [new LegalDocumentAcceptanceInput(LegalDocumentType.Terms, "1.0")]);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("LegalAcceptances.Required");
