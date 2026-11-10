@@ -612,7 +612,8 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
         response.Content.Headers.ContentDisposition!.FileNameStar.Should().Be("vetinity-iceaktar-sablon.xlsx");
         response.Headers.CacheControl!.NoStore.Should().BeTrue();
         using var workbook = new XLWorkbook(new MemoryStream(await response.Content.ReadAsByteArrayAsync()));
-        workbook.Worksheets.Select(w => w.Name).Should().Equal("Musteriler", "Hastalar", "Asilar", "Aciklama");
+        workbook.Worksheets.Select(w => w.Name).Should().Equal(
+            "Musteriler", "Hastalar", "Asilar", "KlinikGecmis", "HesapHareketleri", "Randevular", "Urunler", "Aciklama");
     }
 
     [Theory]

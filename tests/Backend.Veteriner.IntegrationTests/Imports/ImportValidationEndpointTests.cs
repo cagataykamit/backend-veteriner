@@ -783,6 +783,70 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
 
     // ================================================================ Yardımcılar
 
+    // ================================================================ Tam geçiş (ADR-048)
+
+    [Fact]
+    public async Task Validate_Should_Handle_Full_Migration_Tables_And_Require_Clinic_For_Them()
+    {
+        var ctx = await SeedAsync();
+        var cat = await SeedCatalogAsync(ctx.TenantId);
+        var client = ClientFor(ctx.Token);
+        var sfx = cat.Suffix;
+        var today = OperationDayBounds.ToLocalDate(DateTime.UtcNow);
+
+        var bytes = Workbook(
+            ("Musteriler", [["MusteriNo", "AdSoyad", "Telefon", "AcikBakiye"], ["M1", $"Ayşe {sfx}", "05321234567", "1.250,50"], ["M2", $"Veli {sfx}", "05331234567", "-10"]]),
+            ("Hastalar", [["MusteriNo", "HastaNo", "HastaAdi", "Tur"], ["M1", "H1", "Pamuk", cat.SpeciesName]]),
+            ("KlinikGecmis", [["HastaNo", "Tarih", "Tani"], ["H1", "12.05.2024", "Gastroenterit"], ["H1", "12.05.2024", "gastroenterit"], ["H1", "12.05.2024", null]]),
+            ("HesapHareketleri", [["MusteriNo", "Tarih", "IslemTuru", "Tutar"], ["M1", "05.03.2025", "Tahsilat", "350"], ["M1", "05.03.2025", "İade", "350"]]),
+            ("Randevular", [["HastaNo", "Tarih", "Saat"], ["H1", Date(today.AddDays(5)), "10:00"], ["H1", "01.01.2024", "10:00"]]),
+            ("Urunler", [["Ad", "UrunTuru", "SatisFiyati"], [$"Kuduz aşısı {sfx}", "Aşı", "450"], [$"kuduz aşısı {sfx}", "Aşı", "450"]]));
+
+        // Klinik gerektiren tablolar (klinik geçmiş, hesap hareketi, randevu) klinik olmadan yüklenemez.
+        var withoutClinic = await PostAsync(client, Guid.NewGuid(), null, null, ("file", "tam.xlsx", bytes, XlsxType));
+        withoutClinic.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await CodeAsync(withoutClinic)).Should().Be("Imports.ClinicRequired");
+
+        var id = await IdAsync(await PostAsync(client, Guid.NewGuid(), "Tam", ctx.ClinicId, ("file", "tam.xlsx", bytes, XlsxType)));
+        var uploaded = await GetJsonAsync(client, $"/api/v1/imports/batches/{id}");
+        uploaded.GetProperty("tables").EnumerateArray().Select(t => t.GetProperty("table").GetString())
+            .Should().Equal("customers", "pets", "clinicalRecords", "accountEntries", "appointments", "products");
+
+        await PutMappingAsync(client, id, new Dictionary<string, Dictionary<string, string>>
+        {
+            ["customers"] = Map("MusteriNo", "MusteriNo", "AdSoyad", "AdSoyad", "Telefon", "Telefon", "AcikBakiye", "AcikBakiye"),
+            ["pets"] = Map("MusteriNo", "MusteriNo", "HayvanNo", "HastaNo", "HayvanAdi", "HastaAdi", "Tur", "Tur"),
+            ["clinicalRecords"] = Map("HayvanNo", "HastaNo", "Tarih", "Tarih", "Tani", "Tani"),
+            ["accountEntries"] = Map("MusteriNo", "MusteriNo", "Tarih", "Tarih", "IslemTuru", "IslemTuru", "Tutar", "Tutar"),
+            ["appointments"] = Map("HayvanNo", "HastaNo", "Tarih", "Tarih", "Saat", "Saat"),
+            ["products"] = Map("Ad", "Ad", "UrunTuru", "UrunTuru", "SatisFiyati", "SatisFiyati"),
+        });
+
+        var json = await ValidateAsync(client, id);
+
+        json.GetProperty("status").GetString().Should().Be("Validated");
+        Counts(json, "customers").Should().Equal(2, 1, 1, 0, 2, 0, 0); // alacak bakiyesi uyarı, müşteri yine oluşur
+        Counts(json, "clinicalRecords").Should().Equal(3, 2, 0, 1, 1, 0, 1); // mükerrer atlanır, içeriksiz hata
+        Counts(json, "accountEntries").Should().Equal(2, 1, 0, 1, 1, 0, 0);
+        Counts(json, "appointments").Should().Equal(2, 2, 0, 0, 1, 0, 1); // geçmiş randevu atlanır
+        Counts(json, "products").Should().Equal(2, 1, 1, 0, 1, 0, 1);
+        Counts(json, "vaccinations").Should().Equal(0, 0, 0, 0, 0, 0, 0);
+
+        var customerRows = await RowsAsync(client, id, "customers");
+        customerRows[0].GetProperty("values").GetProperty("openingBalance").GetDecimal().Should().Be(1250.50m);
+
+        var preview = await GetJsonAsync(client, $"/api/v1/imports/batches/{id}/preview");
+        preview.GetProperty("canCommit").GetBoolean().Should().BeTrue();
+        preview.GetProperty("reminderImpact").GetProperty("futureAppointments").GetInt32().Should().Be(1);
+        preview.GetProperty("reminderImpact").GetProperty("totalEmailsWithinReminderWindow").GetInt32().Should().Be(0);
+
+        // Kuru çalıştırma ürün tablolarına yazmaz.
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await db.ImportedClinicalRecords.CountAsync(r => r.TenantId == ctx.TenantId)).Should().Be(0);
+        (await db.ImportedAccountEntries.CountAsync(e => e.TenantId == ctx.TenantId)).Should().Be(0);
+    }
+
     private static int[] Counts(JsonElement batch, string table)
     {
         var c = batch.GetProperty("summary").GetProperty(table);
