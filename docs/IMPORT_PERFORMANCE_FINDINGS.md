@@ -196,7 +196,7 @@ Test: `tests/Backend.Veteriner.IntegrationTests/Performance/ImportFullMigrationV
 | Dosya | 7 sayfa, **24.500 satır**: 3.000 müşteri (her 4. müşteride açık bakiye), 5.000 hasta, 8.000 klinik geçmiş, 6.000 hesap hareketi, 1.500 gelecek randevu, 1.000 ürün |
 | Yükleme | 4,9 sn |
 | Doğrulama (istek + arka plan işçisi) | **4,2 sn** |
-| Doğrulamada SELECT (küçük dosya / 24.500 satır) | **34 / 34** (satır sayısından bağımsız; üç tablolu partide 16 idi, yeni tabloların mevcut veri okumaları eklendi) |
+| Doğrulamada SELECT (küçük dosya / 24.500 satır) | **34 / 34** (satır sayısından bağımsız; üç tablolu partide istek + işçi 21 idi, bölüm 8; fark yeni tabloların mevcut veri ve katalog okumaları) |
 | Uygulama (3.000 sahip + 1.000 ürün birimi) | **89,1 sn**; tüm satırlar oluştu, başarısız 0 |
 | Geri alma önizleme | 2,1 sn |
 | Geri alma (`Fail`, engel yok) | **59,8 sn**; parti `RolledBack`, devir ücretleri ve tüm eski program kayıtları silindi |
