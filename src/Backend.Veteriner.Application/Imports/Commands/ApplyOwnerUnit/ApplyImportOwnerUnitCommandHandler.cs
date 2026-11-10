@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Appointments.Commands.Import;
 using Backend.Veteriner.Application.Clients.Commands.Create;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -6,12 +7,18 @@ using Backend.Veteriner.Application.Imports.Commit;
 using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Application.Imports.Specs;
 using Backend.Veteriner.Application.Imports.Validation;
+using Backend.Veteriner.Application.ImportedRecords.Commands;
 using Backend.Veteriner.Application.Pets.Commands.Create;
 using Backend.Veteriner.Application.Pets.Specs;
+using Backend.Veteriner.Application.Products.Commands.Create;
+using Backend.Veteriner.Application.Products.Specs;
 using Backend.Veteriner.Application.Vaccinations.Commands.Import;
+using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Pets;
+using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
 using FluentValidation;
@@ -21,7 +28,10 @@ namespace Backend.Veteriner.Application.Imports.Commands.ApplyOwnerUnit;
 
 /// <summary>
 /// Sahip birimini mevcut komutlarla yazar (kural kopyalanmaz): müşteri <see cref="CreateClientCommand"/>, hasta
-/// <see cref="CreatePetCommand"/>, aşı <see cref="CreateImportedVaccinationCommand"/>. Önizlemedeki eşleşmeler uygulama
+/// <see cref="CreatePetCommand"/>, aşı <see cref="CreateImportedVaccinationCommand"/>, klinik geçmiş
+/// <see cref="CreateImportedClinicalRecordCommand"/>, hesap hareketi <see cref="CreateImportedAccountEntryCommand"/>, randevu
+/// <see cref="CreateImportedAppointmentCommand"/>, ürün <see cref="CreateProductCommand"/>; devir bakiyesi
+/// <see cref="Charge.CreateOpeningBalance"/> (ADR-048). Önizlemedeki eşleşmeler uygulama
 /// anında yeniden çözülür (K4: arada eklenen müşteri/hasta <c>Matched</c>; K10: arada çipi kaydedilen hasta hata; aynı
 /// gün aşısı <c>Skipped</c>). Satır sonuçları ve parti kirası birimin sonunda aynı <c>SaveChanges</c>'te yazılır: kira
 /// başka işçiye geçtiyse rowversion çakışması birimi geri aldırır (aynı satır iki kez yazılmaz).
@@ -32,6 +42,11 @@ public sealed class ApplyImportOwnerUnitCommandHandler
     private const string ClientEntity = "Client";
     private const string PetEntity = "Pet";
     private const string VaccinationEntity = "Vaccination";
+    private const string ClinicalRecordEntity = "ClinicalRecord";
+    private const string AccountEntryEntity = "AccountEntry";
+    private const string AppointmentEntity = "Appointment";
+    private const string ProductEntity = "Product";
+    private const string OpeningBalanceDescription = "Devir bakiyesi (eski program)";
 
     private readonly ITenantContext _tenantContext;
     private readonly IRepository<ImportBatch> _batches;
@@ -39,6 +54,9 @@ public sealed class ApplyImportOwnerUnitCommandHandler
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Vaccination> _vaccinations;
+    private readonly IReadRepository<Appointment> _appointments;
+    private readonly IReadRepository<Product> _products;
+    private readonly IRepository<Charge> _charges;
     private readonly ISender _sender;
     private readonly TimeProvider _timeProvider;
 
@@ -49,6 +67,9 @@ public sealed class ApplyImportOwnerUnitCommandHandler
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
         IReadRepository<Vaccination> vaccinations,
+        IReadRepository<Appointment> appointments,
+        IReadRepository<Product> products,
+        IRepository<Charge> charges,
         ISender sender,
         TimeProvider timeProvider)
     {
@@ -58,6 +79,9 @@ public sealed class ApplyImportOwnerUnitCommandHandler
         _clients = clients;
         _pets = pets;
         _vaccinations = vaccinations;
+        _appointments = appointments;
+        _products = products;
+        _charges = charges;
         _sender = sender;
         _timeProvider = timeProvider;
     }
@@ -77,11 +101,9 @@ public sealed class ApplyImportOwnerUnitCommandHandler
 
         var unit = new UnitState(tenantId, batch, rows, ImportOptionsDocument.Parse(batch.OptionsJson));
 
-        var applied = await ApplyCustomersAsync(unit, request.OwnerKey, ct);
-        if (applied.IsSuccess)
-            applied = await ApplyPetsAsync(unit, ct);
-        if (applied.IsSuccess)
-            applied = await ApplyVaccinationsAsync(unit, ct);
+        var applied = ImportCommitKeys.IsProductUnit(request.OwnerKey)
+            ? await ApplyProductsAsync(unit, ct)
+            : await ApplyOwnerAsync(unit, request.OwnerKey, ct);
         if (!applied.IsSuccess)
             return Result<ImportOwnerUnitResult>.Failure(applied.Error);
 
@@ -105,6 +127,29 @@ public sealed class ApplyImportOwnerUnitCommandHandler
         // Satır sonuçları + kira yenilemesi; parti rowversion'ı değiştiyse (devralındı) birim geri alınır.
         await _rows.SaveChangesAsync(ct);
         return Result<ImportOwnerUnitResult>.Success(new ImportOwnerUnitResult(AlreadyApplied: false));
+    }
+
+    /// <summary>Sahip birimi sırası: müşteri (+ devir bakiyesi) → hesap hareketi → hasta → aşı → klinik geçmiş → randevu.</summary>
+    private async Task<Result> ApplyOwnerAsync(UnitState unit, string ownerKey, CancellationToken ct)
+    {
+        var steps = new Func<Task<Result>>[]
+        {
+            () => ApplyCustomersAsync(unit, ownerKey, ct),
+            () => ApplyAccountEntriesAsync(unit, ct),
+            () => ApplyPetsAsync(unit, ct),
+            () => ApplyVaccinationsAsync(unit, ct),
+            () => ApplyClinicalRecordsAsync(unit, ct),
+            () => ApplyAppointmentsAsync(unit, ct),
+        };
+
+        foreach (var step in steps)
+        {
+            var result = await step();
+            if (!result.IsSuccess)
+                return result;
+        }
+
+        return Result.Success();
     }
 
     // ---------------------------------------------------------------- Müşteri
@@ -168,6 +213,37 @@ public sealed class ApplyImportOwnerUnitCommandHandler
 
         unit.ClientId = created.Value!.Id;
         unit.Add(row, ImportRowApplyStatus.Created, ClientEntity, unit.ClientId, matched: false);
+        return data.OpeningBalance is > 0 ? await CreateOpeningBalanceAsync(unit, row, data, ct) : Result.Success();
+    }
+
+    /// <summary>
+    /// Devir bakiyesi (ADR-048 T3): yalnız oluşturulan müşteriye tek ücret; ciro/gün sonu/e-belge dışıdır (<c>ImportBatchId</c>).
+    /// İstek anahtarı satır kimliğidir; kaydı uygulamayı başlatan kullanıcı açmış sayılır.
+    /// </summary>
+    private async Task<Result> CreateOpeningBalanceAsync(
+        UnitState unit, ImportBatchRow row, ImportNormalizedCustomer data, CancellationToken ct)
+    {
+        if (unit.Batch.ClinicId is not { } clinicId)
+            return Fail(row, ImportRules.ClinicRequired.Code, ImportRules.ClinicRequired.Message);
+
+        var description = data.BalanceDate is { } asOf
+            ? $"Devir bakiyesi (eski program, {asOf:dd.MM.yyyy})"
+            : OpeningBalanceDescription;
+        var charge = Charge.CreateOpeningBalance(
+            unit.TenantId,
+            clinicId,
+            unit.ClientId!.Value,
+            description,
+            data.OpeningBalance!.Value,
+            unit.Options.CommittedByUserId ?? unit.Batch.CreatedByUserId,
+            _timeProvider.GetUtcNow().UtcDateTime,
+            row.Id,
+            unit.Batch.Id);
+        if (!charge.IsSuccess)
+            return Fail(row, charge.Error);
+
+        await _charges.AddAsync(charge.Value!, ct);
+        await _charges.SaveChangesAsync(ct);
         return Result.Success();
     }
 
@@ -286,23 +362,11 @@ public sealed class ApplyImportOwnerUnitCommandHandler
                 continue;
             }
 
-            Guid petId;
-            if (data.PetKey is { } petKey && unit.PetIds.TryGetValue(petKey, out var resolved))
-            {
-                petId = resolved;
-            }
-            else if (ImportCommitKeys.TryParseDb(data.PetKey, out var existingPet))
-            {
-                petId = existingPet;
-                unit.ExistingPetIds.Add(existingPet);
-            }
-            else
-            {
+            if (ResolvePetId(unit, data.PetKey) is not { } petId)
                 return Fail(row, ImportRules.PetNotFound.Code, ImportRules.PetNotFound.Message);
-            }
 
             if (unit.Batch.ClinicId is not { } clinicId)
-                return Fail(row, "Imports.ClinicRequired", "Aşı satırı için partide klinik yok.");
+                return Fail(row, ImportRules.ClinicRequired.Code, ImportRules.ClinicRequired.Message);
 
             var day = OperationDayBounds.ToLocalDate(data.AppliedAtUtc!.Value);
             if (unit.ExistingPetIds.Contains(petId)
@@ -338,6 +402,199 @@ public sealed class ApplyImportOwnerUnitCommandHandler
             .ToHashSet();
         unit.VaccinationDays[petId] = days;
         return days;
+    }
+
+    // ---------------------------------------------------------------- Klinik geçmiş, hesap hareketi, randevu (ADR-048)
+
+    /// <summary>Hasta anahtarı: birimde oluşan/eşleşen hasta (<c>file:</c>) veya mevcut hasta (<c>db:</c>).</summary>
+    private static Guid? ResolvePetId(UnitState unit, string? petKey)
+    {
+        if (petKey is not null && unit.PetIds.TryGetValue(petKey, out var resolved))
+            return resolved;
+
+        if (ImportCommitKeys.TryParseDb(petKey, out var existingPet))
+        {
+            unit.ExistingPetIds.Add(existingPet);
+            return existingPet;
+        }
+
+        return null;
+    }
+
+    private async Task<Result> ApplyClinicalRecordsAsync(UnitState unit, CancellationToken ct)
+    {
+        foreach (var (row, data) in unit.Rows<ImportNormalizedClinicalRecord>(ImportTable.ClinicalRecords))
+        {
+            if (data.Action != ImportRowAction.Create)
+            {
+                unit.Add(row, ImportRowApplyStatus.Skipped, ClinicalRecordEntity, null, matched: false);
+                continue;
+            }
+
+            if (ResolvePetId(unit, data.PetKey) is not { } petId)
+                return Fail(row, ImportRules.PetNotFound.Code, ImportRules.PetNotFound.Message);
+            if (unit.Batch.ClinicId is not { } clinicId)
+                return Fail(row, ImportRules.ClinicRequired.Code, ImportRules.ClinicRequired.Message);
+
+            var content = new ImportedClinicalRecord.Content(
+                data.RecordType, data.Complaint, data.History, data.Findings, data.Diagnosis, data.Treatment,
+                data.Prescription, data.LabResults, data.Notes, data.VeterinarianName, data.WeightKg, data.TemperatureC);
+            var created = await SendAsync(
+                new CreateImportedClinicalRecordCommand(unit.Batch.Id, clinicId, petId, data.RecordedOn!.Value, content), ct);
+            if (!created.IsSuccess)
+                return Fail(row, created.Error);
+
+            unit.Add(row, ImportRowApplyStatus.Created, ClinicalRecordEntity, created.Value, matched: false);
+        }
+
+        return Result.Success();
+    }
+
+    private async Task<Result> ApplyAccountEntriesAsync(UnitState unit, CancellationToken ct)
+    {
+        foreach (var (row, data) in unit.Rows<ImportNormalizedAccountEntry>(ImportTable.AccountEntries))
+        {
+            if (data.Action != ImportRowAction.Create)
+            {
+                unit.Add(row, ImportRowApplyStatus.Skipped, AccountEntryEntity, null, matched: false);
+                continue;
+            }
+
+            if (unit.Batch.ClinicId is not { } clinicId)
+                return Fail(row, ImportRules.ClinicRequired.Code, ImportRules.ClinicRequired.Message);
+
+            var created = await SendAsync(
+                new CreateImportedAccountEntryCommand(
+                    unit.Batch.Id, clinicId, unit.ClientId!.Value, data.OccurredOn!.Value, data.Kind!.Value, data.Amount!.Value,
+                    data.Description, data.PaymentMethod, data.DocumentNumber, data.PetName),
+                ct);
+            if (!created.IsSuccess)
+                return Fail(row, created.Error);
+
+            unit.Add(row, ImportRowApplyStatus.Created, AccountEntryEntity, created.Value, matched: false);
+        }
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Uygulama anında yeniden çözüm: başlangıcı geçmişe düşen randevu ve arada aynı hasta + aynı başlangıçla açılmış (iptal
+    /// edilmemiş) randevu atlanır; ikisi de hata değildir.
+    /// </summary>
+    private async Task<Result> ApplyAppointmentsAsync(UnitState unit, CancellationToken ct)
+    {
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        foreach (var (row, data) in unit.Rows<ImportNormalizedAppointment>(ImportTable.Appointments))
+        {
+            if (data.Action != ImportRowAction.Create)
+            {
+                unit.Add(row, ImportRowApplyStatus.Skipped, AppointmentEntity, null, matched: false);
+                continue;
+            }
+
+            if (ResolvePetId(unit, data.PetKey) is not { } petId)
+                return Fail(row, ImportRules.PetNotFound.Code, ImportRules.PetNotFound.Message);
+            if (unit.Batch.ClinicId is not { } clinicId)
+                return Fail(row, ImportRules.ClinicRequired.Code, ImportRules.ClinicRequired.Message);
+
+            var start = DateTime.SpecifyKind(data.ScheduledAtUtc!.Value, DateTimeKind.Utc);
+            if (start <= now)
+            {
+                unit.Add(row, ImportRowApplyStatus.Skipped, AppointmentEntity, null, matched: false, ImportRules.PastAppointmentSkipped.At());
+                continue;
+            }
+
+            if (unit.ExistingPetIds.Contains(petId)
+                && (await ExistingAppointmentStartsAsync(unit, petId, now, ct)).Contains(start))
+            {
+                unit.Add(row, ImportRowApplyStatus.Skipped, AppointmentEntity, null, matched: false, ImportRules.DuplicateAppointment.At());
+                continue;
+            }
+
+            var created = await SendAsync(
+                new CreateImportedAppointmentCommand(
+                    unit.Batch.Id, clinicId, petId, start, data.DurationMinutes, data.AppointmentType, data.Notes,
+                    data.ReasonId, data.VeterinarianUserId),
+                ct);
+            if (!created.IsSuccess)
+                return Fail(row, created.Error);
+
+            unit.Add(row, ImportRowApplyStatus.Created, AppointmentEntity, created.Value, matched: false);
+        }
+
+        return Result.Success();
+    }
+
+    /// <summary>Mevcut hastanın gelecekteki iptal edilmemiş randevu başlangıçları; hasta başına bir sorgu.</summary>
+    private async Task<HashSet<DateTime>> ExistingAppointmentStartsAsync(UnitState unit, Guid petId, DateTime now, CancellationToken ct)
+    {
+        if (unit.AppointmentStarts.TryGetValue(petId, out var starts))
+            return starts;
+
+        var existing = await _appointments.ListAsync(new ImportExistingAppointmentsSpec(unit.TenantId, [petId], now), ct);
+        starts = existing.Select(a => DateTime.SpecifyKind(a.ScheduledAtUtc, DateTimeKind.Utc)).ToHashSet();
+        unit.AppointmentStarts[petId] = starts;
+        return starts;
+    }
+
+    // ---------------------------------------------------------------- Ürün (ADR-048 T7)
+
+    /// <summary>
+    /// Ürün birimi: kanonik satır (oluşacak veya eşleşen) ve dosya içi mükerrerleri. Oluşturmadan önce barkod, sonra ad + tür
+    /// ile mevcut ürün yeniden aranır (K4 ilkesi; mevcut alanlar güncellenmez). Stok, parti ve narkotik sınıfı yazılmaz.
+    /// </summary>
+    private async Task<Result> ApplyProductsAsync(UnitState unit, CancellationToken ct)
+    {
+        Guid? productId = null;
+        var products = unit.Rows<ImportNormalizedProduct>(ImportTable.Products);
+        foreach (var (row, data) in products.Where(p => p.Data.Action is ImportRowAction.Create or ImportRowAction.Match))
+        {
+            if (data.Action == ImportRowAction.Match && data.TargetId is { } targetId)
+            {
+                if (await _products.FirstOrDefaultAsync(new ProductByIdSpec(unit.TenantId, targetId), ct) is null)
+                    return Fail(row, "Products.NotFound", "Eşleşen ürün artık bulunamadı.");
+                productId = targetId;
+                unit.Add(row, ImportRowApplyStatus.Matched, ProductEntity, targetId, matched: true);
+                continue;
+            }
+
+            if (await FindExistingProductAsync(unit.TenantId, data, ct) is { } existing)
+            {
+                productId = existing.Id;
+                unit.Add(row, ImportRowApplyStatus.Matched, ProductEntity, existing.Id, matched: true, ImportRules.MatchedAtCommit.At());
+                continue;
+            }
+
+            var created = await SendAsync(
+                new CreateProductCommand(
+                    data.CategoryId, data.Name!, data.Sku, data.Barcode, data.Description, data.Unit, data.UnitPrice,
+                    Charge.DefaultCurrency, data.Kind, ControlledSubstanceClass.None, Manufacturer: data.Manufacturer),
+                ct);
+            if (!created.IsSuccess)
+                return Fail(row, created.Error);
+
+            productId = created.Value!.Id;
+            unit.Add(row, ImportRowApplyStatus.Created, ProductEntity, productId, matched: false);
+        }
+
+        // Dosya içi mükerrer: ilk satırın ürününe işaret eder.
+        foreach (var (row, _) in products.Where(p => p.Data.Action == ImportRowAction.Skip))
+            unit.Add(row, ImportRowApplyStatus.Skipped, ProductEntity, productId, matched: false);
+
+        return Result.Success();
+    }
+
+    private async Task<Product?> FindExistingProductAsync(Guid tenantId, ImportNormalizedProduct data, CancellationToken ct)
+    {
+        if (data.Barcode is { } barcode
+            && await _products.FirstOrDefaultAsync(new ProductByTenantAndBarcodeSpec(tenantId, barcode), ct) is { } byBarcode)
+        {
+            return byBarcode;
+        }
+
+        var nameKey = ImportTextFolding.Fold(data.Name);
+        var sameName = await _products.ListAsync(new ImportProductsByNameSpec(tenantId, data.Name!, data.Kind), ct);
+        return sameName.FirstOrDefault(p => ImportTextFolding.Fold(p.Name) == nameKey);
     }
 
     // ---------------------------------------------------------------- Ortak
@@ -392,6 +649,7 @@ public sealed class ApplyImportOwnerUnitCommandHandler
         public Dictionary<string, Guid> PetIds { get; } = new(StringComparer.Ordinal);
         public HashSet<Guid> ExistingPetIds { get; } = new();
         public Dictionary<Guid, HashSet<(Guid DefinitionId, DateOnly Day)>> VaccinationDays { get; } = new();
+        public Dictionary<Guid, HashSet<DateTime>> AppointmentStarts { get; } = new();
         public List<Outcome> Outcomes { get; } = new();
         public ImportBatchRow FirstRow => _rows[0];
 

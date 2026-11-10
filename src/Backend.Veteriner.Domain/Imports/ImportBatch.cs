@@ -351,8 +351,11 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
         return Result.Success();
     }
 
-    /// <summary>Kullanıcı tam olarak önizlediğini onaylar: yalnız en son doğrulamanın kimliği kabul edilir.</summary>
-    public Result StartCommit(Guid validationId, DateTime nowUtc)
+    /// <summary>
+    /// Kullanıcı tam olarak önizlediğini onaylar: yalnız en son doğrulamanın kimliği kabul edilir. <paramref name="optionsJson"/>
+    /// verilirse seçenek belgesinin yerini alır (uygulama katmanı uygulamayı başlatan kullanıcıyı ekler; ADR-048 T3).
+    /// </summary>
+    public Result StartCommit(Guid validationId, DateTime nowUtc, string? optionsJson = null)
     {
         if (Status == ImportBatchStatus.Validated && ValidationId != validationId)
         {
@@ -361,7 +364,10 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
                 "Önizleme güncel değil; eşleme değişmiş veya parti yeniden doğrulanmış.");
         }
 
-        return MoveTo(ImportBatchStatus.Committing, nowUtc, ImportBatchStatus.Validated);
+        var moved = MoveTo(ImportBatchStatus.Committing, nowUtc, ImportBatchStatus.Validated);
+        if (moved.IsSuccess && !string.IsNullOrWhiteSpace(optionsJson))
+            OptionsJson = optionsJson;
+        return moved;
     }
 
     /// <summary>Uygulama işi sürerken kirayı bu işçi tutuyor mu (süresi dolmamış).</summary>

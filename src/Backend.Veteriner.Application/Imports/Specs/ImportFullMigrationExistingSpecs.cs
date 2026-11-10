@@ -81,3 +81,16 @@ public sealed class ImportAppointmentReasonsSpec : Specification<AppointmentReas
         Query.Select(r => new ImportCatalogEntry(r.Id, r.Name, null, null));
     }
 }
+
+/// <summary>
+/// Uygulama anında ürün yeniden eşleşmesi: aynı tür ve (veritabanı harmanlamasıyla) aynı ad; katlanmış karşılaştırma bellekte
+/// yapılır (<c>ImportTextFolding</c>).
+/// </summary>
+public sealed class ImportProductsByNameSpec : Specification<Product>
+{
+    public ImportProductsByNameSpec(Guid tenantId, string name, ProductKind kind)
+    {
+        Query.AsNoTracking();
+        Query.Where(p => p.TenantId == tenantId && p.Kind == kind && p.Name == name);
+    }
+}
