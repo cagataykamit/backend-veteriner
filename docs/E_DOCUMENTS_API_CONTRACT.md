@@ -2,7 +2,7 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-036 (vetinity-product, kabul edildi) — Dilim 3 (e-belge çekirdeği), Dilim 4 (kes / iptal / PDF), AK-1 (a) klinik kendi entegratör hesabını bağlar, AK-3 (c), AK-4 v1, AK-6. İlk sağlayıcı **Paraşüt** (AK-2, 2026-11-11). Uçlar `api/v1` altında (OAuth dönüşü hariç, §3.3); hata zarfı standart `ProblemDetails` + `extensions.code`.
 
-> **Durum:** Sözleşme + uygulama (dal `feat/e-belge-d3-d4-parasut`). Migration `AddEDocuments` yalnız yerel geliştirme veritabanında uygulandı.
+> **Durum:** Sözleşme + uygulama (dal `feat/e-belge-d3-d4-parasut`). Migration `AddEDocuments` (20261110234342) yalnız yerel geliştirme veritabanında uygulandı; paylaşılan/üretim veritabanına uygulanmadı.
 > **Kapsam dışı:** otomatik kesme kuralı, iade belgesi, gelen e-Fatura, webhook (v2); raporlar ve canlı ortam geçişi (Dilim 5).
 
 ---
@@ -175,7 +175,7 @@ Yanıt:
 
 ### 4.3 Liste — `GET /e-documents`
 
-Sorgu: `clinicId`, `clientId`, `status`, `documentType`, `fromUtc`, `toUtc`, `page` (1), `pageSize` (20, en çok 100). Yanıt `{ items: EDocumentListItemDto[], page, pageSize, totalCount }`; sıralama oluşturma zamanı azalan. Liste öğesi: `id, clinicId, clientId, clientName, documentType, status, documentNumber, totalAmount, createdAtUtc, issuedAtUtc, isTest, lastErrorMessage`.
+Sorgu: `clinicId`, `clientId`, `status`, `documentType`, `fromUtc`, `toUtc`, `page` (1), `pageSize` (20, en çok 100). Yanıt standart sayfalı zarf `{ items: EDocumentListItemDto[], page, pageSize, totalItems, totalPages }`; sıralama oluşturma zamanı azalan. Liste öğesi: `id, clinicId, clientId, clientName, documentType, status, documentNumber, totalAmount, createdAtUtc, issuedAtUtc, isTest, lastErrorMessage`.
 
 ### 4.4 Detay — `GET /e-documents/{id}`
 
