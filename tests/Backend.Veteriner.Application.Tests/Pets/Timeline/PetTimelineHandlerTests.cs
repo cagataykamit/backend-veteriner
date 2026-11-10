@@ -497,7 +497,7 @@ public sealed class PetTimelineHandlerTests
         item.SourceId.Should().Be(visit.Id);
         item.Type.Should().Be(PetRecordKind.Visit);
         item.RelatedAppointmentId.Should().Be(appointmentId);
-        item.LinkRef.Id.Should().Be(visit.Id);
+        item.LinkRef!.Id.Should().Be(visit.Id);
     }
 
     [Fact]
@@ -551,7 +551,7 @@ public sealed class PetTimelineHandlerTests
         item.IsVoided.Should().BeFalse();
         item.AddedAfterFinalization.Should().BeTrue();
         item.RelatedExaminationId.Should().Be(examId);
-        item.LinkRef.Type.Should().Be(PetRecordKind.Administration);
+        item.LinkRef!.Type.Should().Be(PetRecordKind.Administration);
         item.LinkRef.Id.Should().Be(late.Id);
     }
 
