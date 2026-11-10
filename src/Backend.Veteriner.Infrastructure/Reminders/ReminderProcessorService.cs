@@ -174,6 +174,8 @@ public sealed partial class ReminderProcessorService
                 && a.ScheduledAtUtc > nowUtc
                 && a.ScheduledAtUtc <= maxScheduledUtc
                 && eligiblePetIds.Contains(a.PetId)
+                && (a.ImportBatchId == null
+                    || _db.ImportBatches.Any(b => b.Id == a.ImportBatchId && b.RemindersReleasedAtUtc != null))
                 && !_db.ReminderDispatchLogs.Any(l => l.TenantId == tenantId
                     && l.SourceEntityType == ReminderSourceEntityType.Appointment
                     && l.SourceEntityId == a.Id

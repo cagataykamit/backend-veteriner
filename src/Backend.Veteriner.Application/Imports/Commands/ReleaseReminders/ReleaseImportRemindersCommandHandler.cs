@@ -20,6 +20,7 @@ public sealed class ReleaseImportRemindersCommandHandler
     : IRequestHandler<ReleaseImportRemindersCommand, Result<ImportReleaseRemindersResultDto>>
 {
     private const string RemindersDisabledNote = "Kiracının aşı hatırlatma ayarı kapalı; ayar açılana kadar e-posta gitmez.";
+    private const string AllRemindersDisabledNote = "Kiracının aşı ve randevu hatırlatma ayarları kapalı; ayarlar açılana kadar e-posta gitmez.";
 
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
@@ -68,13 +69,18 @@ public sealed class ReleaseImportRemindersCommandHandler
                 $"Parti '{batch.Status}' durumundayken hatırlatmalar serbest bırakılamaz; önce uygulama bitmelidir.");
         }
 
+        // Onay aşı + randevu e-postalarının toplamıdır (ADR-048 T5); randevusuz partide aşı sayısına eşittir.
         var impact = await _reminderImpact.ReadAsync(batch, now, ct);
-        if (impact.EmailsWithinReminderWindow != request.ConfirmEmailCount)
+        if (impact.TotalEmailsWithinReminderWindow != request.ConfirmEmailCount)
         {
             return Result<ImportReleaseRemindersResultDto>.Failure(new Error(
                 "Imports.ReminderImpactChanged",
-                $"Onaylanan e-posta sayısı güncel değil; güncel sayı {impact.EmailsWithinReminderWindow}. Yeniden onaylayın.",
-                new Dictionary<string, object?> { ["emailsWithinReminderWindow"] = impact.EmailsWithinReminderWindow }));
+                $"Onaylanan e-posta sayısı güncel değil; güncel sayı {impact.TotalEmailsWithinReminderWindow}. Yeniden onaylayın.",
+                new Dictionary<string, object?>
+                {
+                    ["emailsWithinReminderWindow"] = impact.EmailsWithinReminderWindow,
+                    ["totalEmailsWithinReminderWindow"] = impact.TotalEmailsWithinReminderWindow,
+                }));
         }
 
         var released = batch.ReleaseReminders(now);
@@ -104,6 +110,12 @@ public sealed class ReleaseImportRemindersCommandHandler
             new ImportReleaseRemindersResultDto(batch.ToDto(), impact, alreadyReleased, NoteFor(impact)));
     }
 
+    /// <summary>Randevu içeren partide iki ayar birlikte değerlendirilir; randevusuz partide yalnız aşı ayarı (önceki davranış).</summary>
     private static string? NoteFor(ImportReminderImpactDto impact)
-        => impact.TenantRemindersEnabled ? null : RemindersDisabledNote;
+    {
+        if (impact.FutureAppointments == 0)
+            return impact.TenantRemindersEnabled ? null : RemindersDisabledNote;
+
+        return impact.TenantRemindersEnabled || impact.TenantAppointmentRemindersEnabled ? null : AllRemindersDisabledNote;
+    }
 }

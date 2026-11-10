@@ -25,5 +25,6 @@ internal static class ChargeMappings
             c.AllocatedAmount,
             c.OutstandingAmount,
             c.LineKind,
-            c.VatRate);
+            c.VatRate,
+            c.IsImported);
 }

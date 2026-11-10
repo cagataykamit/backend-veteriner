@@ -127,7 +127,7 @@ public sealed class GetClientBalanceQueryHandler
                             .OrderBy(c => c.CreatedAtUtc).ThenBy(c => c.Id)
                             .Select(c => new ClientBalanceChargeDto(
                                 c.Id, c.ClinicId, c.ExaminationId, c.Description,
-                                c.Amount, c.AllocatedAmount, c.OutstandingAmount, c.CreatedAtUtc))
+                                c.Amount, c.AllocatedAmount, c.OutstandingAmount, c.CreatedAtUtc, c.IsImported))
                             .ToList()))
                     .OrderBy(v => v.VisitId is null)
                     .ThenByDescending(v => v.VisitArrivedAtUtc)

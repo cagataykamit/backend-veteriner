@@ -41,7 +41,8 @@ public sealed record ClientBalanceChargeDto(
     decimal Amount,
     decimal AllocatedAmount,
     decimal OutstandingAmount,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    bool IsImported = false);
 
 public sealed record ClientBalanceUnallocatedPaymentsDto(
     decimal TotalAmount,
