@@ -57,7 +57,43 @@ public sealed class Charge : AggregateRoot, IClinicScoped, ITenantOwned
     /// <summary>İstemci tekrar koruması anahtarı; aynı kiracıda benzersizdir, verilmeyebilir.</summary>
     public Guid? RequestId { get; private set; }
 
+    /// <summary>
+    /// Kaydı oluşturan içe aktarma partisi (devir bakiyesi, ADR-048 T3); günlük girişte boştur. Dolu ücret ciroya, gün sonuna
+    /// ve e-belgeye girmez; bakiyeye, borç raporuna ve tahsilata girer.
+    /// </summary>
+    public Guid? ImportBatchId { get; private set; }
+
+    public bool IsImported => ImportBatchId.HasValue;
+
     private Charge() { }
+
+    /// <summary>
+    /// Eski programdan devreden açık bakiye (ADR-048 T3): müşteriye bağlı tek hizmet satırı (miktar 1, KDV yok), hasta/geliş/
+    /// muayene yok. <paramref name="requestId"/> hazırlık satırının kimliğidir (yeniden çalıştırmada tekrar güvenli).
+    /// </summary>
+    public static Result<Charge> CreateOpeningBalance(
+        Guid tenantId,
+        Guid clinicId,
+        Guid clientId,
+        string description,
+        decimal amount,
+        Guid createdByUserId,
+        DateTime createdAtUtc,
+        Guid requestId,
+        Guid importBatchId)
+    {
+        if (importBatchId == Guid.Empty)
+            return Invalid("ImportBatchId geçersiz.");
+        if (amount <= 0)
+            return Invalid("Devir bakiyesi sıfırdan büyük olmalıdır.");
+
+        var created = Create(
+            tenantId, clinicId, clientId, petId: null, visitId: null, examinationId: null, description,
+            quantity: 1, unitPrice: amount, createdByUserId, createdAtUtc, requestId);
+        if (created.IsSuccess)
+            created.Value!.ImportBatchId = importBatchId;
+        return created;
+    }
 
     public static Result<Charge> Create(
         Guid tenantId,

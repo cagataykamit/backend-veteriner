@@ -35,6 +35,10 @@ public sealed class ImportBatchConfiguration : IEntityTypeConfiguration<ImportBa
         b.ComplexProperty(x => x.CustomerCounts).IsRequired();
         b.ComplexProperty(x => x.PetCounts).IsRequired();
         b.ComplexProperty(x => x.VaccinationCounts).IsRequired();
+        b.ComplexProperty(x => x.ClinicalRecordCounts).IsRequired();
+        b.ComplexProperty(x => x.AccountEntryCounts).IsRequired();
+        b.ComplexProperty(x => x.AppointmentCounts).IsRequired();
+        b.ComplexProperty(x => x.ProductCounts).IsRequired();
 
         b.Property(x => x.CreatedByUserId).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();

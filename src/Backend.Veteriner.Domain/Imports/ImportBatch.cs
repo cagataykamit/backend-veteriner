@@ -68,6 +68,61 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
     public ImportTableCounts CustomerCounts { get; private set; } = ImportTableCounts.Empty;
     public ImportTableCounts PetCounts { get; private set; } = ImportTableCounts.Empty;
     public ImportTableCounts VaccinationCounts { get; private set; } = ImportTableCounts.Empty;
+    public ImportTableCounts ClinicalRecordCounts { get; private set; } = ImportTableCounts.Empty;
+    public ImportTableCounts AccountEntryCounts { get; private set; } = ImportTableCounts.Empty;
+    public ImportTableCounts AppointmentCounts { get; private set; } = ImportTableCounts.Empty;
+    public ImportTableCounts ProductCounts { get; private set; } = ImportTableCounts.Empty;
+
+    /// <summary>Tablonun sayaçları; tablo başına sayaç erişiminin tek yeri.</summary>
+    public ImportTableCounts CountsOf(ImportTable table) => table switch
+    {
+        ImportTable.Customers => CustomerCounts,
+        ImportTable.Pets => PetCounts,
+        ImportTable.Vaccinations => VaccinationCounts,
+        ImportTable.ClinicalRecords => ClinicalRecordCounts,
+        ImportTable.AccountEntries => AccountEntryCounts,
+        ImportTable.Appointments => AppointmentCounts,
+        ImportTable.Products => ProductCounts,
+        _ => throw new ArgumentOutOfRangeException(nameof(table)),
+    };
+
+    /// <summary>Tüm tabloların toplamı (seçici alan üzerinden).</summary>
+    public int SumCounts(Func<ImportTableCounts, int> selector) => ImportTables.All.Sum(t => selector(CountsOf(t)));
+
+    private void SetCounts(ImportTable table, ImportTableCounts counts)
+    {
+        switch (table)
+        {
+            case ImportTable.Customers: CustomerCounts = counts; break;
+            case ImportTable.Pets: PetCounts = counts; break;
+            case ImportTable.Vaccinations: VaccinationCounts = counts; break;
+            case ImportTable.ClinicalRecords: ClinicalRecordCounts = counts; break;
+            case ImportTable.AccountEntries: AccountEntryCounts = counts; break;
+            case ImportTable.Appointments: AppointmentCounts = counts; break;
+            case ImportTable.Products: ProductCounts = counts; break;
+            default: throw new ArgumentOutOfRangeException(nameof(table));
+        }
+    }
+
+    /// <summary>Verilen tabloların sayaçlarını yazar; verilmeyen tablo yalnız <c>Total</c> taşır.</summary>
+    private void ReplaceCounts(IReadOnlyDictionary<ImportTable, ImportTableCounts>? counts)
+    {
+        foreach (var table in ImportTables.All)
+        {
+            SetCounts(table, counts is not null && counts.TryGetValue(table, out var c)
+                ? c
+                : ImportTableCounts.Empty with { Total = CountsOf(table).Total });
+        }
+    }
+
+    private static Dictionary<ImportTable, ImportTableCounts> Three(
+        ImportTableCounts customers, ImportTableCounts pets, ImportTableCounts vaccinations)
+        => new()
+        {
+            [ImportTable.Customers] = customers,
+            [ImportTable.Pets] = pets,
+            [ImportTable.Vaccinations] = vaccinations,
+        };
 
     public Guid CreatedByUserId { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
@@ -162,7 +217,7 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
     /// Yüklenen içeriğin özetini ve tablo başına satır sayısını kaydeder (B2). Yalnız dosyası henüz bağlanmamış
     /// <c>Uploaded</c> parti için; sayaçların yalnız <c>Total</c> alanı dolar, doğrulama sonrası diğerleri gelir.
     /// </summary>
-    public Result AttachFile(string contentHash, int customerRows, int petRows, int vaccinationRows)
+    public Result AttachFile(string contentHash, IReadOnlyDictionary<ImportTable, int> rowCounts)
     {
         if (Status != ImportBatchStatus.Uploaded || ContentHash is not null)
             return InvalidState("Dosya yalnız yeni oluşturulan partiye bağlanabilir.");
@@ -170,15 +225,23 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
         if (contentHash is not { Length: ContentHashLength } || !contentHash.All(Uri.IsHexDigit))
             return Result.Failure("Imports.Validation", $"İçerik özeti {ContentHashLength} karakterlik onaltılık dizge olmalıdır.");
 
-        if (customerRows < 0 || petRows < 0 || vaccinationRows < 0)
+        if (rowCounts.Values.Any(n => n < 0))
             return Result.Failure("Imports.Validation", "Satır sayısı negatif olamaz.");
 
         ContentHash = contentHash.ToLowerInvariant();
-        CustomerCounts = ImportTableCounts.Empty with { Total = customerRows };
-        PetCounts = ImportTableCounts.Empty with { Total = petRows };
-        VaccinationCounts = ImportTableCounts.Empty with { Total = vaccinationRows };
+        foreach (var table in ImportTables.All)
+            SetCounts(table, ImportTableCounts.Empty with { Total = rowCounts.GetValueOrDefault(table) });
         return Result.Success();
     }
+
+    /// <summary>Üç temel tablo için kısayol (müşteri / hasta / aşı); diğer tablolar 0 satır.</summary>
+    public Result AttachFile(string contentHash, int customerRows, int petRows, int vaccinationRows)
+        => AttachFile(contentHash, new Dictionary<ImportTable, int>
+        {
+            [ImportTable.Customers] = customerRows,
+            [ImportTable.Pets] = petRows,
+            [ImportTable.Vaccinations] = vaccinationRows,
+        });
 
     /// <summary>Eşlemeyi tam değiştirir; doğrulanmış parti yeniden eşlenince önizleme geçersizleşir.</summary>
     public Result ApplyMapping(string mappingJson, string? optionsJson, DateTime nowUtc)
@@ -236,6 +299,10 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
         ImportTableCounts pets,
         ImportTableCounts vaccinations,
         DateTime nowUtc)
+        => CompleteValidation(validationId, Three(customers, pets, vaccinations), nowUtc);
+
+    /// <summary>Doğrulama bitti; verilmeyen tablo yalnız <c>Total</c> taşır.</summary>
+    public Result CompleteValidation(Guid validationId, IReadOnlyDictionary<ImportTable, ImportTableCounts> counts, DateTime nowUtc)
     {
         if (validationId == Guid.Empty)
             return Result.Failure("Imports.Validation", "ValidationId geçersiz.");
@@ -247,9 +314,7 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
         ValidationId = validationId;
         ValidatedAtUtc = UpdatedAtUtc;
         ReleaseLease();
-        CustomerCounts = customers;
-        PetCounts = pets;
-        VaccinationCounts = vaccinations;
+        ReplaceCounts(counts);
         return Result.Success();
     }
 
@@ -263,15 +328,26 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
         ImportTableCounts? pets = null,
         ImportTableCounts? vaccinations = null)
     {
+        var given = new Dictionary<ImportTable, ImportTableCounts>();
+        if (customers is not null)
+            given[ImportTable.Customers] = customers;
+        if (pets is not null)
+            given[ImportTable.Pets] = pets;
+        if (vaccinations is not null)
+            given[ImportTable.Vaccinations] = vaccinations;
+        return FailValidation(nowUtc, given);
+    }
+
+    /// <summary>Dosya düzeyi sorun veya hata; verilmeyen tablo yalnız <c>Total</c> taşır.</summary>
+    public Result FailValidation(DateTime nowUtc, IReadOnlyDictionary<ImportTable, ImportTableCounts>? counts)
+    {
         var moved = MoveTo(ImportBatchStatus.ValidationFailed, nowUtc, ImportBatchStatus.Validating);
         if (!moved.IsSuccess)
             return moved;
 
         ValidationId = null;
         ReleaseLease();
-        CustomerCounts = customers ?? ImportTableCounts.Empty with { Total = CustomerCounts.Total };
-        PetCounts = pets ?? ImportTableCounts.Empty with { Total = PetCounts.Total };
-        VaccinationCounts = vaccinations ?? ImportTableCounts.Empty with { Total = VaccinationCounts.Total };
+        ReplaceCounts(counts);
         return Result.Success();
     }
 
@@ -320,6 +396,10 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
         ImportTableCounts pets,
         ImportTableCounts vaccinations,
         DateTime nowUtc)
+        => CompleteCommit(Three(customers, pets, vaccinations), nowUtc);
+
+    /// <summary>Uygulama bitti; verilmeyen tablo yalnız <c>Total</c> taşır.</summary>
+    public Result CompleteCommit(IReadOnlyDictionary<ImportTable, ImportTableCounts> counts, DateTime nowUtc)
     {
         var moved = MoveTo(ImportBatchStatus.Committed, nowUtc, ImportBatchStatus.Committing);
         if (!moved.IsSuccess)
@@ -327,9 +407,7 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
 
         CommittedAtUtc = UpdatedAtUtc;
         ReleaseLease();
-        CustomerCounts = customers;
-        PetCounts = pets;
-        VaccinationCounts = vaccinations;
+        ReplaceCounts(counts);
         return Result.Success();
     }
 

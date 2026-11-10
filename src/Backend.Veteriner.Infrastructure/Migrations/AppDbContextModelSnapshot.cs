@@ -380,6 +380,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("int")
                         .HasDefaultValue(30);
 
+                    b.Property<Guid?>("ImportBatchId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<long>("MutationSequence")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
@@ -412,6 +415,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ImportBatchId")
+                        .HasFilter("[ImportBatchId] IS NOT NULL");
 
                     b.HasIndex("ReasonId");
 
@@ -1614,6 +1620,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid?>("ExaminationId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("ImportBatchId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("LineKind")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
@@ -1660,6 +1669,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ImportBatchId")
+                        .HasFilter("[ImportBatchId] IS NOT NULL");
 
                     b.HasIndex("TenantId", "ClientId");
 
@@ -3420,6 +3432,120 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid?>("ValidationId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "AccountEntryCounts", "Backend.Veteriner.Domain.Imports.ImportBatch.AccountEntryCounts#ImportTableCounts", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<int>("Created")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Error")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Failed")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Matched")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Skipped")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Total")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Valid")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Warning")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("WillCreate")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("WillMatch")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("WillSkip")
+                                .HasColumnType("int");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "AppointmentCounts", "Backend.Veteriner.Domain.Imports.ImportBatch.AppointmentCounts#ImportTableCounts", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<int>("Created")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Error")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Failed")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Matched")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Skipped")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Total")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Valid")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Warning")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("WillCreate")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("WillMatch")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("WillSkip")
+                                .HasColumnType("int");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "ClinicalRecordCounts", "Backend.Veteriner.Domain.Imports.ImportBatch.ClinicalRecordCounts#ImportTableCounts", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<int>("Created")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Error")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Failed")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Matched")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Skipped")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Total")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Valid")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Warning")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("WillCreate")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("WillMatch")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("WillSkip")
+                                .HasColumnType("int");
+                        });
+
                     b.ComplexProperty(typeof(Dictionary<string, object>), "CustomerCounts", "Backend.Veteriner.Domain.Imports.ImportBatch.CustomerCounts#ImportTableCounts", b1 =>
                         {
                             b1.IsRequired();
@@ -3459,6 +3585,44 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         });
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "PetCounts", "Backend.Veteriner.Domain.Imports.ImportBatch.PetCounts#ImportTableCounts", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<int>("Created")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Error")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Failed")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Matched")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Skipped")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Total")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Valid")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Warning")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("WillCreate")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("WillMatch")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("WillSkip")
+                                .HasColumnType("int");
+                        });
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "ProductCounts", "Backend.Veteriner.Domain.Imports.ImportBatch.ProductCounts#ImportTableCounts", b1 =>
                         {
                             b1.IsRequired();
 
@@ -3612,6 +3776,153 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasDatabaseName("UX_ImportBatchRows_BatchId_Table_RowNumber");
 
                     b.ToTable("ImportBatchRows", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Imports.ImportedAccountEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("DocumentNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("ImportBatchId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly>("OccurredOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("PaymentMethod")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("PetName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ImportBatchId");
+
+                    b.HasIndex("TenantId", "ClientId", "OccurredOn");
+
+                    b.ToTable("ImportedAccountEntries", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Imports.ImportedClinicalRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Complaint")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Diagnosis")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Findings")
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("History")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<Guid>("ImportBatchId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LabResults")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<Guid>("PetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Prescription")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("RecordType")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateOnly>("RecordedOn")
+                        .HasColumnType("date");
+
+                    b.Property<decimal?>("TemperatureC")
+                        .HasPrecision(4, 1)
+                        .HasColumnType("decimal(4,1)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Treatment")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("VeterinarianName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<decimal?>("WeightKg")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("decimal(6,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ImportBatchId");
+
+                    b.HasIndex("TenantId", "ClientId");
+
+                    b.HasIndex("TenantId", "PetId", "RecordedOn");
+
+                    b.ToTable("ImportedClinicalRecords", (string)null);
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.LabResults.LabResult", b =>
@@ -6956,6 +7267,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Appointments.Appointment", b =>
                 {
+                    b.HasOne("Backend.Veteriner.Domain.Imports.ImportBatch", null)
+                        .WithMany()
+                        .HasForeignKey("ImportBatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Backend.Veteriner.Domain.Appointments.AppointmentReason", null)
                         .WithMany()
                         .HasForeignKey("ReasonId")
@@ -7155,6 +7471,14 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Charges.Charge", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Imports.ImportBatch", null)
+                        .WithMany()
+                        .HasForeignKey("ImportBatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.ClientCredits.ClientCredit", b =>
                 {
                     b.HasOne("Backend.Veteriner.Domain.Clients.Client", null)
@@ -7340,6 +7664,24 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("BatchId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Imports.ImportedAccountEntry", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Imports.ImportBatch", null)
+                        .WithMany()
+                        .HasForeignKey("ImportBatchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Imports.ImportedClinicalRecord", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Imports.ImportBatch", null)
+                        .WithMany()
+                        .HasForeignKey("ImportBatchId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

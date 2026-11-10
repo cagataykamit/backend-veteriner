@@ -1,4 +1,5 @@
 using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Shared;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -68,5 +69,15 @@ public sealed class ChargeConfiguration : IEntityTypeConfiguration<Charge>
             .IsUnique()
             .HasFilter("[RequestId] IS NOT NULL")
             .HasDatabaseName(RequestIdIndexName);
+
+        // Devir bakiyesi (ADR-048 T3): ciro/gün sonu dışlaması ve parti geri alması bu indeksten okur.
+        b.Property(x => x.ImportBatchId);
+        b.Ignore(x => x.IsImported);
+        b.HasIndex(x => x.ImportBatchId).HasFilter("[ImportBatchId] IS NOT NULL");
+        b.HasOne<ImportBatch>()
+            .WithMany()
+            .HasForeignKey(x => x.ImportBatchId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
     }
 }
