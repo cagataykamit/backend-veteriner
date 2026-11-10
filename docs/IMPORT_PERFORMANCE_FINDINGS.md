@@ -186,3 +186,19 @@ Aynı makine, aynı test (`ImportPerformanceTests`, 5.000 müşteri ölçeği), 
 - İlk ölçümde yeniden doğrulama (2. tur) belirgin yavaştı (A 11.933 ms, B 7.129 ms): sıfırlanan durum yüzünden her satır ayrı `UPDATE` ile yazılıyordu. Sonucu değişmeyen satırların yalnız durumu parça başına küme güncellemesiyle yazılınca yukarıdaki değerlere indi (commit `perf(imports): yeniden dogrulamada ...`).
 - Sorgu sayısı (`ImportValidationQueryCountTests`, istek + işçi): 9 / 10.200 / 24.000 satırda 21 SELECT (önceki yalnız istek: 16); 10.200 satır ≈ 2,4 sn, 24.000 satır ≈ 2,3 sn; POST yanıtı 8–33 ms.
 - **Doğrulanmadı:** staging SQL'de süre; çok örnekli kurulumda iki işçinin gerçekten yarıştığı senaryo (kira/rowversion birim ve entegrasyon testleriyle sınandı, gerçek iki süreçle değil).
+
+## 9. Tam geçiş hacmi (ADR-048, dal `feature/tam-gecis`, 2026-11-10)
+
+Test: `tests/Backend.Veteriner.IntegrationTests/Performance/ImportFullMigrationVolumeTests.cs` (`[PerfFact]`, `VETINITY_PERF=1`; ölçek `IMPORT_FM_SCALE`, varsayılan 1,0). Ortam bölüm 2 ile aynı (yerel LocalDB, Debug, izole test veritabanı, ücretli kiracı); işçiler test içinden doğrudan çalıştırıldı, geri basınç kapalı. Tek koşu.
+
+| Ölçü | Değer |
+|---|---|
+| Dosya | 7 sayfa, **24.500 satır**: 3.000 müşteri (her 4. müşteride açık bakiye), 5.000 hasta, 8.000 klinik geçmiş, 6.000 hesap hareketi, 1.500 gelecek randevu, 1.000 ürün |
+| Yükleme | 4,9 sn |
+| Doğrulama (istek + arka plan işçisi) | **4,2 sn** |
+| Doğrulamada SELECT (küçük dosya / 24.500 satır) | **34 / 34** (satır sayısından bağımsız; üç tablolu partide 16 idi, yeni tabloların mevcut veri okumaları eklendi) |
+| Uygulama (3.000 sahip + 1.000 ürün birimi) | **89,1 sn**; tüm satırlar oluştu, başarısız 0 |
+| Geri alma önizleme | 2,1 sn |
+| Geri alma (`Fail`, engel yok) | **59,8 sn**; parti `RolledBack`, devir ücretleri ve tüm eski program kayıtları silindi |
+
+Notlar: uygulama süresi B4'teki sahip birimi başına maliyetle aynı düzende (bölüm 3.1: 23.000 satır 2,5–3,6 dk); yeni kayıtlar satır başına komutla yazılır (mevcut komut yolları). Geri basınç ve sağlık ucu bu koşuda ölçülmedi (bölüm 3.5'in sonucu geçerli varsayıldı; yeni tablolar yalnız randevu için outbox olayı üretir). Elle girilmiş verisi çok olan kiracıda doğrulama sorgu sayısı değişmez, sorgu süreleri ölçülmedi.
