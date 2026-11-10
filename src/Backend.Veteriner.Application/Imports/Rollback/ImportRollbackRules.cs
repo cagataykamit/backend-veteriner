@@ -33,6 +33,11 @@ public static class ImportRollbackReasons
     public const string HasChargeSuggestions = "HasChargeSuggestions";
     public const string HasOtherVaccinations = "HasOtherVaccinations";
     public const string HasKeptVaccinations = "HasKeptVaccinations";
+    public const string HasOtherClinicalRecords = "HasOtherClinicalRecords";
+    public const string HasKeptAppointments = "HasKeptAppointments";
+
+    // Randevu (ADR-048)
+    public const string AppointmentChanged = "AppointmentChanged";
 
     // Hasta ve müşteri
     public const string HasCharges = "HasCharges";
@@ -43,6 +48,13 @@ public static class ImportRollbackReasons
     public const string HasSales = "HasSales";
     public const string HasOtherPets = "HasOtherPets";
     public const string HasKeptPets = "HasKeptPets";
+    public const string OpeningBalanceChanged = "OpeningBalanceChanged";
+    public const string HasOtherAccountEntries = "HasOtherAccountEntries";
+
+    // Ürün (ADR-048)
+    public const string ProductModified = "ProductModified";
+    public const string HasStock = "HasStock";
+    public const string HasExaminationTemplates = "HasExaminationTemplates";
 
     /// <summary><c>Fail</c> politikasında iş sırasında birimde engel doğdu; birimin silinebilir kaydı da bırakıldı.</summary>
     public const string OwnerUnitBlocked = "OwnerUnitBlocked";

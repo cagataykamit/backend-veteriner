@@ -3,11 +3,22 @@ using Backend.Veteriner.Domain.Imports;
 
 namespace Backend.Veteriner.Application.Imports.Contracts.Dtos;
 
-/// <summary>Tablo başına kayıt sayısı (geri alma).</summary>
-public sealed record ImportRollbackCountsDto(int Clients, int Pets, int Vaccinations)
+/// <summary>
+/// Tablo başına kayıt sayısı (geri alma). <see cref="OpeningBalances"/>: devir ücretleri (müşterinin eki, müşteriyle aynı
+/// kararı alır; ADR-048); geri alınmış sayılarda tutulmaz (<c>null</c>). <see cref="Total"/> devri ayrıca saymaz.
+/// </summary>
+public sealed record ImportRollbackCountsDto(
+    int Clients,
+    int Pets,
+    int Vaccinations,
+    int ClinicalRecords = 0,
+    int AccountEntries = 0,
+    int Appointments = 0,
+    int Products = 0,
+    int? OpeningBalances = null)
 {
     [JsonIgnore]
-    public int Total => Clients + Pets + Vaccinations;
+    public int Total => Clients + Pets + Vaccinations + ClinicalRecords + AccountEntries + Appointments + Products;
 }
 
 /// <summary>Engelli kayıt: kişisel veri yok; satır ayrıntısı <c>rows</c> ucundan.</summary>
@@ -19,7 +30,7 @@ public sealed record ImportRollbackBlockedItemDto(
     IReadOnlyList<string> Reasons);
 
 /// <summary>Mevcut kayıtla eşleşen (asla silinmeyen) satırlar.</summary>
-public sealed record ImportRollbackKeptDto(int MatchedClients, int MatchedPets);
+public sealed record ImportRollbackKeptDto(int MatchedClients, int MatchedPets, int MatchedProducts = 0);
 
 /// <summary>GET .../rollback-preview (IMPORT_API_CONTRACT.md §7.11).</summary>
 public sealed record ImportRollbackPreviewDto(

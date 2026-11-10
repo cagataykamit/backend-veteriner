@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Clients.IntegrationEvents;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Imports.Commands.ApplyOwnerUnit;
@@ -5,9 +6,12 @@ using Backend.Veteriner.Application.Imports.Rollback;
 using Backend.Veteriner.Application.Imports.Specs;
 using Backend.Veteriner.Application.Imports.Validation;
 using Backend.Veteriner.Application.Pets.IntegrationEvents;
+using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Pets;
+using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
 using Mediator;
@@ -16,9 +20,10 @@ namespace Backend.Veteriner.Application.Imports.Commands.RollbackOwnerUnit;
 
 /// <summary>
 /// Birimin bağımlılıklarını bu işlemde yeniden okur, önizlemeyle aynı kuralla (<see cref="ImportRollbackPlanner"/>) karar
-/// verir ve aşı → hasta → müşteri sırasıyla siler. Silinen müşteri/hasta için silme olayı (<c>client.deleted.v1</c> /
-/// <c>pet.deleted.v1</c>) aynı işlemde outbox'a yazılır. Satır sonuçları ve kira yenilemesi aynı işlemdedir: kira başka
-/// işçiye geçtiyse rowversion çakışması birimi geri aldırır. Ürün kodunda başka silme yolu yoktur (§9).
+/// verir ve aşı, klinik geçmiş, randevu → hasta → hesap hareketi, devir ücreti → müşteri; ürün sırasıyla siler (§12.9).
+/// Silinen müşteri/hasta/randevu için silme olayı (<c>client.deleted.v1</c> / <c>pet.deleted.v1</c> /
+/// <c>appointment.deleted.v1</c>) aynı işlemde outbox'a yazılır. Satır sonuçları ve kira yenilemesi aynı işlemdedir: kira
+/// başka işçiye geçtiyse rowversion çakışması birimi geri aldırır. Ürün kodunda başka silme yolu yoktur (§9).
 /// </summary>
 public sealed class RollbackImportOwnerUnitCommandHandler
     : IRequestHandler<RollbackImportOwnerUnitCommand, Result<ImportRollbackUnitResult>>
@@ -29,9 +34,16 @@ public sealed class RollbackImportOwnerUnitCommandHandler
     private readonly IRepository<Vaccination> _vaccinations;
     private readonly IRepository<Pet> _pets;
     private readonly IRepository<Client> _clients;
+    private readonly IRepository<ImportedClinicalRecord> _clinicalRecords;
+    private readonly IRepository<ImportedAccountEntry> _accountEntries;
+    private readonly IRepository<Appointment> _appointments;
+    private readonly IRepository<Charge> _charges;
+    private readonly IRepository<Product> _products;
     private readonly ImportRollbackPlanLoader _plans;
     private readonly IClientIntegrationEventOutbox _clientEvents;
     private readonly IPetIntegrationEventOutbox _petEvents;
+    private readonly IAppointmentIntegrationEventOutbox _appointmentEvents;
+    private readonly IAppointmentProjectionSnapshotFactory _appointmentSnapshots;
     private readonly TimeProvider _timeProvider;
 
     public RollbackImportOwnerUnitCommandHandler(
@@ -41,9 +53,16 @@ public sealed class RollbackImportOwnerUnitCommandHandler
         IRepository<Vaccination> vaccinations,
         IRepository<Pet> pets,
         IRepository<Client> clients,
+        IRepository<ImportedClinicalRecord> clinicalRecords,
+        IRepository<ImportedAccountEntry> accountEntries,
+        IRepository<Appointment> appointments,
+        IRepository<Charge> charges,
+        IRepository<Product> products,
         ImportRollbackPlanLoader plans,
         IClientIntegrationEventOutbox clientEvents,
         IPetIntegrationEventOutbox petEvents,
+        IAppointmentIntegrationEventOutbox appointmentEvents,
+        IAppointmentProjectionSnapshotFactory appointmentSnapshots,
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
@@ -52,9 +71,16 @@ public sealed class RollbackImportOwnerUnitCommandHandler
         _vaccinations = vaccinations;
         _pets = pets;
         _clients = clients;
+        _clinicalRecords = clinicalRecords;
+        _accountEntries = accountEntries;
+        _appointments = appointments;
+        _charges = charges;
+        _products = products;
         _plans = plans;
         _clientEvents = clientEvents;
         _petEvents = petEvents;
+        _appointmentEvents = appointmentEvents;
+        _appointmentSnapshots = appointmentSnapshots;
         _timeProvider = timeProvider;
     }
 
@@ -86,7 +112,7 @@ public sealed class RollbackImportOwnerUnitCommandHandler
             row.RecordRollbackResult(status, payloadKept ? RollbackIssues(row.IssuesJson, item) : row.IssuesJson);
         }
 
-        var deleted = await DeleteAsync(tenantId, plan, now, ct);
+        var deleted = await DeleteAsync(tenantId, batch.Id, plan, now, ct);
 
         // Satır sonuçları + kira yenilemesi (silme kayıtlarıyla aynı işlem); parti devralındıysa rowversion çakışır.
         await _rows.SaveChangesAsync(ct);
@@ -94,8 +120,11 @@ public sealed class RollbackImportOwnerUnitCommandHandler
             new ImportRollbackUnitResult(AlreadyDone: false, deleted, plan.Total(ImportRollbackDecision.Keep)));
     }
 
-    /// <summary>Sıra aşı → hasta → müşteri; müşteri/hasta silme olayı silmeyle aynı işlemde.</summary>
-    private async Task<int> DeleteAsync(Guid tenantId, ImportRollbackPlan plan, DateTime now, CancellationToken ct)
+    /// <summary>
+    /// Sıra aşı, klinik geçmiş, randevu → hasta → hesap hareketi, devir ücreti → müşteri → ürün; müşteri/hasta/randevu silme
+    /// olayı silmeyle aynı işlemde. Devir ücreti satır değildir: müşterisi silinirse silinir.
+    /// </summary>
+    private async Task<int> DeleteAsync(Guid tenantId, Guid batchId, ImportRollbackPlan plan, DateTime now, CancellationToken ct)
     {
         Guid[] ToDelete(ImportTable table) => plan.Items
             .Where(i => i.Row.Table == table && i.Decision == ImportRollbackDecision.Delete)
@@ -109,6 +138,33 @@ public sealed class RollbackImportOwnerUnitCommandHandler
             var vaccinations = await _vaccinations.ListAsync(new ImportRollbackVaccinationsSpec(tenantId, vaccinationIds), ct);
             await _vaccinations.DeleteRangeAsync(vaccinations, ct);
             deleted += vaccinations.Count;
+        }
+
+        var clinicalRecordIds = ToDelete(ImportTable.ClinicalRecords);
+        if (clinicalRecordIds.Length > 0)
+        {
+            var records = await _clinicalRecords.ListAsync(new ImportRollbackClinicalRecordsSpec(tenantId, clinicalRecordIds), ct);
+            await _clinicalRecords.DeleteRangeAsync(records, ct);
+            deleted += records.Count;
+        }
+
+        var appointmentIds = ToDelete(ImportTable.Appointments);
+        if (appointmentIds.Length > 0)
+        {
+            var appointments = await _appointments.ListAsync(new ImportRollbackAppointmentsSpec(tenantId, appointmentIds), ct);
+            foreach (var appointment in appointments)
+            {
+                // Anlık görüntü silmeden önce alınır (projeksiyon günü ve son ziyareti yeniden hesaplar).
+                var sequence = appointment.AdvanceMutationSequence();
+                var snapshot = await _appointmentSnapshots.CreateAsync(appointment, ct);
+                await _appointmentEvents.EnqueueAsync(
+                    AppointmentIntegrationEventTypes.Deleted,
+                    new AppointmentDeletedIntegrationEvent(Guid.NewGuid(), now, sequence, snapshot),
+                    ct);
+            }
+
+            await _appointments.DeleteRangeAsync(appointments, ct);
+            deleted += appointments.Count;
         }
 
         var petIds = ToDelete(ImportTable.Pets);
@@ -127,7 +183,22 @@ public sealed class RollbackImportOwnerUnitCommandHandler
             deleted += pets.Count;
         }
 
+        var accountEntryIds = ToDelete(ImportTable.AccountEntries);
+        if (accountEntryIds.Length > 0)
+        {
+            var entries = await _accountEntries.ListAsync(new ImportRollbackAccountEntriesSpec(tenantId, accountEntryIds), ct);
+            await _accountEntries.DeleteRangeAsync(entries, ct);
+            deleted += entries.Count;
+        }
+
         var clientIds = ToDelete(ImportTable.Customers);
+        var openingBalanceIds = clientIds.Where(plan.OpeningBalances.ContainsKey).Select(id => plan.OpeningBalances[id]).ToArray();
+        if (openingBalanceIds.Length > 0)
+        {
+            var charges = await _charges.ListAsync(new ImportRollbackOpeningBalancesSpec(tenantId, batchId, openingBalanceIds), ct);
+            await _charges.DeleteRangeAsync(charges, ct);
+        }
+
         if (clientIds.Length > 0)
         {
             var clients = await _clients.ListAsync(new ImportRollbackClientsSpec(tenantId, clientIds), ct);
@@ -141,6 +212,14 @@ public sealed class RollbackImportOwnerUnitCommandHandler
 
             await _clients.DeleteRangeAsync(clients, ct);
             deleted += clients.Count;
+        }
+
+        var productIds = ToDelete(ImportTable.Products);
+        if (productIds.Length > 0)
+        {
+            var products = await _products.ListAsync(new ImportRollbackProductsSpec(tenantId, productIds), ct);
+            await _products.DeleteRangeAsync(products, ct);
+            deleted += products.Count;
         }
 
         return deleted;
