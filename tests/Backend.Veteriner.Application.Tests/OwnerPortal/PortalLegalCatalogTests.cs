@@ -13,8 +13,8 @@ public sealed class PortalLegalCatalogTests
     public void Portal_Documents_Should_Be_Draft_0_1()
     {
         LegalDocumentCatalog.RequiredForOwnerAccount.Should().Equal(LegalDocumentType.PortalTerms, LegalDocumentType.PortalPrivacy);
-        LegalDocumentCatalog.CurrentVersion(LegalDocumentType.PortalTerms).Should().Be("0.1");
-        LegalDocumentCatalog.CurrentVersion(LegalDocumentType.PortalPrivacy).Should().Be("0.1");
+        LegalDocumentCatalog.CurrentVersion(LegalDocumentType.PortalTerms).Should().Be("1.0");
+        LegalDocumentCatalog.CurrentVersion(LegalDocumentType.PortalPrivacy).Should().Be("1.0");
     }
 
     [Theory]
@@ -45,7 +45,7 @@ public sealed class PortalLegalCatalogTests
         var rows = LegalDocumentCatalog.CreateOwnerAccountAcceptances(
             ownerAccountId, LegalDocumentCatalog.RequiredForOwnerAccount, DateTime.UtcNow);
 
-        rows.Should().HaveCount(2).And.OnlyContain(r => r.OwnerAccountId == ownerAccountId && r.UserId == null && r.Version == "0.1");
+        rows.Should().HaveCount(2).And.OnlyContain(r => r.OwnerAccountId == ownerAccountId && r.UserId == null && r.Version == "1.0");
     }
 
     [Theory]
