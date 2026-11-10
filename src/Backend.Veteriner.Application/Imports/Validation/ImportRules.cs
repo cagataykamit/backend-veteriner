@@ -121,9 +121,61 @@ public static class ImportRules
     public static readonly ImportRule OwnerRowInvalid = new("Imports.OwnerRowInvalid", ImportIssueSeverity.Error,
         "Sahip müşteri satırı hatalı olduğu için bu satır aktarılamaz.");
     public static readonly ImportRule PetNotFound = new("Imports.PetNotFound", ImportIssueSeverity.Error,
-        "Aşının hastası dosyada veya kayıtlı hastalarda bulunamadı.");
+        "Satırın hastası dosyada veya kayıtlı hastalarda bulunamadı.");
     public static readonly ImportRule PetRowInvalid = new("Imports.PetRowInvalid", ImportIssueSeverity.Error,
-        "Hasta satırı hatalı olduğu için bu aşı satırı aktarılamaz.");
+        "Hasta satırı hatalı olduğu için bu satır aktarılamaz.");
+
+    // Açık bakiye (müşteri; ADR-048 T3)
+    public static readonly ImportRule CreditBalanceNotImported = new("Imports.CreditBalanceNotImported", ImportIssueSeverity.Warning,
+        "Alacak (negatif) bakiye bu sürümde aktarılmaz; müşteri bakiyesiz aktarılacak, tutarı elle düzeltin.");
+    public static readonly ImportRule AmountInvalid = new("Imports.AmountInvalid", ImportIssueSeverity.Warning,
+        "Tutar okunamadı (örnek: 1.250,50); tutar aktarılmayacak.");
+    public static readonly ImportRule BalanceNotAppliedToExisting = new("Imports.BalanceNotAppliedToExisting", ImportIssueSeverity.Info,
+        "Müşteri mevcut bir kayıtla eşleşti veya dosyada tekrar ediyor; bakiye eklenmeyecek (mevcut bilgi değişmez).");
+    public static readonly ImportRule BalanceDateIgnored = new("Imports.BalanceDateIgnored", ImportIssueSeverity.Warning,
+        "Bakiye tarihi okunamadı veya gelecekte; devir açıklamasına yazılmayacak.");
+
+    // Klinik geçmiş (ADR-048 T1)
+    public static readonly ImportRule DateInFuture = new("Imports.DateInFuture", ImportIssueSeverity.Error,
+        "Tarih gelecekte olamaz.");
+    public static readonly ImportRule RecordBeforeBirth = new("Imports.RecordBeforeBirth", ImportIssueSeverity.Warning,
+        "Kayıt tarihi hastanın doğum tarihinden önce.");
+    public static readonly ImportRule ClinicalRecordEmpty = new("Imports.ClinicalRecordEmpty", ImportIssueSeverity.Error,
+        "Klinik kaydın içeriği boş: şikâyet, anamnez, bulgular, tanı, tedavi, reçete, lab sonucu veya nottan en az biri dolu olmalı.");
+    public static readonly ImportRule TemperatureInvalid = new("Imports.TemperatureInvalid", ImportIssueSeverity.Warning,
+        "Ateş geçersiz (25-45 °C arasında bir sayı olmalı); boş aktarılacak.");
+    public static readonly ImportRule DuplicateClinicalRecord = new("Imports.DuplicateClinicalRecord", ImportIssueSeverity.Info,
+        "Aynı hasta, aynı tarih ve aynı içerikte kayıt zaten var; bu satır atlanacak.");
+
+    // Hesap hareketleri (ADR-048 T4)
+    public static readonly ImportRule EntryKindUnrecognized = new("Imports.EntryKindUnrecognized", ImportIssueSeverity.Error,
+        "İşlem türü tanınmadı; Borç veya Tahsilat olmalı.");
+    public static readonly ImportRule EntryAmountInvalid = new("Imports.EntryAmountInvalid", ImportIssueSeverity.Error,
+        "Tutar okunamadı veya sıfırdan büyük değil (örnek: 1.250,50).");
+    public static readonly ImportRule DuplicateAccountEntry = new("Imports.DuplicateAccountEntry", ImportIssueSeverity.Info,
+        "Aynı müşteri, tarih, tür, tutar ve belgeyle hareket zaten var; bu satır atlanacak.");
+
+    // Randevular (ADR-048 T5)
+    public static readonly ImportRule TimeInvalid = new("Imports.TimeInvalid", ImportIssueSeverity.Error,
+        "Randevu saati okunamadı; SS:dd (24 saat) biçiminde olmalı.");
+    public static readonly ImportRule DurationInvalid = new("Imports.DurationInvalid", ImportIssueSeverity.Warning,
+        "Süre 5-240 dakika arasında olmalı; 30 dakika aktarılacak.");
+    public static readonly ImportRule VeterinarianUnmatched = new("Imports.VeterinarianUnmatched", ImportIssueSeverity.Info,
+        "Hekim bir kullanıcıyla eşleşmedi; adı randevu notuna yazılacak.");
+    public static readonly ImportRule ReasonFreeText = new("Imports.ReasonFreeText", ImportIssueSeverity.Info,
+        "Randevu nedeni tanımlı nedenlerde yok; randevu notuna yazılacak.");
+    public static readonly ImportRule AppointmentTypeDefaulted = new("Imports.AppointmentTypeDefaulted", ImportIssueSeverity.Info,
+        "Randevu türü tanınmadı; Diğer olarak aktarılacak.");
+    public static readonly ImportRule PastAppointmentSkipped = new("Imports.PastAppointmentSkipped", ImportIssueSeverity.Info,
+        "Geçmiş randevu aktarılmaz; bu satır atlanacak.");
+    public static readonly ImportRule DuplicateAppointment = new("Imports.DuplicateAppointment", ImportIssueSeverity.Info,
+        "Aynı hasta için aynı saatte randevu zaten var; bu satır atlanacak.");
+
+    // Ürünler (ADR-048 T7)
+    public static readonly ImportRule ProductKindDefaulted = new("Imports.ProductKindDefaulted", ImportIssueSeverity.Warning,
+        "Ürün türü tanınmadı (Hizmet, İlaç, Aşı, Diğer); Diğer olarak aktarılacak.");
+    public static readonly ImportRule CategoryUnmapped = new("Imports.CategoryUnmapped", ImportIssueSeverity.Info,
+        "Kategori tanımlı kategorilerde yok; ürün kategorisiz aktarılacak.");
 
     // Uygulama (B4; satır sonucu yazılırken sorun listesine eklenir, doğrulama durumu değişmez)
     public static readonly ImportRule OwnerUnitFailed = new("Imports.OwnerUnitFailed", ImportIssueSeverity.Error,
@@ -139,9 +191,11 @@ public static class ImportRules
 
     // Dosya düzeyi (satır sorunu değil; preview.blockers)
     public static readonly ImportRule OwnerLinkUnavailable = new("Imports.OwnerLinkUnavailable", ImportIssueSeverity.Error,
-        "Hasta tablosu yalnız MusteriNo ile bağlanıyor ancak müşteri tablosu yok veya MusteriNo sütunu eşlenmemiş.");
+        "Hasta veya hesap hareketi tablosu yalnız MusteriNo ile bağlanıyor ancak müşteri tablosu yok veya MusteriNo sütunu eşlenmemiş.");
     public static readonly ImportRule PetLinkUnavailable = new("Imports.PetLinkUnavailable", ImportIssueSeverity.Error,
-        "Aşı tablosu yalnız HastaNo ile bağlanıyor ancak hasta tablosu yok veya HastaNo sütunu eşlenmemiş.");
+        "Aşı, klinik geçmiş veya randevu tablosu yalnız HastaNo ile bağlanıyor ancak hasta tablosu yok veya HastaNo sütunu eşlenmemiş.");
+    public static readonly ImportRule ClinicRequired = new("Imports.ClinicRequired", ImportIssueSeverity.Error,
+        "Açık bakiye eşlendi ancak partide klinik yok; devir ücreti için klinik seçerek dosyayı yeniden yükleyin.");
     public static readonly ImportRule NoImportableRows = new("Imports.NoImportableRows", ImportIssueSeverity.Error,
         "Aktarılabilir (geçerli) satır yok.");
 

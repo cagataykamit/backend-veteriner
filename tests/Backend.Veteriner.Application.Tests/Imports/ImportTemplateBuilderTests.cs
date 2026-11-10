@@ -11,11 +11,12 @@ namespace Backend.Veteriner.Application.Tests.Imports;
 public sealed class ImportTemplateBuilderTests
 {
     [Fact]
-    public void Xlsx_Should_Have_Three_Data_Sheets_With_Only_Canonical_Headers_And_An_Explanation_Sheet()
+    public void Xlsx_Should_Have_Seven_Data_Sheets_With_Only_Canonical_Headers_And_An_Explanation_Sheet()
     {
         using var workbook = new XLWorkbook(new MemoryStream(ImportTemplateBuilder.BuildXlsx()));
 
-        workbook.Worksheets.Select(w => w.Name).Should().Equal("Musteriler", "Hastalar", "Asilar", "Aciklama");
+        workbook.Worksheets.Select(w => w.Name).Should().Equal(
+            "Musteriler", "Hastalar", "Asilar", "KlinikGecmis", "HesapHareketleri", "Randevular", "Urunler", "Aciklama");
         foreach (var table in ImportCanonicalNames.Tables)
         {
             var sheet = workbook.Worksheet(ImportCanonicalSchema.SheetName(table));

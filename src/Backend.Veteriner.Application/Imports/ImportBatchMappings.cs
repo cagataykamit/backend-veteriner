@@ -24,7 +24,9 @@ internal static class ImportBatchMappings
             b.RolledBackAtUtc,
             b.RemindersReleasedAtUtc,
             b.PayloadPurgedAtUtc,
-            new ImportBatchSummaryDto(b.CustomerCounts.ToDto(), b.PetCounts.ToDto(), b.VaccinationCounts.ToDto()),
+            new ImportBatchSummaryDto(
+                b.CustomerCounts.ToDto(), b.PetCounts.ToDto(), b.VaccinationCounts.ToDto(), b.ClinicalRecordCounts.ToDto(),
+                b.AccountEntryCounts.ToDto(), b.AppointmentCounts.ToDto(), b.ProductCounts.ToDto()),
             tables,
             warnings,
             b.SourceProfile);

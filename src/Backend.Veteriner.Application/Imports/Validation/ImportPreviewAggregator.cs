@@ -6,6 +6,9 @@ namespace Backend.Veteriner.Application.Imports.Validation;
 /// <summary>Hatırlatma etkisi adayı: sonraki aşı tarihi, sahip anahtarı ve sahibin e-postası var mı.</summary>
 public sealed record ImportReminderCandidate(DateTime? DueAtUtc, string? OwnerKey, bool OwnerHasEmail);
 
+/// <summary>Randevu hatırlatma adayı (ADR-048 T5): başlangıç ve sahibin e-postası var mı.</summary>
+public sealed record ImportAppointmentReminderCandidate(DateTime? ScheduledAtUtc, bool OwnerHasEmail);
+
 /// <summary>
 /// Önizleme toplulaştırması (IMPORT_API_CONTRACT.md §7.6): saklanan satır sonuçlarından (<c>IssuesJson</c>,
 /// <c>NormalizedJson</c>) türetilir; saat bağımlı değerler (hatırlatma penceresi) çağrı anındaki saate göredir.
@@ -126,6 +129,46 @@ public static class ImportPreviewAggregator
         }
 
         return new ImportReminderImpactDto(withDue, future, past, owners.Count, inWindow, windowDays, tenantRemindersEnabled, ExcludedByDefault: true);
+    }
+
+    /// <summary>Yalnız <c>Create</c> eylemli hatasız randevu satırları (önizleme tahmini).</summary>
+    public static IEnumerable<ImportAppointmentReminderCandidate> AppointmentCandidates(IEnumerable<string?> appointmentNormalizedJson)
+        => appointmentNormalizedJson
+            .Select(json => ImportNormalizedJson.Parse(Domain.Imports.ImportTable.Appointments, json) as ImportNormalizedAppointment)
+            .Where(row => row is { Action: ImportRowAction.Create })
+            .Select(row => new ImportAppointmentReminderCandidate(row!.ScheduledAtUtc, row.OwnerHasEmail));
+
+    /// <summary>
+    /// Randevu hatırlatma etkisini aşı etkisine ekler (sayım kuralının tek yeri; önizlemede normalize satırlardan, uygulama
+    /// sonrası gerçek randevulardan). Pencere: başlangıç <c>(şimdi, şimdi + windowHours]</c> ve sahip e-postalı.
+    /// </summary>
+    public static ImportReminderImpactDto WithAppointments(
+        ImportReminderImpactDto impact,
+        IEnumerable<ImportAppointmentReminderCandidate> candidates,
+        DateTime nowUtc,
+        int windowHours,
+        bool tenantAppointmentRemindersEnabled)
+    {
+        var windowEnd = nowUtc.AddHours(windowHours);
+        var future = 0;
+        var inWindow = 0;
+        foreach (var row in candidates)
+        {
+            if (row.ScheduledAtUtc is not { } start || start <= nowUtc)
+                continue;
+
+            future++;
+            if (row.OwnerHasEmail && start <= windowEnd)
+                inWindow++;
+        }
+
+        return impact with
+        {
+            FutureAppointments = future,
+            AppointmentEmailsWithinReminderWindow = inWindow,
+            AppointmentReminderWindowHours = windowHours,
+            TenantAppointmentRemindersEnabled = tenantAppointmentRemindersEnabled,
+        };
     }
 
     /// <summary>Bloklayan eşlenmemiş değer kodları (tür/aşı) — yalnız satırı olanlar.</summary>

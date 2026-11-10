@@ -6,7 +6,7 @@ using Mediator;
 namespace Backend.Veteriner.Application.Imports.Queries.GetRows;
 
 /// <summary>
-/// <paramref name="Table"/>: <c>customers|pets|vaccinations</c>; <paramref name="Status"/>: doğrulama durumu
+/// <paramref name="Table"/>: <c>customers|pets|vaccinations|clinicalRecords|accountEntries|appointments|products</c>; <paramref name="Status"/>: doğrulama durumu
 /// (<c>Valid|Warning|Error</c>) veya uygulama durumu (<c>Created|Matched|Skipped|Failed|RolledBack|Kept</c>);
 /// <paramref name="Code"/>: satır sorunlarından birinin kodu.
 /// </summary>

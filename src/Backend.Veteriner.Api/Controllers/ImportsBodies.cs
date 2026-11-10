@@ -35,6 +35,10 @@ public sealed class CreateImportBatchForm
     public IFormFile? CustomersFile { get; init; }
     public IFormFile? PetsFile { get; init; }
     public IFormFile? VaccinationsFile { get; init; }
+    public IFormFile? ClinicalRecordsFile { get; init; }
+    public IFormFile? AccountEntriesFile { get; init; }
+    public IFormFile? AppointmentsFile { get; init; }
+    public IFormFile? ProductsFile { get; init; }
     public string? Encoding { get; init; }
     public string? Delimiter { get; init; }
 

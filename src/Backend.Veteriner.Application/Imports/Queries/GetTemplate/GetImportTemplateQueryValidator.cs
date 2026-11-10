@@ -16,6 +16,6 @@ public sealed class GetImportTemplateQueryValidator : AbstractValidator<GetImpor
         RuleFor(x => x.Table)
             .Must(t => ImportCanonicalNames.TryParseKey(t, out _))
             .When(x => x.Format == Csv)
-            .WithMessage("format=csv için table customers, pets veya vaccinations olmalıdır.");
+            .WithMessage("format=csv için table customers, pets, vaccinations, clinicalRecords, accountEntries, appointments veya products olmalıdır.");
     }
 }

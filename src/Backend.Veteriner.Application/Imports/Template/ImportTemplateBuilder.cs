@@ -42,7 +42,12 @@ public static class ImportTemplateBuilder
         return [.. preamble, .. body];
     }
 
-    public static string CsvFileName(ImportTable table) => $"vetinity-iceaktar-{ImportCanonicalSchema.SheetName(table).ToLowerInvariant()}.csv";
+    public static string CsvFileName(ImportTable table) => table switch
+    {
+        ImportTable.ClinicalRecords => "vetinity-iceaktar-klinik-gecmis.csv",
+        ImportTable.AccountEntries => "vetinity-iceaktar-hesap-hareketleri.csv",
+        _ => $"vetinity-iceaktar-{ImportCanonicalSchema.SheetName(table).ToLowerInvariant()}.csv",
+    };
 
     public const string XlsxFileName = "vetinity-iceaktar-sablon.xlsx";
 

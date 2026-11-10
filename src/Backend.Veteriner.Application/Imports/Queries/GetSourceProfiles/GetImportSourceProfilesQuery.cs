@@ -6,7 +6,7 @@ using Mediator;
 
 namespace Backend.Veteriner.Application.Imports.Queries.GetSourceProfiles;
 
-/// <summary>Hazır eşlemenin bir satırı; <see cref="Table"/> tablo anahtarı (<c>customers|pets|vaccinations</c>).</summary>
+/// <summary>Hazır eşlemenin bir satırı; <see cref="Table"/> tablo anahtarı (<c>customers|pets|vaccinations|clinicalRecords|accountEntries|appointments|products</c>).</summary>
 public sealed record ImportProfileMappingDto(string Table, string Header, string Field, string Source, bool Verified);
 
 /// <summary>Kaynak program profili; kullanıcı yükleme öncesi seçer, <see cref="Mappings"/> sütun önerisini besler.</summary>

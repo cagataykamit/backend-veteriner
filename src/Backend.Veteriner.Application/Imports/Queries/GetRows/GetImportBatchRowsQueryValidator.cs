@@ -15,7 +15,7 @@ public sealed class GetImportBatchRowsQueryValidator : AbstractValidator<GetImpo
         RuleFor(x => x.Table)
             .Must(t => ImportCanonicalNames.TryParseKey(t, out _))
             .When(x => x.Table is not null)
-            .WithMessage("table customers, pets veya vaccinations olmalıdır.");
+            .WithMessage("table customers, pets, vaccinations, clinicalRecords, accountEntries, appointments veya products olmalıdır.");
 
         RuleFor(x => x.Status)
             .Must(s => ImportRowStatusFilter.TryParse(s, out _, out _))

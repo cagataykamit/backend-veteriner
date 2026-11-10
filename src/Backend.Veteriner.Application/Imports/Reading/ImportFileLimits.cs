@@ -27,8 +27,8 @@ public sealed class ImportFileLimits
 
     public const string SectionName = "Imports:Limits";
 
-    /// <summary>Üç dosyalı CSV yüklemesi için istek gövdesi üst sınırı (taşıma katmanında 413).</summary>
-    public const long MaxRequestBytes = 33L * 1024 * 1024;
+    /// <summary>Yedi dosyalı CSV yüklemesi (tablo başına ≤ 10 MB) için istek gövdesi üst sınırı (taşıma katmanında 413).</summary>
+    public const long MaxRequestBytes = 72L * 1024 * 1024;
 
     public int MaxFileBytes { get; set; } = 10 * 1024 * 1024;
     public int MaxRowsPerTable { get; set; } = 10_000;

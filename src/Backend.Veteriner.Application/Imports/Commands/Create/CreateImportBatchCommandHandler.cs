@@ -120,11 +120,11 @@ public sealed class CreateImportBatchCommandHandler
             return Result<ImportBatchCreateResultDto>.Failure(read.Error);
 
         var tables = read.Value!.Tables;
-        if (tables.Any(t => t.Table == ImportTable.Vaccinations) && request.ClinicId is null)
+        if (tables.Any(t => ImportTables.ClinicScoped.Contains(t.Table)) && request.ClinicId is null)
         {
             return Fail(
                 "Imports.ClinicRequired",
-                "Aşı tablosu içeren partide clinicId zorunludur; aşılar bu kliniğe yazılır.");
+                "Aşı, klinik geçmiş, hesap hareketi veya randevu tablosu içeren partide clinicId zorunludur; bu kayıtlar partinin kliniğine yazılır.");
         }
 
         var created = ImportBatch.Create(
@@ -139,11 +139,7 @@ public sealed class CreateImportBatchCommandHandler
             return Result<ImportBatchCreateResultDto>.Failure(created.Error);
 
         var batch = created.Value!;
-        var attached = batch.AttachFile(
-            upload.ContentHash,
-            RowCount(tables, ImportTable.Customers),
-            RowCount(tables, ImportTable.Pets),
-            RowCount(tables, ImportTable.Vaccinations));
+        var attached = batch.AttachFile(upload.ContentHash, tables.ToDictionary(t => t.Table, t => t.Rows.Count));
         if (!attached.IsSuccess)
             return Result<ImportBatchCreateResultDto>.Failure(attached.Error);
 
@@ -231,8 +227,6 @@ public sealed class CreateImportBatchCommandHandler
     private static ImportSourceProfile SourceProfileOf(CreateImportBatchCommand request)
         => ImportSourceProfiles.TryParse(request.SourceProfile, out var profile) ? profile : ImportSourceProfile.Generic;
 
-    private static int RowCount(IReadOnlyList<ImportSourceTable> tables, ImportTable table)
-        => tables.FirstOrDefault(t => t.Table == table)?.Rows.Count ?? 0;
 
     private static Result<ImportBatchCreateResultDto> Fail(string code, string message)
         => Result<ImportBatchCreateResultDto>.Failure(code, message);

@@ -61,6 +61,8 @@ public sealed partial class ImportValidationEngine
         if (address is { Length: > MaxAddressLength })
             issues.Add(ImportRules.FieldTooLong.At("Adres", $"Adres en fazla {MaxAddressLength} karakter olabilir."));
 
+        var (openingBalance, balanceDate) = ReadOpeningBalance(reader, issues);
+
         var node = new CustomerNode(reader.RowNumber);
         if (reference is not null)
         {
@@ -75,7 +77,7 @@ public sealed partial class ImportValidationEngine
             }
         }
 
-        var normalized = new ImportNormalizedCustomer(reference, fullName, phone, email, address);
+        var normalized = new ImportNormalizedCustomer(reference, fullName, phone, email, address, openingBalance, balanceDate);
         if (HasError(issues))
             return Complete(node, Finish(ImportTable.Customers, reader.RowNumber, issues, normalized));
 
@@ -88,7 +90,8 @@ public sealed partial class ImportValidationEngine
             node.Owner = canonical.Owner;
             issues.Add(ImportRules.DuplicateInFile.At(null, $"Aynı müşteri {canonical.Row}. satırda da var; bu satır atlanacak."));
             return Complete(node, Finish(
-                ImportTable.Customers, reader.RowNumber, issues, normalized, ImportRowAction.Skip, mergedIntoRow: canonical.Row));
+                ImportTable.Customers, reader.RowNumber, issues, WithoutBalance(normalized, issues), ImportRowAction.Skip,
+                mergedIntoRow: canonical.Row));
         }
 
         // Kiracıda mevcut müşteri (K4).
@@ -105,7 +108,8 @@ public sealed partial class ImportValidationEngine
             RegisterFileCustomer(node, nameKey, phone, email);
             issues.Add(ImportRules.MatchedExisting.At());
             var action = _onDuplicateClient == ImportOptionsDocument.Skip ? ImportRowAction.Skip : ImportRowAction.Match;
-            return Complete(node, Finish(ImportTable.Customers, reader.RowNumber, issues, normalized, action, existing.Id));
+            return Complete(node, Finish(
+                ImportTable.Customers, reader.RowNumber, issues, WithoutBalance(normalized, issues), action, existing.Id));
         }
 
         // Yeni müşteri: ayırt edilemeyen/benzer kayıtlar için bilgi ve uyarı.
@@ -121,6 +125,52 @@ public sealed partial class ImportValidationEngine
         node.Owner = new OwnerRef($"file:{reader.RowNumber}", null, email is not null);
         RegisterFileCustomer(node, nameKey, phone, email);
         return Complete(node, Finish(ImportTable.Customers, reader.RowNumber, issues, normalized, ImportRowAction.Create));
+    }
+
+    /// <summary>
+    /// Açık bakiye (ADR-048 T3): yalnız pozitif tutar aktarılır; alacak ve okunamayan tutar uyarıdır (müşteri yine aktarılır).
+    /// Bakiye tarihi yalnız devir açıklaması içindir.
+    /// </summary>
+    private (decimal? Balance, DateOnly? BalanceDate) ReadOpeningBalance(ImportRowReader reader, List<ImportIssue> issues)
+    {
+        var raw = reader.Raw("AcikBakiye");
+        var (amount, valid) = ImportValueParsers.ParseAmount(raw);
+        if (!valid)
+        {
+            issues.Add(ImportRules.AmountInvalid.At("AcikBakiye", value: raw));
+            return (null, null);
+        }
+
+        if (amount is < 0)
+        {
+            issues.Add(ImportRules.CreditBalanceNotImported.At("AcikBakiye", value: raw));
+            return (null, null);
+        }
+
+        if (amount is not > 0)
+            return (null, null);
+
+        DateOnly? balanceDate = null;
+        if (reader.Raw("BakiyeTarihi") is { } rawDate)
+        {
+            var parsed = ImportValueParsers.ParseDate(rawDate).Value;
+            if (parsed is { } date && date <= _today)
+                balanceDate = date;
+            else
+                issues.Add(ImportRules.BalanceDateIgnored.At("BakiyeTarihi", value: rawDate));
+        }
+
+        return (amount, balanceDate);
+    }
+
+    /// <summary>Eşleşen veya mükerrer müşteri satırına bakiye eklenmez (mevcut veri ezilmez, K4).</summary>
+    private static ImportNormalizedCustomer WithoutBalance(ImportNormalizedCustomer normalized, List<ImportIssue> issues)
+    {
+        if (normalized.OpeningBalance is null)
+            return normalized;
+
+        issues.Add(ImportRules.BalanceNotAppliedToExisting.At("AcikBakiye"));
+        return normalized with { OpeningBalance = null, BalanceDate = null };
     }
 
     private static ImportRowResult Complete(CustomerNode node, ImportRowResult result)

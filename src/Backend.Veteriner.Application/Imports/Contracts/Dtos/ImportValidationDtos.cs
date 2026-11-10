@@ -34,7 +34,18 @@ public sealed record ImportReminderImpactDto(
     int EmailsWithinReminderWindow,
     int ReminderWindowDays,
     bool TenantRemindersEnabled,
-    bool ExcludedByDefault);
+    bool ExcludedByDefault,
+    int FutureAppointments = 0,
+    int AppointmentEmailsWithinReminderWindow = 0,
+    int AppointmentReminderWindowHours = ImportReminderImpactDto.DefaultAppointmentWindowHours,
+    bool TenantAppointmentRemindersEnabled = false)
+{
+    /// <summary>Kiracı ayarı kaydı yoksa randevu hatırlatma penceresi (saat; <c>TenantReminderSettings</c> varsayılanı).</summary>
+    public const int DefaultAppointmentWindowHours = 24;
+
+    /// <summary>Serbest bırakma onayının karşılaştırıldığı toplam (aşı + randevu; ADR-048 §12.6).</summary>
+    public int TotalEmailsWithinReminderWindow => EmailsWithinReminderWindow + AppointmentEmailsWithinReminderWindow;
+}
 
 public sealed record ImportIssueCountDto(string Code, string Severity, int RowCount);
 

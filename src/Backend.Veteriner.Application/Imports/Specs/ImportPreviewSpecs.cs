@@ -1,5 +1,6 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Imports.Validation;
+using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Pets;
@@ -18,17 +19,31 @@ public sealed class ImportIssuesJsonSpec : Specification<ImportBatchRow, string?
     }
 }
 
-/// <summary>Hatırlatma etkisi için: hatasız aşı satırlarının <c>NormalizedJson</c> değerleri (yalnız tek sütun).</summary>
+/// <summary>
+/// Hatırlatma etkisi için: bir tablonun (aşı veya randevu) hatasız satırlarının <c>NormalizedJson</c> değerleri (yalnız tek
+/// sütun).
+/// </summary>
 public sealed class ImportVaccinationNormalizedJsonSpec : Specification<ImportBatchRow, string?>
 {
-    public ImportVaccinationNormalizedJsonSpec(Guid batchId)
+    public ImportVaccinationNormalizedJsonSpec(Guid batchId, ImportTable table = ImportTable.Vaccinations)
     {
         Query.AsNoTracking();
         Query.Where(r => r.BatchId == batchId
-                         && r.Table == ImportTable.Vaccinations
+                         && r.Table == table
                          && r.ValidationStatus != ImportRowValidationStatus.Error
                          && r.NormalizedJson != null);
         Query.Select(r => r.NormalizedJson);
+    }
+}
+
+/// <summary>Partinin içe aktardığı, hâlâ planlı randevular: hasta ve başlangıç (gerçek randevu hatırlatma etkisi).</summary>
+public sealed class ImportedAppointmentStartSpec : Specification<Appointment, ImportedAppointmentStart>
+{
+    public ImportedAppointmentStartSpec(Guid tenantId, Guid batchId)
+    {
+        Query.AsNoTracking();
+        Query.Where(a => a.TenantId == tenantId && a.ImportBatchId == batchId && a.Status == AppointmentStatus.Scheduled);
+        Query.Select(a => new ImportedAppointmentStart(a.PetId, a.ScheduledAtUtc));
     }
 }
 

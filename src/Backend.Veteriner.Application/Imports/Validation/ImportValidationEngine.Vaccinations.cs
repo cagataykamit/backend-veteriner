@@ -21,7 +21,7 @@ public sealed partial class ImportValidationEngine
     {
         var issues = new List<ImportIssue>();
 
-        var (pet, petSkippedByUser) = ResolvePetForVaccination(reader, issues);
+        var (pet, petSkippedByUser) = ResolvePetLink(reader, issues);
 
         // Aşı tanımı (hastanın türüne göre)
         Guid? definitionId = null;
@@ -153,10 +153,10 @@ public sealed partial class ImportValidationEngine
     }
 
     /// <summary>
-    /// Aşı satırının hayvanını çözer: <c>HayvanNo</c> doluysa dosyadaki hasta; yoksa sahip + hayvan adı + tür ile
+    /// Hastaya bağlanan satırın (aşı, klinik geçmiş, randevu) hayvanını çözer: <c>HayvanNo</c> doluysa dosyadaki hasta; yoksa sahip + hayvan adı + tür ile
     /// dosyadaki sonra sahibin kiracıdaki hastaları.
     /// </summary>
-    private (PetRef? Pet, bool SkippedByUser) ResolvePetForVaccination(ImportRowReader reader, List<ImportIssue> issues)
+    private (PetRef? Pet, bool SkippedByUser) ResolvePetLink(ImportRowReader reader, List<ImportIssue> issues)
     {
         var reference = ImportValueParsers.NormalizeText(reader.Raw("HayvanNo"));
         if (reference is not null && PetReferenceUsable)

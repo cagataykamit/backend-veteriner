@@ -13,7 +13,8 @@ public static class ImportCommitGate
 {
     /// <summary>Dosya düzeyi engeller (eşleme + tablo varlığı); satır verisi gerektirmez.</summary>
     public static List<string> FileBlockers(ImportBatch batch)
-        => ImportPreconditions.Check(ImportMappingDocument.Parse(batch.MappingJson), ImportTableInfoLoader.PresentTables(batch))
+        => ImportPreconditions.Check(
+                ImportMappingDocument.Parse(batch.MappingJson), ImportTableInfoLoader.PresentTables(batch), batch.ClinicId is not null)
             .Select(r => r.Code)
             .ToList();
 
@@ -23,20 +24,17 @@ public static class ImportCommitGate
         var blockers = FileBlockers(batch);
         blockers.AddRange(ImportPreviewAggregator.BlockingCodes(unmapped));
 
-        var counts = new[] { batch.CustomerCounts, batch.PetCounts, batch.VaccinationCounts };
-        var accepted = counts.Sum(c => c.Valid + c.Warning);
-        var total = counts.Sum(c => c.Total);
+        var accepted = batch.SumCounts(c => c.Valid + c.Warning);
+        var total = batch.SumCounts(c => c.Total);
         if (blockers.Count == 0 && accepted == 0 && total > 0)
             blockers.Add(ImportRules.NoImportableRows.Code);
 
         return blockers;
     }
 
-    public static int WillCreate(ImportBatch batch)
-        => batch.CustomerCounts.WillCreate + batch.PetCounts.WillCreate + batch.VaccinationCounts.WillCreate;
+    public static int WillCreate(ImportBatch batch) => batch.SumCounts(c => c.WillCreate);
 
-    public static int ErrorRows(ImportBatch batch)
-        => batch.CustomerCounts.Error + batch.PetCounts.Error + batch.VaccinationCounts.Error;
+    public static int ErrorRows(ImportBatch batch) => batch.SumCounts(c => c.Error);
 
     public static bool CanCommit(ImportBatch batch, IReadOnlyCollection<string> blockers)
         => batch.Status == ImportBatchStatus.Validated
