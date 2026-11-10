@@ -42,6 +42,9 @@ public sealed class Charge : AggregateRoot, IClinicScoped, ITenantOwned
 
     public decimal OutstandingAmount => Amount - AllocatedAmount;
 
+    /// <summary>Ücretin bağlı olduğu geçerli e-belge (ADR-036 Dilim 3); bir ücret yalnız bir geçerli belgeye bağlanır.</summary>
+    public Guid? EDocumentId { get; private set; }
+
     /// <summary>Başarılı mutasyon sayacı; optimistic concurrency token. Her tahsis, geri alma, düzeltme ve iptal 1 artırır.</summary>
     public long MutationSequence { get; private set; }
 
@@ -127,6 +130,9 @@ public sealed class Charge : AggregateRoot, IClinicScoped, ITenantOwned
         if (IsVoided)
             return Result.Failure("Charges.AlreadyVoided", "İptal edilmiş ücret düzeltilemez.");
 
+        if (EDocumentId.HasValue)
+            return EDocumentAttached("düzeltilemez");
+
         var reasonCheck = CorrectionReason.Validate(reason, "Charges.Validation");
         if (!reasonCheck.IsSuccess)
             return reasonCheck;
@@ -172,6 +178,9 @@ public sealed class Charge : AggregateRoot, IClinicScoped, ITenantOwned
         if (voidedByUserId == Guid.Empty)
             return Result.Failure("Charges.Validation", "İptal eden kullanıcı geçersiz.");
 
+        if (EDocumentId.HasValue)
+            return EDocumentAttached("iptal edilemez");
+
         var reasonCheck = CorrectionReason.Validate(reason, "Charges.Validation");
         if (!reasonCheck.IsSuccess)
             return reasonCheck;
@@ -188,6 +197,33 @@ public sealed class Charge : AggregateRoot, IClinicScoped, ITenantOwned
         VoidReason = reason!.Trim();
         MutationSequence++;
         return Result.Success();
+    }
+
+    /// <summary>Ücreti e-belgeye bağlar. İptal edilmiş veya başka belgeye bağlı ücret bağlanamaz.</summary>
+    public Result AttachEDocument(Guid eDocumentId)
+    {
+        if (eDocumentId == Guid.Empty)
+            throw new ArgumentException("EDocumentId geçersiz.", nameof(eDocumentId));
+        if (IsVoided)
+            return Result.Failure("EDocuments.ChargeVoided", "İptal edilmiş ücrete belge kesilemez.");
+        if (EDocumentId == eDocumentId)
+            return Result.Success();
+        if (EDocumentId.HasValue)
+            return Result.Failure("EDocuments.ChargeAlreadyDocumented", "Ücret başka bir geçerli belgeye bağlı.");
+
+        EDocumentId = eDocumentId;
+        MutationSequence++;
+        return Result.Success();
+    }
+
+    /// <summary>Belge iptal edildi veya belgeden vazgeçildi: ücret yeniden belgelenebilir.</summary>
+    public void ReleaseEDocument(Guid eDocumentId)
+    {
+        if (EDocumentId != eDocumentId)
+            return;
+
+        EDocumentId = null;
+        MutationSequence++;
     }
 
     /// <summary>Ödeme iptalinde tahsis sayacını düşürür; <c>AllocatedAmount</c> negatife inemez.</summary>
@@ -252,6 +288,9 @@ public sealed class Charge : AggregateRoot, IClinicScoped, ITenantOwned
 
     private static Result<(string Description, decimal Amount)> InvalidDetails(string message)
         => Result<(string Description, decimal Amount)>.Failure("Charges.Validation", message);
+
+    private static Result EDocumentAttached(string action)
+        => Result.Failure("Charges.EDocumentAttached", $"e-belgesi kesilmiş ücret {action}; önce belgeyi iptal edin.");
 
     private static Result<Charge> Invalid(string message)
         => Result<Charge>.Failure("Charges.Validation", message);
