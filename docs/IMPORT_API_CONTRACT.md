@@ -835,3 +835,11 @@ Tek migration **`AddFullDataMigration`** (yalnız yerel dev DB'ye uygulanır; ca
 - Yeni tablo `ImportedAccountEntries` (`Id`, `TenantId`, `ClinicId`, `ClientId`, `ImportBatchId`, `OccurredOn date`, `Kind`, `Amount decimal(18,2)`, `Currency`, `Description`, `PaymentMethod`, `DocumentNumber`, `PetName`, `CreatedAtUtc`; indeks `(TenantId, ClientId, OccurredOn)`, `(ImportBatchId)`).
 - `Charges.ImportBatchId`, `Appointments.ImportBatchId` (nullable, filtreli indeks, FK NO ACTION).
 - Yeni izin ve seed yok. Kiracı yalıtımı (ADR-040): iki yeni varlık `ITenantOwned`, global kiracı filtresine girer.
+
+### 12.11 Netleştirmeler (frontend sorularına cevap)
+
+- Yeni okuma uçlarında `page` varsayılan 1, `pageSize` varsayılan 20, 1–100 (aşım `400 Validation.FluentValidation`).
+- Zaman çizelgesi `ImportedClinicalRecord` öğesinde `linkRef` **yoktur** (`null`); ayrıntı hasta ekranındaki eski program kayıtları listesinden okunur.
+- `rollback-preview.kept` ek anahtarı `matchedProducts` (mevcut ürünle eşleşen satırlar; hiç silinmez).
+- `GET .../rows` `values` yeni tablolar için normalize kaydın camelCase alanlarıdır (bölüm 7.7 kuralı); ekran kullanmak zorunda değildir.
+- `GET /clients/{id}/balance` satırları (ücret satırı içeriyorsa) ve ücret DTO'su `isImported` taşır (ek alan); başka bakiye/ödeme DTO'su değişmez.
