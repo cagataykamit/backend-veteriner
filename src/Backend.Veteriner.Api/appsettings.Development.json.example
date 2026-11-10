@@ -167,6 +167,20 @@
     "RevokeSessionsOnPermissionChange": false
   },
 
+  "DataProtection": {
+    "KeysPath": ""
+  },
+
+  "EDocuments": {
+    "Parasut": {
+      "Environment": "Test",
+      "IdentityBaseUrl": "https://id-staging.parasut.com/realms/parasut/protocol/openid-connect",
+      "ApiBaseUrl": "https://api-staging.parasut.com/v4",
+      "RedirectUri": "https://localhost:7173/api/e-documents/parasut/callback"
+    }
+  },
+
+
   "Billing": {
     "DefaultCheckoutProvider": "Iyzico",
     "ScheduledPlanChangeProcessor": {
