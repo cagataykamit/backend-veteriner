@@ -110,8 +110,10 @@ Sıra: ada göre (sistem ve kendi şablonları karışık). `sort`/`order` uygul
 İzin: **`ExaminationTemplates.Apply` + `Examinations.Update` + `Administrations.Create`** (üçü birden; varsayılan rollerde birlikte verilir). Kiracı ve klinik bağlamı muayene güncellemesiyle aynı (atanmış klinik, aktif klinik bağlamı).
 
 ```json
-{ "templateId": "…", "rowVersion": "AAAAAAAAB9E=" }
+{ "templateId": "…", "rowVersion": "AAAAAAAAB9E=", "lines": [ { "productId": "…", "quantity": 2 } ] }
 ```
+
+`lines` isteğe bağlıdır (EXAM-013, bölüm 12): verilmezse tüm satırlar şablondaki miktarla uygulanır.
 
 `rowVersion` **muayenenin** güncel sürümüdür (zorunlu). Tek transaction'da sırayla:
 
@@ -168,6 +170,7 @@ Arayüz başarı mesajını `text`, `administrations`, `services` ve `pendingCha
 | 400 | `ExaminationTemplates.VaccineNotAllowed` / `ExaminationTemplates.ProductInactive` | Satır kuralı (+ `productId`) |
 | 400 | `ExaminationTemplates.RouteIdMismatch` | PUT gövde `id` ≠ rota |
 | 400 | `ExaminationTemplates.Inactive` | Pasif şablonu uygulama |
+| 400 | `ExaminationTemplates.LineNotInTemplate` | Uygula: `lines` içinde şablonda olmayan ürün (EXAM-013) |
 | 400 | `Examinations.Validation` | Uygula: muayene `rowVersion` yok/geçersiz |
 | 400 | `Examinations.TemplateTextTooLong` | Uygula: birleşen metin muayene sınırını aşıyor |
 | 400 | `Administrations.*` (ör. `InsufficientStock`, `BatchExpired`) | Uygula: satırın uygulama kaydı reddedildi (+ `productId`); kodlar `ADMINISTRATIONS_API_CONTRACT.md` ile aynı |
@@ -205,3 +208,10 @@ Sistem şablonunu kiracı bazında gizleme/kopyalama ucu (istemci içeriği kopy
 - **Fiyat dolu:** uygula (bölüm 7) önce tek "ücret bekliyor" paket kalemi yazar (`CHARGE_SUGGESTION_API_CONTRACT.md`, `sourceType = "ExaminationPackage"`); stoklu satırlar **pakete dahil** uygulama kaydı olur (stok düşer, kendi kalemini doğurmaz, `packageChargeSuggestionId` paket kalemidir); hizmet satırları kalem doğurmaz (`services[].includedInPackage = true`, `chargeSuggestionId = null`). Yanıta `packageChargeSuggestionId` eklendi (fiyatsızda `null`). Hepsi ya da hiçbiri kuralı aynıdır.
 - Önizleme: istemci paket fiyatını ve satırların `currentUnitPrice × quantity` toplamını gösterebilir (bilgi; tahsil edilen paket fiyatıdır).
 - Migration `AddExaminationPackagePrice`: `ExaminationTemplates.PackagePrice` (decimal(18,2), null), `Administrations.PackageChargeSuggestionId` (null, FK → `ChargeSuggestions`, Restrict), `ChargeSuggestions.ProductId` boş olabilir. Mevcut satırlar değişmez. Down, ürünsüz paket kalemi varsa başarısız olur.
+
+## 12) Uygulamada satır seçimi ve miktar (EXAM-013)
+
+- Uygula gövdesine isteğe bağlı `lines: [{ productId, quantity }]`. **Verilmezse** bugünkü davranış: tüm satırlar şablondaki miktarla. **Verilirse** yalnız listedeki satırlar, listedeki miktarla uygulanır; listede olmayan satır **hariçtir**. Boş liste (`[]`) yalnız metni uygular. Şablon değişmez; migration yok.
+- Kurallar tek yerde (`ExaminationTemplate.SelectLinesForApply`): ürün şablonda olmalı (yoksa `400 ExaminationTemplates.LineNotInTemplate`), aynı ürün bir kez (`400 ExaminationTemplates.Validation`), miktar şablon satırıyla aynı kural (`ExaminationTemplate.CheckLineQuantity`: `> 0`, uygulama kaydı üst sınırı, ondalık ölçeği). En çok 20 satır; biçim hatası `Validation.FluentValidation`. Uygulanan satırlar şablondaki sırayla yazılır; stok, parti ve kontrollü ürün kuralları bölüm 7 ile aynıdır.
+- **Fiyatlı paket:** satır hariç tutulsa ya da miktarı değişse de paket fiyatı **sabit kalır** (orantılı fiyat yok); gerekirse resepsiyon kalemi ücrete çevirirken fiyatı düzenler (ADR-018 K3). Hiç satır uygulanmazsa paket kalemi de doğmaz (`packageChargeSuggestionId = null`).
+- Audit hedefinde `Lines={n}` (yalnız liste verildiyse).

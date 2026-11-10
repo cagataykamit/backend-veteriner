@@ -162,6 +162,59 @@ public sealed class ExaminationTemplate : AggregateRoot
         return Result.Success();
     }
 
+    /// <summary>Satır miktarı kuralı (kaydetme ve uygulama anındaki düzenleme aynı kuralı kullanır; uygulama kaydı sınırlarıyla aynı).</summary>
+    public static Result CheckLineQuantity(decimal quantity)
+    {
+        if (quantity <= 0
+            || quantity > Administration.MaxQuantity
+            || decimal.Round(quantity, Administration.QuantityDecimals) != quantity)
+        {
+            return Invalid(
+                $"Miktar 0'dan büyük, en fazla {Administration.MaxQuantity:0} ve en fazla {Administration.QuantityDecimals} ondalıklı olmalıdır.");
+        }
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Uygulanacak satırlar (EXAM-013). <paramref name="selection"/> verilmezse tüm satırlar şablondaki miktarla; verilirse yalnız
+    /// listedeki satırlar, listedeki miktarla uygulanır (listede olmayan satır hariçtir, boş liste yalnız metni uygular).
+    /// Yalnız şablondaki ürünler seçilebilir; sıra şablondaki sıradır. Şablon değişmez.
+    /// </summary>
+    public Result<IReadOnlyList<ExaminationTemplateLineDraft>> SelectLinesForApply(IReadOnlyList<ExaminationTemplateLineDraft>? selection)
+    {
+        var ordered = _lines.OrderBy(l => l.SortOrder).ToList();
+        if (selection is null)
+        {
+            return Result<IReadOnlyList<ExaminationTemplateLineDraft>>.Success(
+                ordered.Select(l => new ExaminationTemplateLineDraft(l.ProductId, l.Quantity)).ToList());
+        }
+
+        if (selection.Select(s => s.ProductId).Distinct().Count() != selection.Count)
+            return Result<IReadOnlyList<ExaminationTemplateLineDraft>>.Failure(ValidationCode, "Aynı satır bir kez seçilebilir.");
+
+        var quantities = new Dictionary<Guid, decimal>();
+        foreach (var selected in selection)
+        {
+            if (ordered.All(l => l.ProductId != selected.ProductId))
+            {
+                return Result<IReadOnlyList<ExaminationTemplateLineDraft>>.Failure(
+                    "ExaminationTemplates.LineNotInTemplate", "Seçilen satır bu şablonda yok; şablonu yenileyip tekrar deneyin.");
+            }
+
+            var quantity = CheckLineQuantity(selected.Quantity);
+            if (!quantity.IsSuccess)
+                return Result<IReadOnlyList<ExaminationTemplateLineDraft>>.Failure(quantity.Error);
+
+            quantities[selected.ProductId] = selected.Quantity;
+        }
+
+        return Result<IReadOnlyList<ExaminationTemplateLineDraft>>.Success(ordered
+            .Where(l => quantities.ContainsKey(l.ProductId))
+            .Select(l => new ExaminationTemplateLineDraft(l.ProductId, quantities[l.ProductId]))
+            .ToList());
+    }
+
     private Result Apply(
         string name,
         string? visitReason,
@@ -191,13 +244,9 @@ public sealed class ExaminationTemplate : AggregateRoot
             if (line.ProductId == Guid.Empty)
                 return Invalid("Satır ürünü geçersiz.");
 
-            if (line.Quantity <= 0
-                || line.Quantity > Administration.MaxQuantity
-                || decimal.Round(line.Quantity, Administration.QuantityDecimals) != line.Quantity)
-            {
-                return Invalid(
-                    $"Miktar 0'dan büyük, en fazla {Administration.MaxQuantity:0} ve en fazla {Administration.QuantityDecimals} ondalıklı olmalıdır.");
-            }
+            var quantity = CheckLineQuantity(line.Quantity);
+            if (!quantity.IsSuccess)
+                return quantity;
         }
 
         if (lines.Select(l => l.ProductId).Distinct().Count() != lines.Count)

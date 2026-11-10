@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Backend.Veteriner.Application.Examinations;
+using Backend.Veteriner.Application.ExaminationTemplates.Contracts.Dtos;
 
 namespace Backend.Veteriner.Api.Controllers;
 
@@ -76,11 +77,15 @@ public sealed class FinalizeExaminationBody
     public string? RowVersion { get; init; }
 }
 
-/// <summary>POST /examinations/{id}/apply-template gövdesi. <see cref="RowVersion"/>: muayenenin istemcide görülen sürümü (Base64); zorunlu.</summary>
+/// <summary>
+/// POST /examinations/{id}/apply-template gövdesi. <see cref="RowVersion"/>: muayenenin istemcide görülen sürümü (Base64); zorunlu.
+/// <see cref="Lines"/> (isteğe bağlı, EXAM-013): uygulanacak satırlar ve miktarları; verilmezse tüm satırlar şablondaki miktarla uygulanır.
+/// </summary>
 public sealed class ApplyExaminationTemplateBody
 {
     public Guid TemplateId { get; init; }
     public string? RowVersion { get; init; }
+    public IReadOnlyList<ExaminationTemplateLineRequest>? Lines { get; init; }
 }
 
 /// <summary>POST /examinations/{id}/addenda gövdesi. Gerekçe ve metin zorunludur.</summary>
