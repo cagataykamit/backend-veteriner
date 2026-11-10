@@ -1,4 +1,5 @@
 using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Domain.EDocuments;
 using Backend.Veteriner.Domain.Shared;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -63,6 +64,14 @@ public sealed class ChargeConfiguration : IEntityTypeConfiguration<Charge>
         b.HasIndex(x => new { x.TenantId, x.VoidedAtUtc })
             .IncludeProperties(x => new { x.ClinicId, x.ClientId, x.Amount, x.AllocatedAmount, x.CreatedAtUtc })
             .HasDatabaseName("IX_Charges_TenantId_VoidedAtUtc_Covering");
+
+        // ADR-036 Dilim 3: bir ücret yalnız bir geçerli belgeye bağlı (tek sütun); bağ eşzamanlılık belirteciyle yazılır.
+        b.Property(x => x.EDocumentId);
+        b.HasOne<EDocument>()
+            .WithMany()
+            .HasForeignKey(x => x.EDocumentId)
+            .OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.TenantId, x.EDocumentId });
 
         b.HasIndex(x => new { x.TenantId, x.RequestId })
             .IsUnique()

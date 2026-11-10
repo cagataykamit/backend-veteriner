@@ -1,4 +1,9 @@
 // src/Backend.Veteriner.Infrastructure/DependencyInjection.cs
+using Microsoft.AspNetCore.DataProtection;
+using Backend.Veteriner.Infrastructure.EDocuments.Parasut;
+using Backend.Veteriner.Infrastructure.EDocuments;
+using Backend.Veteriner.Application.EDocuments.Providers;
+using Backend.Veteriner.Application.EDocuments;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.ReadModels;
 using Backend.Veteriner.Application.Clients.IntegrationEvents;
@@ -377,6 +382,26 @@ public static class DependencyInjection
         services.Configure<CheckoutReconciliationOptions>(configuration.GetSection("Billing:CheckoutReconciliation"));
         services.AddScoped<CheckoutReconciliationProcessor>();
         services.AddHostedService<CheckoutReconciliationHostedService>();
+
+        // ===== e-belge (ADR-036 Dilim 3–4): şifreli kimlik bilgisi, Paraşüt adaptörü, bekleyen belge işi =====
+        // Anahtar halkası kalıcı ve yedekli olmalı (DataProtection:KeysPath); kaybolursa klinikler entegratörü yeniden bağlar.
+        var dataProtection = services.AddDataProtection().SetApplicationName("Vetinity");
+        var dataProtectionKeysPath = configuration["DataProtection:KeysPath"];
+        if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
+            dataProtection.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+        services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>();
+        services.Configure<ParasutOptions>(configuration.GetSection(ParasutOptions.SectionName));
+        // İstek adresi vergi kimliği içerebilir: varsayılan HttpClient günlükleri kapalı (ParasutClient kendi şablonunu yazar).
+        services.AddHttpClient(ParasutClient.HttpClientName, (sp, client) =>
+                client.Timeout = TimeSpan.FromSeconds(Math.Max(5, sp.GetRequiredService<IOptions<ParasutOptions>>().Value.TimeoutSeconds)))
+            .RemoveAllLoggers();
+        services.AddScoped<ParasutClient>();
+        services.AddScoped<ParasutEDocumentProvider>();
+        services.AddScoped<IEDocumentProvider>(sp => sp.GetRequiredService<ParasutEDocumentProvider>());
+        services.AddScoped<IEDocumentOAuthProvider>(sp => sp.GetRequiredService<ParasutEDocumentProvider>());
+        services.Configure<EDocumentProcessorOptions>(configuration.GetSection(EDocumentProcessorOptions.SectionName));
+        services.AddSingleton<EDocumentStatusProcessor>();
+        services.AddHostedService<EDocumentStatusHostedService>();
 
         services.Configure<ReminderProcessorOptions>(configuration.GetSection("Reminders:Processor"));
         services.AddScoped<IReminderEmailOutboxEnqueuer, ReminderEmailOutboxEnqueuer>();

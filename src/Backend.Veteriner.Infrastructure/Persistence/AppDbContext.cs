@@ -20,6 +20,7 @@ using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Sales;
 using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Domain.EDocuments;
 using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Reminders;
@@ -163,6 +164,9 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<Administration> Administrations => Set<Administration>();
     public DbSet<ChargeSuggestion> ChargeSuggestions => Set<ChargeSuggestion>();
     public DbSet<Sale> Sales => Set<Sale>();
+    public DbSet<EDocument> EDocuments => Set<EDocument>();
+    public DbSet<EDocumentLine> EDocumentLines => Set<EDocumentLine>();
+    public DbSet<EDocumentConnection> EDocumentConnections => Set<EDocumentConnection>();
     public DbSet<SaleLine> SaleLines => Set<SaleLine>();
     public DbSet<Treatment> Treatments => Set<Treatment>();
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
