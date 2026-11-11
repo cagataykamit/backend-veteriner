@@ -328,6 +328,94 @@ public sealed class ExaminationTemplatesEndpointTests : IClassFixture<CustomWebA
         (await SuggestionsAsync(ctx)).Should().BeEmpty();
     }
 
+    /// <summary>EXAM-013: listede olmayan satır hariç tutulur, miktar listeden gelir; şablon değişmez.</summary>
+    [Fact]
+    public async Task Apply_With_Lines_Should_Exclude_Missing_Lines_And_Use_Given_Quantity()
+    {
+        var ctx = await SeedAsync();
+        var vet = await ClientAsync(ctx, VeterinarianPermissions);
+        var templateId = await CreateTemplateAsync(vet, ctx, drugQuantity: 2m);
+
+        var apply = await vet.PostAsJsonAsync(
+            $"/api/v1/examinations/{ctx.ExaminationId}/apply-template",
+            new { templateId, rowVersion = await ExamRowVersionAsync(ctx), lines = new[] { new { productId = ctx.DrugId, quantity = 3m } } });
+
+        apply.StatusCode.Should().Be(HttpStatusCode.OK, await apply.Content.ReadAsStringAsync());
+        var result = await apply.Content.ReadFromJsonAsync<JsonElement>();
+        result.GetProperty("administrations").EnumerateArray().Should().ContainSingle()
+            .Which.GetProperty("quantity").GetDecimal().Should().Be(3m);
+        result.GetProperty("services").GetArrayLength().Should().Be(0);
+        result.GetProperty("pendingChargeCount").GetInt32().Should().Be(1);
+        (await StockAsync(ctx)).Should().Be(17m);
+        (await SuggestionsAsync(ctx)).Should().ContainSingle(s => s.SourceType == ChargeSuggestion.AdministrationSource);
+
+        var template = await (await vet.GetAsync($"{Url}/{templateId}")).Content.ReadFromJsonAsync<JsonElement>();
+        template.GetProperty("lines").EnumerateArray()
+            .Single(l => l.GetProperty("productId").GetGuid() == ctx.DrugId)
+            .GetProperty("quantity").GetDecimal().Should().Be(2m);
+    }
+
+    /// <summary>EXAM-013: fiyatlı pakette fiyat sabit kalır; hiç satır uygulanmazsa paket kalemi doğmaz (yalnız metin).</summary>
+    [Fact]
+    public async Task Apply_Priced_Package_With_Lines_Should_Keep_Price_And_Skip_Package_When_No_Line()
+    {
+        var ctx = await SeedAsync();
+        var vet = await ClientAsync(ctx, VeterinarianPermissions);
+        var templateId = await CreateTemplateAsync(vet, ctx, drugQuantity: 2m, packagePrice: 450m);
+
+        var partial = await vet.PostAsJsonAsync(
+            $"/api/v1/examinations/{ctx.ExaminationId}/apply-template",
+            new { templateId, rowVersion = await ExamRowVersionAsync(ctx), lines = new[] { new { productId = ctx.ServiceId, quantity = 2m } } });
+
+        partial.StatusCode.Should().Be(HttpStatusCode.OK, await partial.Content.ReadAsStringAsync());
+        var partialResult = await partial.Content.ReadFromJsonAsync<JsonElement>();
+        partialResult.GetProperty("administrations").GetArrayLength().Should().Be(0);
+        partialResult.GetProperty("services").EnumerateArray().Should().ContainSingle()
+            .Which.GetProperty("quantity").GetDecimal().Should().Be(2m);
+        (await StockAsync(ctx)).Should().Be(20m);
+        (await SuggestionsAsync(ctx)).Should().ContainSingle()
+            .Which.SuggestedUnitPrice.Should().Be(450m);
+
+        var textOnly = await vet.PostAsJsonAsync(
+            $"/api/v1/examinations/{ctx.ExaminationId}/apply-template",
+            new { templateId, rowVersion = partialResult.GetProperty("rowVersion").GetString(), lines = Array.Empty<object>() });
+
+        textOnly.StatusCode.Should().Be(HttpStatusCode.OK, await textOnly.Content.ReadAsStringAsync());
+        var textOnlyResult = await textOnly.Content.ReadFromJsonAsync<JsonElement>();
+        textOnlyResult.GetProperty("packageChargeSuggestionId").ValueKind.Should().Be(JsonValueKind.Null);
+        textOnlyResult.GetProperty("pendingChargeCount").GetInt32().Should().Be(0);
+        (await SuggestionsAsync(ctx)).Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task Apply_With_Lines_Should_Reject_Product_Not_In_Template_And_Invalid_Quantity()
+    {
+        var ctx = await SeedAsync();
+        var vet = await ClientAsync(ctx, VeterinarianPermissions);
+        var templateId = await CreateTemplateAsync(vet, ctx, drugQuantity: 2m);
+        var rowVersion = await ExamRowVersionAsync(ctx);
+
+        var foreign = await vet.PostAsJsonAsync(
+            $"/api/v1/examinations/{ctx.ExaminationId}/apply-template",
+            new { templateId, rowVersion, lines = new[] { new { productId = Guid.NewGuid(), quantity = 1m } } });
+        foreign.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ProblemCodeAsync(foreign)).Should().Be("ExaminationTemplates.LineNotInTemplate");
+
+        var scale = await vet.PostAsJsonAsync(
+            $"/api/v1/examinations/{ctx.ExaminationId}/apply-template",
+            new { templateId, rowVersion, lines = new[] { new { productId = ctx.DrugId, quantity = 1.23456m } } });
+        scale.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ProblemCodeAsync(scale)).Should().Be("ExaminationTemplates.Validation");
+
+        var zero = await vet.PostAsJsonAsync(
+            $"/api/v1/examinations/{ctx.ExaminationId}/apply-template",
+            new { templateId, rowVersion, lines = new[] { new { productId = ctx.DrugId, quantity = 0m } } });
+        zero.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        (await StockAsync(ctx)).Should().Be(20m);
+        (await ExaminationAsync(ctx)).Findings.Should().Be("Bulgu yok");
+    }
+
     [Fact]
     public async Task Apply_Should_Reject_Finalized_Examination()
     {

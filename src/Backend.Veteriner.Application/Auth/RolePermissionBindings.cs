@@ -97,6 +97,9 @@ public static class RolePermissionBindings
                 PermissionCatalog.Payments.Correct,
 
                 PermissionCatalog.Charges.Read,
+                PermissionCatalog.EDocuments.Read,
+                PermissionCatalog.EDocuments.Issue,
+                PermissionCatalog.EDocuments.Cancel,
                 PermissionCatalog.Charges.Create,
                 PermissionCatalog.Charges.Correct,
 
@@ -254,6 +257,9 @@ public static class RolePermissionBindings
                 PermissionCatalog.Payments.Correct,
 
                 PermissionCatalog.Charges.Read,
+                PermissionCatalog.EDocuments.Read,
+                PermissionCatalog.EDocuments.Issue,
+                PermissionCatalog.EDocuments.Cancel,
                 PermissionCatalog.Charges.Create,
                 PermissionCatalog.Charges.Correct,
 
@@ -417,6 +423,9 @@ public static class RolePermissionBindings
                 PermissionCatalog.Payments.Correct,
 
                 PermissionCatalog.Charges.Read,
+                PermissionCatalog.EDocuments.Read,
+                PermissionCatalog.EDocuments.Issue,
+                PermissionCatalog.EDocuments.Cancel,
                 PermissionCatalog.Charges.Create,
                 PermissionCatalog.Charges.Correct,
 
@@ -578,6 +587,7 @@ public static class RolePermissionBindings
                 PermissionCatalog.Payments.Read,
 
                 PermissionCatalog.Charges.Read,
+                PermissionCatalog.EDocuments.Read,
 
                 PermissionCatalog.Species.Read,
                 PermissionCatalog.Breeds.Read,
@@ -642,6 +652,8 @@ public static class RolePermissionBindings
                 PermissionCatalog.Payments.Update,
 
                 PermissionCatalog.Charges.Read,
+                PermissionCatalog.EDocuments.Read,
+                PermissionCatalog.EDocuments.Issue,
                 PermissionCatalog.Charges.Create,
 
                 // Gün sonu kasayı sayan resepsiyondur; düzeltme ve iptal yönetici düzeyinde (ADR-012 K2).

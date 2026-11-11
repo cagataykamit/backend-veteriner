@@ -26,5 +26,6 @@ internal static class ChargeMappings
             c.OutstandingAmount,
             c.LineKind,
             c.VatRate,
-            c.IsImported);
+            c.IsImported,
+            c.EDocumentId);
 }

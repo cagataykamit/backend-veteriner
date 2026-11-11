@@ -166,6 +166,14 @@ public static class PermissionCatalog
         public const string Correct = "Charges.Correct";
     }
 
+    /// <summary>e-belge (ADR-036 Dilim 3–4): okuma, kesme (yeniden deneme ve vazgeçme dahil) ve iptal ayrı.</summary>
+    public static class EDocuments
+    {
+        public const string Read = "EDocuments.Read";
+        public const string Issue = "EDocuments.Issue";
+        public const string Cancel = "EDocuments.Cancel";
+    }
+
     /// <summary>Günlük kasa sayımı (TIER-008): okuma, kaydetme ve gerekçeli düzeltme/iptal ayrı.</summary>
     public static class CashCounts
     {
@@ -426,6 +434,10 @@ public static class PermissionCatalog
         new(Charges.Read, "Ücret kayıtlarını listeleme ve görüntüleme yetkisi", "Charges"),
         new(Charges.Create, "Ücret kaydı oluşturma yetkisi", "Charges"),
         new(Charges.Correct, "Ücret kaydını gerekçeyle düzeltme/iptal yetkisi", "Charges"),
+
+        new(EDocuments.Read, "e-belgeleri (e-SMM, e-Arşiv, e-Fatura) ve belgesiz ücretleri görüntüleme, PDF indirme yetkisi", "EDocuments"),
+        new(EDocuments.Issue, "Ücret ve satıştan e-belge kesme, hatalı belgeyi yeniden deneme veya vazgeçme yetkisi", "EDocuments"),
+        new(EDocuments.Cancel, "Kesilmiş e-belgeyi gerekçeyle iptal etme yetkisi", "EDocuments"),
 
         new(CashCounts.Read, "Günlük kasa sayımını ve geçmiş sayımları görüntüleme yetkisi", "CashCounts"),
         new(CashCounts.Create, "Günlük kasa sayımını kaydetme yetkisi", "CashCounts"),

@@ -109,6 +109,24 @@ public static class ResultExtensions
                 return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
         }
 
+        // e-belge (E_DOCUMENTS_API_CONTRACT.md): durum / bağ çakışmaları 409, sağlayıcı yapılandırması veya erişimi 503, reddi 502.
+        if (normalized is "edocuments.notconnected" or "edocuments.invalidstate" or "edocuments.chargealreadydocumented"
+            or "edocuments.chargevoided" or "edocuments.requestidconflict" or "edocuments.concurrencyconflict"
+            or "edocuments.cancelwindowexpired" or "edocuments.pdfnotready" or "charges.edocumentattached")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
+        if (normalized is "edocuments.providernotconfigured" or "edocuments.providerunavailable")
+        {
+            return (StatusCodes.Status503ServiceUnavailable, "https://httpstatuses.io/503");
+        }
+
+        if (normalized is "edocuments.providerrejected")
+        {
+            return (StatusCodes.Status502BadGateway, "https://httpstatuses.io/502");
+        }
+
         // Saklama süresi sonunda temizlenen satır verisi (ADR-019 K9).
         if (normalized is "imports.payloadpurged")
         {

@@ -1617,6 +1617,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<Guid?>("EDocumentId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid?>("ExaminationId")
                         .HasColumnType("uniqueidentifier");
 
@@ -1670,10 +1673,14 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("EDocumentId");
+
                     b.HasIndex("ImportBatchId")
                         .HasFilter("[ImportBatchId] IS NOT NULL");
 
                     b.HasIndex("TenantId", "ClientId");
+
+                    b.HasIndex("TenantId", "EDocumentId");
 
                     b.HasIndex("TenantId", "ExaminationId");
 
@@ -2818,6 +2825,366 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasIndex("CreatedAtUtc");
 
                     b.ToTable("DemoRequests", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.EDocuments.ClinicEDocumentSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("AutoIssueEnabledAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("AutoIssueMode")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<TimeOnly>("EndOfDayTime")
+                        .HasColumnType("time");
+
+                    b.Property<bool>("IssueOnPaymentByDefault")
+                        .HasColumnType("bit");
+
+                    b.Property<DateOnly?>("LastEndOfDayRunDate")
+                        .HasColumnType("date");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UpdatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("TenantId", "ClinicId")
+                        .IsUnique();
+
+                    b.ToTable("ClinicEDocumentSettings", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.EDocuments.EDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("CancelRequestedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CancelRequestedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("CancelledAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CheckCount")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DiscardReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("DiscardedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("DiscardedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DocumentNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("DocumentUuid")
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<int>("Environment")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ExternalReference")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("IssuedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("LastErrorKind")
+                        .HasColumnType("int");
+
+                    b.Property<string>("LastErrorMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("LastProviderErrorCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("NextCheckAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("Origin")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("ProviderCode")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<string>("ProviderDocumentId")
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("ProviderInvoiceId")
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("ProviderJobId")
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<decimal?>("ProviderTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid?>("SaleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("VisitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("WithholdingRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("ExternalReference")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "NextCheckAtUtc");
+
+                    b.HasIndex("TenantId", "ClientId");
+
+                    b.HasIndex("TenantId", "RequestId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_EDocuments_TenantId_RequestId");
+
+                    b.HasIndex("TenantId", "ClinicId", "CreatedAtUtc");
+
+                    b.ToTable("EDocuments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_EDocuments_TotalAmount_Positive", "[TotalAmount] > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.EDocuments.EDocumentConnection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AccountId")
+                        .HasMaxLength(100)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("AccountName")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ConnectedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ConnectedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DisconnectedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Environment")
+                        .HasColumnType("int");
+
+                    b.Property<string>("LastVerificationMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool?>("LastVerificationOk")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastVerifiedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ProtectedCredentials")
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(max)");
+
+                    b.Property<string>("ProviderCode")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("TenantId", "ClinicId")
+                        .IsUnique();
+
+                    b.ToTable("EDocumentConnections", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.EDocuments.EDocumentLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ChargeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("EDocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("GrossAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("LineKind")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<decimal>("VatRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChargeId");
+
+                    b.HasIndex("EDocumentId");
+
+                    b.ToTable("EDocumentLines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_EDocumentLines_GrossAmount_Positive", "[GrossAmount] > 0");
+                        });
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Examinations.Examination", b =>
@@ -7473,6 +7840,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Charges.Charge", b =>
                 {
+                    b.HasOne("Backend.Veteriner.Domain.EDocuments.EDocument", null)
+                        .WithMany()
+                        .HasForeignKey("EDocumentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Backend.Veteriner.Domain.Imports.ImportBatch", null)
                         .WithMany()
                         .HasForeignKey("ImportBatchId")
@@ -7630,6 +8002,110 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Navigation("Clinic");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.EDocuments.ClinicEDocumentSettings", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.EDocuments.EDocument", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clients.Client", null)
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.OwnsOne("Backend.Veteriner.Domain.EDocuments.EDocumentBuyer", "Buyer", b1 =>
+                        {
+                            b1.Property<Guid>("EDocumentId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.Property<string>("AddressLine")
+                                .HasMaxLength(500)
+                                .HasColumnType("nvarchar(500)")
+                                .HasColumnName("BuyerAddressLine");
+
+                            b1.Property<string>("District")
+                                .HasMaxLength(80)
+                                .HasColumnType("nvarchar(80)")
+                                .HasColumnName("BuyerDistrict");
+
+                            b1.Property<string>("Email")
+                                .HasMaxLength(320)
+                                .HasColumnType("nvarchar(320)")
+                                .HasColumnName("BuyerEmail");
+
+                            b1.Property<string>("IdentityNumber")
+                                .IsRequired()
+                                .HasMaxLength(11)
+                                .IsUnicode(false)
+                                .HasColumnType("varchar(11)")
+                                .HasColumnName("BuyerIdentityNumber");
+
+                            b1.Property<bool>("IsUnknownBuyer")
+                                .HasColumnType("bit")
+                                .HasColumnName("BuyerIsUnknown");
+
+                            b1.Property<int>("Kind")
+                                .HasColumnType("int")
+                                .HasColumnName("BuyerKind");
+
+                            b1.Property<string>("Name")
+                                .IsRequired()
+                                .HasMaxLength(300)
+                                .HasColumnType("nvarchar(300)")
+                                .HasColumnName("BuyerName");
+
+                            b1.Property<string>("Province")
+                                .HasMaxLength(80)
+                                .HasColumnType("nvarchar(80)")
+                                .HasColumnName("BuyerProvince");
+
+                            b1.Property<string>("TaxOffice")
+                                .HasMaxLength(100)
+                                .HasColumnType("nvarchar(100)")
+                                .HasColumnName("BuyerTaxOffice");
+
+                            b1.HasKey("EDocumentId");
+
+                            b1.ToTable("EDocuments");
+
+                            b1.WithOwner()
+                                .HasForeignKey("EDocumentId");
+                        });
+
+                    b.Navigation("Buyer")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.EDocuments.EDocumentConnection", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.EDocuments.EDocumentLine", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.EDocuments.EDocument", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("EDocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Hospitalizations.Hospitalization", b =>
@@ -8159,6 +8635,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Catalog.ExaminationTemplate", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.EDocuments.EDocument", b =>
                 {
                     b.Navigation("Lines");
                 });
