@@ -135,13 +135,23 @@ public static class ImportRules
     public static readonly ImportRule BalanceDateIgnored = new("Imports.BalanceDateIgnored", ImportIssueSeverity.Warning,
         "Bakiye tarihi okunamadı veya gelecekte; devir açıklamasına yazılmayacak.");
 
+    // Fatura kimliği ve durum (E-vet yedeği ile; IMPORT_API_CONTRACT.md §13)
+    public static readonly ImportRule TaxIdInvalid = new("Imports.TaxIdInvalid", ImportIssueSeverity.Warning,
+        "Kimlik / vergi numarası geçersiz (11 haneli T.C. kimlik no veya 10 haneli vergi no olmalı); fatura bilgisi boş aktarılacak.");
+    public static readonly ImportRule StatusUnrecognized = new("Imports.StatusUnrecognized", ImportIssueSeverity.Warning,
+        "Durum tanınmadı (müşteride Aktif / Pasif, hastada Aktif / Vefat); aktif aktarılacak.");
+    public static readonly ImportRule InactiveClient = new("Imports.InactiveClient", ImportIssueSeverity.Info,
+        "Eski programda pasif müşteri; aktarılır ve hatırlatma istemiyor olarak işaretlenir.");
+    public static readonly ImportRule DeceasedDateIgnored = new("Imports.DeceasedDateIgnored", ImportIssueSeverity.Warning,
+        "Vefat tarihi okunamadı, gelecekte ya da doğum tarihinden önce; hasta tarihsiz vefat olarak aktarılacak.");
+
     // Klinik geçmiş (ADR-048 T1)
     public static readonly ImportRule DateInFuture = new("Imports.DateInFuture", ImportIssueSeverity.Error,
         "Tarih gelecekte olamaz.");
     public static readonly ImportRule RecordBeforeBirth = new("Imports.RecordBeforeBirth", ImportIssueSeverity.Warning,
         "Kayıt tarihi hastanın doğum tarihinden önce.");
     public static readonly ImportRule ClinicalRecordEmpty = new("Imports.ClinicalRecordEmpty", ImportIssueSeverity.Error,
-        "Klinik kaydın içeriği boş: şikâyet, anamnez, bulgular, tanı, tedavi, reçete, lab sonucu veya nottan en az biri dolu olmalı.");
+        "Klinik kaydın içeriği boş: şikâyet, anamnez, bulgular, tanı, tedavi, reçete, lab sonucu, not, kilo veya ateşten en az biri dolu olmalı.");
     public static readonly ImportRule TemperatureInvalid = new("Imports.TemperatureInvalid", ImportIssueSeverity.Warning,
         "Ateş geçersiz (25-45 °C arasında bir sayı olmalı); boş aktarılacak.");
     public static readonly ImportRule DuplicateClinicalRecord = new("Imports.DuplicateClinicalRecord", ImportIssueSeverity.Info,

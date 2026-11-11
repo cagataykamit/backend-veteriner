@@ -36,8 +36,6 @@ public sealed partial class ImportValidationEngine
 
         var recordType = ReadText(reader, "KayitTuru", ImportedClinicalRecord.MaxRecordTypeLength, issues);
         var content = ClinicalContentFields.Select(f => ReadText(reader, f.Field, f.MaxLength, issues)).ToArray();
-        if (content.All(c => c is null))
-            issues.Add(ImportRules.ClinicalRecordEmpty.At());
 
         var veterinarian = ReadText(reader, "Hekim", ImportedClinicalRecord.MaxVeterinarianNameLength, issues);
 
@@ -50,6 +48,10 @@ public sealed partial class ImportValidationEngine
         var (temperature, temperatureValid) = ImportValueParsers.ParseTemperature(rawTemperature);
         if (!temperatureValid)
             issues.Add(ImportRules.TemperatureInvalid.At("Ates", value: rawTemperature));
+
+        // Yalnız ölçüm (kilo, ateş) taşıyan kayıt da içeriktir (eski programlarda muayenelerin çoğu yalnız tartım).
+        if (content.All(c => c is null) && weight is not > 0 && temperature is null)
+            issues.Add(ImportRules.ClinicalRecordEmpty.At());
 
         var normalized = new ImportNormalizedClinicalRecord(
             pet?.Key, pet?.Owner.Key, recordedOn, recordType,

@@ -191,6 +191,9 @@ public sealed partial class ImportValidationEngine
         }
 
         var rawSpecies = reader.Raw("Tur");
+        if (rawSpecies is null)
+            return (FindPetWithoutSpecies(owner, PetNameKey(petName), petName, issues), false);
+
         var species = _resolver.Resolve(ImportValueKind.Species, rawSpecies);
         if (species.Kind == ImportValueResolutionKind.Skipped)
             return (null, true);
@@ -213,6 +216,32 @@ public sealed partial class ImportValidationEngine
 
         issues.Add(ImportRules.PetNotFound.At("HayvanAdi", "Hasta dosyada veya sahibinin kayıtlı hastaları arasında bulunamadı.", petName));
         return (null, false);
+    }
+
+    /// <summary>
+    /// Tür boşsa sahibin aynı adlı <b>tek</b> hastası (dosyada, yoksa kiracıda) bağlanır; aynı adlı birden çok hasta (farklı tür)
+    /// belirsizdir (<c>PetNotFound</c>). Dosyada bilinçli atlanan hasta aranmaz.
+    /// </summary>
+    private PetRef? FindPetWithoutSpecies(OwnerRef owner, string nameKey, string petName, List<ImportIssue> issues)
+    {
+        var filePets = _petsByOwnerName.GetValueOrDefault((owner.Key, nameKey))?.Where(n => n.Ref is not null).ToList() ?? [];
+        if (filePets.Count == 1)
+            return filePets[0].Ref;
+
+        if (filePets.Count == 0 && owner.ClientId is { } clientId
+            && _dbPetsByOwnerName.TryGetValue((clientId, nameKey), out var dbPets) && dbPets.Count == 1)
+        {
+            var dbPet = dbPets[0];
+            return new PetRef($"db:{dbPet.Id}", dbPet.Id, dbPet.SpeciesId, dbPet.BirthDate, owner);
+        }
+
+        issues.Add(ImportRules.PetNotFound.At(
+            "HayvanAdi",
+            filePets.Count > 1 || _dbPetsByOwnerName.GetValueOrDefault((owner.ClientId ?? Guid.Empty, nameKey))?.Count > 1
+                ? "Tür olmadığı için hasta ayırt edilemedi (sahibin aynı adlı birden fazla hastası var)."
+                : "Hasta dosyada veya sahibinin kayıtlı hastaları arasında bulunamadı.",
+            petName));
+        return null;
     }
 
     /// <summary><c>Seri: …; Uygulayan: …; &lt;Not&gt;</c> (dolu olanlar); hepsi boşsa null.</summary>

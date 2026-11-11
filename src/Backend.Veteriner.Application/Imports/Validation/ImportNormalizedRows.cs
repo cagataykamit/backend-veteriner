@@ -34,7 +34,8 @@ public abstract record ImportNormalizedRow
 
 /// <summary>
 /// Müşteri satırı. <see cref="OpeningBalance"/> yalnız pozitif ve aktarılacak devir bakiyesidir (ADR-048 T3); müşteri
-/// oluşturulursa devir ücreti açılır, eşleşen/mükerrer satırda null'dır.
+/// oluşturulursa devir ücreti açılır, eşleşen/mükerrer satırda null'dır. <see cref="NationalId"/> (bireysel) veya
+/// <see cref="TaxNumber"/> (kurumsal) geçerli fatura kimliğidir; <see cref="RemindersOptedOut"/> eski programda pasif müşteridir.
 /// </summary>
 public sealed record ImportNormalizedCustomer(
     string? Reference,
@@ -43,9 +44,17 @@ public sealed record ImportNormalizedCustomer(
     string? Email,
     string? Address,
     decimal? OpeningBalance = null,
-    DateOnly? BalanceDate = null)
+    DateOnly? BalanceDate = null,
+    string? NationalId = null,
+    string? TaxNumber = null,
+    string? TaxOffice = null,
+    bool RemindersOptedOut = false)
     : ImportNormalizedRow;
 
+/// <summary>
+/// Hasta satırı. <see cref="AlertNote"/> doluysa hasta alerji uyarısı alır; <see cref="Deceased"/> hasta vefat olarak işaretlenir
+/// (tarih <see cref="DeceasedOn"/>, isteğe bağlı).
+/// </summary>
 public sealed record ImportNormalizedPet(
     string? OwnerKey,
     string? Reference,
@@ -60,7 +69,10 @@ public sealed record ImportNormalizedPet(
     Guid? ColorId,
     decimal? Weight,
     string? PassportOrTagNumber,
-    string? Notes)
+    string? Notes,
+    string? AlertNote = null,
+    bool Deceased = false,
+    DateOnly? DeceasedOn = null)
     : ImportNormalizedRow;
 
 /// <summary>

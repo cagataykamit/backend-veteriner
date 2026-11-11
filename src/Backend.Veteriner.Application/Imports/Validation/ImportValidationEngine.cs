@@ -60,6 +60,7 @@ public sealed partial class ImportValidationEngine
 
     // Mevcut hayvan / aşı dizinleri.
     private readonly Dictionary<(Guid ClientId, string Name, Guid SpeciesId), ImportExistingPet> _dbPetByIdentity = new();
+    private readonly Dictionary<(Guid ClientId, string Name), List<ImportExistingPet>> _dbPetsByOwnerName = new();
     private readonly Dictionary<string, List<ImportExistingPet>> _dbPetsByChip = new(StringComparer.Ordinal);
     private readonly HashSet<(Guid PetId, Guid DefinitionId, DateOnly Date)> _dbVaccinations = new();
 
@@ -161,6 +162,9 @@ public sealed partial class ImportValidationEngine
         foreach (var pet in existing.Pets.OrderBy(p => p.Id))
         {
             _dbPetByIdentity.TryAdd((pet.ClientId, PetNameKey(pet.Name), pet.SpeciesId), pet);
+            if (!_dbPetsByOwnerName.TryGetValue((pet.ClientId, PetNameKey(pet.Name)), out var sameName))
+                _dbPetsByOwnerName[(pet.ClientId, PetNameKey(pet.Name))] = sameName = [];
+            sameName.Add(pet);
 
             if (ImportValueParsers.ParseMicrochip(pet.Microchip).Value is { } chip)
             {

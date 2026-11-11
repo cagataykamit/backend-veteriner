@@ -33,6 +33,9 @@ public sealed partial class ImportValidationEngine
     private readonly Dictionary<(string OwnerKey, string Name, Guid SpeciesId), PetNode> _petByIdentity = new();
     private readonly Dictionary<string, (string PetKey, int Row)> _fileChips = new(StringComparer.Ordinal);
 
+    /// <summary>Sahip + ad → dosyadaki hastalar (türsüz bağlantı için; türleri farklı aynı adlı hastalar belirsizdir).</summary>
+    private readonly Dictionary<(string OwnerKey, string Name), List<PetNode>> _petsByOwnerName = new();
+
     /// <summary>MusteriNo bağlantısı yalnız müşteri tablosu varsa ve orada MusteriNo eşlenmişse geçerlidir.</summary>
     private bool CustomerReferenceUsable
         => _input.Tables.TryGetValue(ImportTable.Customers, out var rows) && rows.Count > 0
@@ -167,7 +170,18 @@ public sealed partial class ImportValidationEngine
         if (passport is { Length: > MaxPassportLength })
             issues.Add(ImportRules.FieldTooLong.At("KarneNo", $"Karne numarası en fazla {MaxPassportLength} karakter olabilir."));
 
-        var notes = string.Join('\n', new[] { colorNote, reader.Raw("Not") }.Where(s => s is not null));
+        // Alerji: hasta uyarısı (bayrak + kısa not); uyarı notuna sığmayan metin hasta notuna da yazılır.
+        string? alertNote = null;
+        string? allergyNote = null;
+        if (ImportValueParsers.NormalizeText(reader.Raw("Alerji")) is { } allergy)
+        {
+            alertNote = allergy.Length <= Pet.MaxAlertNoteLength ? allergy : "Alerji ayrıntısı hasta notunda.";
+            allergyNote = allergy.Length <= Pet.MaxAlertNoteLength ? null : $"Alerji: {allergy}";
+        }
+
+        var (deceased, deceasedOn) = ReadPetStatus(reader, birthDate, issues);
+
+        var notes = string.Join('\n', new[] { colorNote, allergyNote, reader.Raw("Not") }.Where(s => s is not null));
         if (notes.Length > MaxPetNotesLength)
             issues.Add(ImportRules.FieldTooLong.At("Not", $"Not (renk satırıyla birlikte) en fazla {MaxPetNotesLength} karakter olabilir."));
 
@@ -187,7 +201,7 @@ public sealed partial class ImportValidationEngine
 
         var normalized = new ImportNormalizedPet(
             owner?.Key, reference, name, speciesId, breedId, breedText, gender, birthDate, neutered,
-            chip.Value, colorId, weight, passport, notes.Length == 0 ? null : notes);
+            chip.Value, colorId, weight, passport, notes.Length == 0 ? null : notes, alertNote, deceased, deceasedOn);
 
         if (HasError(issues) || owner is null)
             return Complete(node, Finish(ImportTable.Pets, reader.RowNumber, issues, normalized));
@@ -233,6 +247,9 @@ public sealed partial class ImportValidationEngine
 
         node.Ref = new PetRef(petKey, existing?.Id, speciesId.Value, birthDate ?? existing?.BirthDate, owner);
         _petByIdentity[identity] = node;
+        if (!_petsByOwnerName.TryGetValue((owner.Key, nameKey), out var sameName))
+            _petsByOwnerName[(owner.Key, nameKey)] = sameName = [];
+        sameName.Add(node);
 
         if (existing is not null)
         {
@@ -241,6 +258,36 @@ public sealed partial class ImportValidationEngine
         }
 
         return Complete(node, Finish(ImportTable.Pets, reader.RowNumber, issues, normalized, ImportRowAction.Create));
+    }
+
+    /// <summary>
+    /// Durum: boş/Aktif → aktif; Vefat/Ölü → vefat (tarih isteğe bağlı, gelecekte veya doğumdan önce olamaz: uyarı, tarihsiz);
+    /// tanınmayan → uyarı, aktif. Vefat kuralı <c>Pet.SetStatus</c>'tadır; uygulama onu çağırır.
+    /// </summary>
+    private (bool Deceased, DateOnly? DeceasedOn) ReadPetStatus(ImportRowReader reader, DateOnly? birthDate, List<ImportIssue> issues)
+    {
+        var raw = reader.Raw("Durum");
+        switch (ImportTextFolding.Fold(raw))
+        {
+            case "" or "aktif" or "active":
+                return (false, null);
+            case "vefat" or "olu" or "oldu" or "deceased" or "exitus":
+                break;
+            default:
+                issues.Add(ImportRules.StatusUnrecognized.At("Durum", value: raw));
+                return (false, null);
+        }
+
+        var rawDate = reader.Raw("VefatTarihi");
+        if (rawDate is null)
+            return (true, null);
+
+        var date = ImportValueParsers.ParseDate(rawDate).Value;
+        if (date is { } value && value <= _today && (birthDate is null || value >= birthDate))
+            return (true, value);
+
+        issues.Add(ImportRules.DeceasedDateIgnored.At("VefatTarihi", value: rawDate));
+        return (true, null);
     }
 
     private static ImportRowResult Complete(PetNode node, ImportRowResult result)
