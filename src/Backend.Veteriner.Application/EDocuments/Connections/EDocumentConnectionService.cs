@@ -43,7 +43,7 @@ public sealed class EDocumentConnectionService
         }
 
         var available = _providers.All
-            .Select(p => new EDocumentProviderOptionDto(p.ProviderCode, p.DisplayName, p.IsConfigured))
+            .Select(p => new EDocumentProviderOptionDto(p.ProviderCode, p.DisplayName, p.IsConfigured, _providers.FindOAuth(p.ProviderCode) is null ? "Credentials" : "OAuth"))
             .ToList();
 
         if (connection is null || connection.Status == EDocumentConnectionStatus.NotConnected)

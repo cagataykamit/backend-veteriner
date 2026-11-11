@@ -8,7 +8,8 @@ namespace Backend.Veteriner.Application.EDocuments.Connections;
 
 public sealed record EDocumentAccountChoiceDto(string AccountId, string AccountName, string? TaxNumber);
 
-public sealed record EDocumentProviderOptionDto(string Provider, string ProviderName, bool Configured);
+/// <param name="ConnectionMethod"><c>OAuth</c> (sağlayıcının kendi ekranında onay) veya <c>Credentials</c> (anahtar/kullanıcı bilgisi alanları).</param>
+public sealed record EDocumentProviderOptionDto(string Provider, string ProviderName, bool Configured, string ConnectionMethod);
 
 /// <summary>Klinik e-belge bağlantısı (E_DOCUMENTS_API_CONTRACT §3.1). Kimlik bilgisi hiçbir zaman dönmez.</summary>
 public sealed record EDocumentConnectionDto(

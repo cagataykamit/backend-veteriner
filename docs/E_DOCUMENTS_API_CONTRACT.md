@@ -93,13 +93,14 @@ Klinik başına tek bağlantı (Tenant + Clinic benzersiz). Kimlik bilgileri (OA
   "lastVerificationOk": true,
   "lastVerificationMessage": "Bağlantı çalışıyor.",
   "accountChoices": null,
-  "availableProviders": [ { "provider": "parasut", "providerName": "Paraşüt", "configured": true } ]
+  "availableProviders": [ { "provider": "parasut", "providerName": "Paraşüt", "configured": true, "connectionMethod": "OAuth" } ]
 }
 ```
 
 - `status`: `NotConnected` (kayıt yok veya koparıldı) | `Connected` | `AccountSelectionRequired` (hesapta birden çok firma var, §3.4) | `ReauthorizationRequired` (yenileme belirteci geçersiz; yeniden bağlanmalı).
 - `environment`: `Test` | `Live` — sunucu ayarından (`EDocuments:Parasut:Environment`); belgeye de yazılır. Test ortamında kesilen belge gerçek değildir.
 - `accountChoices`: yalnız `AccountSelectionRequired` iken `[{ "accountId", "accountName", "taxNumber" }]`.
+- `connectionMethod`: `OAuth` (sağlayıcının ekranında onay, §3.2) | `Credentials` (ileride anahtar/kullanıcı alanlarıyla bağlanan sağlayıcılar). Panel sağlayıcı listesini ve kartı buna göre çizer; belge akışlarında sağlayıcı adı geçmez.
 - `configured: false` = sunucuda uygulama kimliği yok; bağlanma `EDocuments.ProviderNotConfigured` (503) döner.
 
 ### 3.2 `POST /clinics/{clinicId}/e-document-connection/authorize`
