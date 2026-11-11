@@ -438,7 +438,7 @@ public sealed class EVetBackupConverterTests
         var checkup = records[3];
         (checkup["HayvanNo"], checkup["Tarih"], checkup["KayitTuru"], checkup["Hekim"], checkup["Not"])
             .Should().Be(("205", "2025-01-01", "Kontrol Muayanesi", "Dr. B", "E-vet görevi: Tamamlandı"));
-        records[4]["Not"].Should().Be("E-vet görevi: Gelmedi\nAranacak\nArandı, gelmedi", "geçmiş Yapılacak görev E-vet'te Gelmedi'dir");
+        records[4]["Not"].Should().Be("E-vet görevi: Gelmedi; Aranacak; Arandı, gelmedi", "geçmiş Yapılacak görev E-vet'te Gelmedi'dir");
         (records[5]["HayvanNo"], records[5]["KayitTuru"]).Should().Be(("202", "Kısırlaştırma"), "vefat eden hastanın geçmişi de alınır");
         records.Should().NotContain(r => r["KayitTuru"] == "Bilgi", "hasta işi olmayan tür");
 

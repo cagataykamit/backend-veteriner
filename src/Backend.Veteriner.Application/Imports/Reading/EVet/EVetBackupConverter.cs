@@ -546,7 +546,7 @@ internal static class EVetBackupConverter
             null,
             null,
             null,
-            EVetCells.Join("\n", completed ? "E-vet görevi: Tamamlandı" : "E-vet görevi: Gelmedi", sheet[row, "Bilgi"], sheet[row, "Açıklama"]),
+            EVetCells.Join("; ", completed ? "E-vet görevi: Tamamlandı" : "E-vet görevi: Gelmedi", sheet[row, "Bilgi"], sheet[row, "Açıklama"]),
         ]);
 
     /// <summary>
