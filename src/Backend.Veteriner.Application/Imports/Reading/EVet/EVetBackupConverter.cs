@@ -1,7 +1,9 @@
 using System.Globalization;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Imports.Mapping;
+using Backend.Veteriner.Application.Imports.Validation;
 using Backend.Veteriner.Domain.Imports;
+using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
 using ClosedXML.Excel;
 
@@ -166,18 +168,13 @@ internal static class EVetBackupConverter
         var reportLinked = 0;
         var duplicated = DuplicatedProtocols(sheet);
 
+        // 1. geçiş: anahtar, sahip ve yaşam bilgisi (aynı sahipte aynı ad + tür kararı bütün sayfayı ister).
+        var entries = new List<PetEntry>();
         foreach (var row in sheet.Rows)
         {
             var protocol = RowKey(sheet, row, duplicated);
             var reportProtocol = duplicated.Contains(sheet[row, "Protokol No"] ?? string.Empty) ? null : protocol;
             var ownerName = sheet[row, "Müşteriler"];
-            var petName = sheet[row, "Hastalar"];
-            var pair = EVetCells.PairKey(ownerName, petName);
-            state.PetsByPair.Append(pair, protocol);
-
-            var status = ImportTextFolding.Fold(sheet[row, "Durum"]);
-            if (protocol is not null && status is "olu" or "pasif")
-                state.InactivePets.Add(protocol);
 
             // Sahip: rapordaki protokol eşlemesi (kesin), yoksa yedekteki sahip adıyla tek müşteri.
             string? owner = null;
@@ -191,6 +188,27 @@ internal static class EVetBackupConverter
             {
                 owner = byName;
             }
+
+            entries.Add(new PetEntry(row, protocol, owner, sheet));
+        }
+
+        var (renamed, merged) = SeparateSameNamedPets(entries);
+        foreach (var entry in entries)
+        {
+            state.PetsByPair.Append(entry.Pair, new PetCandidate(entry.DuplicateOf ?? entry.Key, entry.Registered, entry.Died));
+            if (entry.Key is not null && entry.Status is "olu" or "pasif")
+                state.InactivePets.Add(entry.Key);
+        }
+
+        // 2. geçiş: satırlar.
+        foreach (var entry in entries)
+        {
+            var row = entry.Row;
+            var protocol = entry.Key;
+            var owner = entry.Owner;
+            var ownerName = sheet[row, "Müşteriler"];
+            var pair = entry.Pair;
+            var status = entry.Status;
 
             var (gender, neutered) = SplitGender(sheet[row, "Cinsiyet"]);
             var notes = new List<string?>
@@ -233,7 +251,7 @@ internal static class EVetBackupConverter
                 protocol,
                 owner,
                 ownerName,
-                petName,
+                entry.DisplayName,
                 sheet[row, "Hasta Türü"],
                 sheet[row, "Irk"],
                 gender,
@@ -260,6 +278,14 @@ internal static class EVetBackupConverter
         {
             warnings.Add(new ImportReadWarning(WarningCode, ImportTable.Pets,
                 $"{movedChips} hastanın mikroçipi rakam dışı karakter içeriyor ya da başka hastada da kayıtlı; numara hastanın notuna yazılacak."));
+        }
+
+        if (renamed > 0 || merged > 0)
+        {
+            warnings.Add(new ImportReadWarning(WarningCode, ImportTable.Pets,
+                $"Aynı sahipte aynı ad ve türle birden çok hasta var: bilgileri farklı {renamed} hasta ayrı aktarılacak ve adına E-vet "
+                + $"protokolü eklenecek (ör. Pamuk (E-vet 1234)); bilgileri aynı {merged} tekrar kayıt ilk kayıtla birleşecek. Muayene ve "
+                + "görevler o tarihte kayıtlı ve hayattaki tek hastaya bağlanır; ayırt edilemeyen satır hata alır (yanlış hastaya yazılmaz)."));
         }
 
         if (duplicated.Count > 0 || state.DuplicatedCustomerProtocols > 0)
@@ -314,7 +340,7 @@ internal static class EVetBackupConverter
             var petName = sheet[row, "Hasta Adı"];
             rows.Add(new ImportSourceRow(row.RowNumber,
             [
-                state.PetsByPair.Single(EVetCells.PairKey(ownerName, petName)),
+                state.PetsByPair.Resolve(EVetCells.PairKey(ownerName, petName), EVetCells.ParseDateTime(sheet[row, "Tarih"])),
                 ownerName,
                 petName,
                 EVetCells.Date(sheet[row, "Tarih"]),
@@ -370,7 +396,7 @@ internal static class EVetBackupConverter
         EVetSheet sheet, ConversionState state, List<ImportReadWarning> warnings)
     {
         var applied = new List<AppliedVaccine>();
-        var pending = new List<(ImportSourceRow Row, string Group, DateTime Start)>();
+        var pending = new List<(ImportSourceRow Row, string Group, DateTime Start, string? PetKey)>();
         var appointments = new List<ImportSourceRow>();
         var skipped = new SkipCounter();
 
@@ -388,7 +414,7 @@ internal static class EVetBackupConverter
             if (NonPatientTaskTypes.Contains(type)) { skipped.Add("hasta işi olmayan türde (maaş, borç/ödeme hatırlatması, bilgi)"); continue; }
             if (start is null) { skipped.Add("tarihi okunamayan"); continue; }
 
-            var petProtocol = state.PetsByPair.Single(EVetCells.PairKey(ownerName, petName));
+            var petProtocol = state.PetsByPair.Resolve(EVetCells.PairKey(ownerName, petName), start.Value);
             var petKey = petProtocol ?? EVetCells.PairKey(ownerName, petName);
 
             if (vaccine is not null && status == "tamamlandi")
@@ -399,7 +425,7 @@ internal static class EVetBackupConverter
 
             if (vaccine is not null && status == "yapilacak")
             {
-                pending.Add((row, $"{petKey}\u001f{ImportValueResolver.VaccineSeriesKey(vaccine)}", start.Value));
+                pending.Add((row, $"{petKey}\u001f{ImportValueResolver.VaccineSeriesKey(vaccine)}", start.Value, petProtocol));
                 continue;
             }
 
@@ -423,7 +449,7 @@ internal static class EVetBackupConverter
         foreach (var group in pending.GroupBy(p => p.Group, StringComparer.Ordinal))
         {
             var first = group.First();
-            var protocol = state.PetsByPair.Single(EVetCells.PairKey(sheet[first.Row, "Müşteriler"], sheet[first.Row, "Hastalar"]));
+            var protocol = first.PetKey;
             if (protocol is not null && state.InactivePets.Contains(protocol))
             {
                 skipped.Add("vefat ya da pasif hastaya ait yapılacak aşı", group.Count());
@@ -585,7 +611,7 @@ internal static class EVetBackupConverter
         public DateTime NowLocal { get; } = nowLocal;
         public HashSet<string> CustomerProtocols { get; } = new(StringComparer.Ordinal);
         public Index CustomersByName { get; } = new();
-        public Index PetsByPair { get; } = new();
+        public PetIndex PetsByPair { get; } = new();
         public HashSet<string> InactivePets { get; } = new(StringComparer.Ordinal);
         public int DuplicatedCustomerProtocols { get; set; }
     }
@@ -604,6 +630,129 @@ internal static class EVetBackupConverter
 
         public string? Single(string key)
             => _items.TryGetValue(key, out var list) && list.Count == 1 ? list[0] : null;
+    }
+
+    /// <summary>Hasta sayfasının bir satırı: bağlantı anahtarı, sahip, yaşam bilgisi ve aktarılacak ad.</summary>
+    private sealed class PetEntry
+    {
+        public PetEntry(ImportSourceRow row, string? key, string? owner, EVetSheet sheet)
+        {
+            Row = row;
+            Key = key;
+            Owner = owner;
+            Name = sheet[row, "Hastalar"];
+            DisplayName = Name;
+            Protocol = sheet[row, "Protokol No"];
+            var ownerName = sheet[row, "Müşteriler"];
+            Pair = EVetCells.PairKey(ownerName, Name);
+            Identity = (owner ?? "ad:" + EVetCells.OwnerKey(ownerName),
+                Pet.NormalizeNameForDuplicateCheck(ImportValueParsers.NormalizeText(Name) ?? string.Empty),
+                ImportTextFolding.Fold(sheet[row, "Hasta Türü"]));
+            Status = ImportTextFolding.Fold(sheet[row, "Durum"]);
+            Registered = EVetCells.ParseDateTime(sheet[row, "Kayıt Tarihi"]);
+            Died = EVetCells.ParseDateTime(sheet[row, "Ölüm Zamanı"]);
+            Traits = string.Join('|', EVetCells.Date(sheet[row, "Doğum Tarihi"]), sheet[row, "Cinsiyet"], sheet[row, "Renk"], Status);
+        }
+
+        public ImportSourceRow Row { get; }
+        public string? Key { get; }
+        public string? Owner { get; }
+        public string? Name { get; }
+        public string? Protocol { get; }
+        public string Pair { get; }
+
+        /// <summary>Vetinity'de bir müşteride aynı ad + tür tek hastadır (<c>Pets.DuplicatePet</c>): sahip, ad anahtarı, tür.</summary>
+        public (string Owner, string Name, string Species) Identity { get; }
+
+        public string Status { get; }
+        public DateTime? Registered { get; }
+        public DateTime? Died { get; }
+
+        /// <summary>Aynı hayvanın tekrarını ayırt eden bilgiler (doğum, cinsiyet, renk, durum).</summary>
+        public string Traits { get; }
+
+        public string? DisplayName { get; set; }
+
+        /// <summary>Aynı hayvanın tekrar kaydıysa ilk kaydın anahtarı (doğrulamada ilk satırla birleşir).</summary>
+        public string? DuplicateOf { get; set; }
+    }
+
+    /// <summary>Sahip + hasta adı çiftinin adayı (yaşam bilgisiyle).</summary>
+    private sealed record PetCandidate(string? Key, DateTime? Registered, DateTime? Died);
+
+    /// <summary>
+    /// Sahip + hasta adı → hasta anahtarı. Tek aday varsa o; birden çoksa kaydın tarihinde kayıtlı ve hayatta olan tek aday.
+    /// Ayırt edilemezse "Belirsiz: …" anahtarı döner: doğrulama satırı hasta bulunamadı hatasıyla raporlar, yanlış hastaya yazmaz.
+    /// </summary>
+    private sealed class PetIndex
+    {
+        private readonly Dictionary<string, List<PetCandidate>> _items = new(StringComparer.Ordinal);
+
+        public void Append(string pair, PetCandidate candidate)
+        {
+            if (!_items.TryGetValue(pair, out var list))
+                _items[pair] = list = [];
+            list.Add(candidate);
+        }
+
+        /// <summary>Çift yoksa null (doğrulama ad kuralıyla arar).</summary>
+        public string? Resolve(string pair, DateTime? on)
+        {
+            if (!_items.TryGetValue(pair, out var list))
+                return null;
+
+            var keys = list.Select(c => c.Key).Distinct().ToList();
+            if (keys.Count == 1)
+                return keys[0];
+
+            if (on is { } date)
+            {
+                var alive = list
+                    .Where(c => (c.Registered is null || c.Registered.Value.Date <= date.Date) && (c.Died is null || c.Died.Value.Date >= date.Date))
+                    .Select(c => c.Key)
+                    .Distinct()
+                    .ToList();
+                if (alive.Count == 1)
+                    return alive[0];
+            }
+
+            return $"Belirsiz: {string.Join(" / ", keys.Select(k => k ?? "?"))}";
+        }
+    }
+
+    /// <summary>
+    /// Aynı sahipte aynı ad + türdeki hastalar: bilgileri aynı ve bir hafta içinde açılmışsa aynı hayvanın tekrarıdır (ilk kayıtla
+    /// birleşir); değilse ayrı hayvandır ve Vetinity'de aynı adla iki hasta olamayacağı için adına E-vet protokolü eklenir. Adını
+    /// koruyan kayıt: aktif olan, sonra en yeni kayıtlı. Döner: yeniden adlandırılan ve birleşecek kayıt sayısı.
+    /// </summary>
+    private static (int Renamed, int Merged) SeparateSameNamedPets(List<PetEntry> entries)
+    {
+        var renamed = 0;
+        var merged = 0;
+        foreach (var group in entries.Where(e => e.Name is not null).GroupBy(e => e.Identity).Where(g => g.Count() > 1))
+        {
+            var ordered = group
+                .OrderBy(e => e.Status switch { "olu" => 2, "pasif" => 1, _ => 0 })
+                .ThenByDescending(e => e.Registered)
+                .ToList();
+            var primary = ordered[0];
+            foreach (var other in ordered.Skip(1))
+            {
+                var sameDays = primary.Registered is { } a && other.Registered is { } b && Math.Abs((a - b).TotalDays) <= 7;
+                if (sameDays && other.Traits == primary.Traits)
+                {
+                    other.DuplicateOf = primary.Key;
+                    merged++;
+                }
+                else
+                {
+                    other.DisplayName = $"{other.Name} (E-vet {other.Protocol ?? $"satır {other.Row.RowNumber}"})";
+                    renamed++;
+                }
+            }
+        }
+
+        return (renamed, merged);
     }
 
     private sealed class SkipCounter

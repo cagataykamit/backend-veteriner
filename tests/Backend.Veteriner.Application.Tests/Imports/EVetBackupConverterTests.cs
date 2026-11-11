@@ -343,6 +343,39 @@ public sealed class EVetBackupConverterTests
         result.Warnings.Should().Contain(w => w.Message.Contains("1 müşteri ve 1 hasta protokol numarası"));
     }
 
+    [Fact]
+    public void Same_Owner_Same_Named_Different_Pets_Should_Stay_Separate_And_Records_Follow_Lifecycle()
+    {
+        object?[] header = ["Kayıt Tarihi", "Müşteriler", "Hastalar", "Protokol No", "Hasta Türü", "Cinsiyet", "Doğum Tarihi", "Ölüm Zamanı", "Durum"];
+        var workbook = ImportTestFiles.Xlsx(
+            ("Müşteri Listesi", [CustomerHeader, [Registered, "Ayşe Yılmaz", 0d, 101, null, null, null, null, null, null, null, null, null, null, "Aktif"]]),
+            ("Hasta Listesi",
+            [
+                header,
+                [new DateTime(2020, 1, 1), "Ayşe Yılmaz", "Pamuk", 1, "Kedi", "Dişi", null, new DateTime(2023, 5, 1), "Ölü"],
+                [new DateTime(2024, 1, 1), "Ayşe Yılmaz", "Pamuk", 2, "Kedi", "Erkek", null, null, "Aktif"],
+                [new DateTime(2024, 1, 3), "Ayşe Yılmaz", "Pamuk", 3, "Kedi", "Erkek", null, null, "Aktif"],
+                [new DateTime(2021, 1, 1), "Ayşe Yılmaz", "Boncuk", 4, "Köpek", "Erkek", null, null, "Aktif"],
+                [new DateTime(2021, 2, 1), "Ayşe Yılmaz", "Boncuk", 5, "Köpek", "Dişi", null, null, "Aktif"],
+            ]),
+            ("Muayene Listesi",
+            [
+                ExaminationHeader,
+                [new DateTime(2022, 6, 1), "Ayşe Yılmaz", "Pamuk", "Dr. A", 4d, null, "Eski kedi", null, null, null, null, null],
+                [new DateTime(2025, 6, 1), "Ayşe Yılmaz", "Pamuk", "Dr. A", 5d, null, "Yeni kedi", null, null, null, null, null],
+                [new DateTime(2025, 6, 1), "Ayşe Yılmaz", "Boncuk", "Dr. A", 9d, null, "Hangisi?", null, null, null, null, null],
+            ]));
+
+        var result = Read(new ImportFileSet(ImportTestFiles.XlsxFile(workbook), null, null, null));
+
+        // Aktif ve en yeni olan adını korur; ölü eski kedi E-vet protokolüyle ayrılır; aynı bilgili tekrar kayıt (3) ilk kayıtla birleşir.
+        Rows(result, ImportTable.Pets).Select(p => p["HayvanAdi"]).Should().Equal(
+            "Pamuk (E-vet 1)", "Pamuk", "Pamuk", "Boncuk (E-vet 4)", "Boncuk");
+        Rows(result, ImportTable.ClinicalRecords).Select(r => r["HayvanNo"]).Should().Equal(
+            "1", "3", "Belirsiz: 4 / 5");
+        result.Warnings.Should().Contain(w => w.Message.Contains("bilgileri farklı 2 hasta") && w.Message.Contains("bilgileri aynı 1 tekrar"));
+    }
+
     // ================================================================ Randevu → aşı / randevu
 
     [Fact]
@@ -399,7 +432,7 @@ public sealed class EVetBackupConverterTests
         (first["HayvanNo"], first["Tarih"], first["KayitTuru"], first["Hekim"]).Should().Be(("205", "2025-06-01", "Muayene", "Dr. A"));
         (first["Kilo"], first["Ates"], first["Sikayet"], first["Tani"], first["Tedavi"]).Should().Be(("4.25", "38.5", "Kusma", "Gastrit", "Serum"));
         first["Bulgular"].Should().Be("Genel Durum: NORMAL; Kapiller Dolum: 2.00", "boş (-) parametreler atılır");
-        records[1]["HayvanNo"].Should().BeNull("aynı sahip adı + hasta adı iki hastada: belirsiz, doğrulama hata verir");
+        records[1]["HayvanNo"].Should().Be("Belirsiz: 201 / 204", "aynı sahip adı + hasta adı iki hastada: doğrulama hata verir, yanlış hastaya yazılmaz");
         records[1]["Kilo"].Should().BeNull();
         (records[2]["Kilo"], records[2]["Bulgular"]).Should().Be(("3.1", null));
     }
