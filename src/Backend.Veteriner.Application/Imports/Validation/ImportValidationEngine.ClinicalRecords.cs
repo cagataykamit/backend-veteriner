@@ -49,8 +49,11 @@ public sealed partial class ImportValidationEngine
         if (!temperatureValid)
             issues.Add(ImportRules.TemperatureInvalid.At("Ates", value: rawTemperature));
 
-        // Yalnız ölçüm (kilo, ateş) taşıyan kayıt da içeriktir (eski programlarda muayenelerin çoğu yalnız tartım).
-        if (content.All(c => c is null) && weight is not > 0 && temperature is null)
+        // Yalnız ölçüm (kilo, ateş) taşıyan kayıt da içeriktir; kural varlıkta (ImportedClinicalRecord.Content.HasContent).
+        var recordContent = new ImportedClinicalRecord.Content(
+            recordType, content[0], content[1], content[2], content[3], content[4], content[5], content[6], content[7],
+            veterinarian, weight, temperature);
+        if (!recordContent.HasContent())
             issues.Add(ImportRules.ClinicalRecordEmpty.At());
 
         var normalized = new ImportNormalizedClinicalRecord(

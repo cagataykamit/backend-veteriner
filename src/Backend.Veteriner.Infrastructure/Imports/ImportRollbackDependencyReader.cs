@@ -134,12 +134,14 @@ public sealed class ImportRollbackDependencyReader : IImportRollbackDependencyRe
                 .Select(r => new { r.PetId, r.Id })
                 .ToListAsync(ct);
 
+        // Değişti = oluşturulduktan sonra güncellendi. Oluşturma anında yazılan fatura kimliği (içe aktarmada KimlikNo) aynı anı
+        // taşır ve değişiklik sayılmaz.
         var clientIds = targets.ClientIds.ToArray();
         var clientModified = clientIds.Length == 0
             ? new Dictionary<Guid, bool>()
             : await _db.Clients.AsNoTracking()
                 .Where(c => c.TenantId == tenantId && clientIds.Contains(c.Id))
-                .ToDictionaryAsync(c => c.Id, c => c.UpdatedAtUtc != null, ct);
+                .ToDictionaryAsync(c => c.Id, c => c.UpdatedAtUtc != null && c.UpdatedAtUtc > c.CreatedAtUtc, ct);
 
         var clientPets = clientIds.Length == 0
             ? []

@@ -394,15 +394,14 @@ public sealed class ApplyImportOwnerUnitCommandHandler
         var today = OperationDayBounds.ToLocalDate(_timeProvider.GetUtcNow().UtcDateTime);
         foreach (var (row, petId, deceasedOn) in unit.DeceasedPets)
         {
-            var pet = await _petsWrite.FirstOrDefaultAsync(new PetForUpdateByIdSpec(unit.TenantId, petId), ct);
-            if (pet is null)
+            // Hasta bu birimde (aynı bağlamda) oluşturuldu ve izleniyor; kimlikle okuma izlenen örneği verir.
+            var pet = await _petsWrite.GetByIdAsync(petId, ct);
+            if (pet is null || pet.TenantId != unit.TenantId)
                 return Fail(row, "Pets.NotFound", "Oluşturulan hasta bulunamadı.");
 
             var status = pet.SetStatus(PetStatus.Deceased, deceasedOn, today);
             if (!status.IsSuccess)
                 return Fail(row, status.Error);
-
-            await _petsWrite.UpdateAsync(pet, ct);
         }
 
         await _petsWrite.SaveChangesAsync(ct);
