@@ -121,9 +121,11 @@ internal static class EVetBackupConverter
     private static ImportSourceTable ConvertCustomers(EVetSheet sheet, ConversionState state)
     {
         var rows = new List<ImportSourceRow>();
+        var duplicated = DuplicatedProtocols(sheet);
+        state.DuplicatedCustomerProtocols = duplicated.Count;
         foreach (var row in sheet.Rows)
         {
-            var protocol = sheet[row, "Protokol No"];
+            var protocol = RowKey(sheet, row, duplicated);
             var name = sheet[row, "Müşteriler"];
             if (protocol is not null)
                 state.CustomerProtocols.Add(protocol);
@@ -162,10 +164,12 @@ internal static class EVetBackupConverter
         var chipOwners = new Dictionary<string, string>(StringComparer.Ordinal);
         var movedChips = 0;
         var reportLinked = 0;
+        var duplicated = DuplicatedProtocols(sheet);
 
         foreach (var row in sheet.Rows)
         {
-            var protocol = sheet[row, "Protokol No"];
+            var protocol = RowKey(sheet, row, duplicated);
+            var reportProtocol = duplicated.Contains(sheet[row, "Protokol No"] ?? string.Empty) ? null : protocol;
             var ownerName = sheet[row, "Müşteriler"];
             var petName = sheet[row, "Hastalar"];
             var pair = EVetCells.PairKey(ownerName, petName);
@@ -177,7 +181,7 @@ internal static class EVetBackupConverter
 
             // Sahip: rapordaki protokol eşlemesi (kesin), yoksa yedekteki sahip adıyla tek müşteri.
             string? owner = null;
-            if (protocol is not null && state.Reports.OwnerByPetProtocol?.GetValueOrDefault(protocol) is { } linked
+            if (reportProtocol is not null && state.Reports.OwnerByPetProtocol?.GetValueOrDefault(reportProtocol) is { } linked
                 && state.CustomerProtocols.Contains(linked))
             {
                 owner = linked;
@@ -258,8 +262,34 @@ internal static class EVetBackupConverter
                 $"{movedChips} hastanın mikroçipi rakam dışı karakter içeriyor ya da başka hastada da kayıtlı; numara hastanın notuna yazılacak."));
         }
 
+        if (duplicated.Count > 0 || state.DuplicatedCustomerProtocols > 0)
+        {
+            warnings.Add(new ImportReadWarning(WarningCode, ImportTable.Pets,
+                $"Yedekte {state.DuplicatedCustomerProtocols} müşteri ve {duplicated.Count} hasta protokol numarası birden çok kayıtta geçiyor; "
+                + "bu kayıtların numarasına satır numarası eklendi (ör. 1234#56) ve sahipleri adla bağlanacak."));
+        }
+
         return new ImportSourceTable(ImportTable.Pets, PetHeaders, rows);
     }
+
+    /// <summary>Sayfada birden çok satırda geçen protokol numaraları (E-vet benzersizlik denetlemiyor).</summary>
+    private static HashSet<string> DuplicatedProtocols(EVetSheet sheet)
+        => sheet.Rows
+            .Select(r => sheet[r, "Protokol No"])
+            .OfType<string>()
+            .GroupBy(p => p, StringComparer.Ordinal)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToHashSet(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Satırın bağlantı anahtarı: protokol tekse kendisi; tekrar ediyorsa <c>protokol#satır</c> (her tekrar ayrı kayıt kalır,
+    /// <c>DuplicateReference</c> ile düşmez; rapordaki protokol eşlemesi bu kayıtlar için kullanılmaz).
+    /// </summary>
+    private static string? RowKey(EVetSheet sheet, ImportSourceRow row, HashSet<string> duplicated)
+        => sheet[row, "Protokol No"] is { } protocol && duplicated.Contains(protocol)
+            ? $"{protocol}#{row.RowNumber}"
+            : sheet[row, "Protokol No"];
 
     /// <summary>E-vet cinsiyet hücresi kısırlığı da taşır (<c>Kısırlaştırılmış Dişi</c>, <c>Kısır</c>, <c>Bilinmiyor</c>).</summary>
     private static (string? Gender, bool Neutered) SplitGender(string? value)
@@ -557,6 +587,7 @@ internal static class EVetBackupConverter
         public Index CustomersByName { get; } = new();
         public Index PetsByPair { get; } = new();
         public HashSet<string> InactivePets { get; } = new(StringComparer.Ordinal);
+        public int DuplicatedCustomerProtocols { get; set; }
     }
 
     /// <summary>Anahtar → protokol; tek ve dolu protokol varsa onu verir (belirsiz veya protokolsüz kayıt null).</summary>

@@ -311,6 +311,38 @@ public sealed class EVetBackupConverterTests
         pets["202"]["KarneNo"].Should().Be("TR001");
     }
 
+    [Fact]
+    public void Repeated_Protocols_Should_Get_Row_Suffixed_Keys_Instead_Of_Being_Dropped()
+    {
+        var workbook = ImportTestFiles.Xlsx(
+            ("Müşteri Listesi",
+            [
+                CustomerHeader,
+                [Registered, "Ayşe Yılmaz", 0d, 7, null, null, null, null, null, null, null, null, null, null, "Aktif"],
+                [Registered, "Can Demir", 0d, 7, null, null, null, null, null, null, null, null, null, null, "Aktif"],
+            ]),
+            ("Hasta Listesi",
+            [
+                PetHeader,
+                ["Ayşe Yılmaz", "Pamuk", 9, null, null, null, "Kedi", null, "Dişi", null, null, null, null, null, "Aktif"],
+                ["Can Demir", "Karabaş", 9, null, null, null, "Köpek", null, "Erkek", null, null, null, null, null, "Aktif"],
+            ]),
+            ("Muayene Listesi",
+            [
+                ExaminationHeader,
+                [new DateTime(2025, 6, 1), "Can Demir", "Karabaş", "Dr. A", 12d, null, "Topallık", null, null, null, null, null],
+            ]));
+        var files = new ImportFileSet(ImportTestFiles.XlsxFile(workbook), null, null, null);
+
+        var result = Read(files);
+
+        Rows(result, ImportTable.Customers).Select(c => c["MusteriNo"]).Should().Equal("7#2", "7#3");
+        var pets = Rows(result, ImportTable.Pets);
+        pets.Select(p => (p["HayvanNo"], p["MusteriNo"])).Should().Equal(("9#2", "7#2"), ("9#3", "7#3"));
+        Rows(result, ImportTable.ClinicalRecords).Single()["HayvanNo"].Should().Be("9#3");
+        result.Warnings.Should().Contain(w => w.Message.Contains("1 müşteri ve 1 hasta protokol numarası"));
+    }
+
     // ================================================================ Randevu → aşı / randevu
 
     [Fact]
