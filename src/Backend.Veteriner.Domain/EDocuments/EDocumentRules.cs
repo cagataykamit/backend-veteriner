@@ -1,3 +1,6 @@
+using System.Linq.Expressions;
+using Backend.Veteriner.Domain.Charges;
+
 namespace Backend.Veteriner.Domain.EDocuments;
 
 /// <summary>
@@ -17,6 +20,17 @@ public static class EDocumentRules
 
     /// <summary>Tek belgeye bağlanabilecek en çok ücret.</summary>
     public const int MaxChargesPerDocument = 50;
+
+    /// <summary>
+    /// Belgeye girebilecek ücret: eski programdan devreden bakiye ücreti (ADR-048 T3) girmez; belgesi eski programın konusudur.
+    /// Belgesiz listesi, hatırlatma sayacı, otomatik kesme ve ödemeden kesme bu kuralla süzer; elle seçimde reddedilir.
+    /// </summary>
+    public static readonly Expression<Func<Charge, bool>> IsDocumentableCharge = c => c.ImportBatchId == null;
+
+    private static readonly Func<Charge, bool> IsDocumentableChargeCompiled = IsDocumentableCharge.Compile();
+
+    /// <summary>Bellekteki ücret için <see cref="IsDocumentableCharge"/>.</summary>
+    public static bool IsDocumentable(Charge charge) => IsDocumentableChargeCompiled(charge);
 
     public const int MaxNoteLength = 500;
     public const int MaxReasonLength = 500;

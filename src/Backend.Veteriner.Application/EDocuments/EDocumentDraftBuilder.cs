@@ -197,6 +197,11 @@ public sealed class EDocumentDraftBuilder
         var charges = track ? await _chargesWrite.ListAsync(chargeSpec, ct) : await _chargesRead.ListAsync(chargeSpec, ct);
         if (charges.Count != ids.Count || charges.Any(c => c.ClinicId != clinicId))
             return Result<(IReadOnlyList<Charge>, Guid?)>.Failure("EDocuments.ChargeNotFound", "Seçilen ücretlerden biri bulunamadı.");
+        if (!charges.All(EDocumentRules.IsDocumentable))
+        {
+            return Result<(IReadOnlyList<Charge>, Guid?)>.Failure(
+                "EDocuments.ImportedCharge", "Eski programdan devreden bakiyeye e-belge kesilmez.");
+        }
 
         var ordered = ids.Select(id => charges.First(c => c.Id == id)).ToList();
         return Result<(IReadOnlyList<Charge>, Guid?)>.Success((ordered, saleId));

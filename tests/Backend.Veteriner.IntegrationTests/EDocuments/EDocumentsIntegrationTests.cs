@@ -244,6 +244,48 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
         (await db.AuditLogs.AsNoTracking().CountAsync(a => a.Action == "EDocument.AutoIssue" && a.TargetId == goodDoc.ToString())).Should().Be(1);
     }
 
+    [Fact]
+    public async Task Imported_Opening_Balance_Should_Stay_Out_Of_Every_EDocument_Flow()
+    {
+        var ctx = await SeedAsync();
+        await ctx.PutAsync($"/api/v1/clinics/{ctx.ClinicId}/e-document-settings", new { autoIssueMode = "EndOfDay", endOfDayTime = "00:00", issueOnPaymentByDefault = true });
+        var clientId = await ctx.CreateClientAsync(new { personType = "Individual", nationalId = Tckn });
+        var devir = await AddOpeningBalanceAsync(ctx, clientId, 300m);
+        var paymentId = await ctx.PayAsync(clientId, devir, 300m);
+
+        var fromPayment = await ctx.PostAsync("/api/v1/e-documents/from-payment", new { paymentId });
+        fromPayment.GetProperty("documents").GetArrayLength().Should().Be(0);
+
+        var manual = await ctx.Http.PostAsJsonAsync("/api/v1/e-documents", new { requestId = Guid.NewGuid(), clinicId = ctx.ClinicId, chargeIds = new[] { devir } });
+        manual.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(manual)).Should().Be("EDocuments.ImportedCharge");
+
+        var before = _provider.IssueCount;
+        await _factory.Services.GetRequiredService<Backend.Veteriner.Infrastructure.EDocuments.EDocumentAutomationProcessor>().RunOnceAsync(CancellationToken.None);
+        _provider.IssueCount.Should().Be(before);
+        (await ctx.GetAsync($"/api/v1/charges/{devir}")).GetProperty("eDocumentId").ValueKind.Should().Be(JsonValueKind.Null);
+
+        var undocumented = await ctx.GetAsync($"/api/v1/e-documents/undocumented-charges?clinicId={ctx.ClinicId}&clientId={clientId}");
+        undocumented.GetProperty("items").GetArrayLength().Should().Be(0, "devir bakiyesi belgesiz sayılmaz (ADR-048 T3)");
+        var reminders = await ctx.GetAsync($"/api/v1/e-documents/reminders?clinicId={ctx.ClinicId}");
+        reminders.GetProperty("undocumentedPaidCount").GetInt32().Should().Be(0);
+    }
+
+    /// <summary>İçe aktarma partisiyle devir ücreti (ADR-048 T3); içe aktarma sihirbazının yazdığı kaydın aynısı.</summary>
+    private async Task<Guid> AddOpeningBalanceAsync(TestContext ctx, Guid clientId, decimal amount)
+    {
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var tenantId = (await db.Clinics.AsNoTracking().SingleAsync(c => c.Id == ctx.ClinicId)).TenantId;
+        var batch = Backend.Veteriner.Domain.Imports.ImportBatch.Create(tenantId, ctx.ClinicId, Guid.NewGuid(), "Devir", ctx.UserId, DateTime.UtcNow).Value!;
+        db.ImportBatches.Add(batch);
+        var charge = Backend.Veteriner.Domain.Charges.Charge.CreateOpeningBalance(
+            tenantId, ctx.ClinicId, clientId, "Devir bakiyesi", amount, ctx.UserId, DateTime.UtcNow, Guid.NewGuid(), batch.Id).Value!;
+        db.Charges.Add(charge);
+        await db.SaveChangesAsync();
+        return charge.Id;
+    }
+
     private async Task RenameClientAsync(Guid clientId, string name)
     {
         await using var scope = _factory.Services.CreateSystemScope();

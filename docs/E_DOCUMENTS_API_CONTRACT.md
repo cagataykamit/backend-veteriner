@@ -194,7 +194,7 @@ Yanıt:
 ```
 
 - `requestId` zorunlu; aynı kiracıda aynı `requestId` ilk belgeyi döndürür (200, yeniden gönderim yapmaz). Farklı içerikle aynı `requestId` → `EDocuments.RequestIdConflict` (409).
-- Seçim tek gruba düşmeli (§1.1). Ücret başka geçerli belgeye bağlıysa `EDocuments.ChargeAlreadyDocumented` (409); iptal edilmiş ücret `EDocuments.ChargeVoided` (409). Eşzamanlı iki istek aynı ücreti alamaz (ücret eşzamanlılık belirteci; kaybeden `EDocuments.ConcurrencyConflict`, 409).
+- Seçim tek gruba düşmeli (§1.1). Ücret başka geçerli belgeye bağlıysa `EDocuments.ChargeAlreadyDocumented` (409); iptal edilmiş ücret `EDocuments.ChargeVoided` (409); eski programdan devreden bakiye ücreti (`isImported`, ADR-048 T3) `EDocuments.ImportedCharge` (409). Eşzamanlı iki istek aynı ücreti alamaz (ücret eşzamanlılık belirteci; kaybeden `EDocuments.ConcurrencyConflict`, 409).
 - Bağlantı yoksa / yeniden yetki gerekiyorsa `EDocuments.NotConnected` (409).
 - `note` (≤ 500) belgeye not olarak gider.
 - Akış: belge kaydı (kimliği ve sağlayıcıya giden dış referans UUID'si bizde üretilir) **gönderimden önce** yazılır → sağlayıcıya gönderilir → yanıt `EDocumentDto`. e-SMM genelde hemen `Issued`; e-Arşiv / e-Fatura `Sending` döner, arka plan işi sonucu alır. Kalıcı hata `Failed` + `lastError`.
@@ -241,7 +241,7 @@ Geçersiz durum geçişi `EDocuments.InvalidState` (409). Hepsi 200 `EDocumentDt
 
 ### 4.6 Belgesiz ücretler — `GET /e-documents/undocumented-charges`
 
-AK-4 "belgesi kesilmemiş ücretler" listesi. Sorgu: `clinicId`, `clientId`, `visitId`, `fromUtc`, `toUtc`, `page`, `pageSize`. İptal edilmemiş ve belgeye bağlı olmayan ücretler (`Discarded` / `Cancelled` belgeden serbest kalanlar dahil) **ve kesilemeyen (`Failed`) belgeye bağlı ücretler**. Öğe: `chargeId, clientId, clientName, petId, petName, visitId, saleId, description, amount, outstandingAmount, createdAtUtc, failedDocumentId, reason`. `reason` (kullanıcı metni): "Belge kesilemedi: …" (sağlayıcı hatası; `failedDocumentId` ile yeniden dene / vazgeç), "Müşterinin vergi numarası eksik.", "Ödeme bekliyor."; hazırsa null. İzin `EDocuments.Read`.
+AK-4 "belgesi kesilmemiş ücretler" listesi. Sorgu: `clinicId`, `clientId`, `visitId`, `fromUtc`, `toUtc`, `page`, `pageSize`. İptal edilmemiş ve belgeye bağlı olmayan ücretler (`Discarded` / `Cancelled` belgeden serbest kalanlar dahil) **ve kesilemeyen (`Failed`) belgeye bağlı ücretler**. Eski programdan devreden bakiye ücreti (`isImported`, ADR-048 T3) bu listeye, hatırlatma sayacına, ödemeden kesmeye ve otomatik kesmeye girmez; kural `EDocumentRules.IsDocumentableCharge`. Öğe: `chargeId, clientId, clientName, petId, petName, visitId, saleId, description, amount, outstandingAmount, createdAtUtc, failedDocumentId, reason`. `reason` (kullanıcı metni): "Belge kesilemedi: …" (sağlayıcı hatası; `failedDocumentId` ile yeniden dene / vazgeç), "Müşterinin vergi numarası eksik.", "Ödeme bekliyor."; hazırsa null. İzin `EDocuments.Read`.
 
 ### 4.7 Ücret alanı
 
