@@ -40,6 +40,7 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
         PermissionCatalog.Clinics.Read, PermissionCatalog.Clinics.Update,
         PermissionCatalog.Charges.Read, PermissionCatalog.Charges.Create, PermissionCatalog.Charges.Correct,
         PermissionCatalog.EDocuments.Read, PermissionCatalog.EDocuments.Issue, PermissionCatalog.EDocuments.Cancel,
+        PermissionCatalog.Payments.Read, PermissionCatalog.Payments.Create,
     ];
 
     private readonly FakeProvider _provider = new();
@@ -160,6 +161,96 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
         (await IntegrationTestProblemDetails.ReadCodeAsync(issue)).Should().Be("EDocuments.NotConnected");
     }
 
+    [Fact]
+    public async Task Payment_Should_Issue_Only_Fully_Paid_Charges_Once_And_Settings_Should_Report_Document_Kinds()
+    {
+        var ctx = await SeedAsync();
+        var settings = await ctx.PutAsync($"/api/v1/clinics/{ctx.ClinicId}/e-document-settings", new { autoIssueMode = "Off", endOfDayTime = "22:30", issueOnPaymentByDefault = true });
+        settings.GetProperty("issueOnPaymentByDefault").GetBoolean().Should().BeTrue();
+        settings.GetProperty("endOfDayTime").GetString().Should().Be("22:30");
+        settings.GetProperty("serviceDocument").GetString().Should().Be("ESmm");
+        settings.GetProperty("productDocument").GetString().Should().Be("Invoice");
+
+        var clientId = await ctx.CreateClientAsync(new { personType = "Individual", nationalId = Tckn });
+        var full = await ctx.ChargeAsync(clientId, 1200m, "Service");
+        var partial = await ctx.ChargeAsync(clientId, 500m, "Service");
+        var paymentId = await ctx.PayAsync(clientId, full, 1200m);
+        var partialPayment = await ctx.PayAsync(clientId, partial, 100m);
+
+        var before = _provider.IssueCount;
+        var result = await ctx.PostAsync("/api/v1/e-documents/from-payment", new { paymentId });
+        result.GetProperty("documents").GetArrayLength().Should().Be(1, result.ToString());
+        var doc = result.GetProperty("documents")[0];
+        doc.GetProperty("origin").GetString().Should().Be("Payment");
+        doc.GetProperty("documentType").GetString().Should().Be("ESmm");
+
+        var again = await ctx.PostAsync("/api/v1/e-documents/from-payment", new { paymentId });
+        again.GetProperty("documents")[0].GetProperty("id").GetGuid().Should().Be(doc.GetProperty("id").GetGuid());
+        _provider.IssueCount.Should().Be(before + 1);
+
+        var none = await ctx.PostAsync("/api/v1/e-documents/from-payment", new { paymentId = partialPayment });
+        none.GetProperty("documents").GetArrayLength().Should().Be(0);
+        var undocumented = await ctx.GetAsync($"/api/v1/e-documents/undocumented-charges?clinicId={ctx.ClinicId}&clientId={clientId}");
+        var row = undocumented.GetProperty("items").EnumerateArray().Single();
+        row.GetProperty("chargeId").GetGuid().Should().Be(partial);
+        row.GetProperty("reason").GetString().Should().Be("Ödeme bekliyor.");
+    }
+
+    [Fact]
+    public async Task Automation_Should_Issue_Paid_Charges_Once_Report_Failures_And_Send_Daily_Summary()
+    {
+        var ctx = await SeedAsync();
+        await ctx.PutAsync($"/api/v1/clinics/{ctx.ClinicId}/e-document-settings", new { autoIssueMode = "EndOfDay", endOfDayTime = "00:00", issueOnPaymentByDefault = false });
+
+        var good = await ctx.CreateClientAsync(new { personType = "Individual", nationalId = Tckn });
+        var goodCharge = await ctx.ChargeAsync(good, 400m, "Service");
+        await ctx.PayAsync(good, goodCharge, 400m);
+        var unpaid = await ctx.ChargeAsync(good, 50m, "Service");
+        var bad = await ctx.CreateClientAsync(null);
+        await RenameClientAsync(bad, "Hatalı Adres Müşteri");
+        var badCharge = await ctx.ChargeAsync(bad, 250m, "Service");
+        await ctx.PayAsync(bad, badCharge, 250m);
+
+        var processor = _factory.Services.GetRequiredService<Backend.Veteriner.Infrastructure.EDocuments.EDocumentAutomationProcessor>();
+        await processor.RunOnceAsync(CancellationToken.None);
+        var issuedAfterFirst = _provider.IssueCount;
+        await processor.RunOnceAsync(CancellationToken.None);
+        _provider.IssueCount.Should().Be(issuedAfterFirst, "gün sonu günde bir kez çalışır; aynı ücret ikinci kez kesilmez");
+
+        var goodDoc = (await ctx.GetAsync($"/api/v1/charges/{goodCharge}")).GetProperty("eDocumentId").GetGuid();
+        var detail = await ctx.GetAsync($"/api/v1/e-documents/{goodDoc}");
+        detail.GetProperty("origin").GetString().Should().Be("Automatic");
+        detail.GetProperty("status").GetString().Should().Be("Issued");
+        (await ctx.GetAsync($"/api/v1/charges/{unpaid}")).GetProperty("eDocumentId").ValueKind.Should().Be(JsonValueKind.Null);
+
+        var manual = await ctx.Http.PostAsJsonAsync("/api/v1/e-documents", new { requestId = Guid.NewGuid(), clinicId = ctx.ClinicId, chargeIds = new[] { goodCharge } });
+        (await IntegrationTestProblemDetails.ReadCodeAsync(manual)).Should().Be("EDocuments.ChargeAlreadyDocumented");
+
+        var undocumented = await ctx.GetAsync($"/api/v1/e-documents/undocumented-charges?clinicId={ctx.ClinicId}&clientId={bad}");
+        var failedRow = undocumented.GetProperty("items").EnumerateArray().Single();
+        failedRow.GetProperty("reason").GetString().Should().Contain("Alıcı adresi zorunlu");
+        failedRow.GetProperty("failedDocumentId").ValueKind.Should().Be(JsonValueKind.String);
+
+        var reminders = await ctx.GetAsync($"/api/v1/e-documents/reminders?clinicId={ctx.ClinicId}");
+        reminders.GetProperty("connected").GetBoolean().Should().BeTrue();
+        reminders.GetProperty("failedCount").GetInt32().Should().Be(1);
+
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var summaries = await db.UserNotifications.AsNoTracking()
+            .Where(n => n.UserId == ctx.UserId && n.Type == Backend.Veteriner.Domain.Notifications.UserNotificationType.EDocumentsDailySummary)
+            .ToListAsync();
+        summaries.Should().ContainSingle().Which.Body.Should().Contain("1 belge otomatik kesildi").And.Contain("1 belge kesilemedi");
+        (await db.AuditLogs.AsNoTracking().CountAsync(a => a.Action == "EDocument.AutoIssue" && a.TargetId == goodDoc.ToString())).Should().Be(1);
+    }
+
+    private async Task RenameClientAsync(Guid clientId, string name)
+    {
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE Clients SET FullName = {name} WHERE Id = {clientId}");
+    }
+
     private async Task<TestContext> SeedAsync()
     {
         var hasher = _factory.Services.GetRequiredService<IPasswordHasher>();
@@ -228,6 +319,27 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
             return JsonDocument.Parse(body).RootElement.GetProperty("charge").GetProperty("id").GetGuid();
         }
 
+        public async Task<Guid> PayAsync(Guid clientId, Guid chargeId, decimal amount)
+        {
+            var response = await Http.PostAsJsonAsync("/api/v1/payments", new
+            {
+                clinicId = ClinicId, clientId, amount, currency = "TRY", method = 0, paidAtUtc = DateTime.UtcNow, requestId = Guid.NewGuid(),
+                allocations = new[] { new { chargeId, amount } },
+            });
+            var body = await response.Content.ReadAsStringAsync();
+            response.StatusCode.Should().Be(HttpStatusCode.Created, body);
+            var root = JsonDocument.Parse(body).RootElement;
+            return root.ValueKind == JsonValueKind.String ? root.GetGuid() : root.GetProperty("id").GetGuid();
+        }
+
+        public async Task<JsonElement> PutAsync(string url, object body)
+        {
+            var response = await Http.PutAsJsonAsync(url, body);
+            var text = await response.Content.ReadAsStringAsync();
+            response.StatusCode.Should().Be(HttpStatusCode.OK, text);
+            return JsonDocument.Parse(text).RootElement;
+        }
+
         public async Task<JsonElement> PostAsync(string url, object body)
         {
             var response = await Http.PostAsJsonAsync(url, body);
@@ -270,6 +382,8 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
             account.Credentials.Should().Be("fake-credentials");
             Interlocked.Increment(ref _issueCount);
             LastRecipient = request.EInvoiceRecipient;
+            if (request.Buyer.Name.Contains("Hatalı", StringComparison.Ordinal))
+                return Task.FromResult(ProviderResult<ProviderIssueOutcome>.Fail(new ProviderError(EDocumentErrorKind.InvalidData, "Alıcı adresi zorunlu.", "422")));
             var invoiceId = $"inv-{request.ExternalReference:N}";
             return Task.FromResult(ProviderResult<ProviderIssueOutcome>.Ok(request.Type == EDocumentType.ESmm
                 ? new ProviderIssueOutcome(ProviderIssueState.Issued, invoiceId, "smm-1", null, "SMM-1", "uuid-1", 1200m)

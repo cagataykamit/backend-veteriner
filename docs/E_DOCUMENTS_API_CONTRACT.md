@@ -3,7 +3,8 @@
 Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-036 (vetinity-product, kabul edildi) — Dilim 3 (e-belge çekirdeği), Dilim 4 (kes / iptal / PDF), AK-1 (a) klinik kendi entegratör hesabını bağlar, AK-3 (c), AK-4 v1, AK-6. İlk sağlayıcı **Paraşüt** (AK-2, 2026-11-11). Uçlar `api/v1` altında (OAuth dönüşü hariç, §3.3); hata zarfı standart `ProblemDetails` + `extensions.code`.
 
 > **Durum:** Sözleşme + uygulama (dal `feat/e-belge-d3-d4-parasut`). Migration `AddEDocuments` (20261110234342) yalnız yerel geliştirme veritabanında uygulandı; paylaşılan/üretim veritabanına uygulanmadı.
-> **Kapsam dışı:** otomatik kesme kuralı, iade belgesi, gelen e-Fatura, webhook (v2); raporlar ve canlı ortam geçişi (Dilim 5).
+> **Kullanıcı kararları (2026-11-11):** ödeme ekranında "e-Belge kes", belgesiz ücret hatırlatması (menü rozeti, gün sonu bildirimi) ve tam otomatik kesme (AK-4 d, v2'den v1'e) bu işe girdi (§4.8–§4.10, §6). e-belge ekranları ve uçları sağlayıcıdan bağımsızdır; sağlayıcıya özgü her şey sağlayıcı uygulamasında kalır.
+> **Kapsam dışı:** iade belgesi, gelen e-Fatura, webhook (v2); raporlar ve canlı ortam geçişi (Dilim 5).
 
 ---
 
@@ -109,7 +110,9 @@ Gövde `{ "provider": "parasut" }`. Yanıt `{ "authorizationUrl": "https://id-st
 
 Paraşüt'e kayıtlı kalıcı yönlendirme adresi; **`api/v1` altında değildir**: `https://localhost:7173/api/e-documents/parasut/callback` (yerel), `https://api.vetinity.com/api/e-documents/parasut/callback` (canlı). Sorgu `code`, `state` (veya `error`). İşlem: `state` çözülür ve süresi denetlenir → kod belirteçle değiştirilir → `GET /me?include=companies` → tek firma varsa (veya klinik VKN'si tek firmayla eşleşiyorsa) bağlanır, değilse `AccountSelectionRequired` → bağlantı sınanır. Sonunda tarayıcı panele döner:
 
-`{App:FrontendBaseUrl}/panel/settings/clinics/{clinicId}?eDocumentConnection={connected|select-account|error}&reason={kod}`
+`{App:FrontendBaseUrl}/panel/settings/e-documents?eDocumentConnection={connected|select-account|error}&clinicId={klinik}&reason={kod}`
+
+(Panelde tek "e-Belge" ayar sayfası; `clinicId` state çözülemezse yoktur.)
 
 `reason` yalnız hata kodudur (ör. `denied`, `expired`, `exchange-failed`); belirteç veya kişisel veri taşımaz. Denetim kaydı: `Clinic.EDocumentConnection.Connect`.
 
@@ -126,6 +129,29 @@ Bağlantıyı sınar (belirteç yenilenir, firma erişilebilir mi, e-belge kulla
 Bağlantıyı koparır: şifreli kimlik bilgisi silinir, durum `NotConnected`. Kesilmiş belgeler kalır (PDF/iptal için yeniden bağlanmak gerekir). 204. Denetim: `Clinic.EDocumentConnection.Disconnect`.
 
 ---
+
+### 3.7 Klinik e-Belge ayarı — `GET` / `PUT /clinics/{clinicId}/e-document-settings`
+
+Okuma `Clinics.Read`, yazma `Clinics.Update`. Bağlantıdan ayrıdır (koparılınca ayar kalır). Kayıt yoksa varsayılan döner.
+
+```json
+{
+  "clinicId": "…",
+  "autoIssueMode": "Off",
+  "endOfDayTime": "23:00",
+  "issueOnPaymentByDefault": false,
+  "autoIssueEnabledAtUtc": null,
+  "taxpayerType": "Both",
+  "serviceDocument": "ESmm",
+  "productDocument": "Invoice"
+}
+```
+
+- `autoIssueMode`: `Off` | `OnPayment` (tamamen ödenen ücret arka plan işinin bir sonraki turunda, en çok `EDocuments:Processor:AutomationIntervalSeconds` gecikmeyle kesilir) | `EndOfDay` (günde bir kez `endOfDayTime`'da, İstanbul saati).
+- `autoIssueEnabledAtUtc`: otomatik kesmenin açıldığı an; **yalnız bundan sonra yazılan ücretler** otomatik kesilir (açmak geçmişi toplu kesmez). Kapatınca boşalır.
+- `issueOnPaymentByDefault`: ödeme ekranındaki "e-Belge kes" seçeneğinin varsayılanı.
+- `serviceDocument` / `productDocument`: mükellef türünden çıkan belge (`ESmm` | `Invoice` = alıcıya göre e-Arşiv / e-Fatura); mükellef türü yoksa null. Kural backend'de (§1.1), panel yalnız gösterir.
+- PUT gövdesi: `{ autoIssueMode, endOfDayTime: "SS:dd", issueOnPaymentByDefault }`. Geçersiz saat `EDocuments.Validation` (400). Denetim: `Clinic.EDocumentSettings.Update`.
 
 ## 4) Belgeler
 
@@ -196,6 +222,8 @@ Sorgu: `clinicId`, `clientId`, `status`, `documentType`, `fromUtc`, `toUtc`, `pa
 }
 ```
 
+Detay ve liste öğesi ayrıca `origin`: `Manual` | `Payment` | `Automatic` taşır.
+
 `lastError`: `{ "kind": "InvalidData|Authorization|AccountSuspended|QuotaExceeded|ProviderRejected|Transient|Unknown", "message": "Türkçe, kullanıcıya gösterilecek metin" }`. Sağlayıcı yanıt kodu denetim kaydına ve `lastError.providerCode`'a yazılır; belirteç/kişisel veri yazılmaz.
 
 ### 4.5 Eylemler
@@ -212,7 +240,7 @@ Geçersiz durum geçişi `EDocuments.InvalidState` (409). Hepsi 200 `EDocumentDt
 
 ### 4.6 Belgesiz ücretler — `GET /e-documents/undocumented-charges`
 
-AK-4 "belgesi kesilmemiş ücretler" listesi. Sorgu: `clinicId`, `clientId`, `visitId`, `fromUtc`, `toUtc`, `page`, `pageSize`. İptal edilmemiş ve belgeye bağlı olmayan ücretler (`Discarded` / `Cancelled` belgeden serbest kalanlar dahil). Öğe: `chargeId, clientId, clientName, petName, visitId, saleId, description, amount, createdAtUtc`. İzin `EDocuments.Read`.
+AK-4 "belgesi kesilmemiş ücretler" listesi. Sorgu: `clinicId`, `clientId`, `visitId`, `fromUtc`, `toUtc`, `page`, `pageSize`. İptal edilmemiş ve belgeye bağlı olmayan ücretler (`Discarded` / `Cancelled` belgeden serbest kalanlar dahil) **ve kesilemeyen (`Failed`) belgeye bağlı ücretler**. Öğe: `chargeId, clientId, clientName, petId, petName, visitId, saleId, description, amount, outstandingAmount, createdAtUtc, failedDocumentId, reason`. `reason` (kullanıcı metni): "Belge kesilemedi: …" (sağlayıcı hatası; `failedDocumentId` ile yeniden dene / vazgeç), "Müşterinin vergi numarası eksik.", "Ödeme bekliyor."; hazırsa null. İzin `EDocuments.Read`.
 
 ### 4.7 Ücret alanı
 
@@ -220,9 +248,37 @@ AK-4 "belgesi kesilmemiş ücretler" listesi. Sorgu: `clinicId`, `clientId`, `vi
 
 ---
 
+### 4.8 Ödemeden kes — `POST /e-documents/from-payment`
+
+Gövde `{ "paymentId": "…" }`. `EDocuments.Issue`. Ödeme ekranındaki "e-Belge kes": ödemenin (geri alınmamış) tahsislerinin karşıladığı ücretlerden **tamamen ödenmiş ve belgesiz** olanlar belge türüne göre gruplanır, her grup ayrı belge olarak kesilir (`origin: Payment`). Kısmi ödenen ücret ödeme tamamlanınca kesilir. Tekrar koruması ödeme kimliğinden türetilen requestId ile (aynı ödeme iki kez gönderilse de çift belge yok). Ödeme kaydı belge hatasından etkilenmez; belge `Failed` olur ve yeniden denenebilir.
+
+```json
+{ "documents": [ EDocumentDto ], "skipped": [ { "chargeId": "…", "code": "EDocuments.BuyerIdentityMissing", "message": "…" } ] }
+```
+
+`documents` ödemenin ücretlerine bağlı mevcut belgeleri de içerir. Bağlantı yoksa `EDocuments.NotConnected` (409); ödeme yoksa `Payments.NotFound` (404).
+
+### 4.9 Hatırlatma — `GET /e-documents/reminders?clinicId=`
+
+`EDocuments.Read`. Menü rozeti: `{ "connected": true, "undocumentedPaidCount": 3, "failedCount": 1 }`. `undocumentedPaidCount`: bağlantı kurulduktan sonra yazılmış, tamamen ödenmiş ve belgesiz ücretler (bağlantıdan önceki geçmiş ücretler hatırlatmaya girmez); `failedCount`: kesilemeyen belgeler. Bağlantı yoksa `connected: false` ve sıfırlar.
+
+### 4.10 Gün sonu bildirimi
+
+Bağlı her klinikte `endOfDayTime`'da (ayar yoksa 23:00, otomatik kapalı olsa da) günde bir kez, kliniğe erişen ve `EDocuments.Issue` izni olan kullanıcılara bildirim (`type: EDocumentsDailySummary`, `targetType: "EDocuments"`, `targetId` = klinik): "N belge otomatik kesildi · M belge kesilemedi · K ödenmiş ücretin belgesi yok". Hepsi sıfırsa bildirim yok.
+
 ## 5) Sağlayıcı soyutlaması (uygulama notu)
 
 - `IEDocumentProvider` (Application): mükellef sorgusu, belge gönder, durum sorgula, iptal, PDF, bağlantı sına; `IEDocumentOAuthProvider` OAuth bağlanma adımları. Paraşüt uygulaması `Infrastructure/EDocuments/Parasut`. Domain'de sağlayıcı adı geçmez; bağlantı `providerCode` metniyle sağlayıcıyı seçer. İkinci entegratör yeni bir `IEDocumentProvider` kaydıdır.
 - Hata sınıfları adaptörde çevrilir: geçersiz veri, yetki (bağlantı `ReauthorizationRequired`), hesap askıda (Paraşüt 402), kontör, sağlayıcı reddi, geçici (otomatik yeniden deneme).
 - Paraşüt akışı: alıcı cari (`contacts`, vergi no ile aranır, yoksa oluşturulur) → satış faturası (`sales_invoices`, `external_reference_key` = belgenin dış referansı; tekrarında mevcut fatura kullanılır) → e-SMM (`e_smms`, eşzamanlı) / e-Arşiv (`e_archives`) / e-Fatura (`e_invoices`, `scenario: basic`, `to` = gelen kutusu adresi) → iş takibi (`trackable_jobs`) → `active_e_document`. İptal `DELETE sales_invoices/{id}/cancel`. PDF `…/{id}/pdf` (adres süreli, saklanmaz).
 - Ayarlar (`EDocuments:Parasut`): `ClientId`, `ClientSecret` (user-secrets / ortam değişkeni; repoda yok), `Environment` (`Test`/`Live`), `IdentityBaseUrl`, `ApiBaseUrl`, `RedirectUri`. `EDocuments:Processor`: `Enabled`, `IntervalSeconds`, `BatchSize`, `MaxAttempts`. Data Protection anahtar halkası: `DataProtection:KeysPath` (canlıda kalıcı ve yedekli dizin; boşsa varsayılan konum ve açılışta uyarı).
+
+## 6) Otomatik kesme (arka plan işi)
+
+- `EDocumentAutomationProcessor` (`EDocuments:Processor:AutomationIntervalSeconds`, varsayılan 60 sn) bağlı klinikleri tarar; her klinik kendi kiracı kapsamında işlenir.
+- Uygun ücret: tamamen ödenmiş (`allocatedAmount = amount`), iptal edilmemiş, belgesiz, `autoIssueEnabledAtUtc`'den sonra yazılmış; bağlantı sağlam; alıcı belge türü için yeterli (kurumsalda vergi no). Uygun olmayan veya hata alan ücret kesilmez, §4.6 listesinde nedeniyle görünür ve §4.9–§4.10 hatırlatmasına girer.
+- Gruplama müşteri başına, belge türüne göre; tekrar koruması anahtarla türetilen requestId + "bir ücret tek geçerli belge" bağı (otomatik ve elle kesme yarışsa da çift belge yok).
+- Otomatik belgenin `createdByUserId`'si ayarı en son kaydeden kullanıcıdır, `origin: Automatic`. Her otomatik belge denetim kaydına `EDocument.AutoIssue` olarak yazılır (aktör yok, yük `origin: "Automatic"`).
+- Gün sonu işaretlemesi işten önce kaydedilir (`ClinicEDocumentSettings.RowVersion`); iki örnek aynı günü ikinci kez çalıştırmaz.
+- Deneme kiracısında canlı ortamda otomatik kesme yapılmaz.
+- Migration: `AddEDocumentAutomation` (`ClinicEDocumentSettings`, `EDocuments.Origin`); yalnız yerel geliştirme veritabanında uygulandı.
