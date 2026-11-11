@@ -12,6 +12,9 @@ public enum ClientCreditSource
 
     /// <summary>Ödeme hiçbir ücrete tahsis edilmedi (avans/depozito); tamamı kredi.</summary>
     Prepayment = 1,
+
+    /// <summary>Eski programdan devreden alacak (ADR-048 T3); içe aktarmada açılır, kaynak ödemesi yoktur.</summary>
+    OpeningBalance = 2,
 }
 
 /// <summary>Kredi durumu; saklanmaz, alanlardan hesaplanır.</summary>
@@ -28,6 +31,7 @@ public enum ClientCreditStatus
 /// (<see cref="Payment.Settle"/>), müşteri + klinik kapsamlıdır, yalnız TRY. Sonraki ücretlere mahsup edilir
 /// (<see cref="Apply"/>); mahsup ücretin tahsis sayacını ödeme tahsisiyle aynı yoldan artırır, böylece açık tutar ve bakiye
 /// ek kural gerektirmez. Kalan tutar iade edilebilir (kasa çıkışı); kaynak ödeme iptal edilirse kullanılmamış kredi de kapanır.
+/// Tek istisna devir alacağıdır (<see cref="FromImport"/>): eski programda alınmış para, ödemesi yoktur.
 /// </summary>
 public sealed class ClientCredit : AggregateRoot, IClinicScoped, ITenantOwned
 {
@@ -35,7 +39,16 @@ public sealed class ClientCredit : AggregateRoot, IClinicScoped, ITenantOwned
     public Guid TenantId { get; private set; }
     public Guid ClinicId { get; private set; }
     public Guid ClientId { get; private set; }
-    public Guid SourcePaymentId { get; private set; }
+
+    /// <summary>Kredinin doğduğu ödeme; yalnız devir alacağında (<see cref="ClientCreditSource.OpeningBalance"/>) boştur.</summary>
+    public Guid? SourcePaymentId { get; private set; }
+
+    /// <summary>
+    /// Krediyi açan içe aktarma partisi (devir alacağı, ADR-048 T3); günlük işlemde boştur. Kredinin oluşması mali olay değildir,
+    /// bu yüzden ciroya, gün sonuna, kasaya ve e-belgeye girmez; bakiyeye ve portala girer.
+    /// </summary>
+    public Guid? ImportBatchId { get; private set; }
+
     public ClientCreditSource Source { get; private set; }
     public decimal Amount { get; private set; }
 
@@ -62,6 +75,7 @@ public sealed class ClientCredit : AggregateRoot, IClinicScoped, ITenantOwned
     /// <summary>Başarılı mutasyon sayacı; optimistic concurrency token.</summary>
     public long MutationSequence { get; private set; }
 
+    public bool IsImported => ImportBatchId.HasValue;
     public bool IsRefunded => RefundedAtUtc.HasValue;
     public bool IsVoided => VoidedAtUtc.HasValue;
     public bool IsClosed => IsRefunded || IsVoided;
@@ -90,6 +104,42 @@ public sealed class ClientCredit : AggregateRoot, IClinicScoped, ITenantOwned
             CreatedByUserId = createdByUserId,
             CreatedAtUtc = DateTime.SpecifyKind(nowUtc, DateTimeKind.Utc),
         };
+
+    /// <summary>
+    /// Eski programdan devreden alacak (ADR-048 T3): içe aktarılan eksi bakiyenin mutlak değeri; ödeme yazılmaz. Sonrası diğer
+    /// kredilerle aynıdır (mahsup, geri alma, iade); kaynak ödemesi olmadığı için ödeme iptaliyle etkileşmez.
+    /// </summary>
+    public static Result<ClientCredit> FromImport(
+        Guid tenantId,
+        Guid clinicId,
+        Guid clientId,
+        decimal amount,
+        Guid createdByUserId,
+        DateTime createdAtUtc,
+        Guid importBatchId)
+    {
+        if (tenantId == Guid.Empty || clinicId == Guid.Empty || clientId == Guid.Empty)
+            return Result<ClientCredit>.Failure("ClientCredits.Validation", "Kiracı, klinik ve müşteri zorunludur.");
+        if (createdByUserId == Guid.Empty)
+            return Result<ClientCredit>.Failure("ClientCredits.Validation", "Oluşturan kullanıcı geçersiz.");
+        if (importBatchId == Guid.Empty)
+            return Result<ClientCredit>.Failure("ClientCredits.Validation", "ImportBatchId geçersiz.");
+        if (amount <= 0 || decimal.Round(amount, 2) != amount)
+            return Result<ClientCredit>.Failure("ClientCredits.Validation", "Devir alacağı 0'dan büyük ve en fazla 2 ondalıklı olmalıdır.");
+
+        return Result<ClientCredit>.Success(new ClientCredit
+        {
+            TenantId = tenantId,
+            ClinicId = clinicId,
+            ClientId = clientId,
+            SourcePaymentId = null,
+            ImportBatchId = importBatchId,
+            Source = ClientCreditSource.OpeningBalance,
+            Amount = amount,
+            CreatedByUserId = createdByUserId,
+            CreatedAtUtc = DateTime.SpecifyKind(createdAtUtc, DateTimeKind.Utc),
+        });
+    }
 
     /// <summary>
     /// Krediden ücrete mahsup: ücretin açık tutarını ve kredinin kalanını aşamaz; ücret aynı kiracı/klinik/müşteri/para biriminde

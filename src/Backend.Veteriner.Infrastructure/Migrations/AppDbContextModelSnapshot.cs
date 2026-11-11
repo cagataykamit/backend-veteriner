@@ -1737,6 +1737,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("nvarchar(3)");
 
+                    b.Property<Guid?>("ImportBatchId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<long>("MutationSequence")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
@@ -1766,7 +1769,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<int>("Source")
                         .HasColumnType("int");
 
-                    b.Property<Guid>("SourcePaymentId")
+                    b.Property<Guid?>("SourcePaymentId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("TenantId")
@@ -1789,8 +1792,13 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasIndex("SourcePaymentId");
 
+                    b.HasIndex("ImportBatchId", "ClientId")
+                        .IsUnique()
+                        .HasFilter("[ImportBatchId] IS NOT NULL");
+
                     b.HasIndex("TenantId", "SourcePaymentId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[SourcePaymentId] IS NOT NULL");
 
                     b.HasIndex("TenantId", "ClientId", "ClinicId");
 
@@ -1799,6 +1807,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             t.HasCheckConstraint("CK_ClientCredits_Amount_Positive", "[Amount] > 0");
 
                             t.HasCheckConstraint("CK_ClientCredits_Refund_Consistent", "([RefundedAtUtc] IS NULL AND [RefundedAmount] IS NULL AND [RefundedByUserId] IS NULL) OR ([RefundedAtUtc] IS NOT NULL AND [RefundedAmount] > 0 AND [RefundedByUserId] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_ClientCredits_Source_Consistent", "([Source] = 2 AND [SourcePaymentId] IS NULL AND [ImportBatchId] IS NOT NULL) OR ([Source] <> 2 AND [SourcePaymentId] IS NOT NULL)");
 
                             t.HasCheckConstraint("CK_ClientCredits_UsedAmount_Range", "[UsedAmount] >= 0 AND [UsedAmount] <= [Amount]");
                         });
@@ -7859,6 +7869,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Backend.Veteriner.Domain.Imports.ImportBatch", null)
+                        .WithMany()
+                        .HasForeignKey("ImportBatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Backend.Veteriner.Domain.CashRegisters.CashRegister", null)
                         .WithMany()
                         .HasForeignKey("RefundCashRegisterId")
@@ -7867,8 +7882,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasOne("Backend.Veteriner.Domain.Payments.Payment", null)
                         .WithMany()
                         .HasForeignKey("SourcePaymentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.ClientCredits.ClientCreditApplication", b =>

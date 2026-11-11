@@ -19,13 +19,14 @@ public sealed record PaymentAllocationItemDto(
 
 /// <summary>
 /// GET /charges/{id}/allocations satırı. <see cref="Kind"/> <c>Payment</c>: ödeme tahsisi; <c>Credit</c>: krediden mahsup (FIN-005),
-/// bu satırda ödeme alanları kredinin kaynak ödemesidir (paranın geldiği tahsilat).
+/// bu satırda ödeme alanları kredinin kaynak ödemesidir (paranın geldiği tahsilat). Devir alacağından mahsupta kaynak ödeme
+/// yoktur; ödeme alanları boştur (ADR-048 T3).
 /// </summary>
 public sealed record ChargeAllocationItemDto(
     Guid Id,
-    Guid PaymentId,
-    DateTime PaidAtUtc,
-    PaymentMethod Method,
+    Guid? PaymentId,
+    DateTime? PaidAtUtc,
+    PaymentMethod? Method,
     decimal Amount,
     DateTime CreatedAtUtc,
     Guid CreatedByUserId,

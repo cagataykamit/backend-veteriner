@@ -249,4 +249,38 @@ public sealed class ClientCreditTests
 
         charge.Void(UserId, "Yanlış ücret", Now).Error.Code.Should().Be("Charges.VoidBlockedByAllocation");
     }
+
+    [Fact]
+    public void FromImport_Should_Open_Paymentless_Opening_Credit_That_Applies_Like_Any_Credit()
+    {
+        var batchId = Guid.NewGuid();
+
+        var credit = ClientCredit.FromImport(TenantId, ClinicId, ClientId, 250.50m, UserId, Now, batchId).Value!;
+
+        credit.Source.Should().Be(ClientCreditSource.OpeningBalance);
+        credit.SourcePaymentId.Should().BeNull();
+        credit.ImportBatchId.Should().Be(batchId);
+        credit.IsImported.Should().BeTrue();
+        credit.RemainingAmount.Should().Be(250.50m);
+
+        var charge = NewCharge(100m);
+        credit.Apply(charge, 100m, UserId, null, Now).IsSuccess.Should().BeTrue();
+        credit.RemainingAmount.Should().Be(150.50m);
+        charge.OutstandingAmount.Should().Be(0m);
+        credit.Refund(UserId, "Müşteriye iade", PaymentMethod.Cash, Now).IsSuccess.Should().BeTrue();
+        credit.RefundedAmount.Should().Be(150.50m);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    [InlineData(0.001)]
+    public void FromImport_Should_Reject_Invalid_Amount(decimal amount)
+        => ClientCredit.FromImport(TenantId, ClinicId, ClientId, amount, UserId, Now, Guid.NewGuid())
+            .Error.Code.Should().Be("ClientCredits.Validation");
+
+    [Fact]
+    public void FromImport_Should_Require_Batch()
+        => ClientCredit.FromImport(TenantId, ClinicId, ClientId, 10m, UserId, Now, Guid.Empty)
+            .Error.Code.Should().Be("ClientCredits.Validation");
 }

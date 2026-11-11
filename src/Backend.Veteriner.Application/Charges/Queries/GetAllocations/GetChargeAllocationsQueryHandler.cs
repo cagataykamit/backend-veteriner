@@ -77,22 +77,25 @@ public sealed class GetChargeAllocationsQueryHandler
                 r.Amount, r.CreatedAtUtc, r.CreatedByUserId))
             .ToList();
 
-        // Krediden mahsuplar (FIN-005): ödeme alanları kredinin kaynak ödemesidir.
+        // Krediden mahsuplar (FIN-005): ödeme alanları kredinin kaynak ödemesidir; devir alacağında (ödemesiz) boştur.
         var applications = await _creditApplications.ListAsync(new ActiveClientCreditApplicationsByChargeSpec(tenantId, charge.Id), ct);
         if (applications.Count > 0)
         {
             var credits = (await _credits.ListAsync(
                     new ClientCreditsByIdsSpec(tenantId, applications.Select(a => a.CreditId).Distinct().ToArray()), ct))
                 .ToDictionary(c => c.Id);
-            var sourceIds = credits.Values.Select(c => c.SourcePaymentId).Distinct().ToArray();
-            var sources = (await _payments.ListAsync(new PaymentsByIdsSpec(tenantId, sourceIds), ct)).ToDictionary(p => p.Id);
+            var sourceIds = credits.Values.Where(c => c.SourcePaymentId.HasValue).Select(c => c.SourcePaymentId!.Value).Distinct().ToArray();
+            var sources = sourceIds.Length == 0
+                ? new Dictionary<Guid, Payment>()
+                : (await _payments.ListAsync(new PaymentsByIdsSpec(tenantId, sourceIds), ct)).ToDictionary(p => p.Id);
             items.AddRange(applications
-                .Where(a => credits.TryGetValue(a.CreditId, out var c) && sources.ContainsKey(c.SourcePaymentId))
+                .Where(a => credits.TryGetValue(a.CreditId, out var c)
+                            && (c.SourcePaymentId is not { } paymentId || sources.ContainsKey(paymentId)))
                 .Select(a =>
                 {
-                    var source = sources[credits[a.CreditId].SourcePaymentId];
+                    var source = credits[a.CreditId].SourcePaymentId is { } paymentId ? sources[paymentId] : null;
                     return new ChargeAllocationItemDto(
-                        a.Id, source.Id, source.PaidAtUtc, source.Method, a.Amount, a.CreatedAtUtc, a.CreatedByUserId,
+                        a.Id, source?.Id, source?.PaidAtUtc, source?.Method, a.Amount, a.CreatedAtUtc, a.CreatedByUserId,
                         ChargeAllocationKinds.Credit, a.CreditId);
                 }));
         }

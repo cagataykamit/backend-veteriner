@@ -146,7 +146,7 @@ dosyanın sütun açıklamaları. CRLF, UTF-8 BOM'lu.
 | `eski-program-hareketleri.csv` | Eski program hesap hareketleri (içe aktarılmış, salt okunur; bakiyeyi etkilemez, ADR-048): tarih, borç/tahsilat, tutar, açıklama, ödeme şekli, belge no, hasta adı | İçe aktarma partisi kimliği |
 | `odemeler.csv` | Ödemeler: tutar, yöntem, nakdin kasası (`KasaId`; nakitte boşsa Ana kasa), zaman, dağıtılan ve krediye kalan, not, iptal | İstek anahtarı ve özeti, değişiklik sayacı |
 | `odeme_dagitimlari.csv` | Ödemenin ücretlere dağıtımı | — |
-| `krediler.csv` | Müşteri kredileri ve **iadeleri** (iade zamanı, tutarı, yöntemi, nakit iadede kasası, gerekçesi, iade eden) | Değişiklik sayacı |
+| `krediler.csv` | Müşteri kredileri ve **iadeleri** (iade zamanı, tutarı, yöntemi, nakit iadede kasası, gerekçesi, iade eden); devir alacağında kaynak ödeme boş, içe aktarma partisi dolu (`IceAktarmaPartisiId`, ADR-048 T3) | Değişiklik sayacı |
 | `kredi_kullanimlari.csv` | Kredinin ücretlere uygulanması | İstek anahtarı |
 | `kasalar.csv` | Kasalar (TIER-008): klinik, kod, ad, Ana kasa mı, etkin | — |
 | `kasa_hareket_turleri.csv` | Kasa giriş/çıkışının gelir/gider türleri | — |
