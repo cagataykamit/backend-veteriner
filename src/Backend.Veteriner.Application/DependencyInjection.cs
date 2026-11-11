@@ -159,6 +159,7 @@ public static class DependencyInjection
         services.AddScoped<IPetTimelineSource, HospitalizationTimelineSource>();
         services.AddScoped<IPetTimelineSource, AdministrationTimelineSource>();
         services.AddScoped<IPetTimelineSource, ImagingTimelineSource>();
+        services.AddScoped<IPetTimelineSource, ImportedClinicalRecordTimelineSource>();
 
         // Dosya katmanı (IMAGING_API_CONTRACT.md): sahip türü başına erişim kuralı, ortak okuma ve iptalde erişim kapatma.
         services.AddScoped<IStoredFileOwnerAccess, ImagingRecordFileOwnerAccess>();

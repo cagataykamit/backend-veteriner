@@ -28,7 +28,31 @@ public sealed record ClientDataExportDto(
     ClientDataExportSectionDto<ClientDataExportPrescriptionDto> Prescriptions,
     ClientDataExportSectionDto<ClientDataExportChargeDto> Charges,
     ClientDataExportSectionDto<ClientDataExportPaymentDto> Payments,
-    ClientDataExportBalanceDto Balance);
+    ClientDataExportBalanceDto Balance,
+    ClientDataExportSectionDto<ClientDataExportImportedClinicalRecordDto>? ImportedClinicalRecords = null,
+    ClientDataExportSectionDto<ClientDataExportImportedAccountEntryDto>? ImportedAccountEntries = null);
+
+/// <summary>Eski program kaydı (içe aktarılmış klinik geçmiş, ADR-048 T1); veri kopyasında salt okunur bölüm.</summary>
+public sealed record ClientDataExportImportedClinicalRecordDto(
+    DateOnly RecordedOn,
+    Guid PetId,
+    string PetName,
+    string? RecordType,
+    string? Complaint,
+    string? Diagnosis,
+    string? Treatment,
+    string? Prescription,
+    string? Notes,
+    string? VeterinarianName);
+
+/// <summary>Eski program hesap hareketi (ADR-048 T4); bakiyeyi etkilemez.</summary>
+public sealed record ClientDataExportImportedAccountEntryDto(
+    DateOnly OccurredOn,
+    string Kind,
+    decimal Amount,
+    string Currency,
+    string? Description,
+    string? DocumentNumber);
 
 public sealed record ClientDataExportSectionDto<T>(IReadOnlyList<T> Items, bool IsTruncated);
 

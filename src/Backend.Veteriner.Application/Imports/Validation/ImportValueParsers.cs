@@ -237,4 +237,129 @@ public static class ImportValueParsers
         rule.RuleFor(x => x).EmailAddress();
         return rule;
     }
+
+    // ---------------------------------------------------------------- Tam geçiş (ADR-048; IMPORT_API_CONTRACT.md §12.4)
+
+    public const decimal MaxAmount = 9_999_999.99m;
+
+    private static readonly Regex AmountShape = new(@"^\d{1,3}([.,]\d{3})+([.,]\d{1,2})?$|^\d+([.,]\d{1,2})?$", RegexOptions.Compiled, RegexTimeout);
+    private static readonly Regex ForeignCurrency = new(@"[$€£]|\b(usd|eur|gbp|dolar|euro)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, RegexTimeout);
+    private static readonly Regex TimeText = new(@"^(\d{1,2})[:.](\d{2})(?::(\d{2})(?:[.,]\d+)?)?$", RegexOptions.Compiled, RegexTimeout);
+    private static readonly Regex DateTimeTail = new(@"[T ](\d{1,2}:\d{2}(?::\d{2}(?:[.,]\d+)?)?)$", RegexOptions.Compiled, RegexTimeout);
+
+    /// <summary>
+    /// TL tutarı (§12.4): para işareti ve boşluk atılır; iki farklı ayırıcı varsa sondaki ondalık; tek ayırıcı ve ardından tam
+    /// 3 hane binliktir (<c>1.250</c> = 1250), aksi ondalık. En çok 2 ondalık, mutlak değer ≤ <see cref="MaxAmount"/>; işaret
+    /// korunur (negatif = alacak). Boş <c>(null, true)</c>; başka para birimi veya okunamayan <c>(null, false)</c>.
+    /// </summary>
+    public static (decimal? Value, bool Valid) ParseAmount(string? value)
+    {
+        var text = value?.Trim();
+        if (string.IsNullOrEmpty(text))
+            return (null, true);
+        if (ForeignCurrency.IsMatch(text))
+            return (null, false);
+
+        text = Regex.Replace(text, @"₺|\bTL\b|\bTRY\b", string.Empty, RegexOptions.IgnoreCase, RegexTimeout).Replace(" ", string.Empty);
+        var negative = text.StartsWith('-') || (text.StartsWith('(') && text.EndsWith(')'));
+        text = text.Trim('-', '+', '(', ')');
+        if (!AmountShape.IsMatch(text))
+            return (null, false);
+
+        var lastDot = text.LastIndexOf('.');
+        var lastComma = text.LastIndexOf(',');
+        string normalized;
+        if (lastDot >= 0 && lastComma >= 0)
+        {
+            var decimalSeparator = lastDot > lastComma ? '.' : ',';
+            var thousands = decimalSeparator == '.' ? ',' : '.';
+            normalized = text.Replace(thousands.ToString(), string.Empty).Replace(decimalSeparator, '.');
+        }
+        else if (lastDot >= 0 || lastComma >= 0)
+        {
+            var separator = lastDot >= 0 ? '.' : ',';
+            var parts = text.Split(separator);
+            normalized = parts[^1].Length == 3
+                ? string.Concat(parts)
+                : string.Concat(parts[..^1]) + "." + parts[^1];
+        }
+        else
+        {
+            normalized = text;
+        }
+
+        if (!decimal.TryParse(normalized, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var amount)
+            || decimal.Round(amount, 2) != amount
+            || amount > MaxAmount)
+        {
+            return (null, false);
+        }
+
+        return (negative ? -amount : amount, true);
+    }
+
+    /// <summary>Vücut ısısı (°C, 25–45, 1 ondalık); boş <c>(null, true)</c>, aralık dışı/okunamayan <c>(null, false)</c>.</summary>
+    public static (decimal? Value, bool Valid) ParseTemperature(string? value)
+    {
+        var text = value?.Trim();
+        if (string.IsNullOrEmpty(text))
+            return (null, true);
+
+        text = text.Replace("°C", string.Empty, StringComparison.OrdinalIgnoreCase).Replace("°", string.Empty).Replace(',', '.').Trim();
+        if (!decimal.TryParse(text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var temperature))
+            return (null, false);
+
+        temperature = Math.Round(temperature, 1, MidpointRounding.AwayFromZero);
+        return temperature is < 25m or > 45m ? (null, false) : (temperature, true);
+    }
+
+    /// <summary>
+    /// Saat (24 saat): <c>SS:dd</c>, <c>SS.dd</c>, <c>SS:dd:ss</c>, XLSX okuyucusunun saat hücresi (<c>1899-12-30T14:30:00</c>)
+    /// veya Excel gün kesri (<c>0,604</c>). Boş/okunamayan null.
+    /// </summary>
+    public static TimeOnly? ParseTimeOfDay(string? value)
+    {
+        var text = value?.Trim();
+        if (string.IsNullOrEmpty(text))
+            return null;
+
+        if (DateTimeTail.Match(text) is { Success: true } tail)
+            text = tail.Groups[1].Value;
+
+        if (TimeText.Match(text) is { Success: true } m)
+        {
+            var hour = int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture);
+            var minute = int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture);
+            return hour is >= 0 and < 24 && minute is >= 0 and < 60 ? new TimeOnly(hour, minute) : null;
+        }
+
+        if (double.TryParse(text.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var fraction)
+            && fraction is >= 0 and < 1)
+        {
+            var minutes = (int)Math.Round(fraction * 24 * 60, MidpointRounding.AwayFromZero);
+            return minutes < 24 * 60 ? new TimeOnly(minutes / 60, minutes % 60) : null;
+        }
+
+        return null;
+    }
+
+    /// <summary>Tarih hücresi saat de taşıyorsa (<c>gg.aa.yyyy SS:dd</c>, <c>yyyy-aa-ggTSS:dd:ss</c>) saati; yoksa null.</summary>
+    public static TimeOnly? TimeOfDayIn(string? dateText)
+    {
+        var text = dateText?.Trim();
+        return text is not null && DateTimeTail.IsMatch(text) ? ParseTimeOfDay(text) : null;
+    }
+
+    /// <summary>Tam sayı dakika; boş <c>(null, true)</c>, sayı değil <c>(null, false)</c>. Aralık denetimi çağırandadır.</summary>
+    public static (int? Value, bool Valid) ParseMinutes(string? value)
+    {
+        var text = value?.Trim();
+        if (string.IsNullOrEmpty(text))
+            return (null, true);
+
+        text = Regex.Replace(text, @"(dk|dakika|min)\.?$", string.Empty, RegexOptions.IgnoreCase, RegexTimeout).Trim();
+        if (IntegerWithZeroFraction.IsMatch(text))
+            text = text[..text.IndexOfAny(['.', ','])];
+        return int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var minutes) ? (minutes, true) : (null, false);
+    }
 }

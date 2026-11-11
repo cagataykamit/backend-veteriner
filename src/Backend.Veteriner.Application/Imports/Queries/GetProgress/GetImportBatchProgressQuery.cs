@@ -66,7 +66,7 @@ public sealed class GetImportBatchProgressQueryHandler : IRequestHandler<GetImpo
         if (batch.Status == ImportBatchStatus.Validating)
         {
             // Doğrulama: işçi kirayı alıp önceki sonuçları sıfırladıktan sonra sonucu yazılmış satırlar; kuyruktayken 0.
-            total = batch.CustomerCounts.Total + batch.PetCounts.Total + batch.VaccinationCounts.Total;
+            total = batch.SumCounts(c => c.Total);
             processed = leaseActive ? await _rows.CountAsync(new ImportValidatedRowsSpec(batch.Id), ct) : 0;
         }
         else if (RollbackPhase.Contains(batch.Status))
@@ -78,7 +78,7 @@ public sealed class GetImportBatchProgressQueryHandler : IRequestHandler<GetImpo
         }
         else
         {
-            total = batch.CustomerCounts.Total + batch.PetCounts.Total + batch.VaccinationCounts.Total;
+            total = batch.SumCounts(c => c.Total);
             var started = batch.Status is ImportBatchStatus.Committing or ImportBatchStatus.Committed or ImportBatchStatus.CommitFailed;
             processed = started ? await _rows.CountAsync(new ImportAppliedRowsSpec(batch.Id), ct) : 0;
         }

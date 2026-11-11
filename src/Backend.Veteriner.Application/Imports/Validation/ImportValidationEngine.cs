@@ -39,8 +39,9 @@ public sealed record ImportValidationOutput(IReadOnlyList<ImportRowResult> Rows)
 
 /// <summary>
 /// Kuru çalıştırma motoru (IMPORT_API_CONTRACT.md §6.4): hiçbir şey yazmaz, veritabanına gitmez. Girdi tamamen bellekte
-/// (satırlar, katalog, mevcut kayıt anlık görüntüsü) olduğundan satır başına sorgu yoktur. Sıra: müşteri → hasta → aşı;
-/// her tabloda dosya sırası (ilk görülen kazanır). Kural kodları <see cref="ImportRules"/> kataloğundadır.
+/// (satırlar, katalog, mevcut kayıt anlık görüntüsü) olduğundan satır başına sorgu yoktur. Sıra: müşteri → hasta → aşı →
+/// klinik geçmiş → hesap hareketi → randevu → ürün (<see cref="ImportTables.All"/>); her tabloda dosya sırası (ilk görülen
+/// kazanır). Kural kodları <see cref="ImportRules"/> kataloğundadır.
 /// </summary>
 public sealed partial class ImportValidationEngine
 {
@@ -94,7 +95,12 @@ public sealed partial class ImportValidationEngine
                 {
                     ImportTable.Customers => ProcessCustomer(reader),
                     ImportTable.Pets => ProcessPet(reader),
-                    _ => ProcessVaccination(reader),
+                    ImportTable.Vaccinations => ProcessVaccination(reader),
+                    ImportTable.ClinicalRecords => ProcessClinicalRecord(reader),
+                    ImportTable.AccountEntries => ProcessAccountEntry(reader),
+                    ImportTable.Appointments => ProcessAppointment(reader),
+                    ImportTable.Products => ProcessProduct(reader),
+                    _ => throw new ArgumentOutOfRangeException(nameof(table)),
                 });
             }
         }
@@ -169,6 +175,36 @@ public sealed partial class ImportValidationEngine
             if (vaccination.AppliedAtUtc is { } appliedAt)
                 _dbVaccinations.Add((vaccination.PetId, vaccination.VaccineDefinitionId, OperationDayBounds.ToLocalDate(appliedAt)));
         }
+
+        // Tam geçiş tabloları (ADR-048).
+        foreach (var record in existing.ClinicalRecords)
+        {
+            _dbClinicalRecords.Add((record.PetId, record.RecordedOn, ClinicalContentKey(
+            [
+                record.Complaint, record.History, record.Findings, record.Diagnosis, record.Treatment, record.Prescription,
+                record.LabResults, record.Notes,
+            ])));
+        }
+
+        foreach (var entry in existing.AccountEntries)
+        {
+            _dbAccountEntries.Add((entry.ClientId, entry.OccurredOn, entry.Kind, entry.Amount,
+                ImportTextFolding.Fold(entry.DocumentNumber), ImportTextFolding.Fold(entry.Description)));
+        }
+
+        foreach (var appointment in existing.Appointments)
+            _dbAppointments.Add((appointment.PetId, appointment.ScheduledAtUtc));
+
+        foreach (var product in existing.Products.OrderBy(p => p.Id))
+        {
+            if (product.Barcode is { Length: > 0 } barcode)
+                _dbProductsByBarcode.TryAdd(barcode.Trim(), product);
+            _dbProductsByName.TryAdd((ImportTextFolding.Fold(product.Name), product.Kind), product);
+        }
+
+        IndexByName(_veterinariansByName, existing.Veterinarians);
+        IndexByName(_reasonsByName, existing.AppointmentReasons);
+        IndexByName(_categoriesByName, existing.ProductCategories);
     }
 
     /// <summary>Hayvan mükerrer anahtarı: Türkçe duyarlı, aksan duyarsız ad anahtarı (CreatePetCommand ile aynı kural).</summary>

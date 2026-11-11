@@ -12,7 +12,11 @@ public sealed record ImportCommitRowInfo(
     ImportRowApplyStatus ApplyStatus,
     string? NormalizedJson);
 
-/// <summary>Sahip birimi: bir sahip (müşteri) + hastaları + aşıları; tek transaction'da uygulanır.</summary>
+/// <summary>
+/// Uygulama birimi; tek transaction'da uygulanır. Sahip birimi: bir sahip (müşteri) + devir bakiyesi + hesap hareketleri +
+/// hastaları ve onların aşıları, klinik geçmiş kayıtları, randevuları. Ürün birimi (<c>product:&lt;satır&gt;</c>): bir ürün
+/// satırı ve dosya içi mükerrerleri; sahip birimlerinden sonra gelir (ADR-048).
+/// </summary>
 public sealed record ImportOwnerUnitPlan(string OwnerKey, IReadOnlyList<Guid> RowIds);
 
 /// <summary>
@@ -30,10 +34,15 @@ public static class ImportCommitKeys
 {
     private const string FilePrefix = "file:";
     private const string DbPrefix = "db:";
+    private const string ProductPrefix = "product:";
 
     public static string File(int rowNumber) => $"{FilePrefix}{rowNumber}";
 
     public static string Db(Guid id) => $"{DbPrefix}{id}";
+
+    public static string ProductUnit(int rowNumber) => $"{ProductPrefix}{rowNumber}";
+
+    public static bool IsProductUnit(string? key) => key is not null && key.StartsWith(ProductPrefix, StringComparison.Ordinal);
 
     public static bool TryParseDb(string? key, out Guid id)
     {
@@ -48,6 +57,20 @@ public static class ImportCommitKeys
     /// <summary>Hasta satırının kendi anahtarı (aşılar buna bağlanır); bilinçli atlanan satırda null.</summary>
     public static string? Pet(int rowNumber, ImportNormalizedPet row, Func<int, ImportNormalizedPet?> byRow)
         => Resolve(rowNumber, row, byRow, depth: 0);
+
+    /// <summary>
+    /// Ürün satırının birimi: oluşacak veya eşleşen ürün kendi satırının birimidir; dosya içi mükerrer ilk satırın birimine
+    /// katılır (sonucu o ürüne işaret eder). Bilinçli/bağlanamayan satırda null.
+    /// </summary>
+    public static string? Product(int rowNumber, ImportNormalizedProduct row, Func<int, ImportNormalizedProduct?> byRow)
+        => row.Action switch
+        {
+            ImportRowAction.Create or ImportRowAction.Match => ProductUnit(rowNumber),
+            ImportRowAction.Skip when row.MergedIntoRow is { } canonical
+                                      && byRow(canonical) is { Action: ImportRowAction.Create or ImportRowAction.Match }
+                => ProductUnit(canonical),
+            _ => null,
+        };
 
     private static string? Resolve<T>(int rowNumber, T row, Func<int, T?> byRow, int depth)
         where T : ImportNormalizedRow
@@ -72,6 +95,10 @@ public static class ImportCommitPlanner
         var customers = ParseTable<ImportNormalizedCustomer>(rows, ImportTable.Customers);
         var pets = ParseTable<ImportNormalizedPet>(rows, ImportTable.Pets);
         var vaccinations = ParseTable<ImportNormalizedVaccination>(rows, ImportTable.Vaccinations);
+        var clinicalRecords = ParseTable<ImportNormalizedClinicalRecord>(rows, ImportTable.ClinicalRecords);
+        var accountEntries = ParseTable<ImportNormalizedAccountEntry>(rows, ImportTable.AccountEntries);
+        var appointments = ParseTable<ImportNormalizedAppointment>(rows, ImportTable.Appointments);
+        var products = ParseTable<ImportNormalizedProduct>(rows, ImportTable.Products);
 
         var skip = new List<Guid>();
         var units = new Dictionary<string, List<Guid>>(StringComparer.Ordinal);
@@ -90,6 +117,11 @@ public static class ImportCommitPlanner
                         => ImportCommitKeys.Customer(row.RowNumber, c, n => customers.GetValueOrDefault(n)),
                     ImportTable.Pets when pets.TryGetValue(row.RowNumber, out var p) => p.OwnerKey,
                     ImportTable.Vaccinations when vaccinations.TryGetValue(row.RowNumber, out var v) => v.OwnerKey,
+                    ImportTable.ClinicalRecords when clinicalRecords.TryGetValue(row.RowNumber, out var r) => r.OwnerKey,
+                    ImportTable.AccountEntries when accountEntries.TryGetValue(row.RowNumber, out var e) => e.OwnerKey,
+                    ImportTable.Appointments when appointments.TryGetValue(row.RowNumber, out var a) => a.OwnerKey,
+                    ImportTable.Products when products.TryGetValue(row.RowNumber, out var pr)
+                        => ImportCommitKeys.Product(row.RowNumber, pr, n => products.GetValueOrDefault(n)),
                     _ => null,
                 };
 

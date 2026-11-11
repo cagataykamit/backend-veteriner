@@ -1,8 +1,10 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Pets;
+using Backend.Veteriner.Domain.Products;
 
 namespace Backend.Veteriner.Application.Imports.Validation;
 
@@ -30,12 +32,18 @@ public abstract record ImportNormalizedRow
     public int? MergedIntoRow { get; init; }
 }
 
+/// <summary>
+/// Müşteri satırı. <see cref="OpeningBalance"/> yalnız pozitif ve aktarılacak devir bakiyesidir (ADR-048 T3); müşteri
+/// oluşturulursa devir ücreti açılır, eşleşen/mükerrer satırda null'dır.
+/// </summary>
 public sealed record ImportNormalizedCustomer(
     string? Reference,
     string? FullName,
     string? Phone,
     string? Email,
-    string? Address)
+    string? Address,
+    decimal? OpeningBalance = null,
+    DateOnly? BalanceDate = null)
     : ImportNormalizedRow;
 
 public sealed record ImportNormalizedPet(
@@ -72,6 +80,66 @@ public sealed record ImportNormalizedVaccination(
     string? Notes)
     : ImportNormalizedRow;
 
+/// <summary>Klinik geçmiş satırı (salt okunur eski program kaydı; ADR-048 T1). Sahip anahtarı hastanın sahibidir.</summary>
+public sealed record ImportNormalizedClinicalRecord(
+    string? PetKey,
+    string? OwnerKey,
+    DateOnly? RecordedOn,
+    string? RecordType,
+    string? Complaint,
+    string? History,
+    string? Findings,
+    string? Diagnosis,
+    string? Treatment,
+    string? Prescription,
+    string? LabResults,
+    string? Notes,
+    string? VeterinarianName,
+    decimal? WeightKg,
+    decimal? TemperatureC)
+    : ImportNormalizedRow;
+
+/// <summary>Hesap hareketi satırı (salt okunur; bakiyeyi etkilemez; ADR-048 T4).</summary>
+public sealed record ImportNormalizedAccountEntry(
+    string? OwnerKey,
+    DateOnly? OccurredOn,
+    ImportedAccountEntryKind? Kind,
+    decimal? Amount,
+    string? Description,
+    string? PaymentMethod,
+    string? DocumentNumber,
+    string? PetName)
+    : ImportNormalizedRow;
+
+/// <summary>
+/// Gelecek randevu satırı (ADR-048 T5). <see cref="OwnerHasEmail"/>/<see cref="ScheduledAtUtc"/> randevu hatırlatma etkisini
+/// hesaplamak içindir. <see cref="Notes"/> hekim/neden eklerini de taşır.
+/// </summary>
+public sealed record ImportNormalizedAppointment(
+    string? PetKey,
+    string? OwnerKey,
+    bool OwnerHasEmail,
+    DateTime? ScheduledAtUtc,
+    int DurationMinutes,
+    AppointmentType AppointmentType,
+    Guid? VeterinarianUserId,
+    Guid? ReasonId,
+    string? Notes)
+    : ImportNormalizedRow;
+
+/// <summary>Ürün/hizmet kartı satırı (stok miktarı yok; ADR-048 T7). <c>TargetId</c> eşleşen mevcut üründür.</summary>
+public sealed record ImportNormalizedProduct(
+    string? Name,
+    ProductKind Kind,
+    Guid? CategoryId,
+    string Unit,
+    decimal UnitPrice,
+    string? Barcode,
+    string? Sku,
+    string? Manufacturer,
+    string? Description)
+    : ImportNormalizedRow;
+
 /// <summary><c>NormalizedJson</c> okuma/yazma; tek yer.</summary>
 public static class ImportNormalizedJson
 {
@@ -94,6 +162,10 @@ public static class ImportNormalizedJson
         ImportTable.Customers => Parse<ImportNormalizedCustomer>(json),
         ImportTable.Pets => Parse<ImportNormalizedPet>(json),
         ImportTable.Vaccinations => Parse<ImportNormalizedVaccination>(json),
+        ImportTable.ClinicalRecords => Parse<ImportNormalizedClinicalRecord>(json),
+        ImportTable.AccountEntries => Parse<ImportNormalizedAccountEntry>(json),
+        ImportTable.Appointments => Parse<ImportNormalizedAppointment>(json),
+        ImportTable.Products => Parse<ImportNormalizedProduct>(json),
         _ => null,
     };
 

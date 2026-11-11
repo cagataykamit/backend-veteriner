@@ -13,6 +13,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.Imaging;
+using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Prescriptions;
@@ -50,6 +51,7 @@ public sealed class PetTimelineHandlerTests
     private readonly List<Administration> _administrations = [];
     private readonly List<Product> _products = [];
     private readonly List<ImagingRecord> _imaging = [];
+    private readonly List<ImportedClinicalRecord> _imported = [];
 
     public PetTimelineHandlerTests()
     {
@@ -80,7 +82,8 @@ public sealed class PetTimelineHandlerTests
                 new VaccinationTimelineSource(InMemory(_vaccinations).Object),
                 new HospitalizationTimelineSource(InMemory(_hosp).Object),
                 new AdministrationTimelineSource(InMemory(_administrations).Object, InMemory(_products).Object),
-                new ImagingTimelineSource(InMemory(_imaging).Object)
+                new ImagingTimelineSource(InMemory(_imaging).Object),
+                new ImportedClinicalRecordTimelineSource(InMemory(_imported).Object)
             ]);
 
     /// <summary>Spec'i bellekte değerlendirir (EF'e çeviri entegrasyon testinde doğrulanır).</summary>
@@ -338,7 +341,7 @@ public sealed class PetTimelineHandlerTests
 
         var result = await CreateHandler().Handle(new GetPetTimelineQuery(_petId), CancellationToken.None);
 
-        result.Value!.OmittedTypes.Should().Equal("Examination");
+        result.Value!.OmittedTypes.Should().Equal("Examination", "ImportedClinicalRecord");
         result.Value.Items.Should().ContainSingle().Which.RelatedExaminationId.Should().BeNull();
     }
 
@@ -418,6 +421,47 @@ public sealed class PetTimelineHandlerTests
     }
 
     [Fact]
+    public async Task Imported_Clinical_Record_Is_Read_Only_Row_At_Istanbul_Noon_Without_Link()
+    {
+        ImportedClinicalRecord New(string? type, string? diagnosis, string? complaint)
+            => ImportedClinicalRecord.Create(
+                _tenantId, _clinicId, _petId, Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 10, 1),
+                new ImportedClinicalRecord.Content(type, complaint, null, null, diagnosis, null, null, null, null, "Dr. Eski", null, null),
+                T0).Value!;
+
+        var withType = New("Kontrol", "Otitis externa", "Kaşıntı");
+        var untyped = New(null, null, new string('a', 250));
+        _imported.AddRange([withType, untyped]);
+
+        var result = await CreateHandler().Handle(new GetPetTimelineQuery(_petId), CancellationToken.None);
+
+        var typed = result.Value!.Items.Single(i => i.SourceId == withType.Id);
+        typed.Type.Should().Be(PetRecordKind.ImportedClinicalRecord);
+        typed.EventAtUtc.Should().Be(T0);
+        typed.Title.Should().Be("Kontrol");
+        typed.Summary.Should().Be("Otitis externa");
+        typed.LinkRef.Should().BeNull();
+        typed.IsVoided.Should().BeFalse();
+        var plain = result.Value.Items.Single(i => i.SourceId == untyped.Id);
+        plain.Title.Should().Be(ImportedClinicalRecordTimelineSource.DefaultTitle);
+        plain.Summary.Should().HaveLength(200);
+    }
+
+    [Fact]
+    public async Task Imported_Clinical_Record_Is_Omitted_Without_Examinations_Read()
+    {
+        _imported.Add(ImportedClinicalRecord.Create(
+            _tenantId, _clinicId, _petId, Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 10, 1),
+            new ImportedClinicalRecord.Content(null, "Kusma", null, null, null, null, null, null, null, null, null, null), T0).Value!);
+        _permissions.Setup(p => p.HasPermission(PermissionCatalog.Examinations.Read)).Returns(false);
+
+        var result = await CreateHandler().Handle(new GetPetTimelineQuery(_petId), CancellationToken.None);
+
+        result.Value!.Items.Should().NotContain(i => i.Type == PetRecordKind.ImportedClinicalRecord);
+        result.Value.OmittedTypes.Should().Contain("ImportedClinicalRecord");
+    }
+
+    [Fact]
     public async Task Imaging_Is_Omitted_Without_Imaging_Read()
     {
         _imaging.Add(ImagingRecord.Create(
@@ -453,7 +497,7 @@ public sealed class PetTimelineHandlerTests
         item.SourceId.Should().Be(visit.Id);
         item.Type.Should().Be(PetRecordKind.Visit);
         item.RelatedAppointmentId.Should().Be(appointmentId);
-        item.LinkRef.Id.Should().Be(visit.Id);
+        item.LinkRef!.Id.Should().Be(visit.Id);
     }
 
     [Fact]
@@ -507,7 +551,7 @@ public sealed class PetTimelineHandlerTests
         item.IsVoided.Should().BeFalse();
         item.AddedAfterFinalization.Should().BeTrue();
         item.RelatedExaminationId.Should().Be(examId);
-        item.LinkRef.Type.Should().Be(PetRecordKind.Administration);
+        item.LinkRef!.Type.Should().Be(PetRecordKind.Administration);
         item.LinkRef.Id.Should().Be(late.Id);
     }
 

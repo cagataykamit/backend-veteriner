@@ -96,11 +96,16 @@ public sealed class GetImportRollbackPreviewQueryHandler
             BlockedItemsTruncated: blocked.Total > MaxBlockedItems,
             new ImportRollbackKeptDto(
                 snapshot.CountRows(ImportTable.Customers, ImportRowApplyStatus.Matched),
-                snapshot.CountRows(ImportTable.Pets, ImportRowApplyStatus.Matched)),
+                snapshot.CountRows(ImportTable.Pets, ImportRowApplyStatus.Matched),
+                snapshot.CountRows(ImportTable.Products, ImportRowApplyStatus.Matched)),
             new ImportRollbackCountsDto(
                 snapshot.CountRows(ImportTable.Customers, ImportRowApplyStatus.RolledBack),
                 snapshot.CountRows(ImportTable.Pets, ImportRowApplyStatus.RolledBack),
-                snapshot.CountRows(ImportTable.Vaccinations, ImportRowApplyStatus.RolledBack)),
+                snapshot.CountRows(ImportTable.Vaccinations, ImportRowApplyStatus.RolledBack),
+                snapshot.CountRows(ImportTable.ClinicalRecords, ImportRowApplyStatus.RolledBack),
+                snapshot.CountRows(ImportTable.AccountEntries, ImportRowApplyStatus.RolledBack),
+                snapshot.CountRows(ImportTable.Appointments, ImportRowApplyStatus.RolledBack),
+                snapshot.CountRows(ImportTable.Products, ImportRowApplyStatus.RolledBack)),
             batch.RemindersReleasedAtUtc is not null,
             warnings);
     }

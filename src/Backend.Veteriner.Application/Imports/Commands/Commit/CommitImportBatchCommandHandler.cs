@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Imports.Access;
 using Backend.Veteriner.Application.Imports.Commit;
 using Backend.Veteriner.Application.Imports.Contracts.Dtos;
+using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Application.Imports.Specs;
 using Backend.Veteriner.Application.Imports.Validation;
 using Backend.Veteriner.Application.Tenants.Specs;
@@ -26,6 +27,7 @@ public sealed class CommitImportBatchCommandHandler : IRequestHandler<CommitImpo
     private readonly IClinicContext _clinicContext;
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly ICurrentUserPermissionChecker _permissions;
+    private readonly IClientContext _clientContext;
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IRepository<ImportBatch> _batches;
     private readonly IReadRepository<ImportBatchRow> _rows;
@@ -37,6 +39,7 @@ public sealed class CommitImportBatchCommandHandler : IRequestHandler<CommitImpo
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
         ICurrentUserPermissionChecker permissions,
+        IClientContext clientContext,
         IReadRepository<Tenant> tenants,
         IRepository<ImportBatch> batches,
         IReadRepository<ImportBatchRow> rows,
@@ -47,6 +50,7 @@ public sealed class CommitImportBatchCommandHandler : IRequestHandler<CommitImpo
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
         _permissions = permissions;
+        _clientContext = clientContext;
         _tenants = tenants;
         _batches = batches;
         _rows = rows;
@@ -110,7 +114,8 @@ public sealed class CommitImportBatchCommandHandler : IRequestHandler<CommitImpo
                 $"{ImportCommitGate.ErrorRows(batch)} hatalı satır var; 'FailIfAny' seçiminde hiçbir şey uygulanmaz.");
         }
 
-        var started = batch.StartCommit(request.ValidationId, _timeProvider.GetUtcNow().UtcDateTime);
+        var options = ImportOptionsDocument.Parse(batch.OptionsJson) with { CommittedByUserId = _clientContext.UserId };
+        var started = batch.StartCommit(request.ValidationId, _timeProvider.GetUtcNow().UtcDateTime, options.ToJson());
         if (!started.IsSuccess)
             return Result<ImportCommitResultDto>.Failure(started.Error);
 

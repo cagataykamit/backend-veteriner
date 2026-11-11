@@ -27,11 +27,15 @@ public sealed record ImportBatchDto(
     IReadOnlyList<ImportWarningDto>? Warnings = null,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] ImportSourceProfile SourceProfile = ImportSourceProfile.Generic);
 
-/// <summary>Tablo başına sayaçlar.</summary>
+/// <summary>Tablo başına sayaçlar; tam geçiş tabloları (ADR-048) partide yoksa sıfırdır.</summary>
 public sealed record ImportBatchSummaryDto(
     ImportTableCountsDto Customers,
     ImportTableCountsDto Pets,
-    ImportTableCountsDto Vaccinations);
+    ImportTableCountsDto Vaccinations,
+    ImportTableCountsDto ClinicalRecords,
+    ImportTableCountsDto AccountEntries,
+    ImportTableCountsDto Appointments,
+    ImportTableCountsDto Products);
 
 /// <summary>Doğrulama tahmini (<c>Total..WillSkip</c>) ve uygulama sonucu (<c>Created..Failed</c>).</summary>
 public sealed record ImportTableCountsDto(

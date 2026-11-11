@@ -10,6 +10,7 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned, IC
     public const int MinDurationMinutes = 5;
     public const int MaxDurationMinutes = 240;
     public const int DefaultDurationMinutes = 30;
+    public const int MaxNotesLength = 2000;
     public const int MinNoShowRevertReasonLength = 5;
     public const int MaxNoShowReasonLength = 500;
 
@@ -39,6 +40,12 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned, IC
     /// (onay eski saat içindir).
     /// </summary>
     public DateTime? OwnerConfirmedAtUtc { get; private set; }
+
+    /// <summary>
+    /// Kaydı oluşturan içe aktarma partisi (ADR-048 T5); günlük girişte boştur. Partinin hatırlatmaları serbest bırakılana
+    /// kadar randevu hatırlatma adaylarından dışlanır (ADR-019 K3).
+    /// </summary>
+    public Guid? ImportBatchId { get; private set; }
 
     /// <summary>
     /// Başarılı domain mutasyon sayacı; optimistic concurrency token.
@@ -96,6 +103,33 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned, IC
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
         ReasonId = reasonId;
         VeterinarianUserId = veterinarianUserId;
+    }
+
+    /// <summary>
+    /// Eski programdan gelen gelecek randevu (ADR-048 T5): planlı durumda, partinin kliniğinde. Saat çakışması ve çalışma
+    /// saati içe aktarmada engel değildir (eski program zaten planlamıştı); bu kurallar oluşturma komutundadır, burada değil.
+    /// </summary>
+    public static Appointment CreateImported(
+        Guid tenantId,
+        Guid clinicId,
+        Guid petId,
+        DateTime scheduledAtUtc,
+        int durationMinutes,
+        AppointmentType appointmentType,
+        string? notes,
+        Guid? reasonId,
+        Guid? veterinarianUserId,
+        Guid importBatchId)
+    {
+        if (importBatchId == Guid.Empty)
+            throw new ArgumentException("ImportBatchId geçersiz.", nameof(importBatchId));
+
+        return new Appointment(
+            tenantId, clinicId, petId, scheduledAtUtc, durationMinutes, appointmentType, AppointmentStatus.Scheduled, notes,
+            reasonId, veterinarianUserId)
+        {
+            ImportBatchId = importBatchId,
+        };
     }
 
     /// <summary>Başarılı domain mutasyonundan sonra tam bir kez çağrılır.</summary>

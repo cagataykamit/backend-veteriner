@@ -29,7 +29,7 @@ public sealed class ImportValidationRunner
         var mapping = ImportMappingDocument.Parse(batch.MappingJson);
 
         // Dosya düzeyi sorun: satırlar işlenmez, önceki satır sonuçlarına dokunulmaz.
-        if (ImportPreconditions.Check(mapping, present).Count > 0)
+        if (ImportPreconditions.Check(mapping, present, batch.ClinicId is not null).Count > 0)
             return ImportValidationOutcome.FileLevelFailure;
 
         var tables = rows
@@ -42,16 +42,15 @@ public sealed class ImportValidationRunner
                     .ToList());
 
         var catalogs = await _catalogs.LoadAsync(batch.TenantId, ct);
-        var existing = await _existingData.LoadAsync(batch.TenantId, ImportLookupKeys.From(tables, mapping), ct);
+        var existing = await _existingData.LoadAsync(
+            batch.TenantId, batch.ClinicId, ImportLookupKeys.From(tables, mapping), present, nowUtc, ct);
 
         var output = ImportValidationEngine.Run(new ImportValidationInput(
             tables, mapping, ImportOptionsDocument.Parse(batch.OptionsJson), catalogs, existing, nowUtc));
 
         return new ImportValidationOutcome(
             output.Rows.ToDictionary(r => (r.Table, r.RowNumber)),
-            output.CountsOf(ImportTable.Customers),
-            output.CountsOf(ImportTable.Pets),
-            output.CountsOf(ImportTable.Vaccinations));
+            ImportCanonicalNames.Tables.ToDictionary(t => t, output.CountsOf));
     }
 }
 
@@ -59,23 +58,17 @@ public sealed class ImportValidationRunner
 public sealed class ImportValidationOutcome
 {
     /// <summary>Dosya düzeyi başarısızlık (bağlantı sütunu yok): satır sonucu yok, parti <c>ValidationFailed</c>.</summary>
-    public static readonly ImportValidationOutcome FileLevelFailure = new(null, null, null, null);
+    public static readonly ImportValidationOutcome FileLevelFailure = new(null, null);
 
     private readonly IReadOnlyDictionary<(ImportTable Table, int RowNumber), ImportRowResult>? _rows;
-    private readonly ImportTableCounts? _customers;
-    private readonly ImportTableCounts? _pets;
-    private readonly ImportTableCounts? _vaccinations;
+    private readonly IReadOnlyDictionary<ImportTable, ImportTableCounts>? _counts;
 
     public ImportValidationOutcome(
         IReadOnlyDictionary<(ImportTable Table, int RowNumber), ImportRowResult>? rows,
-        ImportTableCounts? customers,
-        ImportTableCounts? pets,
-        ImportTableCounts? vaccinations)
+        IReadOnlyDictionary<ImportTable, ImportTableCounts>? counts)
     {
         _rows = rows;
-        _customers = customers;
-        _pets = pets;
-        _vaccinations = vaccinations;
+        _counts = counts;
     }
 
     /// <summary>Satır sonuçları var mı (dosya düzeyi başarısızlıkta yok).</summary>
@@ -100,12 +93,12 @@ public sealed class ImportValidationOutcome
     /// </summary>
     public Result Complete(ImportBatch batch, DateTime nowUtc)
     {
-        if (_customers is not { } customers || _pets is not { } pets || _vaccinations is not { } vaccinations)
-            return batch.FailValidation(nowUtc);
+        if (_counts is null)
+            return batch.FailValidation(nowUtc, counts: null);
 
-        var importable = customers.Valid + customers.Warning + pets.Valid + pets.Warning + vaccinations.Valid + vaccinations.Warning;
+        var importable = _counts.Values.Sum(c => c.Valid + c.Warning);
         return importable == 0
-            ? batch.FailValidation(nowUtc, customers, pets, vaccinations)
-            : batch.CompleteValidation(Guid.NewGuid(), customers, pets, vaccinations, nowUtc);
+            ? batch.FailValidation(nowUtc, _counts)
+            : batch.CompleteValidation(Guid.NewGuid(), _counts, nowUtc);
     }
 }

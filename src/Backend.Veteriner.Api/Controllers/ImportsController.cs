@@ -75,7 +75,11 @@ public sealed class ImportsController : ControllerBase
             return problem!;
 
         // Aşırı büyük dosya belleğe alınmadan reddedilir; kalan denetimler okuyucudadır.
-        if (new[] { form.File, form.CustomersFile, form.PetsFile, form.VaccinationsFile }
+        if (new[]
+            {
+                form.File, form.CustomersFile, form.PetsFile, form.VaccinationsFile, form.ClinicalRecordsFile,
+                form.AccountEntriesFile, form.AppointmentsFile, form.ProductsFile,
+            }
             .Any(f => f is not null && f.Length > _limits.MaxFileBytes))
         {
             return Result.Failure(
@@ -88,7 +92,11 @@ public sealed class ImportsController : ControllerBase
             await ReadAsync(form.File, ct),
             await ReadAsync(form.CustomersFile, ct),
             await ReadAsync(form.PetsFile, ct),
-            await ReadAsync(form.VaccinationsFile, ct));
+            await ReadAsync(form.VaccinationsFile, ct),
+            await ReadAsync(form.ClinicalRecordsFile, ct),
+            await ReadAsync(form.AccountEntriesFile, ct),
+            await ReadAsync(form.AppointmentsFile, ct),
+            await ReadAsync(form.ProductsFile, ct));
 
         var result = await _mediator.Send(
             new CreateImportBatchCommand(
@@ -131,7 +139,7 @@ public sealed class ImportsController : ControllerBase
 
     /// <summary>
     /// Doldurulacak şablon: <c>format=xlsx</c> (Musteriler, Hastalar, Asilar, Aciklama sayfaları) veya
-    /// <c>format=csv&amp;table=customers|pets|vaccinations</c>.
+    /// <c>format=csv&amp;table=customers|pets|vaccinations|clinicalRecords|accountEntries|appointments|products</c>.
     /// </summary>
     [HttpGet("template")]
     [Authorize(Policy = PermissionCatalog.Imports.Read)]

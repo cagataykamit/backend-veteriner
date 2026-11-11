@@ -196,7 +196,7 @@ public sealed class ImportRollbackPlannerTests
         var rows = Rows();
         rows.Add(Row(ImportTable.Pets, 8, Guid.NewGuid(), ImportRowApplyStatus.RolledBack));
 
-        var targets = ImportRollbackPlanner.Targets(rows);
+        var targets = ImportRollbackPlanner.Targets(Guid.NewGuid(), rows);
 
         targets.ClientIds.Should().BeEquivalentTo([Client1, Client2]);
         targets.PetIds.Should().BeEquivalentTo([Pet1, Pet2, PetOfMatched]);

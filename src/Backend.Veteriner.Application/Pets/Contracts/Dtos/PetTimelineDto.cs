@@ -19,7 +19,7 @@ public sealed record PetTimelineItemDto(
     string? Summary,
     string? Status,
     bool IsVoided,
-    PetTimelineLinkRefDto LinkRef,
+    PetTimelineLinkRefDto? LinkRef,
     Guid? RelatedExaminationId,
     Guid? RelatedVisitId,
     Guid? RelatedAppointmentId,

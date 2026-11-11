@@ -50,7 +50,7 @@ public sealed partial class ImportValidationEngine
         else if (name.Length > MaxPetNameLength)
             issues.Add(ImportRules.FieldTooLong.At("HayvanAdi", $"Hasta adı en fazla {MaxPetNameLength} karakter olabilir."));
 
-        var owner = ResolveOwnerForPet(reader, issues);
+        var owner = ResolveOwnerLink(reader, issues);
 
         // Tür
         Guid? speciesId = null;
@@ -264,9 +264,9 @@ public sealed partial class ImportValidationEngine
     }
 
     /// <summary>
-    /// Hasta satırının sahibini çözer (bölüm 6.4 bağlantı çözümü). Çözülemezse nedeni <paramref name="issues"/>'a ekler.
+    /// Müşteriye bağlanan satırın (hasta, hesap hareketi) sahibini çözer (bölüm 6.4 bağlantı çözümü). Çözülemezse nedeni <paramref name="issues"/>'a ekler.
     /// </summary>
-    private OwnerRef? ResolveOwnerForPet(ImportRowReader reader, List<ImportIssue> issues)
+    private OwnerRef? ResolveOwnerLink(ImportRowReader reader, List<ImportIssue> issues)
     {
         var reference = ImportValueParsers.NormalizeText(reader.Raw("MusteriNo"));
         if (reference is not null && CustomerReferenceUsable)

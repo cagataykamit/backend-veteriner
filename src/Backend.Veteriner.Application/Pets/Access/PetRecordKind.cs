@@ -15,5 +15,8 @@ public enum PetRecordKind
     Appointment = 8,
     Payment = 9,
     Administration = 10,
-    Imaging = 11
+    Imaging = 11,
+
+    /// <summary>İçe aktarılmış eski program kaydı (salt okunur klinik geçmiş; ADR-048 T1). Yalnız zaman çizelgesinde.</summary>
+    ImportedClinicalRecord = 12
 }

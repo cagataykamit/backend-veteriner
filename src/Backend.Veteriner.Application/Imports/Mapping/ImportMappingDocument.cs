@@ -48,9 +48,13 @@ public sealed record ImportRollbackRequest(Guid RequestId, string Policy);
 
 /// <summary>
 /// Parti seçenekleri (<c>OptionsJson</c>). <see cref="OnDuplicateClient"/> ADR-019 K4; <see cref="Rollback"/> son geri alma
-/// isteği (B5; geri alma işi politikayı buradan okur).
+/// isteği (B5; geri alma işi politikayı buradan okur); <see cref="CommittedByUserId"/> uygulamayı başlatan kullanıcı (devir
+/// ücretini açan kullanıcı sayılır, ADR-048 T3; yoksa partiyi oluşturan).
 /// </summary>
-public sealed record ImportOptionsDocument(string OnDuplicateClient, ImportRollbackRequest? Rollback = null)
+public sealed record ImportOptionsDocument(
+    string OnDuplicateClient,
+    ImportRollbackRequest? Rollback = null,
+    Guid? CommittedByUserId = null)
 {
     public const string Match = "Match";
     public const string Skip = "Skip";

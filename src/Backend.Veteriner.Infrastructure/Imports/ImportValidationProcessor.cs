@@ -258,6 +258,10 @@ public sealed class ImportValidationProcessor
                 Customers = Counts(batch.CustomerCounts),
                 Pets = Counts(batch.PetCounts),
                 Vaccinations = Counts(batch.VaccinationCounts),
+                ClinicalRecords = Counts(batch.ClinicalRecordCounts),
+                AccountEntries = Counts(batch.AccountEntryCounts),
+                Appointments = Counts(batch.AppointmentCounts),
+                Products = Counts(batch.ProductCounts),
             },
             AuditJson);
 

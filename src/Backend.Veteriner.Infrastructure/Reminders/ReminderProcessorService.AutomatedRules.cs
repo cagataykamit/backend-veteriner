@@ -112,6 +112,7 @@ public sealed partial class ReminderProcessorService
     /// <summary>
     /// Ödenmemiş ücretin üzerinden N gün geçen müşteri; müşteri başına yalnız en eski ücret aday olur, hatırlatma o ücret ödenene kadar
     /// yinelenmez. Bağlanmamış ödemesi ya da açık kredisi olan müşteri (mutabakat kliniktedir) ve ücreti vefat eden hayvana ait kayıt dışlanır.
+    /// İçe aktarılan devir bakiyesi, partinin hatırlatmaları serbest bırakılana kadar aday olmaz (ADR-019 K3, ADR-048 T3).
     /// </summary>
     private async Task ProcessDebtRuleAsync(
         ClinicReminderRule rule,
@@ -135,7 +136,9 @@ public sealed partial class ReminderProcessorService
             && c.VoidedAtUtc == null
             && c.Amount > c.AllocatedAmount
             && c.CreatedAtUtc <= dueCutoffUtc
-            && c.CreatedAtUtc >= floorUtc);
+            && c.CreatedAtUtc >= floorUtc
+            && (c.ImportBatchId == null
+                || _db.ImportBatches.Any(b => b.Id == c.ImportBatchId && b.RemindersReleasedAtUtc != null)));
 
         var candidates = await inWindow
             .AsNoTracking()

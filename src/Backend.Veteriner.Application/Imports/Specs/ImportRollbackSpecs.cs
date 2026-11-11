@@ -1,8 +1,11 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Imports.Rollback;
+using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Pets;
+using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Vaccinations;
 
 namespace Backend.Veteriner.Application.Imports.Specs;
@@ -72,6 +75,56 @@ public sealed class ImportRollbackClientsSpec : Specification<Client>
     {
         var set = ids.ToArray();
         Query.Where(c => c.TenantId == tenantId && set.Contains(c.Id));
+    }
+}
+
+/// <summary>Geri almada silinecek klinik geçmiş kayıtları (izlenir; ADR-048).</summary>
+public sealed class ImportRollbackClinicalRecordsSpec : Specification<ImportedClinicalRecord>
+{
+    public ImportRollbackClinicalRecordsSpec(Guid tenantId, IReadOnlyCollection<Guid> ids)
+    {
+        var set = ids.ToArray();
+        Query.Where(r => r.TenantId == tenantId && set.Contains(r.Id));
+    }
+}
+
+/// <summary>Geri almada silinecek hesap hareketleri (izlenir; ADR-048).</summary>
+public sealed class ImportRollbackAccountEntriesSpec : Specification<ImportedAccountEntry>
+{
+    public ImportRollbackAccountEntriesSpec(Guid tenantId, IReadOnlyCollection<Guid> ids)
+    {
+        var set = ids.ToArray();
+        Query.Where(e => e.TenantId == tenantId && set.Contains(e.Id));
+    }
+}
+
+/// <summary>Geri almada silinecek randevular (izlenir; ADR-048).</summary>
+public sealed class ImportRollbackAppointmentsSpec : Specification<Appointment>
+{
+    public ImportRollbackAppointmentsSpec(Guid tenantId, IReadOnlyCollection<Guid> ids)
+    {
+        var set = ids.ToArray();
+        Query.Where(a => a.TenantId == tenantId && set.Contains(a.Id));
+    }
+}
+
+/// <summary>Geri almada silinecek, partinin açtığı devir ücretleri (izlenir; ADR-048 T3).</summary>
+public sealed class ImportRollbackOpeningBalancesSpec : Specification<Charge>
+{
+    public ImportRollbackOpeningBalancesSpec(Guid tenantId, Guid batchId, IReadOnlyCollection<Guid> ids)
+    {
+        var set = ids.ToArray();
+        Query.Where(c => c.TenantId == tenantId && c.ImportBatchId == batchId && set.Contains(c.Id));
+    }
+}
+
+/// <summary>Geri almada silinecek ürünler (izlenir; ADR-048 T7).</summary>
+public sealed class ImportRollbackProductsSpec : Specification<Product>
+{
+    public ImportRollbackProductsSpec(Guid tenantId, IReadOnlyCollection<Guid> ids)
+    {
+        var set = ids.ToArray();
+        Query.Where(p => p.TenantId == tenantId && set.Contains(p.Id));
     }
 }
 

@@ -138,8 +138,13 @@ internal static class FinanceEvents
         return q;
     }
 
+    /// <summary>
+    /// Ciro ve gün sonu ücret kaynağı (tek yer). İçe aktarılan devir bakiyesi (<c>ImportBatchId</c> dolu; ADR-048 T3) eski
+    /// dönemin cirosudur, faturası eski programda kesildi: oluşma, iptal ve düzeltme olaylarına girmez. Tahsilatı ödeme
+    /// olayıdır ve kasada görünür. Bakiye, borç raporu ve portal bakiyesi bu kaynaktan geçmez; devir orada görünür.
+    /// </summary>
     private static IQueryable<Domain.Charges.Charge> Charges(AppDbContext db, FinanceEventFilter f)
-        => InScope(db.Charges.IgnoreQueryFilters(QueryFilterNames.Ignorable).AsNoTracking(), f);
+        => InScope(db.Charges.IgnoreQueryFilters(QueryFilterNames.Ignorable).AsNoTracking().Where(c => c.ImportBatchId == null), f);
 
     private static IQueryable<Domain.Payments.Payment> Payments(AppDbContext db, FinanceEventFilter f)
         => InScope(db.Payments.IgnoreQueryFilters(QueryFilterNames.Ignorable).AsNoTracking(), f);

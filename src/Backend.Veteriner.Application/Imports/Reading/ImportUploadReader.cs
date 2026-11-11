@@ -45,7 +45,7 @@ public sealed class ImportUploadReader
     public Result<ImportPreparedUpload> Prepare(ImportFileSet files, string? encoding, string? delimiter)
     {
         if (!files.HasAny)
-            return Fail("Imports.EmptyFile", "Yüklenecek dosya yok; file veya customersFile/petsFile/vaccinationsFile gönderin.");
+            return Fail("Imports.EmptyFile", "Yüklenecek dosya yok; file (XLSX) veya tablo başına CSV alanlarından birini (customersFile, petsFile, vaccinationsFile, clinicalRecordsFile, accountEntriesFile, appointmentsFile, productsFile) gönderin.");
 
         if (files.Workbook is not null && files.HasCsv)
             return Fail("Imports.UnsupportedFile", "file (XLSX) ile CSV alanları birlikte gönderilemez.");
@@ -206,15 +206,7 @@ public sealed class ImportUploadReader
             yield return (file, false);
     }
 
-    private static IEnumerable<(ImportTable Table, ImportUploadedFile File)> CsvInputs(ImportFileSet files)
-    {
-        if (files.CustomersCsv is not null)
-            yield return (ImportTable.Customers, files.CustomersCsv);
-        if (files.PetsCsv is not null)
-            yield return (ImportTable.Pets, files.PetsCsv);
-        if (files.VaccinationsCsv is not null)
-            yield return (ImportTable.Vaccinations, files.VaccinationsCsv);
-    }
+    private static IEnumerable<(ImportTable Table, ImportUploadedFile File)> CsvInputs(ImportFileSet files) => files.CsvFiles;
 
     private static Result<ImportPreparedUpload> Fail(string code, string message)
         => Fail<ImportPreparedUpload>(code, message);

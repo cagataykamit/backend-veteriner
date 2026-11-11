@@ -307,11 +307,7 @@ public sealed class ImportCommitProcessor
         var pending = counts.Where(c => c.ApplyStatus == ImportRowApplyStatus.Pending).Sum(c => c.Count);
         var now = Now;
         var completed = pending == 0
-            ? batch.CompleteCommit(
-                Applied(batch.CustomerCounts, ImportTable.Customers),
-                Applied(batch.PetCounts, ImportTable.Pets),
-                Applied(batch.VaccinationCounts, ImportTable.Vaccinations),
-                now)
+            ? batch.CompleteCommit(ImportTables.All.ToDictionary(t => t, t => Applied(batch.CountsOf(t), t)), now)
             : batch.FailCommit(now);
         if (!completed.IsSuccess)
             return;
@@ -371,6 +367,10 @@ public sealed class ImportCommitProcessor
                 Customers = Counts(batch.CustomerCounts),
                 Pets = Counts(batch.PetCounts),
                 Vaccinations = Counts(batch.VaccinationCounts),
+                ClinicalRecords = Counts(batch.ClinicalRecordCounts),
+                AccountEntries = Counts(batch.AccountEntryCounts),
+                Appointments = Counts(batch.AppointmentCounts),
+                Products = Counts(batch.ProductCounts),
             },
             AuditJson);
 

@@ -33,11 +33,20 @@ public sealed record ImportRollbackItem(
     public string Entity => ImportRollbackPlanner.EntityOf(Row.Table);
 }
 
-/// <summary>Sahip birimi: bir müşteri ve ona bağlı partinin oluşturduğu hasta/aşı satırları (tek transaction).</summary>
+/// <summary>
+/// Geri alma birimi (tek transaction): bir müşteri ve ona bağlı partinin oluşturduğu hasta, aşı, klinik geçmiş, randevu ve
+/// hesap hareketi satırları; ya da bir ürün satırı (ADR-048). Anahtar müşteri veya ürün kimliğidir.
+/// </summary>
 public sealed record ImportRollbackUnit(Guid OwnerKey, IReadOnlyList<Guid> RowIds);
 
+/// <summary>
+/// <see cref="OpeningBalances"/>: hedef müşterilere partinin açtığı devir ücretleri (müşteri → ücret). Devir satır değil
+/// müşterinin ekidir; müşteriyle aynı kararı alır (müşteri silinirse ücret de silinir).
+/// </summary>
 public sealed record ImportRollbackPlan(IReadOnlyList<ImportRollbackItem> Items, IReadOnlyList<ImportRollbackUnit> Units)
 {
+    public IReadOnlyDictionary<Guid, Guid> OpeningBalances { get; init; } = new Dictionary<Guid, Guid>();
+
     public IEnumerable<ImportRollbackItem> Blocked => Items.Where(i => i.Decision == ImportRollbackDecision.Keep);
 
     public bool HasBlocked => Blocked.Any();
@@ -45,25 +54,38 @@ public sealed record ImportRollbackPlan(IReadOnlyList<ImportRollbackItem> Items,
     public int Count(ImportTable table, ImportRollbackDecision decision)
         => Items.Count(i => i.Row.Table == table && i.Decision == decision);
 
+    /// <summary>Kararı <paramref name="decision"/> olan müşterilerin devir ücreti sayısı.</summary>
+    public int CountOpeningBalances(ImportRollbackDecision decision)
+        => Items.Count(i => i.Row.Table == ImportTable.Customers && i.Decision == decision && OpeningBalances.ContainsKey(i.TargetId));
+
     public int Total(ImportRollbackDecision decision) => Items.Count(i => i.Decision == decision);
 }
 
 /// <summary>
-/// Geri alma silinebilirlik kuralının tek yeri (IMPORT_API_CONTRACT.md §9, B5 tablosu). Saf fonksiyondur: önizleme
+/// Geri alma silinebilirlik kuralının tek yeri (IMPORT_API_CONTRACT.md §9, B5 tablosu; §12.9). Saf fonksiyondur: önizleme
 /// (tüm parti), istek anındaki engel denetimi ve arka plan birim işlemi (birim, aynı transaction'da yeniden okunmuş
 /// bağımlılıklarla) aynı kuralı çalıştırır. Yalnız <c>Created</c> (ve önceki kısmi geri almadan <c>Kept</c>) satırlar
-/// değerlendirilir; eşleşen mevcut kayıt (<c>Matched</c>) hiçbir zaman hedef değildir.
+/// değerlendirilir; eşleşen mevcut kayıt (<c>Matched</c>) hiçbir zaman hedef değildir. Partinin kendi kayıtları bağ sayılmaz,
+/// diğer her bağ engeldir (ADR-048).
 /// </summary>
 public static class ImportRollbackPlanner
 {
     public const string ClientEntity = "Client";
     public const string PetEntity = "Pet";
     public const string VaccinationEntity = "Vaccination";
+    public const string ClinicalRecordEntity = "ClinicalRecord";
+    public const string AccountEntryEntity = "AccountEntry";
+    public const string AppointmentEntity = "Appointment";
+    public const string ProductEntity = "Product";
 
     public static string EntityOf(ImportTable table) => table switch
     {
         ImportTable.Customers => ClientEntity,
         ImportTable.Pets => PetEntity,
+        ImportTable.ClinicalRecords => ClinicalRecordEntity,
+        ImportTable.AccountEntries => AccountEntryEntity,
+        ImportTable.Appointments => AppointmentEntity,
+        ImportTable.Products => ProductEntity,
         _ => VaccinationEntity,
     };
 
@@ -71,20 +93,28 @@ public static class ImportRollbackPlanner
     public static bool IsTarget(ImportRollbackRowInfo row)
         => row.TargetId is not null && row.ApplyStatus is ImportRowApplyStatus.Created or ImportRowApplyStatus.Kept;
 
-    public static ImportRollbackTargets Targets(IEnumerable<ImportRollbackRowInfo> rows)
+    public static ImportRollbackTargets Targets(Guid batchId, IEnumerable<ImportRollbackRowInfo> rows)
     {
         var targets = rows.Where(IsTarget).ToList();
         Guid[] Ids(ImportTable table) => targets.Where(r => r.Table == table).Select(r => r.TargetId!.Value).Distinct().ToArray();
-        return new ImportRollbackTargets(Ids(ImportTable.Customers), Ids(ImportTable.Pets), Ids(ImportTable.Vaccinations));
+        return new ImportRollbackTargets(Ids(ImportTable.Customers), Ids(ImportTable.Pets), Ids(ImportTable.Vaccinations))
+        {
+            BatchId = batchId,
+            ClinicalRecordIds = Ids(ImportTable.ClinicalRecords),
+            AccountEntryIds = Ids(ImportTable.AccountEntries),
+            AppointmentIds = Ids(ImportTable.Appointments),
+            ProductIds = Ids(ImportTable.Products),
+        };
     }
 
     public static ImportRollbackPlan Build(IEnumerable<ImportRollbackRowInfo> rows, ImportRollbackFacts facts)
     {
         var targets = rows.Where(IsTarget).OrderBy(r => r.Table).ThenBy(r => r.RowNumber).ToList();
         var items = new List<ImportRollbackItem>(targets.Count);
+        List<ImportRollbackRowInfo> TargetsOf(ImportTable table) => targets.Where(r => r.Table == table).ToList();
 
         // Aşı: yalnız kendi bağları.
-        var vaccinationRows = targets.Where(r => r.Table == ImportTable.Vaccinations).ToList();
+        var vaccinationRows = TargetsOf(ImportTable.Vaccinations);
         var batchVaccinations = vaccinationRows.Select(r => r.TargetId!.Value).ToHashSet();
         foreach (var row in vaccinationRows)
         {
@@ -100,10 +130,35 @@ public static class ImportRollbackPlanner
                 (v.Modified, ImportRollbackReasons.VaccinationModified)));
         }
 
-        var keptVaccinations = KeptIds(items, ImportTable.Vaccinations);
+        // Klinik geçmiş ve hesap hareketi: salt okunur, başka kayıt bağlanamaz; varsa silinir.
+        var clinicalRecordRows = TargetsOf(ImportTable.ClinicalRecords);
+        var batchClinicalRecords = clinicalRecordRows.Select(r => r.TargetId!.Value).ToHashSet();
+        foreach (var row in clinicalRecordRows)
+            items.Add(facts.ClinicalRecords.ContainsKey(row.TargetId!.Value) ? Decide(row, Array.Empty<string>()) : Gone(row));
 
-        // Hasta: kendi bağları + kalan tek bağ partinin silinebilir aşıları olmalı.
-        var petRows = targets.Where(r => r.Table == ImportTable.Pets).ToList();
+        // Randevu: hâlâ planlı, değişmemiş, geliş/muayene bağlı değil.
+        foreach (var row in TargetsOf(ImportTable.Appointments))
+        {
+            if (!facts.Appointments.TryGetValue(row.TargetId!.Value, out var a))
+            {
+                items.Add(Gone(row));
+                continue;
+            }
+
+            items.Add(Decide(row,
+                (a.Changed, ImportRollbackReasons.AppointmentChanged),
+                (a.HasVisits, ImportRollbackReasons.HasVisits),
+                (a.HasExaminations, ImportRollbackReasons.HasExaminations)));
+        }
+
+        var keptVaccinations = KeptIds(items, ImportTable.Vaccinations);
+        var petsWithKeptAppointments = items
+            .Where(i => i.Row.Table == ImportTable.Appointments && i.Decision == ImportRollbackDecision.Keep)
+            .Select(i => facts.Appointments[i.TargetId].PetId)
+            .ToHashSet();
+
+        // Hasta: kendi bağları + kalan bağlar partinin silinebilir aşıları, klinik geçmiş kayıtları ve randevuları olmalı.
+        var petRows = TargetsOf(ImportTable.Pets);
         var batchPets = petRows.Select(r => r.TargetId!.Value).ToHashSet();
         foreach (var row in petRows)
         {
@@ -120,14 +175,23 @@ public static class ImportRollbackPlanner
                 reasons.Add(ImportRollbackReasons.HasOtherVaccinations);
             if (vaccinations.Any(keptVaccinations.Contains))
                 reasons.Add(ImportRollbackReasons.HasKeptVaccinations);
+            if ((facts.PetClinicalRecords.GetValueOrDefault(petId) ?? []).Any(id => !batchClinicalRecords.Contains(id)))
+                reasons.Add(ImportRollbackReasons.HasOtherClinicalRecords);
+            if (petsWithKeptAppointments.Contains(petId))
+                reasons.Add(ImportRollbackReasons.HasKeptAppointments);
 
             items.Add(Decide(row, reasons));
         }
 
         var keptPets = KeptIds(items, ImportTable.Pets);
 
-        // Müşteri: değiştirilmemiş, kendi bağı yok ve tüm hastaları partinin silinebilir hastaları.
-        foreach (var row in targets.Where(r => r.Table == ImportTable.Customers))
+        var accountEntryRows = TargetsOf(ImportTable.AccountEntries);
+        var batchAccountEntries = accountEntryRows.Select(r => r.TargetId!.Value).ToHashSet();
+        foreach (var row in accountEntryRows)
+            items.Add(facts.AccountEntries.ContainsKey(row.TargetId!.Value) ? Decide(row, Array.Empty<string>()) : Gone(row));
+
+        // Müşteri: değiştirilmemiş, kendi bağı yok, tüm hastaları partinin silinebilir hastaları; devir ücreti dokunulmamış.
+        foreach (var row in TargetsOf(ImportTable.Customers))
         {
             var clientId = row.TargetId!.Value;
             if (!facts.ClientModified.TryGetValue(clientId, out var modified))
@@ -144,11 +208,26 @@ public static class ImportRollbackPlanner
                 reasons.Add(ImportRollbackReasons.HasOtherPets);
             if (pets.Any(keptPets.Contains))
                 reasons.Add(ImportRollbackReasons.HasKeptPets);
+            if ((facts.ClientAccountEntries.GetValueOrDefault(clientId) ?? []).Any(id => !batchAccountEntries.Contains(id)))
+                reasons.Add(ImportRollbackReasons.HasOtherAccountEntries);
+            if (facts.OpeningBalances.TryGetValue(clientId, out var balance) && balance.Changed)
+                reasons.Add(ImportRollbackReasons.OpeningBalanceChanged);
 
             items.Add(Decide(row, reasons));
         }
 
-        return new ImportRollbackPlan(items, BuildUnits(items, facts));
+        // Ürün: kendi birimi; bağ nedenleri okumadan gelir.
+        foreach (var row in TargetsOf(ImportTable.Products))
+        {
+            items.Add(facts.Products.TryGetValue(row.TargetId!.Value, out var productBlockers)
+                ? Decide(row, productBlockers.OrderBy(r => r, StringComparer.Ordinal))
+                : Gone(row));
+        }
+
+        return new ImportRollbackPlan(items, BuildUnits(items, facts))
+        {
+            OpeningBalances = facts.OpeningBalances.ToDictionary(kv => kv.Key, kv => kv.Value.ChargeId),
+        };
     }
 
     /// <summary>
@@ -169,21 +248,27 @@ public static class ImportRollbackPlanner
     }
 
     /// <summary>
-    /// Birim anahtarı hedefin sahibidir (müşteri; hasta için sahibi, aşı için hastasının sahibi). Sahibi bilinmeyen
-    /// (zaten silinmiş) kayıt kendi biriminde kalır. Sıra: birimin ilk satırı (tablo, satır numarası).
+    /// Birim anahtarı hedefin sahibidir (müşteri; hasta için sahibi; aşı, klinik geçmiş ve randevu için hastasının sahibi;
+    /// hesap hareketi için müşterisi). Ürün kendi birimidir. Sahibi bilinmeyen (zaten silinmiş) kayıt kendi biriminde kalır.
+    /// Sıra: birimin ilk satırı (tablo, satır numarası); ürün birimleri bu yüzden sonda.
     /// </summary>
     private static List<ImportRollbackUnit> BuildUnits(IReadOnlyList<ImportRollbackItem> items, ImportRollbackFacts facts)
     {
+        Guid PetOwner(Guid? petId, Guid fallback)
+            => petId is { } id && facts.PetOwners.TryGetValue(id, out var owner) ? owner : fallback;
+
         Guid OwnerOf(ImportRollbackItem item)
         {
             var id = item.TargetId;
             return item.Row.Table switch
             {
-                ImportTable.Customers => id,
-                ImportTable.Pets => facts.PetOwners.TryGetValue(id, out var owner) ? owner : id,
-                _ => facts.Vaccinations.TryGetValue(id, out var v) && facts.PetOwners.TryGetValue(v.PetId, out var petOwner)
-                    ? petOwner
-                    : id,
+                ImportTable.Customers or ImportTable.Products => id,
+                ImportTable.Pets => PetOwner(id, id),
+                ImportTable.Vaccinations => PetOwner(facts.Vaccinations.TryGetValue(id, out var v) ? v.PetId : null, id),
+                ImportTable.ClinicalRecords => PetOwner(facts.ClinicalRecords.TryGetValue(id, out var petId) ? petId : null, id),
+                ImportTable.Appointments => PetOwner(facts.Appointments.TryGetValue(id, out var a) ? a.PetId : null, id),
+                ImportTable.AccountEntries => facts.AccountEntries.TryGetValue(id, out var clientId) ? clientId : id,
+                _ => id,
             };
         }
 

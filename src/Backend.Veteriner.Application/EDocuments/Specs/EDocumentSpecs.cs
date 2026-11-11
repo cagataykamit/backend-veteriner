@@ -126,6 +126,7 @@ public sealed class UndocumentedChargesOfVisitSpec : Specification<Charge>
             Query.AsNoTracking();
         Query.Where(c => c.TenantId == tenantId && c.ClinicId == clinicId && c.VisitId == visitId
                          && c.VoidedAtUtc == null && c.EDocumentId == null);
+        Query.Where(EDocumentRules.IsDocumentableCharge);
         Query.OrderBy(c => c.CreatedAtUtc);
     }
 }
@@ -140,6 +141,7 @@ public sealed class UndocumentedChargesSpec : Specification<Charge>
         Query.AsNoTracking();
         Query.Where(c => c.TenantId == tenantId && c.ClinicId == clinicId && c.VoidedAtUtc == null
                          && (c.EDocumentId == null || failedDocumentIds.Contains(c.EDocumentId.Value)));
+        Query.Where(EDocumentRules.IsDocumentableCharge);
         if (clientId.HasValue)
             Query.Where(c => c.ClientId == clientId.Value);
         if (visitId.HasValue)
@@ -176,6 +178,7 @@ public sealed class AutoIssueEligibleChargesSpec : Specification<Charge>
         Query.AsNoTracking();
         Query.Where(c => c.TenantId == tenantId && c.ClinicId == clinicId && c.VoidedAtUtc == null && c.EDocumentId == null
                          && c.AllocatedAmount == c.Amount && c.CreatedAtUtc >= sinceUtc);
+        Query.Where(EDocumentRules.IsDocumentableCharge);
         Query.OrderBy(c => c.CreatedAtUtc).Take(take);
     }
 }
@@ -188,6 +191,7 @@ public sealed class UndocumentedPaidChargesSpec : Specification<Charge>
         Query.AsNoTracking();
         Query.Where(c => c.TenantId == tenantId && c.ClinicId == clinicId && c.VoidedAtUtc == null && c.EDocumentId == null
                          && c.AllocatedAmount == c.Amount && c.CreatedAtUtc >= sinceUtc);
+        Query.Where(EDocumentRules.IsDocumentableCharge);
     }
 }
 

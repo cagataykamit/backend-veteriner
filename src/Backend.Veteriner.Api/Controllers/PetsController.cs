@@ -4,6 +4,7 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.ImportedRecords;
 using Backend.Veteriner.Application.Pets.Commands.Create;
 using Backend.Veteriner.Application.Pets.Commands.SetStatus;
 using Backend.Veteriner.Application.Pets.Commands.Update;
@@ -191,6 +192,29 @@ public sealed class PetsController : ControllerBase
         var result = await _mediator.Send(
             new GetPetTimelineQuery(id, types, fromUtc, toUtc, clinicId, includeVoided, limit, cursor),
             ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Eski program kayıtları (ADR-048 T1): içe aktarılmış salt okunur klinik geçmiş, yeniden eskiye; yalnız erişilebilir
+    /// kliniklerin kayıtları. Kişisel sağlık verisi taşıdığından önbelleğe alınmaz. Bkz. docs/IMPORT_API_CONTRACT.md §12.8.
+    /// </summary>
+    [HttpGet("{id:guid}/imported-clinical-records")]
+    [Authorize(Policy = PermissionCatalog.Examinations.Read)]
+    [ProducesResponseType(typeof(PagedResult<ImportedClinicalRecordDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetImportedClinicalRecords(
+        [FromRoute] Guid id,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = ImportedRecordPaging.DefaultPageSize,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+        Response.Headers.CacheControl = "no-store";
+        var result = await _mediator.Send(new GetPetImportedClinicalRecordsQuery(id, page, pageSize), ct);
         return result.ToActionResult(this);
     }
 

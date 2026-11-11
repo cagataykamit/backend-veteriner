@@ -238,7 +238,8 @@ public sealed class IssueEDocumentsFromPaymentCommandHandler
         var charges = chargeIds.Count == 0
             ? []
             : await _charges.ListAsync(new ChargesForEDocumentSpec(caller.TenantId, chargeIds, tracked: false), ct);
-        var eligible = charges.Where(c => c.EDocumentId is null && c.OutstandingAmount == 0m).Select(c => c.Id).ToList();
+        var eligible = charges.Where(EDocumentRules.IsDocumentable)
+            .Where(c => c.EDocumentId is null && c.OutstandingAmount == 0m).Select(c => c.Id).ToList();
 
         var outcome = await _batch.IssueAsync(
             caller.TenantId, caller.ClinicId, caller.UserId, eligible, EDocumentOrigin.Payment, $"payment:{payment.Id:N}",

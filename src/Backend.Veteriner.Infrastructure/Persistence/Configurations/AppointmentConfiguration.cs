@@ -1,4 +1,5 @@
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Imports;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -37,7 +38,7 @@ public sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appointm
             .HasConversion<int>();
 
         b.Property(x => x.Notes)
-            .HasMaxLength(2000);
+            .HasMaxLength(Appointment.MaxNotesLength);
 
         b.Property(x => x.ReasonId);
         b.Property(x => x.VeterinarianUserId);
@@ -64,5 +65,14 @@ public sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appointm
         // Dashboard clinic-scope: TenantId+ClinicId seek, PetId DISTINCT/GROUP BY, ScheduledAtUtc MAX (covering).
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.PetId })
             .IncludeProperties(x => x.ScheduledAtUtc);
+
+        // İçe aktarılan gelecek randevular (ADR-048 T5): hatırlatma dışlaması ve parti geri alması bu indeksten okur.
+        b.Property(x => x.ImportBatchId);
+        b.HasIndex(x => x.ImportBatchId).HasFilter("[ImportBatchId] IS NOT NULL");
+        b.HasOne<ImportBatch>()
+            .WithMany()
+            .HasForeignKey(x => x.ImportBatchId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
     }
 }

@@ -135,13 +135,15 @@ dosyanın sütun açıklamaları. CRLF, UTF-8 BOM'lu.
 | `receteler.csv` | Reçeteler: içerik, HBS durumu, iptal, geç giriş | HBS işaretleyen kişi |
 | `recete_satirlari.csv` | Reçete satırları: ilaç, ürün, miktar, doz, birim, kullanım, seri no | — |
 | `asilar.csv` | Aşılar (uygulanan ve planlanan): ad, durum, zamanlar, yol/bölge, not, HBS | İçe aktarma partisi kimliği |
+| `eski-program-kayitlari.csv` | Eski program kayıtları (içe aktarılmış salt okunur klinik geçmiş, ADR-048): tarih, kayıt türü, şikâyet, anamnez, bulgular, tanı, tedavi, reçete ve lab metni, not, hekim adı, kilo, ateş | İçe aktarma partisi kimliği |
 | `uygulamalar.csv` | İlaç/malzeme uygulamaları: ürün, parti, miktar, yol/bölge, iptal | İstek anahtarı, paket önerisi bağı |
 | `lab_sonuclari.csv` | Lab istek ve sonuçları: test, durum, zamanlar, sonuç metni, yorum, iptal | Ekli dosyaların içeriği |
 | `goruntuleme.csv` | Görüntüleme kayıtları | Görüntü dosyaları |
 | `dosyalar.csv` | Yüklenen dosyaların kaydı: bağlı kayıt, dosya adı, tür, boyut, durum | Dosya içeriği, depo anahtarı, SHA-256 |
 | `yatislar.csv` | Yatışlar: zamanlar, neden, konum, not, taburcu notu | Oda kimliği |
 | `bakim_talimatlari.csv` | Bakım talimatları | — |
-| `ucretler.csv` | Ücretler: açıklama, tür, miktar, birim fiyat, tutar, KDV, para birimi, kapanan tutar, iptal | İstek anahtarı, değişiklik sayacı |
+| `ucretler.csv` | Ücretler: açıklama, tür, miktar, birim fiyat, tutar, KDV, para birimi, kapanan tutar, iptal; devir bakiyesinde içe aktarma partisi (`IceAktarmaPartisiId`, ADR-048) | İstek anahtarı, değişiklik sayacı |
+| `eski-program-hareketleri.csv` | Eski program hesap hareketleri (içe aktarılmış, salt okunur; bakiyeyi etkilemez, ADR-048): tarih, borç/tahsilat, tutar, açıklama, ödeme şekli, belge no, hasta adı | İçe aktarma partisi kimliği |
 | `odemeler.csv` | Ödemeler: tutar, yöntem, nakdin kasası (`KasaId`; nakitte boşsa Ana kasa), zaman, dağıtılan ve krediye kalan, not, iptal | İstek anahtarı ve özeti, değişiklik sayacı |
 | `odeme_dagitimlari.csv` | Ödemenin ücretlere dağıtımı | — |
 | `krediler.csv` | Müşteri kredileri ve **iadeleri** (iade zamanı, tutarı, yöntemi, nakit iadede kasası, gerekçesi, iade eden) | Değişiklik sayacı |

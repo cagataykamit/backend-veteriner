@@ -4,10 +4,12 @@ using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.ImportedRecords;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Examinations;
+using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Prescriptions;
@@ -43,6 +45,8 @@ public sealed class GetClientDataExportQueryHandler
     private readonly IReadRepository<Prescription> _prescriptions;
     private readonly IReadRepository<Charge> _charges;
     private readonly IReadRepository<Payment> _payments;
+    private readonly IReadRepository<ImportedClinicalRecord> _importedRecords;
+    private readonly IReadRepository<ImportedAccountEntry> _importedEntries;
 
     public GetClientDataExportQueryHandler(
         ITenantContext tenantContext,
@@ -59,7 +63,9 @@ public sealed class GetClientDataExportQueryHandler
         IReadRepository<Treatment> treatments,
         IReadRepository<Prescription> prescriptions,
         IReadRepository<Charge> charges,
-        IReadRepository<Payment> payments)
+        IReadRepository<Payment> payments,
+        IReadRepository<ImportedClinicalRecord> importedRecords,
+        IReadRepository<ImportedAccountEntry> importedEntries)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -76,6 +82,8 @@ public sealed class GetClientDataExportQueryHandler
         _prescriptions = prescriptions;
         _charges = charges;
         _payments = payments;
+        _importedRecords = importedRecords;
+        _importedEntries = importedEntries;
     }
 
     public async ValueTask<Result<ClientDataExportDto>> Handle(GetClientDataExportQuery request, CancellationToken ct)
@@ -122,6 +130,10 @@ public sealed class GetClientDataExportQueryHandler
             new ChargesForClientDataExportSpec(tenantId, client.Id, clinicId, accessible, Max + 1), ct);
         var payments = await _payments.ListAsync(
             new PaymentsForClientDataExportSpec(tenantId, client.Id, clinicId, accessible, Max + 1), ct);
+        var importedRecords = await _importedRecords.ListAsync(
+            new ImportedClinicalRecordsForClientDataExportSpec(tenantId, client.Id, clinicId, accessible, Max + 1), ct);
+        var importedEntries = await _importedEntries.ListAsync(
+            new ImportedAccountEntriesForClientSpec(tenantId, client.Id, clinicId, accessible, page: 1, pageSize: Max + 1), ct);
 
         string? kvkkRecordedByName = null;
         if (client.KvkkConsentRecordedByUserId is { } recordedBy)
@@ -181,7 +193,12 @@ public sealed class GetClientDataExportQueryHandler
                 b.ChargedAmount,
                 b.AllocatedAmount,
                 b.OutstandingAmount,
-                b.UnallocatedPayments.TotalAmount)));
+                b.UnallocatedPayments.TotalAmount),
+            Section(importedRecords.Select(r => new ClientDataExportImportedClinicalRecordDto(
+                r.RecordedOn, r.PetId, PetName(r.PetId), r.RecordType, r.Complaint, r.Diagnosis, r.Treatment, r.Prescription,
+                r.Notes, r.VeterinarianName))),
+            Section(importedEntries.Select(e => new ClientDataExportImportedAccountEntryDto(
+                e.OccurredOn, e.Kind.ToString(), e.Amount, e.Currency, e.Description, e.DocumentNumber)))));
     }
 
     /// <summary>Okunan satırlar üst sınır + 1 ile istenir; fazlası varsa kesilir ve işaretlenir.</summary>

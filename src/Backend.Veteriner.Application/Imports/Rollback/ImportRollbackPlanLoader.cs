@@ -32,7 +32,7 @@ public sealed class ImportRollbackPlanLoader
         Guid tenantId, Guid batchId, IReadOnlyCollection<Guid>? rowIds, CancellationToken ct)
     {
         var rows = await _rows.ListAsync(new ImportRollbackRowsSpec(batchId, rowIds), ct);
-        var facts = await _dependencies.ReadAsync(tenantId, ImportRollbackPlanner.Targets(rows), ct);
+        var facts = await _dependencies.ReadAsync(tenantId, ImportRollbackPlanner.Targets(batchId, rows), ct);
         return new ImportRollbackSnapshot(rows, ImportRollbackPlanner.Build(rows, facts));
     }
 
@@ -48,5 +48,10 @@ public sealed class ImportRollbackPlanLoader
         => new(
             plan.Count(ImportTable.Customers, decision),
             plan.Count(ImportTable.Pets, decision),
-            plan.Count(ImportTable.Vaccinations, decision));
+            plan.Count(ImportTable.Vaccinations, decision),
+            plan.Count(ImportTable.ClinicalRecords, decision),
+            plan.Count(ImportTable.AccountEntries, decision),
+            plan.Count(ImportTable.Appointments, decision),
+            plan.Count(ImportTable.Products, decision),
+            plan.CountOpeningBalances(decision));
 }

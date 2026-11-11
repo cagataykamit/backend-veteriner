@@ -42,6 +42,7 @@ public static class ImportCanonicalSchema
     private const string PetNoHeader = "HastaNo";
     private const string PetNameHeader = "HastaAdi";
     private const string VaccinationPetLinkNote = "Evet (biri): HastaNo veya SahipAdSoyad + SahipTelefon + HastaAdi + Tur";
+    private const string OwnerLinkNote = "Evet (biri): MusteriNo veya SahipAdSoyad + SahipTelefon";
 
     private static readonly ImportCanonicalField[] CustomerFields =
     [
@@ -55,7 +56,12 @@ public static class ImportCanonicalSchema
             "E-posta", "E posta", "Email", "E-mail", "Mail", "Eposta Adresi"),
         new("Adres", "Hayır", "En çok 500 karakter.", "Örnek Mah. Örnek Sok. No:1", false,
             "Adresi", "Açık Adres", "Address"),
+        new("AcikBakiye", "Hayır", "Eski programdaki borç (TL). Pozitif tutar yeni müşteriye tek bir devir ücreti olarak açılır; negatif (alacak) aktarılmaz.", "1.250,00", true,
+            "Açık Bakiye", "Bakiye", "Borç", "Borç Bakiyesi", "Kalan Borç", "Devir", "Devir Bakiyesi", "Cari Bakiye"),
+        new("BakiyeTarihi", "Hayır", "Bakiyenin hangi tarihteki durum olduğu (devir ücreti açıklamasına yazılır).", "31.10.2026", true,
+            "Bakiye Tarihi", "Devir Tarihi"),
     ];
+
 
     private static readonly ImportCanonicalField[] PetFields =
     [
@@ -117,6 +123,105 @@ public static class ImportCanonicalSchema
             "Notlar", "Açıklama"),
     ];
 
+    /// <summary>Hastaya bağlanan tabloların (klinik geçmiş, randevu) bağlantı alanları; aşı tablosuyla aynı tanım.</summary>
+    private static ImportCanonicalField[] PetLinkFields() => VaccinationFields[..5];
+
+    private static readonly ImportCanonicalField[] ClinicalRecordFields =
+    [
+        .. PetLinkFields(),
+        new("Tarih", "Evet", "Kaydın tarihi: gg.aa.yyyy veya yyyy-aa-gg; gelecekte olamaz, 1990'dan eski olamaz.", "12.05.2024", true,
+            "Muayene Tarihi", "Kayıt Tarihi", "İşlem Tarihi", "Geliş Tarihi", "Date"),
+        new("KayitTuru", "Hayır", "Muayene, Kontrol, Ameliyat... (en çok 100 karakter).", "Muayene", false,
+            "Kayıt Türü", "Kayıt Tipi", "Muayene Türü", "İşlem"),
+        new("Sikayet", "Hayır*", "Şikâyet / geliş nedeni (en çok 2000 karakter). *Şikâyet, anamnez, bulgular, tanı, tedavi, reçete, lab sonucu veya nottan en az biri dolu olmalı.", "İştahsızlık", false,
+            "Şikayet", "Şikâyet", "Şikayeti", "Başvuru Nedeni", "Geliş Nedeni"),
+        new("Anamnez", "Hayır*", "Öykü (en çok 4000 karakter).", "3 gündür yemiyor", false,
+            "Öykü", "Hikaye", "Hikâye"),
+        new("Bulgular", "Hayır*", "Muayene bulguları (en çok 8000 karakter).", "Ateş yüksek", false,
+            "Bulgu", "Muayene Bulguları", "Klinik Bulgular", "Fizik Muayene", "Muayene"),
+        new("Tani", "Hayır*", "Tanı (en çok 2000 karakter).", "Gastroenterit", false,
+            "Tanı", "Teşhis", "Ön Tanı", "Kesin Tanı", "Tanılar"),
+        new("Tedavi", "Hayır*", "Uygulanan tedavi / plan (en çok 4000 karakter).", "Serum, antibiyotik", false,
+            "Uygulanan Tedavi", "Yapılan İşlem", "Yapılan İşlemler", "Plan"),
+        new("Recete", "Hayır*", "Reçete metni (en çok 4000 karakter); reçete kaydı veya stok hareketi oluşmaz.", "Amoksisilin 2x1", false,
+            "Reçete", "İlaçlar", "Reçete Edilen", "Verilen İlaçlar"),
+        new("LabSonuc", "Hayır*", "Laboratuvar sonucu metni (en çok 4000 karakter).", "Hemogram normal", false,
+            "Lab", "Laboratuvar", "Lab Sonucu", "Lab Sonuçları", "Tahlil", "Tahlil Sonucu", "Test Sonuçları"),
+        new("Not", "Hayır*", "Serbest not (en çok 4000 karakter).", "Kontrole gelecek", false,
+            "Notlar", "Açıklama"),
+        new("Hekim", "Hayır", "Kaydı giren hekimin adı (serbest metin).", "Dr. Örnek", false,
+            "Veteriner", "Veteriner Hekim", "Doktor", "Hekim Adı"),
+        new("Kilo", "Hayır", "Kilogram; ondalık virgül veya nokta.", "4,5", false,
+            "Ağırlık", "Kg", "Kilo (kg)", "Ağırlık (kg)"),
+        new("Ates", "Hayır", "Vücut ısısı (°C, 25-45).", "38,6", false,
+            "Ateş", "Vücut Isısı", "Sıcaklık", "Ateş (°C)"),
+    ];
+
+    private static readonly ImportCanonicalField[] AccountEntryFields =
+    [
+        new("MusteriNo", OwnerLinkNote, "Müşteri sayfasındaki MusteriNo ile aynı değer.", "M-1001", true,
+            "Müşteri No", "Müşteri Numarası", "Müşteri Kodu", "Cari Kodu", "Cari No"),
+        new("SahipAdSoyad", OwnerLinkNote, "Müşterinin adı soyadı.", "Ayşe Yılmaz", false,
+            "Sahip Ad Soyad", "Sahip", "Müşteri", "Müşteri Adı", "Cari", "Cari Adı", "Ad Soyad"),
+        new("SahipTelefon", OwnerLinkNote, "Müşterinin cep telefonu.", "05321234567", true,
+            "Sahip Tel", "Müşteri Telefon", "Telefon", "Cep"),
+        new("Tarih", "Evet", "Hareket tarihi: gg.aa.yyyy veya yyyy-aa-gg; gelecekte olamaz.", "05.03.2025", true,
+            "İşlem Tarihi", "Hareket Tarihi", "Belge Tarihi", "Fiş Tarihi", "Fatura Tarihi"),
+        new("IslemTuru", "Evet", "Borç (ücret, fatura, satış) veya Tahsilat (ödeme, makbuz).", "Tahsilat", false,
+            "İşlem Türü", "Hareket Türü", "Hareket Tipi", "Borç/Alacak", "B/A", "Tip"),
+        new("Tutar", "Evet", "TL; 1.250,50 veya 1250.50 biçimi; sıfırdan büyük.", "350,00", true,
+            "Tutar (TL)", "Tutarı", "Toplam", "Meblağ"),
+        new("Aciklama", "Hayır", "Açıklama (en çok 500 karakter).", "Aşı ücreti", false,
+            "Açıklama", "Hizmet", "Ürün/Hizmet", "Not"),
+        new("OdemeSekli", "Hayır", "Nakit, Kart... (bilgi; kasaya bağlanmaz).", "Nakit", false,
+            "Ödeme Şekli", "Ödeme Türü", "Ödeme Tipi", "Ödeme Yöntemi"),
+        new("BelgeNo", "Hayır", "Fatura / makbuz numarası (en çok 50 karakter).", "A-0042", true,
+            "Belge No", "Fatura No", "Makbuz No", "Fiş No", "Evrak No"),
+        new("HastaAdi", "Hayır", "İlgili hastanın adı (bilgi; hastaya bağlanmaz).", "Pamuk", false,
+            "Hasta Adı", "Hayvan Adı", "Hasta", "Hayvan"),
+    ];
+
+    private static readonly ImportCanonicalField[] AppointmentFields =
+    [
+        .. PetLinkFields(),
+        new("Tarih", "Evet", "Randevu tarihi: gg.aa.yyyy veya yyyy-aa-gg (saat de içerebilir). Geçmiş randevular atlanır.", "20.12.2026", true,
+            "Randevu Tarihi", "Randevu Zamanı", "Tarih Saat"),
+        new("Saat", "Hayır*", "SS:dd (24 saat). *Tarih saat taşımıyorsa zorunlu.", "14:30", true,
+            "Randevu Saati", "Başlangıç", "Başlangıç Saati"),
+        new("Sure", "Hayır", "Dakika (5-240); boşsa 30.", "30", true,
+            "Süre", "Süre (dk)", "Dakika", "Süre (dakika)"),
+        new("Hekim", "Hayır", "Hekimin adı; kullanıcıyla eşleşirse randevuya atanır, aksi nota yazılır.", "Dr. Örnek", false,
+            "Veteriner", "Veteriner Hekim", "Doktor", "Hekim Adı"),
+        new("Neden", "Hayır", "Randevu nedeni; tanımlı nedenle eşleşmezse nota yazılır.", "Aşı", false,
+            "Randevu Nedeni", "Sebep", "Konu"),
+        new("RandevuTuru", "Hayır", "Muayene, Aşı, Kontrol, Ameliyat, Bakım, Danışma.", "Kontrol", false,
+            "Randevu Türü", "Randevu Tipi"),
+        new("Not", "Hayır", "Randevu notu (en çok 2000 karakter).", "Aç gelsin", false,
+            "Notlar", "Açıklama"),
+    ];
+
+    private static readonly ImportCanonicalField[] ProductFields =
+    [
+        new("Ad", "Evet", "Ürün veya hizmet adı (en çok 300 karakter).", "Kuduz aşısı", false,
+            "Ürün Adı", "Hizmet Adı", "Ürün", "Hizmet", "Adı", "Stok Adı", "Malzeme", "Ürün/Hizmet"),
+        new("UrunTuru", "Hayır", "Hizmet, İlaç, Aşı veya Diğer; boşsa Diğer.", "Aşı", false,
+            "Ürün Türü", "Ürün Tipi", "Tür", "Tip"),
+        new("Kategori", "Hayır", "Ayarlar'daki ürün kategorisiyle eşleşirse bağlanır.", "Aşılar", false,
+            "Grup", "Ürün Grubu", "Kategori Adı"),
+        new("Birim", "Hayır", "Satış birimi; boşsa Adet.", "Adet", false,
+            "Birimi", "Ölçü Birimi"),
+        new("SatisFiyati", "Hayır", "TL; boşsa 0.", "450,00", true,
+            "Satış Fiyatı", "Fiyat", "Birim Fiyat", "Fiyatı", "Satış Fiyatı (TL)", "Fiyat (TL)"),
+        new("Barkod", "Hayır", "En çok 100 karakter; hücreyi METİN biçiminde tutun.", "8690000000000", true,
+            "Barkod No", "Barcode"),
+        new("StokKodu", "Hayır", "Ürün kodu (en çok 100 karakter).", "ASI-001", true,
+            "Stok Kodu", "Ürün Kodu", "Kod", "SKU"),
+        new("Uretici", "Hayır", "Üretici / firma (en çok 200 karakter).", "Örnek İlaç A.Ş.", false,
+            "Üretici", "Firma", "Marka"),
+        new("Aciklama", "Hayır", "Açıklama (en çok 4000 karakter).", "Yıllık", false,
+            "Açıklama", "Not"),
+    ];
+
     private static readonly Dictionary<ImportTable, ImportRequirement> Requirements = new()
     {
         [ImportTable.Customers] = new(["AdSoyad"], []),
@@ -126,6 +231,16 @@ public static class ImportCanonicalSchema
         [ImportTable.Vaccinations] = new(
             ["AsiAdi", "UygulamaTarihi"],
             [["HayvanNo"], ["SahipAdSoyad", "SahipTelefon", "HayvanAdi", "Tur"]]),
+        [ImportTable.ClinicalRecords] = new(
+            ["Tarih"],
+            [["HayvanNo"], ["SahipAdSoyad", "SahipTelefon", "HayvanAdi", "Tur"]]),
+        [ImportTable.AccountEntries] = new(
+            ["Tarih", "IslemTuru", "Tutar"],
+            [["MusteriNo"], ["SahipAdSoyad", "SahipTelefon"]]),
+        [ImportTable.Appointments] = new(
+            ["Tarih"],
+            [["HayvanNo"], ["SahipAdSoyad", "SahipTelefon", "HayvanAdi", "Tur"]]),
+        [ImportTable.Products] = new(["Ad"], []),
     };
 
     private static readonly Dictionary<ImportTable, string[]> SheetNames = new()
@@ -133,6 +248,10 @@ public static class ImportCanonicalSchema
         [ImportTable.Customers] = ["Musteriler", "Musteri", "Customers"],
         [ImportTable.Pets] = ["Hastalar", "Hasta", "Hayvanlar", "Hayvan", "Pets"],
         [ImportTable.Vaccinations] = ["Asilar", "Asi", "Vaccinations"],
+        [ImportTable.ClinicalRecords] = ["KlinikGecmis", "Muayeneler", "Muayene", "KlinikKayitlar", "ClinicalRecords", "Examinations"],
+        [ImportTable.AccountEntries] = ["HesapHareketleri", "Hareketler", "CariHareketler", "Tahsilatlar", "AccountEntries"],
+        [ImportTable.Appointments] = ["Randevular", "Randevu", "Appointments"],
+        [ImportTable.Products] = ["Urunler", "Urun", "Hizmetler", "UrunHizmet", "UrunlerHizmetler", "Products"],
     };
 
     public static IReadOnlyList<ImportCanonicalField> Fields(ImportTable table) => table switch
@@ -140,6 +259,10 @@ public static class ImportCanonicalSchema
         ImportTable.Customers => CustomerFields,
         ImportTable.Pets => PetFields,
         ImportTable.Vaccinations => VaccinationFields,
+        ImportTable.ClinicalRecords => ClinicalRecordFields,
+        ImportTable.AccountEntries => AccountEntryFields,
+        ImportTable.Appointments => AppointmentFields,
+        ImportTable.Products => ProductFields,
         _ => throw new ArgumentOutOfRangeException(nameof(table)),
     };
 
