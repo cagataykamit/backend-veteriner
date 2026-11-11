@@ -18,6 +18,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 | Tam geçiş (ADR-048) | Yeni tablolar `clinicalRecords`, `accountEntries`, `appointments`, `products`; müşteride `AcikBakiye`/`BakiyeTarihi`; devir ücreti; randevu hatırlatma dışlaması; okuma uçları `GET /pets/{id}/imported-clinical-records`, `GET /clients/{id}/imported-account-entries` (bölüm 12) | **Uygulandı** (migration `AddFullDataMigration`) |
 | E-vet yedeği | `sourceProfile = EVet` ile Genel > Yedek Al dosyası + raporlar (`evetPatientReportFile`, `evetVaccineReportFile`, `productsFile`); fatura kimliği, müşteri/hasta durumu, alerji alanları; türsüz hasta bağlantısı; ölçümlü klinik kayıt (bölüm 13) | **Uygulandı** (migration yok) |
 | Devir alacağı (ADR-048 T3 eki) | `AcikBakiye < 0` yeni müşteriye devir alacağı açar (müşteri kredisi, kaynak `OpeningBalance`); `Imports.CreditBalanceNotImported` kalktı; geri alma alacağı da siler (bölüm 12.3, 12.5, 12.7, 12.9; `CLIENT_CREDIT_API_CONTRACT.md` §13) | **Uygulandı** (migration `AddImportedClientCredits`) |
+| E-vet geçmiş görevleri (ADR-048 eki, 2026-11-12) | Randevu Listesi'nde geçmişte kalan aşı dışı görev (tamamlanmış ya da gelinmemiş) klinik geçmiş satırına çevrilir; bu satırların `rowNumber` değeri `1.000.000 + Excel satırı` (bölüm 13.2) | **Uygulandı** (migration yok) |
 
 **Frontend için değişenler (B1):**
 - Yeni izinler `Imports.Read`, `Imports.Manage`, `Imports.Commit` yalnız yönetici düzeyine (Admin, Owner, ClinicAdmin) bağlanır. Seed çalışıp kullanıcı çıkış-giriş yapana kadar bu uçlar `403` döner; menü öğesi izinle gizlenmelidir.
@@ -92,6 +93,11 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 - Kredi okuma DTO'su (`GET /clients/{id}/credits`): `source` yeni değer `OpeningBalance`; `sourcePaymentId` artık **nullable** (devir alacağında `null`); yeni alan `isImported` (bool). Ücretin tahsis listesinde devir alacağından yapılan mahsup satırının `paymentId`, `paidAtUtc`, `method` alanları `null`dur. Ayrıntı `CLIENT_CREDIT_API_CONTRACT.md` §13. Arayüz etiketi: "Devir alacağı (eski program)".
 - `rollback-preview` `openingBalances` sayacı devir ücreti **ve** devir alacağını birlikte sayar (müşterinin eki). Yeni neden kodu yok: kullanılmış alacak `OpeningBalanceChanged` ile müşteriyi tutar (bölüm 12.9).
 - Migration `AddImportedClientCredits`; yeni izin yok.
+
+**Frontend için değişenler (E-vet geçmiş görevleri, 2026-11-12; geriye uyumlu, bölüm 13.2):**
+- E-vet yedeğinde geçmişte kalan aşı dışı görevler (kontrol, kısırlaştırma, operasyon, taburcu, dikiş alma, tetkik…) artık atlanmaz; **klinik geçmiş** tablosuna satır olarak eklenir. `KayitTuru` görev tipidir; `Not` ilk satırı `E-vet görevi: Tamamlandı` ya da `E-vet görevi: Gelmedi`, ardından görevin bilgi ve açıklama metni.
+- Bu satırlar klinik geçmiş tablosunda muayene satırlarıyla birlikte durur. Satır numarası çakışmasın diye `rowNumber = 1.000.000 + Randevu Listesi Excel satırı` olur (ör. `1000245` → Randevu Listesi satır 245). Hata listesinde 1.000.000 üstü numara görülürse ekran "Randevu Listesi satır N" diye gösterebilir; göstermezse de bilgi kaybı yoktur.
+- Yükleme uyarısı (`Imports.EVetConversion`) geçmiş görevden oluşan klinik kayıt sayısını (tamamlanmış / gelinmemiş) ayrıca verir. Yeni alan, kod, izin ve migration yoktur.
 
 ## 1) Kapsam ve sınırlar
 
@@ -904,14 +910,15 @@ Pilot klinik E-vet SMART'tan geliyor. E-vet'in en zengin dışa aktarması **Gen
 
 **Muayene** (`Muayene Listesi`) → klinik geçmiş: hasta `(Hasta Sahibi, Hasta Adı)` çiftiyle hasta sayfasında **tek** hastaya bağlanırsa `HayvanNo`. Çift birden çok hastadaysa kaydın tarihinde kayıtlı (`Kayıt Tarihi` ≤ tarih) ve hayatta (`Ölüm Zamanı` yok ya da ≥ tarih) **tek** hasta seçilir; yine ayırt edilemezse `HayvanNo = Belirsiz: <protokoller>` yazılır ve doğrulama satırı `PetNotFound` hatasıyla raporlar (yanlış hastaya yazılmaz; gerçek yedekte 75 muayene, 156 aşı). Çift hasta sayfasında hiç yoksa `HayvanNo` boş kalır ve doğrulama türsüz ad kuralını uygular (bölüm 6.4). `Tarih` → `Tarih` (gün), `KayitTuru = Muayene`, `Veteriner Hekim` → `Hekim`, `Ağırlık` → `Kilo` (0 boş), `Vücut Sıcaklığı` → `Ates` (1 ondalık), `Semptom` → `Sikayet`, `Hastalık Teşhisi` → `Tani`, `Anamnez`, `Tedavi Şekli` → `Tedavi`, `Açıklama` → `Not`, `Diğer Parametreler` (muayene bulgusu şablonu: genel durum, mukoza, lenf yumrusu, dehidrasyon…) yalnız dolu (`-` olmayan) öğeleriyle → `Bulgular`.
 
-**Randevu Listesi** (görevler) → aşı ve randevu:
+**Randevu Listesi** (görevler) → aşı, randevu ve klinik geçmiş:
 
 | Görev | Sonuç |
 |---|---|
 | `Aşı Paketi` dolu ve `Durum = Tamamlandı` (görev tipi `Aşılama` ya da `Tamamlandı` olabilir) | **Aşı geçmişi**: `AsiAdi = Aşı Paketi` (katalog/değer eşleme, bölüm 5), `UygulamaTarihi`, `Uygulayan = Veteriner`, not `Ürün: …; Bilgi; Açıklama`. |
 | `Aşı Paketi` dolu ve `Durum = Yapılacak` | Aynı hastanın aynı **aşı serisindeki** (bölüm 13.3) son uygulamasından sonraki en erken görev tarihi o uygulamanın **`SonrakiAsiTarihi`** olur (geçmişte kalmışsa da: gecikmiş aşı). Seride hiç uygulama yoksa ve tarih gelecekteyse **randevu** (`RandevuTuru = Aşı`, not `Aşı: <paket>`); geçmişteyse aktarılmaz. |
+| Aşı paketi boş, görev tarihi geçmiş (`Durum = Tamamlandı`, ya da `Yapılacak` ve başlangıcı şimdiden önce = E-vet'te "Gelmedi") | **Klinik geçmiş** (2026-11-12, ADR-048 eki): `Tarih` görev günü, `KayitTuru = Görev Tipi` (ör. `Kısırlaştırma`, `TABURCU`), `Hekim = Veteriner`, `Not` = `E-vet görevi: Tamamlandı` ya da `E-vet görevi: Gelmedi` + `Bilgi` + `Açıklama` (satır satır). Hasta bağlantısı muayeneyle aynı; vefat/pasif hastanın geçmiş görevi de alınır. `rowNumber = 1.000.000 + Excel satırı` (aynı tabloda muayene satırlarıyla çakışmasın). Mükerrer kuralı klinik geçmişinkidir (bölüm 12.3). |
 | Diğer görev, `Yapılacak` ve gelecekte | **Randevu**: `Tarih`/`Saat` görev başlangıcı, `Hekim = Veteriner`, `Neden = Görev Tipi`, `Kontrol…` → `RandevuTuru = Kontrol`, not `Bilgi; Açıklama`. |
-| Hastasız, `İptal`, hasta işi olmayan tür (`Maaş`, `BORÇ HATIRLATMA`, `ÖDEME SÖZÜ`, `Bilgi`, `Hatırlatma`, `Randevu Talep`), geçmişte kalmış/tamamlanmış aşı dışı görev, vefat/pasif hastanın gelecek işi | Aktarılmaz; sayıları nedenleriyle `warnings` içinde (`Imports.EVetConversion`). Geçmiş ziyaretin içeriği muayene listesindedir (ADR-048 T5). |
+| Hastasız, `İptal`, hasta işi olmayan tür (`Maaş`, `BORÇ HATIRLATMA`, `ÖDEME SÖZÜ`, `Bilgi`, `Hatırlatma`, `Randevu Talep`), tarihi okunamayan görev, vefat/pasif hastanın gelecek işi | Aktarılmaz; sayıları nedenleriyle `warnings` içinde (`Imports.EVetConversion`). |
 
 Görev → hasta bağlantısı muayeneyle aynıdır (`Müşteriler`, `Hastalar` çifti).
 
