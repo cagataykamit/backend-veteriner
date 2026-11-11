@@ -76,6 +76,8 @@ public sealed class ParasutEDocumentProviderTests
         _server.On("GET", "/sales_invoices/find_by_external_reference_key", HttpStatusCode.NotFound, null);
         _server.On("GET", "/contacts", HttpStatusCode.OK, """{"data":[]}""");
         _server.On("POST", "/contacts", HttpStatusCode.Created, """{"data":{"id":"c-1","type":"contacts"}}""");
+        _server.On("GET", "/products", HttpStatusCode.OK, """{"data":[]}""");
+        _server.On("POST", "/products", HttpStatusCode.Created, """{"data":{"id":"p-1","type":"products"}}""");
         _server.On("POST", "/sales_invoices", HttpStatusCode.Created, """{"data":{"id":"inv-1","type":"sales_invoices"}}""");
         _server.On("GET", "/sales_invoices/inv-1", HttpStatusCode.OK,
             """{"data":{"id":"inv-1","type":"sales_invoices","attributes":{"net_total":"1200.0"},"relationships":{"active_e_document":{"data":null}}}}""");
@@ -99,6 +101,10 @@ public sealed class ParasutEDocumentProviderTests
         var detail = invoice["data"]!["relationships"]!["details"]!["data"]![0]!["attributes"]!;
         detail["unit_price"]!.GetValue<decimal>().Should().Be(1000m);
         detail["vat_rate"]!.GetValue<decimal>().Should().Be(20m);
+        invoice["data"]!["relationships"]!["details"]!["data"]![0]!["relationships"]!["product"]!["data"]!["id"]!.ToString().Should().Be("p-1");
+        var product = _server.Body("POST", "/products")!["data"]!["attributes"]!;
+        product["name"]!.ToString().Should().Be("Muayene");
+        product["code"]!.ToString().Should().Be(ParasutEDocumentProvider.ProductCode("muayene"));
         _server.Body("POST", "/e_smms")!["data"]!["relationships"]!["sales_invoice"]!["data"]!["id"]!.ToString().Should().Be("inv-1");
         _server.Requests.Should().AllSatisfy(r => r.Authorization.Should().Be("Bearer access-1"));
     }
@@ -126,6 +132,7 @@ public sealed class ParasutEDocumentProviderTests
     {
         _server.On("GET", "/sales_invoices/find_by_external_reference_key", HttpStatusCode.NotFound, null);
         _server.On("GET", "/contacts", HttpStatusCode.OK, """{"data":[{"id":"c-1"}]}""");
+        _server.On("GET", "/products", HttpStatusCode.OK, """{"data":[{"id":"p-9"}]}""");
         _server.On("POST", "/sales_invoices", HttpStatusCode.UnprocessableEntity,
             """{"errors":[{"title":"Unprocessable","detail":"Bu key ile daha önce bir fatura oluşturulmuş.","meta":{"sales_invoice_id":"inv-7"}}]}""");
         _server.On("GET", "/sales_invoices/inv-7", HttpStatusCode.OK, """{"data":{"id":"inv-7","relationships":{"active_e_document":{"data":null}}}}""");
@@ -136,7 +143,7 @@ public sealed class ParasutEDocumentProviderTests
         result.Value!.State.Should().Be(ProviderIssueState.Pending);
         result.Value.ProviderInvoiceId.Should().Be("inv-7");
         result.Value.ProviderJobId.Should().Be("job-1");
-        _server.Requests.Should().NotContain(r => r.Method == "POST" && r.Path.EndsWith("/contacts"));
+        _server.Requests.Should().NotContain(r => r.Method == "POST" && (r.Path.EndsWith("/contacts") || r.Path.EndsWith("/products")));
     }
 
     [Fact]
@@ -193,6 +200,20 @@ public sealed class ParasutEDocumentProviderTests
     }
 
     [Fact]
+    public async Task Rate_Limit_Should_Be_Retried_Within_Request()
+    {
+        _server.OnSequence("GET", "/e_invoice_inboxes",
+            (HttpStatusCode.TooManyRequests, """{"errors":[{"title":"Too Many Requests"}]}"""),
+            (HttpStatusCode.OK, """{"data":[]}"""));
+
+        var result = await Provider().FindEInvoiceRecipientAsync(Account(), "1234567890", CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue(result.Error?.Message);
+        result.Value.Should().BeNull();
+        _server.Requests.Count(r => r.Path.EndsWith("/e_invoice_inboxes")).Should().Be(2);
+    }
+
+    [Fact]
     public async Task Cancel_Should_Cancel_Sales_Invoice()
     {
         _server.On("DELETE", "/sales_invoices/inv-1/cancel", HttpStatusCode.OK, """{"data":{"id":"inv-1","attributes":{"item_type":"cancelled"}}}""");
@@ -238,7 +259,13 @@ public sealed class ParasutEDocumentProviderTests
         public List<(string Method, string Path, string? Authorization, string? Body)> Requests { get; } = [];
         public Dictionary<string, string>? TokenForm { get; private set; }
 
+        private readonly Dictionary<string, Queue<(HttpStatusCode Status, string? Body)>> _sequences = [];
+
         public void On(string method, string suffix, HttpStatusCode status, string? body) => _routes.Add((method, suffix, status, body));
+
+        /// <summary>Aynı uca sırayla farklı yanıtlar (ör. önce 429, sonra 200).</summary>
+        public void OnSequence(string method, string suffix, params (HttpStatusCode Status, string? Body)[] responses)
+            => _sequences[$"{method} {suffix}"] = new Queue<(HttpStatusCode, string?)>(responses);
 
         public JsonNode? Body(string method, string suffix)
             => Requests.Where(r => r.Method == method && r.Path.EndsWith(suffix)).Select(r => r.Body is null ? null : JsonNode.Parse(r.Body)).LastOrDefault();
@@ -251,6 +278,18 @@ public sealed class ParasutEDocumentProviderTests
                 TokenForm = body!.Split('&').Select(p => p.Split('=')).ToDictionary(p => Uri.UnescapeDataString(p[0]), p => Uri.UnescapeDataString(p[1]));
             else
                 Requests.Add((request.Method.Method, path, request.Headers.Authorization?.ToString(), body));
+
+            var sequence = _sequences.FirstOrDefault(s => s.Key.StartsWith(request.Method.Method + " ") && path.EndsWith(s.Key[(request.Method.Method.Length + 1)..]) && s.Value.Count > 0);
+            if (sequence.Value is { } queue)
+            {
+                var (status, text) = queue.Dequeue();
+                var queued = new HttpResponseMessage(status);
+                if (status == HttpStatusCode.TooManyRequests)
+                    queued.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromMilliseconds(10));
+                if (text is not null)
+                    queued.Content = new StringContent(text, Encoding.UTF8, "application/json");
+                return queued;
+            }
 
             var route = _routes.LastOrDefault(r => r.Method == request.Method.Method && path.EndsWith(r.Suffix));
             if (route.Suffix is null)

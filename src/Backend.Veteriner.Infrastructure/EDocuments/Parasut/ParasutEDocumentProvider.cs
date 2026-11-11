@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json.Nodes;
 using Backend.Veteriner.Application.EDocuments.Providers;
 using Backend.Veteriner.Domain.EDocuments;
@@ -326,9 +328,12 @@ public sealed class ParasutEDocumentProvider : IEDocumentProvider, IEDocumentOAu
         if (request.WithholdingRate is { } withholding)
             attributes["withholding_rate"] = withholding;
 
+        // Paraşüt satırda ürün/hizmet kaydı ister ("Ürün/hizmet doldurulmalı"); satır adı ürün adı olur.
+        var products = new Dictionary<string, string>(StringComparer.Ordinal);
         var details = new JsonArray();
         foreach (var line in request.Lines)
         {
+            var productId = await EnsureProductAsync(session, company, line, products, ct);
             details.Add(new JsonObject
             {
                 ["type"] = "sales_invoice_details",
@@ -339,6 +344,7 @@ public sealed class ParasutEDocumentProvider : IEDocumentProvider, IEDocumentOAu
                     ["vat_rate"] = line.VatRate,
                     ["description"] = line.Description,
                 },
+                ["relationships"] = new JsonObject { ["product"] = Relation("products", productId) },
             });
         }
 
@@ -371,6 +377,43 @@ public sealed class ParasutEDocumentProvider : IEDocumentProvider, IEDocumentOAu
         return response.Body?["data"]?["id"]?.ToString()
             ?? throw new ParasutException(new ProviderError(EDocumentErrorKind.Unknown, "Paraşüt fatura kaydı oluşturulamadı."));
     }
+
+    /// <summary>
+    /// Satırın ürün/hizmet kaydı: açıklamadan türetilen sabit kodla (<c>VTN-…</c>) aranır, yoksa oluşturulur. Aynı açıklama her
+    /// belgede aynı kayda düşer; kliniğin Paraşüt'teki kendi ürünlerine dokunulmaz.
+    /// </summary>
+    private async Task<string> EnsureProductAsync(
+        ParasutSession session, string company, EDocumentSendLine line, Dictionary<string, string> cache, CancellationToken ct)
+    {
+        var name = line.Description.Trim();
+        var code = ProductCode(name);
+        if (cache.TryGetValue(code, out var cached))
+            return cached;
+
+        var found = await _client.SendAsync(
+            session, HttpMethod.Get, $"/{company}/products?filter[code]={Uri.EscapeDataString(code)}&page[size]=1", null, "/{company}/products", ct);
+        EnsureSuccess(found, "ürün arama");
+        if (found.Body?["data"] is JsonArray { Count: > 0 } list && list[0]?["id"]?.ToString() is { Length: > 0 } existingId)
+            return cache[code] = existingId;
+
+        var attributes = new JsonObject
+        {
+            ["name"] = name.Length > 255 ? name[..255] : name,
+            ["code"] = code,
+            ["vat_rate"] = line.VatRate,
+            ["currency"] = "TRL",
+        };
+        Set(attributes, "unit", line.Unit);
+        var created = await _client.SendAsync(session, HttpMethod.Post, $"/{company}/products", Document("products", attributes, null), "/{company}/products", ct);
+        EnsureSuccess(created, "ürün oluşturma");
+        var id = created.Body?["data"]?["id"]?.ToString()
+            ?? throw new ParasutException(new ProviderError(EDocumentErrorKind.Unknown, "Paraşüt ürün kaydı oluşturulamadı."));
+        return cache[code] = id;
+    }
+
+    /// <summary>Açıklamadan türetilen sabit ürün kodu (aynı açıklama → aynı Paraşüt ürünü).</summary>
+    public static string ProductCode(string name)
+        => "VTN-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(name.Trim().ToLowerInvariant())))[..12];
 
     private async Task<IReadOnlyList<ParasutCompany>> CompaniesAsync(ParasutSession session, CancellationToken ct)
     {

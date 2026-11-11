@@ -50,7 +50,8 @@ internal sealed class ParasutSession
     }
 }
 
-internal sealed record ParasutResponse(HttpStatusCode Status, JsonNode? Body);
+/// <param name="RetryAfter">429 yanıtındaki bekleme süresi (<c>Retry-After</c>); yoksa <c>null</c>.</param>
+internal sealed record ParasutResponse(HttpStatusCode Status, JsonNode? Body, TimeSpan? RetryAfter = null);
 
 /// <summary>
 /// Paraşüt HTTP istemcisi: OAuth belirteç uçları ve JSON:API istekleri. Erişim belirteci süresi dolmak üzereyse veya istek
@@ -62,6 +63,11 @@ public sealed class ParasutClient
     public const string HttpClientName = "parasut";
     private const string JsonApiMediaType = "application/vnd.api+json";
     private static readonly TimeSpan RefreshSkew = TimeSpan.FromMinutes(2);
+
+    /// <summary>Hız sınırında (429) aynı istek içinde en çok bu kadar beklenip yeniden denenir; sonra geçici hata olarak arka plan işine kalır.</summary>
+    private const int RateLimitRetries = 2;
+    private static readonly TimeSpan DefaultRateLimitWait = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan MaxRateLimitWait = TimeSpan.FromSeconds(10);
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ParasutOptions _options;
@@ -118,6 +124,14 @@ public sealed class ParasutClient
         if (response.Status == HttpStatusCode.Unauthorized)
         {
             await RefreshAsync(session, ct);
+            response = await SendOnceAsync(session, method, path, body, pathTemplate, ct);
+        }
+
+        // Paraşüt paketinin 10 saniyelik istek sınırı düşük olabilir (staging'de belge başına birkaç istek bunu aşıyor).
+        for (var attempt = 0; attempt < RateLimitRetries && response.Status == HttpStatusCode.TooManyRequests; attempt++)
+        {
+            var wait = response.RetryAfter is { } after && after > TimeSpan.Zero ? after : DefaultRateLimitWait;
+            await Task.Delay(wait > MaxRateLimitWait ? MaxRateLimitWait : wait, _timeProvider, ct);
             response = await SendOnceAsync(session, method, path, body, pathTemplate, ct);
         }
 
@@ -198,7 +212,10 @@ public sealed class ParasutClient
             using var response = await client.SendAsync(request, ct);
             var text = await response.Content.ReadAsStringAsync(ct);
             _logger.LogInformation("Paraşüt {Method} {Path} → {Status}", method.Method, pathTemplate, (int)response.StatusCode);
-            return new ParasutResponse(response.StatusCode, Parse(text));
+            var retryAfter = response.Headers.RetryAfter is { } header
+                ? header.Delta ?? (header.Date is { } date ? date - _timeProvider.GetUtcNow() : null)
+                : null;
+            return new ParasutResponse(response.StatusCode, Parse(text), retryAfter);
         }
         catch (HttpRequestException ex)
         {
