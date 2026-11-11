@@ -17,6 +17,13 @@ public static class XlsxTableReader
     private const int XmlProbeBytes = 64 * 1024;
 
     public static Result<ImportReadResult> Read(byte[] content, ImportFileLimits limits)
+        => Open(content, limits, workbook => ReadWorkbook(workbook, limits));
+
+    /// <summary>
+    /// Zip denetiminden geçen çalışma kitabını açar ve <paramref name="read"/> ile yorumlar. Kaynak programa özel okuyucular
+    /// (E-vet yedeği: <see cref="EVet.EVetBackupConverter"/>) da aynı güvenlik kapısından geçer.
+    /// </summary>
+    internal static Result<ImportReadResult> Open(byte[] content, ImportFileLimits limits, Func<XLWorkbook, Result<ImportReadResult>> read)
     {
         var scan = ScanArchive(content, limits);
         if (!scan.IsSuccess)
@@ -26,7 +33,10 @@ public static class XlsxTableReader
         {
             using var stream = new MemoryStream(content, writable: false);
             using var workbook = new XLWorkbook(stream, new LoadOptions { RecalculateAllFormulas = false });
-            return ReadWorkbook(workbook, limits);
+            if (workbook.Worksheets.Count > limits.MaxSheets)
+                return Failure("Imports.UnsupportedFile", $"Çalışma kitabında en fazla {limits.MaxSheets} sayfa olabilir.");
+
+            return read(workbook);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
@@ -35,11 +45,8 @@ public static class XlsxTableReader
         }
     }
 
-    private static Result<ImportReadResult> ReadWorkbook(XLWorkbook workbook, ImportFileLimits limits)
+    internal static Result<ImportReadResult> ReadWorkbook(XLWorkbook workbook, ImportFileLimits limits)
     {
-        if (workbook.Worksheets.Count > limits.MaxSheets)
-            return Failure("Imports.UnsupportedFile", $"Çalışma kitabında en fazla {limits.MaxSheets} sayfa olabilir.");
-
         var tables = new List<ImportSourceTable>();
         var warnings = new List<ImportReadWarning>();
         var seen = new HashSet<ImportTable>();
@@ -86,7 +93,7 @@ public static class XlsxTableReader
         return Result<ImportReadResult>.Success(new ImportReadResult(tables, warnings));
     }
 
-    private static IEnumerable<ImportRawRow> ReadRows(IXLWorksheet sheet)
+    internal static IEnumerable<ImportRawRow> ReadRows(IXLWorksheet sheet)
     {
         // RowsUsed yalnız hücresi olan satırları gezer; milyonlarca boş satır taranmaz.
         foreach (var row in sheet.RowsUsed())

@@ -116,7 +116,7 @@ internal static class ImportTableAssembler
     }
 
     /// <summary>Deneme kiracısında tavan <see cref="TrialLimits.ImportMaxRowsPerTable"/> ve kod <c>Trial.ImportLimitExceeded</c> (TRIAL-004).</summary>
-    private static Result<ImportSourceTable?> TooManyRows(ImportTable table, ImportFileLimits limits)
+    internal static Result<ImportSourceTable?> TooManyRows(ImportTable table, ImportFileLimits limits)
         => limits.IsTrial
             ? Result<ImportSourceTable?>.Failure(TrialLimits.ImportLimitExceeded(ImportCanonicalNames.Display(table)))
             : Result<ImportSourceTable?>.Failure(

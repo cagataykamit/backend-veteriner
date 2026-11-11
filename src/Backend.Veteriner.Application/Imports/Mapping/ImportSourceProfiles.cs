@@ -22,22 +22,15 @@ public sealed record ImportSourceProfileDefinition(
 /// <summary>
 /// Rakip programlardan gelen dosyalar için hazır sütun eşlemeleri — tek yer (TIER-021; IMPORT_API_CONTRACT.md §4.5). Eşleme
 /// önerisi (<see cref="ImportCanonicalSchema.Suggest"/>) kanonik başlıktan sonra, genel takma adlardan önce bu listeye bakar;
-/// kullanıcı öneriyi her zaman düzeltebilir. Elimizde bu programların gerçek dışa aktarma dosyası yoktur: her satır kamuya açık ya
-/// da rakip incelemesinde görülen başlıktan gelir ve doğrulanmamıştır. Kaynağı bulunamayan başlık buraya yazılmaz, genel takma ad
-/// listesine (<see cref="ImportCanonicalSchema"/>) bırakılır. Gerçek dosya gelince yalnız bu dosya düzeltilir.
+/// kullanıcı öneriyi her zaman düzeltebilir. Kaynağı bulunamayan başlık buraya yazılmaz, genel takma ad listesine
+/// (<see cref="ImportCanonicalSchema"/>) bırakılır. Kolayvet'in gerçek dosyası görülmedi. E-vet'in "Yedek Al" dosyası ve raporları
+/// görüldü (2026-11-11): yedek eşleme adımına gelmeden kanonik tablolara çevrilir (<see cref="Reading.EVet.EVetBackupConverter"/>);
+/// buradaki E-vet satırları tek sayfanın ayrıca CSV olarak yüklendiği durum içindir ve gerçek başlıklardır.
 /// </summary>
 public static class ImportSourceProfiles
 {
-    private const string EVetCustomerList =
-        "Rakip incelemesi: E-vet Müşteriler genel listesi ve Rapor > Müşteri Listesi sütunları (ürün deposu competitors/e-vet.md). "
-        + "Yedek Al ekranı Müşteri Listesi'ni Excel olarak veriyor; dosyanın başlıkları görülmedi.";
-
-    private const string EVetPatientList =
-        "Rakip incelemesi: E-vet Rapor > Hasta Listesi ve Sahiplenme Listesi sütunları (ürün deposu competitors/e-vet.md). "
-        + "Yedek Al ekranı Hasta Listesi'ni Excel olarak veriyor; dosyanın başlıkları görülmedi.";
-
-    private const string EVetHbsList =
-        "Rakip incelemesi: E-vet HBS e-Reçete ve ATS listesi sütunu (ürün deposu competitors/e-vet.md); hasta dışa aktarmasında görülmedi.";
+    private const string EVetBackup = "E-vet Genel > Yedek Al Excel dosyası (gerçek dosyayla doğrulandı, 2026-11-11).";
+    private const string EVetPatientReport = "E-vet Rapor > Hasta Listesi CSV'si (gerçek dosyayla doğrulandı, 2026-11-11).";
 
     public static readonly IReadOnlyList<ImportSourceProfileDefinition> All =
     [
@@ -50,25 +43,34 @@ public static class ImportSourceProfiles
             + "Gerçek dosya görülünce eşleme eklenecek.",
             []),
         new(ImportSourceProfile.EVet, "E-vet",
-            "Başlıklar E-vet ekranlarında görülen sütun adlarından alındı; gerçek dışa aktarma dosyasıyla doğrulanmadı. Aşı geçmişi için "
-            + "E-vet dışa aktarması görülmedi, aşı sayfasında genel eş anlamlı başlıklar kullanılır.",
+            "E-vet'in Genel > Yedek Al Excel dosyası (müşteri, hasta, randevu, muayene) doğrudan okunur. Rapor > Hasta Listesi sahip "
+            + "bağlantısını, Rapor > Resmi > Aşı Bilgi aşı seri numarasını tamamlar; Rapor > Depo > Ürün Listesi ürünleri getirir. "
+            + "Gerçek E-vet dosyalarıyla doğrulandı.",
             [
-                new(ImportTable.Customers, "Adı", "AdSoyad", EVetCustomerList),
-                new(ImportTable.Customers, "Müşteri", "AdSoyad", EVetCustomerList),
-                new(ImportTable.Customers, "Protokol No", "MusteriNo", EVetCustomerList),
-                new(ImportTable.Customers, "Gsm", "Telefon", EVetCustomerList),
-                new(ImportTable.Customers, "Email", "Eposta", EVetCustomerList),
-                new(ImportTable.Pets, "Hasta Adı", "HayvanAdi", EVetPatientList),
-                new(ImportTable.Pets, "Hasta", "HayvanAdi", EVetPatientList),
-                new(ImportTable.Pets, "Protokol", "HayvanNo", EVetPatientList),
-                new(ImportTable.Pets, "Tür", "Tur", EVetPatientList),
-                new(ImportTable.Pets, "Hasta Irkı", "Irk", EVetPatientList),
-                new(ImportTable.Pets, "Irk", "Irk", EVetPatientList),
-                new(ImportTable.Pets, "Cinsiyet", "Cinsiyet", EVetPatientList),
-                new(ImportTable.Pets, "Doğum Tarihi", "DogumTarihi", EVetPatientList),
-                new(ImportTable.Pets, "Sahip", "SahipAdSoyad", EVetPatientList),
-                new(ImportTable.Pets, "Gsm", "SahipTelefon", EVetPatientList),
-                new(ImportTable.Pets, "Çip No", "Mikrocip", EVetHbsList),
+                new(ImportTable.Customers, "Müşteriler", "AdSoyad", EVetBackup, Verified: true),
+                new(ImportTable.Customers, "Protokol No", "MusteriNo", EVetBackup, Verified: true),
+                new(ImportTable.Customers, "Gsm", "Telefon", EVetBackup, Verified: true),
+                new(ImportTable.Customers, "Email", "Eposta", EVetBackup, Verified: true),
+                new(ImportTable.Customers, "Bakiye", "AcikBakiye", EVetBackup, Verified: true),
+                new(ImportTable.Customers, "Kimlik No", "KimlikNo", EVetBackup, Verified: true),
+                new(ImportTable.Customers, "Vergi Dairesi", "VergiDairesi", EVetBackup, Verified: true),
+                new(ImportTable.Customers, "Durum", "Durum", EVetBackup, Verified: true),
+                new(ImportTable.Pets, "Hastalar", "HayvanAdi", EVetBackup, Verified: true),
+                new(ImportTable.Pets, "Hasta Adı", "HayvanAdi", EVetPatientReport, Verified: true),
+                new(ImportTable.Pets, "Protokol No", "HayvanNo", EVetBackup, Verified: true),
+                new(ImportTable.Pets, "Müşteriler", "SahipAdSoyad", EVetBackup, Verified: true),
+                new(ImportTable.Pets, "Hasta Türü", "Tur", EVetBackup, Verified: true),
+                new(ImportTable.Pets, "Hasta Irkı", "Irk", EVetPatientReport, Verified: true),
+                new(ImportTable.Pets, "Irk", "Irk", EVetBackup, Verified: true),
+                new(ImportTable.Pets, "Cinsiyet", "Cinsiyet", EVetBackup, Verified: true),
+                new(ImportTable.Pets, "Doğum Tarihi", "DogumTarihi", EVetBackup, Verified: true),
+                new(ImportTable.Pets, "Çip No", "Mikrocip", EVetBackup, Verified: true),
+                new(ImportTable.Pets, "Kart No", "KarneNo", EVetBackup, Verified: true),
+                new(ImportTable.Pets, "Renk", "Renk", EVetBackup, Verified: true),
+                new(ImportTable.Pets, "Ağırlık", "Agirlik", EVetBackup, Verified: true),
+                new(ImportTable.Pets, "Alerjik Durumu", "Alerji", EVetBackup, Verified: true),
+                new(ImportTable.Pets, "Ölüm Zamanı", "VefatTarihi", EVetBackup, Verified: true),
+                new(ImportTable.Pets, "Durum", "Durum", EVetBackup, Verified: true),
             ]),
     ];
 

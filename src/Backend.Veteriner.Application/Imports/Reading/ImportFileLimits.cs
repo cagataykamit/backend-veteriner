@@ -31,8 +31,8 @@ public sealed class ImportFileLimits
     public const long MaxRequestBytes = 72L * 1024 * 1024;
 
     public int MaxFileBytes { get; set; } = 10 * 1024 * 1024;
-    public int MaxRowsPerTable { get; set; } = 10_000;
-    public int MaxTotalRows { get; set; } = 25_000;
+    public int MaxRowsPerTable { get; set; } = 50_000;
+    public int MaxTotalRows { get; set; } = 100_000;
     public int MaxColumns { get; set; } = 60;
     public int MaxCellChars { get; set; } = 10_000;
     public int MaxSheets { get; set; } = 20;
