@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace Backend.Veteriner.Application.Imports.Mapping;
 
 /// <summary>
@@ -106,17 +108,47 @@ public sealed class ImportValueResolver
         if (_userMappings.TryGetValue((kind, key), out var target))
             return target is { } id ? ImportValueResolution.Resolved(id) : ImportValueResolution.Skipped;
 
-        if (TryUnique(kind, key, parentId, out var resolved))
+        if (TryCatalogOrAlias(kind, key, parentId, out var resolved))
             return resolved;
 
-        if (BuiltInAliases.TryGetValue(kind, out var aliases)
-            && aliases.TryGetValue(key, out var aliasTarget)
-            && TryUnique(kind, aliasTarget, parentId, out resolved))
+        // Aşı adı doz/yıl/tür ekleriyle yazılmışsa (YILLIK KEDİ KARMA, LÖSEMİ 2, İÇ PARAZİT 2 AYLIK) aşı serisinin adıyla denenir.
+        if (kind == ImportValueKind.Vaccine && ReduceVaccineKey(key) is var series && series != key
+            && TryCatalogOrAlias(kind, series, parentId, out resolved))
         {
             return resolved;
         }
 
         return ImportValueResolution.Unmapped;
+    }
+
+    /// <summary>
+    /// Aşı serisi anahtarı: katlanmış addan baştaki/sondaki <c>yıllık</c>, sondaki doz numarası ve <c>N aylık</c>, baştaki
+    /// <c>kedi</c>/<c>köpek</c> atılır (<c>YILLIK KEDİ KARMA</c> = <c>KEDİ KARMA 2</c> = <c>karma</c>). Sonraki aşı tarihini serinin
+    /// son uygulamasına bağlamak (E-vet dönüştürücüsü) ve katalog eşlemesi aynı kuralı kullanır.
+    /// </summary>
+    public static string VaccineSeriesKey(string? vaccineName) => ReduceVaccineKey(ImportTextFolding.Fold(vaccineName));
+
+    private static string ReduceVaccineKey(string key)
+    {
+        var reduced = VaccineYearly.Replace(key, string.Empty);
+        reduced = VaccineDoseSuffix.Replace(reduced, string.Empty);
+        reduced = VaccineSpeciesPrefix.Replace(reduced, string.Empty);
+        return reduced.Length == 0 ? key : reduced;
+    }
+
+    private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(100);
+    private static readonly Regex VaccineYearly = new("^yillik|yillik$", RegexOptions.Compiled, RegexTimeout);
+    private static readonly Regex VaccineDoseSuffix = new(@"\d*aylik$|\d+$", RegexOptions.Compiled, RegexTimeout);
+    private static readonly Regex VaccineSpeciesPrefix = new("^(kedi|kopek)(?=.)", RegexOptions.Compiled, RegexTimeout);
+
+    private bool TryCatalogOrAlias(ImportValueKind kind, string key, Guid? parentId, out ImportValueResolution resolved)
+    {
+        if (TryUnique(kind, key, parentId, out resolved))
+            return true;
+
+        return BuiltInAliases.TryGetValue(kind, out var aliases)
+               && aliases.TryGetValue(key, out var aliasTarget)
+               && TryUnique(kind, aliasTarget, parentId, out resolved);
     }
 
     private bool TryUnique(ImportValueKind kind, string key, Guid? parentId, out ImportValueResolution resolution)

@@ -40,6 +40,35 @@ public sealed class ImportValueResolverTests
     private static ImportValueResolver Resolver(params ImportValueMapping[] userMappings) => new(Catalogs, userMappings);
 
     [Theory]
+    [InlineData("YILLIK KEDİ KARMA", "karma")]
+    [InlineData("KÖPEK KARMA 3", "karma")]
+    [InlineData("LÖSEMİ  1", "losemi")]
+    [InlineData("İÇ PARAZİT 2 AYLIK", "icparazit")]
+    [InlineData("İç Parazit 1,5 Aylık", "icparazit")]
+    [InlineData("TETANOZ YILLIK", "tetanoz")]
+    [InlineData("Kedi", "kedi")]
+    [InlineData("İÇ+DIŞ PARAZİT", "icdisparazit")]
+    public void Vaccine_Series_Key_Should_Drop_Dose_Year_And_Species_Words(string name, string expected)
+        => ImportValueResolver.VaccineSeriesKey(name).Should().Be(expected);
+
+    [Theory]
+    [InlineData("YILLIK KEDİ KARMA")]
+    [InlineData("KÖPEK KARMA 2")]
+    [InlineData("Karma Aşısı")]
+    public void Vaccine_With_Dose_Or_Year_Words_Should_Resolve_To_Its_Series(string source)
+        => Resolver().Resolve(ImportValueKind.Vaccine, source, Dog).Should().Be(ImportValueResolution.Resolved(Mixed));
+
+    [Fact]
+    public void Exact_Vaccine_Name_Should_Win_Over_Series_Reduction()
+    {
+        var yearly = Guid.NewGuid();
+        var catalogs = Catalogs with { Vaccines = [.. Catalogs.Vaccines, new(yearly, "Yıllık Karma", null, null)] };
+
+        new ImportValueResolver(catalogs, []).Resolve(ImportValueKind.Vaccine, "YILLIK KARMA", Dog)
+            .Should().Be(ImportValueResolution.Resolved(yearly));
+    }
+
+    [Theory]
     [InlineData("Köpek")]
     [InlineData("KÖPEK")]
     [InlineData("kopek")]
