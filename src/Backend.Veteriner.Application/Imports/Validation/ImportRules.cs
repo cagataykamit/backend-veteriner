@@ -126,8 +126,6 @@ public static class ImportRules
         "Hasta satırı hatalı olduğu için bu satır aktarılamaz.");
 
     // Açık bakiye (müşteri; ADR-048 T3)
-    public static readonly ImportRule CreditBalanceNotImported = new("Imports.CreditBalanceNotImported", ImportIssueSeverity.Warning,
-        "Alacak (negatif) bakiye bu sürümde aktarılmaz; müşteri bakiyesiz aktarılacak, tutarı elle düzeltin.");
     public static readonly ImportRule AmountInvalid = new("Imports.AmountInvalid", ImportIssueSeverity.Warning,
         "Tutar okunamadı (örnek: 1.250,50); tutar aktarılmayacak.");
     public static readonly ImportRule BalanceNotAppliedToExisting = new("Imports.BalanceNotAppliedToExisting", ImportIssueSeverity.Info,

@@ -98,7 +98,8 @@ public sealed class ImportFullMigrationCommitRollbackTests
         bool otherRecord = false,
         bool otherEntry = false,
         bool balanceChanged = false,
-        IReadOnlySet<string>? productReasons = null)
+        IReadOnlySet<string>? productReasons = null,
+        bool openingCredit = false)
         => new(
             new Dictionary<Guid, ImportRollbackVaccinationFact>(),
             new Dictionary<Guid, Guid> { [Pet] = Client },
@@ -116,7 +117,7 @@ public sealed class ImportFullMigrationCommitRollbackTests
             {
                 [Appointment] = new(Pet, appointmentChanged, HasVisits: false, HasExaminations: false),
             },
-            OpeningBalances = new Dictionary<Guid, ImportRollbackOpeningBalanceFact> { [Client] = new(Charge, balanceChanged) },
+            OpeningBalances = new Dictionary<Guid, ImportRollbackOpeningBalanceFact> { [Client] = new(Charge, balanceChanged, openingCredit) },
             Products = new Dictionary<Guid, IReadOnlySet<string>> { [ProductId] = productReasons ?? new HashSet<string>() },
         };
 
@@ -128,7 +129,7 @@ public sealed class ImportFullMigrationCommitRollbackTests
         plan.HasBlocked.Should().BeFalse();
         plan.Items.Should().OnlyContain(i => i.Decision == ImportRollbackDecision.Delete);
         plan.CountOpeningBalances(ImportRollbackDecision.Delete).Should().Be(1);
-        plan.OpeningBalances[Client].Should().Be(Charge);
+        plan.OpeningBalances[Client].Id.Should().Be(Charge);
 
         // Sahip birimi müşteri + hasta + geçmiş + randevu + hesap hareketi; ürün kendi biriminde, sonda.
         plan.Units.Select(u => u.OwnerKey).Should().Equal(Client, ProductId);
@@ -155,6 +156,25 @@ public sealed class ImportFullMigrationCommitRollbackTests
         Reasons(plan, ImportTable.Pets).Should().Equal(ImportRollbackReasons.HasOtherClinicalRecords);
         Reasons(plan, ImportTable.Customers).Should().BeEquivalentTo(
             [ImportRollbackReasons.HasKeptPets, ImportRollbackReasons.HasOtherAccountEntries, ImportRollbackReasons.OpeningBalanceChanged]);
+    }
+
+    [Fact]
+    public void Unused_Opening_Credit_Is_Deleted_With_The_Client()
+    {
+        var plan = ImportRollbackPlanner.Build(Rows(), Facts(openingCredit: true));
+
+        Decision(plan, ImportTable.Customers).Should().Be(ImportRollbackDecision.Delete);
+        plan.CountOpeningBalances(ImportRollbackDecision.Delete).Should().Be(1);
+        plan.OpeningBalances[Client].IsCredit.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Used_Opening_Credit_Keeps_The_Client_Like_A_Paid_Opening_Charge()
+    {
+        var plan = ImportRollbackPlanner.Build(Rows(), Facts(balanceChanged: true, openingCredit: true));
+
+        Reasons(plan, ImportTable.Customers).Should().Contain(ImportRollbackReasons.OpeningBalanceChanged);
+        plan.CountOpeningBalances(ImportRollbackDecision.Keep).Should().Be(1);
     }
 
     [Fact]

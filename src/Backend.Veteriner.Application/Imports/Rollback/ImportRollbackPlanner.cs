@@ -40,12 +40,13 @@ public sealed record ImportRollbackItem(
 public sealed record ImportRollbackUnit(Guid OwnerKey, IReadOnlyList<Guid> RowIds);
 
 /// <summary>
-/// <see cref="OpeningBalances"/>: hedef müşterilere partinin açtığı devir ücretleri (müşteri → ücret). Devir satır değil
-/// müşterinin ekidir; müşteriyle aynı kararı alır (müşteri silinirse ücret de silinir).
+/// <see cref="OpeningBalances"/>: hedef müşterilere partinin açtığı devir ücreti ya da devir alacağı (müşteri → kayıt). Devir
+/// satır değil müşterinin ekidir; müşteriyle aynı kararı alır (müşteri silinirse devir de silinir).
 /// </summary>
 public sealed record ImportRollbackPlan(IReadOnlyList<ImportRollbackItem> Items, IReadOnlyList<ImportRollbackUnit> Units)
 {
-    public IReadOnlyDictionary<Guid, Guid> OpeningBalances { get; init; } = new Dictionary<Guid, Guid>();
+    public IReadOnlyDictionary<Guid, ImportRollbackOpeningBalanceFact> OpeningBalances { get; init; } =
+        new Dictionary<Guid, ImportRollbackOpeningBalanceFact>();
 
     public IEnumerable<ImportRollbackItem> Blocked => Items.Where(i => i.Decision == ImportRollbackDecision.Keep);
 
@@ -54,7 +55,7 @@ public sealed record ImportRollbackPlan(IReadOnlyList<ImportRollbackItem> Items,
     public int Count(ImportTable table, ImportRollbackDecision decision)
         => Items.Count(i => i.Row.Table == table && i.Decision == decision);
 
-    /// <summary>Kararı <paramref name="decision"/> olan müşterilerin devir ücreti sayısı.</summary>
+    /// <summary>Kararı <paramref name="decision"/> olan müşterilerin devir ücreti ve devir alacağı sayısı.</summary>
     public int CountOpeningBalances(ImportRollbackDecision decision)
         => Items.Count(i => i.Row.Table == ImportTable.Customers && i.Decision == decision && OpeningBalances.ContainsKey(i.TargetId));
 
@@ -226,7 +227,7 @@ public static class ImportRollbackPlanner
 
         return new ImportRollbackPlan(items, BuildUnits(items, facts))
         {
-            OpeningBalances = facts.OpeningBalances.ToDictionary(kv => kv.Key, kv => kv.Value.ChargeId),
+            OpeningBalances = facts.OpeningBalances,
         };
     }
 

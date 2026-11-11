@@ -16,6 +16,7 @@ using Backend.Veteriner.Application.Products.Specs;
 using Backend.Veteriner.Application.Vaccinations.Commands.Import;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Pets;
@@ -32,7 +33,7 @@ namespace Backend.Veteriner.Application.Imports.Commands.ApplyOwnerUnit;
 /// <see cref="CreatePetCommand"/>, aşı <see cref="CreateImportedVaccinationCommand"/>, klinik geçmiş
 /// <see cref="CreateImportedClinicalRecordCommand"/>, hesap hareketi <see cref="CreateImportedAccountEntryCommand"/>, randevu
 /// <see cref="CreateImportedAppointmentCommand"/>, ürün <see cref="CreateProductCommand"/>; devir bakiyesi
-/// <see cref="Charge.CreateOpeningBalance"/> (ADR-048). Önizlemedeki eşleşmeler uygulama
+/// <see cref="Charge.CreateOpeningBalance"/>, devir alacağı <see cref="ClientCredit.FromImport"/> (ADR-048). Önizlemedeki eşleşmeler uygulama
 /// anında yeniden çözülür (K4: arada eklenen müşteri/hasta <c>Matched</c>; K10: arada çipi kaydedilen hasta hata; aynı
 /// gün aşısı <c>Skipped</c>). Satır sonuçları ve parti kirası birimin sonunda aynı <c>SaveChanges</c>'te yazılır: kira
 /// başka işçiye geçtiyse rowversion çakışması birimi geri aldırır (aynı satır iki kez yazılmaz).
@@ -59,6 +60,7 @@ public sealed class ApplyImportOwnerUnitCommandHandler
     private readonly IReadRepository<Appointment> _appointments;
     private readonly IReadRepository<Product> _products;
     private readonly IRepository<Charge> _charges;
+    private readonly IRepository<ClientCredit> _credits;
     private readonly ISender _sender;
     private readonly TimeProvider _timeProvider;
 
@@ -73,6 +75,7 @@ public sealed class ApplyImportOwnerUnitCommandHandler
         IReadRepository<Appointment> appointments,
         IReadRepository<Product> products,
         IRepository<Charge> charges,
+        IRepository<ClientCredit> credits,
         ISender sender,
         TimeProvider timeProvider)
     {
@@ -86,6 +89,7 @@ public sealed class ApplyImportOwnerUnitCommandHandler
         _appointments = appointments;
         _products = products;
         _charges = charges;
+        _credits = credits;
         _sender = sender;
         _timeProvider = timeProvider;
     }
@@ -229,7 +233,12 @@ public sealed class ApplyImportOwnerUnitCommandHandler
 
         unit.ClientId = created.Value!.Id;
         unit.Add(row, ImportRowApplyStatus.Created, ClientEntity, unit.ClientId, matched: false);
-        return data.OpeningBalance is > 0 ? await CreateOpeningBalanceAsync(unit, row, data, ct) : Result.Success();
+        return data.OpeningBalance switch
+        {
+            > 0 => await CreateOpeningBalanceAsync(unit, row, data, ct),
+            < 0 => await CreateOpeningCreditAsync(unit, row, data, ct),
+            _ => Result.Success(),
+        };
     }
 
     /// <summary>Doğrulanmış fatura kimliği: TCKN → bireysel; VKN → kurumsal (unvan müşteri adı, vergi dairesiyle).</summary>
@@ -272,6 +281,32 @@ public sealed class ApplyImportOwnerUnitCommandHandler
 
         await _charges.AddAsync(charge.Value!, ct);
         await _charges.SaveChangesAsync(ct);
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Devir alacağı (ADR-048 T3): eksi bakiyenin mutlak değeri kadar, yalnız oluşturulan müşteriye tek müşteri kredisi; ödeme
+    /// yazılmaz, bu yüzden ciroya, gün sonuna, kasaya ve e-belgeye girmez. Açanı devir ücretiyle aynı kuraldır.
+    /// </summary>
+    private async Task<Result> CreateOpeningCreditAsync(
+        UnitState unit, ImportBatchRow row, ImportNormalizedCustomer data, CancellationToken ct)
+    {
+        if (unit.Batch.ClinicId is not { } clinicId)
+            return Fail(row, ImportRules.ClinicRequired.Code, ImportRules.ClinicRequired.Message);
+
+        var credit = ClientCredit.FromImport(
+            unit.TenantId,
+            clinicId,
+            unit.ClientId!.Value,
+            -data.OpeningBalance!.Value,
+            unit.Options.CommittedByUserId ?? unit.Batch.CreatedByUserId,
+            _timeProvider.GetUtcNow().UtcDateTime,
+            unit.Batch.Id);
+        if (!credit.IsSuccess)
+            return Fail(row, credit.Error);
+
+        await _credits.AddAsync(credit.Value!, ct);
+        await _credits.SaveChangesAsync(ct);
         return Result.Success();
     }
 

@@ -133,8 +133,8 @@ public sealed partial class ImportValidationEngine
     }
 
     /// <summary>
-    /// Açık bakiye (ADR-048 T3): yalnız pozitif tutar aktarılır; alacak ve okunamayan tutar uyarıdır (müşteri yine aktarılır).
-    /// Bakiye tarihi yalnız devir açıklaması içindir.
+    /// Açık bakiye (ADR-048 T3): artı tutar devir borcu, eksi tutar devir alacağıdır; okunamayan tutar uyarıdır (müşteri yine
+    /// aktarılır). Bakiye tarihi yalnız devir ücretinin açıklaması içindir.
     /// </summary>
     private (decimal? Balance, DateOnly? BalanceDate) ReadOpeningBalance(ImportRowReader reader, List<ImportIssue> issues)
     {
@@ -146,13 +146,7 @@ public sealed partial class ImportValidationEngine
             return (null, null);
         }
 
-        if (amount is < 0)
-        {
-            issues.Add(ImportRules.CreditBalanceNotImported.At("AcikBakiye", value: raw));
-            return (null, null);
-        }
-
-        if (amount is not > 0)
+        if (amount is null or 0)
             return (null, null);
 
         DateOnly? balanceDate = null;

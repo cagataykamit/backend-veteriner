@@ -2,6 +2,7 @@ using Ardalis.Specification;
 using Backend.Veteriner.Application.Imports.Rollback;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Pets;
@@ -112,6 +113,16 @@ public sealed class ImportRollbackAppointmentsSpec : Specification<Appointment>
 public sealed class ImportRollbackOpeningBalancesSpec : Specification<Charge>
 {
     public ImportRollbackOpeningBalancesSpec(Guid tenantId, Guid batchId, IReadOnlyCollection<Guid> ids)
+    {
+        var set = ids.ToArray();
+        Query.Where(c => c.TenantId == tenantId && c.ImportBatchId == batchId && set.Contains(c.Id));
+    }
+}
+
+/// <summary>Geri almada silinecek, partinin açtığı devir alacakları (izlenir; ADR-048 T3).</summary>
+public sealed class ImportRollbackOpeningCreditsSpec : Specification<ClientCredit>
+{
+    public ImportRollbackOpeningCreditsSpec(Guid tenantId, Guid batchId, IReadOnlyCollection<Guid> ids)
     {
         var set = ids.ToArray();
         Query.Where(c => c.TenantId == tenantId && c.ImportBatchId == batchId && set.Contains(c.Id));

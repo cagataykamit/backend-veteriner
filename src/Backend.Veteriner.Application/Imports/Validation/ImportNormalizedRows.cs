@@ -33,8 +33,8 @@ public abstract record ImportNormalizedRow
 }
 
 /// <summary>
-/// Müşteri satırı. <see cref="OpeningBalance"/> yalnız pozitif ve aktarılacak devir bakiyesidir (ADR-048 T3); müşteri
-/// oluşturulursa devir ücreti açılır, eşleşen/mükerrer satırda null'dır. <see cref="NationalId"/> (bireysel) veya
+/// Müşteri satırı. <see cref="OpeningBalance"/> aktarılacak sıfır dışı devir bakiyesidir (ADR-048 T3): müşteri oluşturulursa
+/// artı tutar devir ücreti, eksi tutar devir alacağı açar; eşleşen/mükerrer satırda null'dır. <see cref="NationalId"/> (bireysel) veya
 /// <see cref="TaxNumber"/> (kurumsal) geçerli fatura kimliğidir; <see cref="RemindersOptedOut"/> eski programda pasif müşteridir.
 /// </summary>
 public sealed record ImportNormalizedCustomer(
