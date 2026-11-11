@@ -6,6 +6,7 @@ namespace Backend.Veteriner.Application.Charges.Contracts.Dtos;
 /// <summary>Ücret satırı. <see cref="PetId"/>, <see cref="VisitId"/>, <see cref="ExaminationId"/> null olabilir.</summary>
 /// <param name="LineKind">Satır türü (ADR-036); varsayılan hizmet.</param>
 /// <param name="VatRate">KDV oranı (%); null = klinik varsayılanı.</param>
+/// <param name="EDocumentId">Ücretin bağlı olduğu geçerli e-belge (ADR-036 Dilim 3); okunur.</param>
 public sealed record ChargeDto(
     Guid Id,
     Guid ClinicId,
@@ -25,7 +26,8 @@ public sealed record ChargeDto(
     decimal AllocatedAmount,
     decimal OutstandingAmount,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] ChargeLineKind LineKind,
-    decimal? VatRate);
+    decimal? VatRate,
+    Guid? EDocumentId = null);
 
 /// <summary>Ücret ekleme sonucu; <see cref="Created"/> false ise aynı <c>requestId</c> ile tekrar istek ilk kaydı döndürmüştür.</summary>
 public sealed record ChargeCreateResultDto(bool Created, ChargeDto Charge);

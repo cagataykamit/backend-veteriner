@@ -58,6 +58,8 @@ public sealed class TenantIsolationArchitectureTests
         ["Backend.Veteriner.Infrastructure/AppointmentRequests/AppointmentRequestExpiryHostedService.cs"] = "Süresi dolan randevu talepleri taraması",
         ["Backend.Veteriner.Infrastructure/Billing/ScheduledPlanChangeProcessorHostedService.cs"] = "Vadesi gelen plan değişiklikleri",
         ["Backend.Veteriner.Infrastructure/Billing/CheckoutReconciliationProcessor.cs"] = "Ödeme oturumlarının sağlayıcıyla uzlaştırması",
+        ["Backend.Veteriner.Infrastructure/EDocuments/EDocumentStatusProcessor.cs"] = "Bekleyen e-belgeler: sonucu gelmeyen ve iptali süren belgelerin taraması",
+        ["Backend.Veteriner.Infrastructure/EDocuments/EDocumentAutomationProcessor.cs"] = "Otomatik e-belge ve gün sonu özeti: bağlı kliniklerin taraması",
         ["Backend.Veteriner.Infrastructure/Reminders/ReminderProcessorService.cs"] = "Hatırlatması açık kiracılar ve günlük uzlaştırması",
         ["Backend.Veteriner.Infrastructure/Projections/Appointments/AppointmentProjectionRebuildService.cs"] = "Okuma modelini yeniden kurma",
         ["Backend.Veteriner.Infrastructure/Projections/Clients/ClientReadModelBackfillService.cs"] = "Okuma modeli doldurma (kiracısız çağrı)",

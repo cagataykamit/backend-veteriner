@@ -39,6 +39,9 @@ public static class TrialLimits
     public const string PetQuotaExceededCode = "Trial.PetQuotaExceeded";
     public const string StorageQuotaExceededCode = "Trial.StorageQuotaExceeded";
 
+    /// <summary>Deneme kiracısında canlı ortamda gerçek e-belge kesilmez (ADR-036 ilke 7).</summary>
+    public const string EDocumentsNotAllowedCode = "Trial.EDocumentsNotAllowed";
+
     public static Error ExportLimitExceeded() => new(
         ExportLimitExceededCode,
         $"Deneme sürümünde dışa aktarma en fazla {ExportMaxRows} satır sınırı; abonelikle kalkar. Filtreyi daraltın.");
