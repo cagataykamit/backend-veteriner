@@ -13,7 +13,8 @@ namespace Backend.Veteriner.Application.Imports.Reading.EVet;
 /// E-vet "Genel &gt; Yedek Al" çalışma kitabını (Müşteri / Hasta / Randevu / Muayene Listesi sayfaları, düz tablolar) kanonik
 /// tablolara çevirir (IMPORT_API_CONTRACT.md §13). Yalnız biçim ve E-vet'e özgü anlam burada çözülür (sayfa ve sütun adları,
 /// sahip bağlantısı, cinsiyet hücresindeki kısırlık, görev türleri, sonraki aşı tarihi); doğrulama ve yazma kuralları kanonik
-/// tablolar üzerinden aynen işler. Çıkan satır numarası kaynak sayfanın Excel satırıdır.
+/// tablolar üzerinden aynen işler. Çıkan satır numarası kaynak sayfanın Excel satırıdır; klinik geçmişe dönüşen görevde
+/// <see cref="TaskClinicalRowOffset"/> eklenir (aynı tabloda muayene satırlarıyla çakışmasın).
 /// </summary>
 internal static class EVetBackupConverter
 {
@@ -24,6 +25,9 @@ internal static class EVetBackupConverter
     private const string PetSheet = "hastalistesi";
     private const string TaskSheet = "randevulistesi";
     private const string ExaminationSheet = "muayenelistesi";
+
+    /// <summary>Klinik geçmişe dönüşen görevin satır numarası: bu değer + Randevu Listesi Excel satırı (IMPORT_API_CONTRACT.md §13.2).</summary>
+    public const int TaskClinicalRowOffset = 1_000_000;
 
     /// <summary>Hasta işi olmayan görev türleri (katlanmış): klinik içi ve finans hatırlatmaları.</summary>
     private static readonly HashSet<string> NonPatientTaskTypes = new(StringComparer.Ordinal)
@@ -94,15 +98,18 @@ internal static class EVetBackupConverter
             Add(output, ConvertCustomers(customers, state));
         if (sheets.TryGetValue(PetSheet, out var pets))
             Add(output, ConvertPets(pets, state, warnings));
+        var clinicalRows = new List<ImportSourceRow>();
+        if (sheets.TryGetValue(ExaminationSheet, out var examinations))
+            clinicalRows.AddRange(ConvertExaminations(examinations, state));
         if (sheets.TryGetValue(TaskSheet, out var tasks))
         {
-            var (vaccinations, appointments) = ConvertTasks(tasks, state, warnings);
+            var (vaccinations, appointments, taskRecords) = ConvertTasks(tasks, state, warnings);
             Add(output, vaccinations);
             Add(output, appointments);
+            clinicalRows.AddRange(taskRecords);
         }
 
-        if (sheets.TryGetValue(ExaminationSheet, out var examinations))
-            Add(output, ConvertExaminations(examinations, state));
+        Add(output, new ImportSourceTable(ImportTable.ClinicalRecords, ClinicalHeaders, clinicalRows));
 
         foreach (var table in output)
         {
@@ -331,7 +338,7 @@ internal static class EVetBackupConverter
 
     // ---------------------------------------------------------------- Muayene
 
-    private static ImportSourceTable ConvertExaminations(EVetSheet sheet, ConversionState state)
+    private static List<ImportSourceRow> ConvertExaminations(EVetSheet sheet, ConversionState state)
     {
         var rows = new List<ImportSourceRow>();
         foreach (var row in sheet.Rows)
@@ -357,7 +364,7 @@ internal static class EVetBackupConverter
             ]));
         }
 
-        return new ImportSourceTable(ImportTable.ClinicalRecords, ClinicalHeaders, rows);
+        return rows;
     }
 
     /// <summary>
@@ -389,15 +396,18 @@ internal static class EVetBackupConverter
 
     /// <summary>
     /// Görevler: aşı paketi dolu ve tamamlanmış → aşı geçmişi; yapılacak aşı görevi → aynı aşı serisinin son uygulamasının
-    /// sonraki aşı tarihi (son uygulama yoksa ve tarih gelecekteyse randevu); diğer gelecek görevler → randevu. Hastasız,
-    /// iptal, hasta işi olmayan tür ve geçmişte kalan aşı dışı görev aktarılmaz. Vefat/pasif hastaya gelecek iş yazılmaz.
+    /// sonraki aşı tarihi (son uygulama yoksa ve tarih gelecekteyse randevu); geçmişte kalan aşı dışı görev (tamamlanmış ya da
+    /// gelinmemiş) → klinik geçmiş (ADR-048 eki: E-vet işlemleri muayene listesine değil göreve yazar); diğer gelecek görevler
+    /// → randevu. Hastasız, iptal ve hasta işi olmayan tür aktarılmaz. Vefat/pasif hastaya gelecek iş yazılmaz.
     /// </summary>
-    private static (ImportSourceTable? Vaccinations, ImportSourceTable? Appointments) ConvertTasks(
+    private static (ImportSourceTable? Vaccinations, ImportSourceTable? Appointments, List<ImportSourceRow> ClinicalRecords) ConvertTasks(
         EVetSheet sheet, ConversionState state, List<ImportReadWarning> warnings)
     {
         var applied = new List<AppliedVaccine>();
         var pending = new List<(ImportSourceRow Row, string Group, DateTime Start, string? PetKey)>();
         var appointments = new List<ImportSourceRow>();
+        var records = new List<ImportSourceRow>();
+        var missed = 0;
         var skipped = new SkipCounter();
 
         foreach (var row in sheet.Rows)
@@ -429,13 +439,16 @@ internal static class EVetBackupConverter
                 continue;
             }
 
-            if (status != "yapilacak" || start.Value <= state.NowLocal)
+            // E-vet'te tarihi geçmiş "Yapılacak" görev "Gelmedi" görünür.
+            if (status == "tamamlandi" || (status == "yapilacak" && start.Value <= state.NowLocal))
             {
-                skipped.Add(vaccine is null && type == "asilama" && status == "tamamlandi"
-                    ? "aşı adı boş tamamlanmış aşılama"
-                    : "geçmişte kalmış ya da tamamlanmış aşı dışı");
+                var completed = status == "tamamlandi";
+                records.Add(TaskRecord(sheet, row, petProtocol, ownerName, petName, start.Value, completed));
+                missed += completed ? 0 : 1;
                 continue;
             }
+
+            if (status != "yapilacak") { skipped.Add("durumu tanınmayan"); continue; }
 
             if (petProtocol is not null && state.InactivePets.Contains(petProtocol)) { skipped.Add("vefat ya da pasif hastaya ait gelecek"); continue; }
             appointments.Add(Appointment(sheet, row, petProtocol, ownerName, petName, start.Value, vaccine: null));
@@ -486,6 +499,13 @@ internal static class EVetBackupConverter
         warnings.Add(new ImportReadWarning(WarningCode, ImportTable.Vaccinations,
             $"Randevu Listesi: {vaccinationRows.Count} tamamlanmış aşı aşı geçmişine, {appointments.Count} gelecek görev randevuya dönüşecek; "
             + $"{dueDates} aşının sonraki aşı tarihi E-vet'teki yapılacak aşı görevinden alındı."));
+        if (records.Count > 0)
+        {
+            warnings.Add(new ImportReadWarning(WarningCode, ImportTable.ClinicalRecords,
+                $"Randevu Listesi: geçmişte kalan {records.Count} aşı dışı görev ({records.Count - missed} tamamlanmış, {missed} gelinmemiş) "
+                + "hastanın eski program kayıtlarına eklenecek; kayıt türü görev tipidir."));
+        }
+
         if (skipped.Total > 0)
         {
             warnings.Add(new ImportReadWarning(WarningCode, ImportTable.Appointments,
@@ -501,8 +521,33 @@ internal static class EVetBackupConverter
 
         return (
             vaccinationRows.Count == 0 ? null : new ImportSourceTable(ImportTable.Vaccinations, VaccinationHeaders, vaccinationRows),
-            appointments.Count == 0 ? null : new ImportSourceTable(ImportTable.Appointments, AppointmentHeaders, appointments));
+            appointments.Count == 0 ? null : new ImportSourceTable(ImportTable.Appointments, AppointmentHeaders, appointments),
+            records);
     }
+
+    /// <summary>
+    /// Geçmiş görev → klinik geçmiş satırı: kayıt türü görev tipi, notun ilk satırı görevin sonucu (tamamlandı / gelmedi),
+    /// ardından bilgi ve açıklama.
+    /// </summary>
+    private static ImportSourceRow TaskRecord(
+        EVetSheet sheet, ImportSourceRow row, string? petProtocol, string? ownerName, string? petName, DateTime start, bool completed)
+        => new(TaskClinicalRowOffset + row.RowNumber,
+        [
+            petProtocol,
+            ownerName,
+            petName,
+            start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            sheet[row, "Görev Tipi"],
+            sheet[row, "Veteriner"],
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            EVetCells.Join("\n", completed ? "E-vet görevi: Tamamlandı" : "E-vet görevi: Gelmedi", sheet[row, "Bilgi"], sheet[row, "Açıklama"]),
+        ]);
 
     /// <summary>
     /// Aşı Bilgi satırını aynı sahip + hasta + gündeki tamamlanmış aşıya bağlar: o gün tek aşı ve tek rapor satırı varsa doğrudan;

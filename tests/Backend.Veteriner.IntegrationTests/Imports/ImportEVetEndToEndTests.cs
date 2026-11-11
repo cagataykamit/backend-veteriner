@@ -25,7 +25,7 @@ namespace Backend.IntegrationTests.Imports;
 
 /// <summary>
 /// E-vet "Genel &gt; Yedek Al" yüklemesi uçtan uca (IMPORT_API_CONTRACT.md §13; gerçek SQL Server/LocalDB): dönüştürme → doğrula →
-/// uygula → fatura kimliği, pasif müşteri, alerji, vefat (geçmiş kayıtlardan sonra), sonraki aşı tarihi, yalnız kilolu muayene →
+/// uygula → fatura kimliği, pasif müşteri, alerji, vefat (geçmiş kayıtlardan sonra), sonraki aşı tarihi, yalnız kilolu muayene, geçmiş görev →
 /// geri al. Yapı gerçek dosyadan; değerler uydurmadır.
 /// </summary>
 [Collection("imports-api")]
@@ -68,6 +68,8 @@ public sealed class ImportEVetEndToEndTests : IClassFixture<CustomWebApplication
                 [owner, "Pamuk", "Tamamlandı", "2025-02-10T10:00:00", ctx.VaccineName, "Dr. A", "Tamamlandı"],
                 [owner, "Pamuk", "Aşılama", due.ToString("yyyy-MM-ddTHH:mm:ss"), ctx.VaccineName, "Dr. A", "Yapılacak"],
                 [owner, "Pamuk", "Kontrol Muayanesi", checkup.ToString("yyyy-MM-ddTHH:mm:ss"), null, "Dr. A", "Yapılacak"],
+                [owner, "Duman", "Kısırlaştırma", "2025-03-01T09:00:00", null, "Dr. A", "Tamamlandı"],
+                [owner, "Pamuk", "Kontrol Muayanesi", "2025-07-01T14:00:00", null, "Dr. A", "Yapılacak"],
                 [null, null, "Maaş", "2025-03-01T09:00:00", null, "Dr. A", "Tamamlandı"]]),
             ("Muayene Listesi", [
                 ["Tarih", "Hasta Sahibi", "Hasta Adı", "Veteriner Hekim", "Ağırlık", "Semptom"],
@@ -85,7 +87,7 @@ public sealed class ImportEVetEndToEndTests : IClassFixture<CustomWebApplication
 
         var batch = await GetJsonAsync(http, $"/api/v1/imports/batches/{id}");
         batch.GetProperty("status").GetString().Should().Be("Committed", batch.ToString());
-        foreach (var (table, created) in new[] { ("customers", 2), ("pets", 2), ("vaccinations", 2), ("clinicalRecords", 2), ("appointments", 1) })
+        foreach (var (table, created) in new[] { ("customers", 2), ("pets", 2), ("vaccinations", 2), ("clinicalRecords", 4), ("appointments", 1) })
             batch.GetProperty("summary").GetProperty(table).GetProperty("created").GetInt32().Should().Be(created, table);
 
         await using (var scope = _factory.Services.CreateSystemScope())
@@ -112,6 +114,15 @@ public sealed class ImportEVetEndToEndTests : IClassFixture<CustomWebApplication
                 .Should().Be(DateOnly.FromDateTime(due), "yapılacak aşı görevi sonraki aşı tarihidir");
             (await db.ImportedClinicalRecords.AsNoTracking().Where(r => r.ImportBatchId == id).Select(r => r.WeightKg).ToListAsync())
                 .Should().Contain(4.3m, "yalnız kilo taşıyan muayene aktarılır");
+            var tasks = await db.ImportedClinicalRecords.AsNoTracking()
+                .Where(r => r.ImportBatchId == id && r.RecordType != "Muayene")
+                .Select(r => new { r.PetId, r.RecordType, r.Notes, r.VeterinarianName })
+                .ToListAsync();
+            tasks.Should().BeEquivalentTo(new[]
+            {
+                new { PetId = duman.Id, RecordType = (string?)"Kısırlaştırma", Notes = (string?)"E-vet görevi: Tamamlandı", VeterinarianName = (string?)"Dr. A" },
+                new { PetId = pamuk.Id, RecordType = (string?)"Kontrol Muayanesi", Notes = (string?)"E-vet görevi: Gelmedi", VeterinarianName = (string?)"Dr. A" },
+            }, "geçmiş görevler eski program kaydı olur (ADR-048 eki)");
             (await db.Appointments.AsNoTracking().SingleAsync(a => a.ImportBatchId == id)).PetId.Should().Be(pamuk.Id);
         }
 

@@ -1,6 +1,7 @@
 using System.Text;
 using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Application.Imports.Reading;
+using Backend.Veteriner.Application.Imports.Reading.EVet;
 using Backend.Veteriner.Application.Imports.Validation;
 using Backend.Veteriner.Domain.Imports;
 using AwesomeAssertions;
@@ -74,6 +75,9 @@ public sealed class EVetBackupConverterTests
             ["Ayşe Yılmaz", "Tarçın", "Tamamlandı", new DateTime(2025, 10, 1, 10, 20, 0), "İÇ+DIŞ PARAZİT", "Dr. A", null, null, "Tamamlandı"],
             ["Can Demir", "Karabaş", "Aşılama", new DateTime(2024, 3, 1, 10, 0, 0), "KUDUZ", "Dr. A", null, null, "Tamamlandı"],
             ["Can Demir", "Karabaş", "Aşılama", new DateTime(2024, 3, 2, 10, 0, 0), "KUDUZ", "Dr. A", null, null, "İptal"],
+            ["Ayşe Yılmaz", "Tarçın", "DİKİŞ ALINMASI", new DateTime(2025, 6, 10, 15, 0, 0), null, "Dr. B", "Aranacak", "Arandı, gelmedi", "Yapılacak"],
+            ["Can Demir", "Karabaş", "Kısırlaştırma", new DateTime(2025, 2, 1, 9, 0, 0), null, "Dr. A", null, null, "Tamamlandı"],
+            ["Ayşe Yılmaz", "Tarçın", "Bilgi", new DateTime(2025, 2, 1, 9, 0, 0), null, "Dr. A", null, "Not", "Tamamlandı"],
         ]),
         ("Muayene Listesi",
         [
@@ -417,8 +421,29 @@ public sealed class EVetBackupConverterTests
         (checkup["Neden"], checkup["Hekim"], checkup["Not"]).Should().Be(("Kontrol Muayanesi", "Dr. B", "Dikiş kontrol"));
 
         var skipped = result.Warnings.Single(w => w.Message.Contains("görev aktarılmayacak")).Message;
-        skipped.Should().Contain("hastası olmayan: 1").And.Contain("hasta işi olmayan türde").And.Contain("iptal edilmiş: 1")
-            .And.Contain("vefat ya da pasif hastaya ait yapılacak aşı: 1").And.Contain("hiç uygulanmamış ve tarihi geçmiş aşı: 1");
+        skipped.Should().Contain("hastası olmayan: 1").And.Contain("hasta işi olmayan türde (maaş, borç/ödeme hatırlatması, bilgi): 2")
+            .And.Contain("iptal edilmiş: 1").And.Contain("vefat ya da pasif hastaya ait yapılacak aşı: 1")
+            .And.Contain("hiç uygulanmamış ve tarihi geçmiş aşı: 1");
+    }
+
+    [Fact]
+    public void Past_Non_Vaccine_Tasks_Should_Become_Clinical_Records_With_Outcome_Note()
+    {
+        var result = Read(Files());
+        var source = result.Tables.Single(t => t.Table == ImportTable.ClinicalRecords);
+        var records = Rows(result, ImportTable.ClinicalRecords);
+
+        // Muayene satırları önce, görevler 1.000.000 + Excel satırıyla (aynı tabloda çakışmasın).
+        source.Rows.Select(r => r.RowNumber).Should().Equal(2, 3, 4, 1_000_006, 1_000_014, 1_000_015);
+        var checkup = records[3];
+        (checkup["HayvanNo"], checkup["Tarih"], checkup["KayitTuru"], checkup["Hekim"], checkup["Not"])
+            .Should().Be(("205", "2025-01-01", "Kontrol Muayanesi", "Dr. B", "E-vet görevi: Tamamlandı"));
+        records[4]["Not"].Should().Be("E-vet görevi: Gelmedi\nAranacak\nArandı, gelmedi", "geçmiş Yapılacak görev E-vet'te Gelmedi'dir");
+        (records[5]["HayvanNo"], records[5]["KayitTuru"]).Should().Be(("202", "Kısırlaştırma"), "vefat eden hastanın geçmişi de alınır");
+        records.Should().NotContain(r => r["KayitTuru"] == "Bilgi", "hasta işi olmayan tür");
+
+        result.Warnings.Should().Contain(w => w.Table == ImportTable.ClinicalRecords
+                                              && w.Message.Contains("3 aşı dışı görev (2 tamamlanmış, 1 gelinmemiş)"));
     }
 
     // ================================================================ Muayene
@@ -493,6 +518,8 @@ public sealed class EVetBackupConverterTests
 
         Row(ImportTable.ClinicalRecords, 3).Issues.Should().Contain(i => i.Code == ImportRules.PetNotFound.Code, "belirsiz eşleşme hatadır");
         Row(ImportTable.ClinicalRecords, 4).Status.Should().NotBe(ImportRowValidationStatus.Error, "yalnız kilo taşıyan kayıt boş değildir");
+        output.Rows.Where(r => r.Table == ImportTable.ClinicalRecords && r.RowNumber > EVetBackupConverter.TaskClinicalRowOffset)
+            .Should().HaveCount(3).And.OnlyContain(r => r.Status != ImportRowValidationStatus.Error, "geçmiş görev kaydı geçerlidir");
         output.Rows.Where(r => r.Table == ImportTable.Appointments).Should().OnlyContain(r => r.Status != ImportRowValidationStatus.Error);
     }
 }
