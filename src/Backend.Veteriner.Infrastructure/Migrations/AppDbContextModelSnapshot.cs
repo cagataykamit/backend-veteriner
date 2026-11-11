@@ -2815,6 +2815,58 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("DemoRequests", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.EDocuments.ClinicEDocumentSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("AutoIssueEnabledAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("AutoIssueMode")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<TimeOnly>("EndOfDayTime")
+                        .HasColumnType("time");
+
+                    b.Property<bool>("IssueOnPaymentByDefault")
+                        .HasColumnType("bit");
+
+                    b.Property<DateOnly?>("LastEndOfDayRunDate")
+                        .HasColumnType("date");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UpdatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("TenantId", "ClinicId")
+                        .IsUnique();
+
+                    b.ToTable("ClinicEDocumentSettings", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.EDocuments.EDocument", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2897,6 +2949,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<string>("Note")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("Origin")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
 
                     b.Property<string>("ProviderCode")
                         .IsRequired()
@@ -7624,6 +7681,15 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Navigation("Clinic");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.EDocuments.ClinicEDocumentSettings", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.EDocuments.EDocument", b =>

@@ -402,6 +402,8 @@ public static class DependencyInjection
         services.Configure<EDocumentProcessorOptions>(configuration.GetSection(EDocumentProcessorOptions.SectionName));
         services.AddSingleton<EDocumentStatusProcessor>();
         services.AddHostedService<EDocumentStatusHostedService>();
+        services.AddSingleton<EDocumentAutomationProcessor>();
+        services.AddHostedService<EDocumentAutomationHostedService>();
 
         services.Configure<ReminderProcessorOptions>(configuration.GetSection("Reminders:Processor"));
         services.AddScoped<IReminderEmailOutboxEnqueuer, ReminderEmailOutboxEnqueuer>();

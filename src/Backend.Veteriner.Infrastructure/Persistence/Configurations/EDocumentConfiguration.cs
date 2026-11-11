@@ -30,6 +30,7 @@ public sealed class EDocumentConfiguration : IEntityTypeConfiguration<EDocument>
         b.Property(x => x.Type).IsRequired().HasConversion<int>();
         b.Property(x => x.Status).IsRequired().HasConversion<int>();
         b.Property(x => x.Environment).IsRequired().HasConversion<int>();
+        b.Property(x => x.Origin).IsRequired().HasConversion<int>().HasDefaultValue(EDocumentOrigin.Manual);
         b.Property(x => x.ProviderCode).IsRequired().IsUnicode(false).HasMaxLength(EDocument.MaxProviderCodeLength);
         b.Property(x => x.ExternalReference).IsRequired();
         b.Property(x => x.RequestId).IsRequired();
@@ -90,6 +91,30 @@ public sealed class EDocumentConfiguration : IEntityTypeConfiguration<EDocument>
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.CreatedAtUtc });
         b.HasIndex(x => new { x.TenantId, x.ClientId });
         b.HasIndex(x => new { x.Status, x.NextCheckAtUtc });
+    }
+}
+
+public sealed class ClinicEDocumentSettingsConfiguration : IEntityTypeConfiguration<ClinicEDocumentSettings>
+{
+    public void Configure(EntityTypeBuilder<ClinicEDocumentSettings> b)
+    {
+        b.ToTable("ClinicEDocumentSettings");
+
+        b.HasKey(x => x.Id);
+        b.Property(x => x.TenantId).IsRequired();
+        b.Property(x => x.ClinicId).IsRequired();
+        b.Property(x => x.AutoIssueMode).IsRequired().HasConversion<int>();
+        b.Property(x => x.EndOfDayTime).IsRequired();
+        b.Property(x => x.IssueOnPaymentByDefault).IsRequired();
+        b.Property(x => x.AutoIssueEnabledAtUtc);
+        b.Property(x => x.LastEndOfDayRunDate);
+        b.Property(x => x.UpdatedByUserId).IsRequired();
+        b.Property(x => x.CreatedAtUtc).IsRequired();
+        b.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
+
+        b.HasIndex(x => new { x.TenantId, x.ClinicId }).IsUnique();
+
+        b.HasOne<Clinic>().WithMany().HasForeignKey(x => x.ClinicId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 

@@ -167,6 +167,7 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<EDocument> EDocuments => Set<EDocument>();
     public DbSet<EDocumentLine> EDocumentLines => Set<EDocumentLine>();
     public DbSet<EDocumentConnection> EDocumentConnections => Set<EDocumentConnection>();
+    public DbSet<ClinicEDocumentSettings> ClinicEDocumentSettings => Set<ClinicEDocumentSettings>();
     public DbSet<SaleLine> SaleLines => Set<SaleLine>();
     public DbSet<Treatment> Treatments => Set<Treatment>();
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
