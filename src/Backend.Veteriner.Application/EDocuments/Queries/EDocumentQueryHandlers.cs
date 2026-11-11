@@ -247,14 +247,17 @@ public sealed class GetUndocumentedChargesQueryHandler
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Sale> _sales;
+    private readonly IReadRepository<EDocument> _documents;
 
     public GetUndocumentedChargesQueryHandler(
         EDocumentAccess access,
         IReadRepository<Charge> charges,
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
-        IReadRepository<Sale> sales)
+        IReadRepository<Sale> sales,
+        IReadRepository<EDocument> documents)
     {
+        _documents = documents;
         _access = access;
         _charges = charges;
         _clients = clients;
@@ -269,13 +272,19 @@ public sealed class GetUndocumentedChargesQueryHandler
             return Result<PagedResult<UndocumentedChargeDto>>.Failure(access.Error);
 
         var caller = access.Value!;
+        var failed = (await _documents.ListAsync(new FailedEDocumentsOfClinicSpec(caller.TenantId, caller.ClinicId), ct))
+            .ToDictionary(f => f.Id, f => f.LastErrorMessage);
+        var failedIds = failed.Keys.ToList();
         var total = await _charges.CountAsync(
-            new UndocumentedChargesSpec(caller.TenantId, caller.ClinicId, request.ClientId, request.VisitId, request.FromUtc, request.ToUtc), ct);
+            new UndocumentedChargesSpec(caller.TenantId, caller.ClinicId, request.ClientId, request.VisitId, request.FromUtc, request.ToUtc, failedIds), ct);
         var rows = await _charges.ListAsync(
             new UndocumentedChargesSpec(
-                caller.TenantId, caller.ClinicId, request.ClientId, request.VisitId, request.FromUtc, request.ToUtc, request.Page, request.PageSize), ct);
+                caller.TenantId, caller.ClinicId, request.ClientId, request.VisitId, request.FromUtc, request.ToUtc, failedIds, request.Page, request.PageSize), ct);
 
-        var names = await GetEDocumentsListQueryHandler.ClientNamesAsync(_clients, caller.TenantId, rows.Select(r => r.ClientId), ct);
+        var clientIds = rows.Select(r => r.ClientId).Distinct().ToArray();
+        var clients = clientIds.Length == 0
+            ? new Dictionary<Guid, Client>()
+            : (await _clients.ListAsync(new ClientsByTenantIdsSpec(caller.TenantId, clientIds), ct)).ToDictionary(c => c.Id);
         var petIds = rows.Where(r => r.PetId.HasValue).Select(r => r.PetId!.Value).Distinct().ToArray();
         var petNames = petIds.Length == 0
             ? new Dictionary<Guid, string>()
@@ -289,16 +298,31 @@ public sealed class GetUndocumentedChargesQueryHandler
             .Select(r => new UndocumentedChargeDto(
                 r.Id,
                 r.ClientId,
-                names.GetValueOrDefault(r.ClientId, string.Empty),
+                clients.TryGetValue(r.ClientId, out var client) ? client.FullName : string.Empty,
                 r.PetId,
                 r.PetId is { } pid ? petNames.GetValueOrDefault(pid) : null,
                 r.VisitId,
                 saleByCharge.TryGetValue(r.Id, out var saleId) ? saleId : null,
                 r.Description,
                 r.Amount,
-                r.CreatedAtUtc))
+                r.OutstandingAmount,
+                r.CreatedAtUtc,
+                r.EDocumentId,
+                UndocumentedReason(r, client, r.EDocumentId is { } docId ? failed.GetValueOrDefault(docId) : null)))
             .ToList();
         return Result<PagedResult<UndocumentedChargeDto>>.Success(
             PagedResult<UndocumentedChargeDto>.Create(items, total, request.Page, request.PageSize));
+    }
+
+    /// <summary>Kesilemeyen belgenin hatası, eksik alıcı kimliği veya bekleyen ödeme; hazırsa <c>null</c>.</summary>
+    private static string? UndocumentedReason(Charge charge, Client? client, string? failedMessage)
+    {
+        if (charge.EDocumentId is not null)
+            return string.IsNullOrWhiteSpace(failedMessage) ? "Belge kesilemedi." : $"Belge kesilemedi: {failedMessage}";
+        if (client is not null && EDocumentDraftBuilder.BuildBuyer(client).Buyer is null)
+            return "Müşterinin vergi numarası eksik.";
+        if (charge.OutstandingAmount > 0m)
+            return "Ödeme bekliyor.";
+        return null;
     }
 }

@@ -52,6 +52,9 @@ public interface IUserNotificationPublisher
 
     /// <summary>Tüm veri dışa aktarma işi hazır ya da başarısız sonlandı: yalnız talep edene.</summary>
     Task DataExportFinishedAsync(DataExportJob job, CancellationToken ct);
+
+    /// <summary>Gün sonu e-belge özeti (ADR-036 AK-4 hatırlatma): kliniğe erişen belge kesme izni olanlara.</summary>
+    Task EDocumentsDailySummaryAsync(Guid tenantId, Guid clinicId, int issued, int failed, int undocumented, CancellationToken ct);
 }
 
 public sealed class UserNotificationPublisher : IUserNotificationPublisher
@@ -60,6 +63,7 @@ public sealed class UserNotificationPublisher : IUserNotificationPublisher
     public const string AppointmentTarget = "Appointment";
     public const string PortalDataRequestTarget = "PortalDataRequest";
     public const string DataExportTarget = "DataExport";
+    public const string EDocumentsTarget = "EDocuments";
 
     private static readonly CultureInfo Turkish = CultureInfo.GetCultureInfo("tr-TR");
 
@@ -205,6 +209,33 @@ public sealed class UserNotificationPublisher : IUserNotificationPublisher
             DataExportTarget,
             job.Id,
             _timeProvider.GetUtcNow().UtcDateTime), ct);
+    }
+
+    public async Task EDocumentsDailySummaryAsync(Guid tenantId, Guid clinicId, int issued, int failed, int undocumented, CancellationToken ct)
+    {
+        var userIds = await _recipients.ListAsync(tenantId, clinicId, PermissionCatalog.EDocuments.Issue, TenantWideClaimNames.All, ct);
+        var parts = new List<string>();
+        if (issued > 0)
+            parts.Add($"{issued} belge otomatik kesildi");
+        if (failed > 0)
+            parts.Add($"{failed} belge kesilemedi");
+        if (undocumented > 0)
+            parts.Add($"{undocumented} ödenmiş ücretin belgesi yok");
+        var body = string.Join(" · ", parts);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        foreach (var userId in userIds)
+        {
+            await _notifications.AddAsync(UserNotification.Create(
+                tenantId,
+                clinicId,
+                userId,
+                UserNotificationType.EDocumentsDailySummary,
+                failed > 0 || undocumented > 0 ? "Belgesi kesilmemiş ücretler var" : "Gün sonu e-belge özeti",
+                body,
+                EDocumentsTarget,
+                clinicId,
+                utcNow), ct);
+        }
     }
 
     private async Task ToQueueManagersAsync(

@@ -121,6 +121,9 @@ public static class DependencyInjection
         services.AddScoped<EDocuments.EDocumentAccess>();
         services.AddScoped<EDocuments.EDocumentDraftBuilder>();
         services.AddScoped<EDocuments.EDocumentSender>();
+        services.AddScoped<EDocuments.EDocumentIssuer>();
+        services.AddScoped<EDocuments.EDocumentBatchIssuer>();
+        services.AddScoped<EDocuments.Automation.EDocumentAutomation>();
         services.AddScoped<EDocuments.EDocumentActionRunner>();
         services.AddScoped<EDocuments.Connections.EDocumentConnectionService>();
         services.AddScoped<RegisterReportRunner>();

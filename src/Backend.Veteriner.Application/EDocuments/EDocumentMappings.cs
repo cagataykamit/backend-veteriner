@@ -14,6 +14,7 @@ internal static class EDocumentMappings
             clientName,
             d.Type,
             d.Status,
+            d.Origin,
             d.ProviderCode,
             providers.Find(d.ProviderCode)?.DisplayName ?? d.ProviderCode,
             d.Environment == EDocumentEnvironment.Test,
@@ -58,7 +59,8 @@ internal static class EDocumentMappings
             d.CreatedAtUtc,
             d.IssuedAtUtc,
             d.Environment == EDocumentEnvironment.Test,
-            d.LastErrorMessage);
+            d.LastErrorMessage,
+            d.Origin);
 
     public static bool CanCancel(EDocument d, DateTime utcNow)
         => d.Status is EDocumentStatus.Issued or EDocumentStatus.CancelRejected

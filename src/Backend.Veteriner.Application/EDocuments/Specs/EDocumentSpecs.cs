@@ -132,11 +132,14 @@ public sealed class UndocumentedChargesOfVisitSpec : Specification<Charge>
 
 public sealed class UndocumentedChargesSpec : Specification<Charge>
 {
+    /// <param name="failedDocumentIds">Kesilemeyen belgeler: bunlara bağlı ücretler de belgesiz sayılır (nedeniyle listelenir).</param>
     public UndocumentedChargesSpec(
-        Guid tenantId, Guid clinicId, Guid? clientId, Guid? visitId, DateTime? fromUtc, DateTime? toUtc, int? page = null, int? pageSize = null)
+        Guid tenantId, Guid clinicId, Guid? clientId, Guid? visitId, DateTime? fromUtc, DateTime? toUtc,
+        IReadOnlyCollection<Guid> failedDocumentIds, int? page = null, int? pageSize = null)
     {
         Query.AsNoTracking();
-        Query.Where(c => c.TenantId == tenantId && c.ClinicId == clinicId && c.VoidedAtUtc == null && c.EDocumentId == null);
+        Query.Where(c => c.TenantId == tenantId && c.ClinicId == clinicId && c.VoidedAtUtc == null
+                         && (c.EDocumentId == null || failedDocumentIds.Contains(c.EDocumentId.Value)));
         if (clientId.HasValue)
             Query.Where(c => c.ClientId == clientId.Value);
         if (visitId.HasValue)
@@ -162,5 +165,84 @@ public sealed class SalesByChargeIdsSpec : Specification<Sale>
         Query.AsNoTracking();
         Query.Include(s => s.Lines);
         Query.Where(s => s.TenantId == tenantId && s.ChargeId != null && chargeIds.Contains(s.ChargeId.Value));
+    }
+}
+
+/// <summary>Otomatik kesmeye uygun ücretler: tamamen ödenmiş, iptal edilmemiş, belgesiz ve otomatik kesme açıldıktan sonra yazılmış.</summary>
+public sealed class AutoIssueEligibleChargesSpec : Specification<Charge>
+{
+    public AutoIssueEligibleChargesSpec(Guid tenantId, Guid clinicId, DateTime sinceUtc, int take)
+    {
+        Query.AsNoTracking();
+        Query.Where(c => c.TenantId == tenantId && c.ClinicId == clinicId && c.VoidedAtUtc == null && c.EDocumentId == null
+                         && c.AllocatedAmount == c.Amount && c.CreatedAtUtc >= sinceUtc);
+        Query.OrderBy(c => c.CreatedAtUtc).Take(take);
+    }
+}
+
+/// <summary>Hatırlatma sayacı: bağlantıdan sonra yazılmış, tamamen ödenmiş ve belgesiz ücretler.</summary>
+public sealed class UndocumentedPaidChargesSpec : Specification<Charge>
+{
+    public UndocumentedPaidChargesSpec(Guid tenantId, Guid clinicId, DateTime sinceUtc)
+    {
+        Query.AsNoTracking();
+        Query.Where(c => c.TenantId == tenantId && c.ClinicId == clinicId && c.VoidedAtUtc == null && c.EDocumentId == null
+                         && c.AllocatedAmount == c.Amount && c.CreatedAtUtc >= sinceUtc);
+    }
+}
+
+/// <summary>Kesilemeyen (Failed) belgelerin kimlikleri; belgesiz ücretler listesine nedeniyle düşerler.</summary>
+public sealed class FailedEDocumentsOfClinicSpec : Specification<EDocument, FailedEDocumentItem>
+{
+    public FailedEDocumentsOfClinicSpec(Guid tenantId, Guid clinicId, int take = 500)
+    {
+        Query.AsNoTracking();
+        Query.Where(d => d.TenantId == tenantId && d.ClinicId == clinicId && d.Status == EDocumentStatus.Failed);
+        Query.OrderByDescending(d => d.CreatedAtUtc).Take(take);
+        Query.Select(d => new FailedEDocumentItem(d.Id, d.LastErrorMessage));
+    }
+}
+
+public sealed record FailedEDocumentItem(Guid Id, string? LastErrorMessage);
+
+/// <summary>Gün sonu özeti: bugün (İstanbul) otomatik kesilen ve kesilemeyen belgeler.</summary>
+public sealed class AutomaticEDocumentsInRangeSpec : Specification<EDocument>
+{
+    public AutomaticEDocumentsInRangeSpec(Guid tenantId, Guid clinicId, DateTime fromUtc, DateTime toUtc)
+    {
+        Query.AsNoTracking();
+        Query.Where(d => d.TenantId == tenantId && d.ClinicId == clinicId && d.Origin == EDocumentOrigin.Automatic
+                         && d.CreatedAtUtc >= fromUtc && d.CreatedAtUtc < toUtc);
+    }
+}
+
+public sealed class ClinicEDocumentSettingsByClinicSpec : Specification<ClinicEDocumentSettings>
+{
+    public ClinicEDocumentSettingsByClinicSpec(Guid tenantId, Guid clinicId)
+    {
+        Query.Where(s => s.TenantId == tenantId && s.ClinicId == clinicId);
+    }
+}
+
+/// <summary>Bağlı e-belge bağlantıları (kiracılar arası; çağıran <c>AsSystem</c> kapsamında çalıştırır).</summary>
+public sealed class ConnectedEDocumentConnectionsSpec : Specification<EDocumentConnection, ConnectedClinicItem>
+{
+    public ConnectedEDocumentConnectionsSpec()
+    {
+        Query.AsNoTracking();
+        Query.Where(c => c.Status == EDocumentConnectionStatus.Connected);
+        Query.Select(c => new ConnectedClinicItem(c.TenantId, c.ClinicId));
+    }
+}
+
+public sealed record ConnectedClinicItem(Guid TenantId, Guid ClinicId);
+
+/// <summary>Ödemenin geri alınmamış tahsisleri (karşıladığı ücretler).</summary>
+public sealed class ActiveAllocationsOfPaymentSpec : Specification<Backend.Veteriner.Domain.Payments.PaymentAllocation>
+{
+    public ActiveAllocationsOfPaymentSpec(Guid tenantId, Guid paymentId)
+    {
+        Query.AsNoTracking();
+        Query.Where(a => a.TenantId == tenantId && a.PaymentId == paymentId && a.ReversedAtUtc == null);
     }
 }

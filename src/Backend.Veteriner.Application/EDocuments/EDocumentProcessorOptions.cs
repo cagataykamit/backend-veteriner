@@ -11,4 +11,7 @@ public sealed class EDocumentProcessorOptions
 
     /// <summary>Belge başına arka plan kontrolü üst sınırı (artan aralıkla ~1 gün); aşılınca belge hatalı olur.</summary>
     public int MaxAttempts { get; init; } = 60;
+
+    /// <summary>Otomatik e-belge ve gün sonu özeti turu aralığı ("Ödeme alınınca" modunda kesme gecikmesi en çok budur).</summary>
+    public int AutomationIntervalSeconds { get; init; } = 60;
 }

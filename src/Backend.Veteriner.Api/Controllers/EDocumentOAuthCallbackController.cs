@@ -12,7 +12,7 @@ namespace Backend.Veteriner.Api.Controllers;
 /// <summary>
 /// Entegratör OAuth dönüşü. Yol <b>sürüm içermez</b> (<c>/api/e-documents/{sağlayıcı}/callback</c>): Paraşüt'e kayıtlı yönlendirme
 /// adresleri kalıcıdır ve değiştirilemez. Anonim; kiracı ve klinik şifreli <c>state</c>'ten çözülür. Sonunda tarayıcı panelin
-/// klinik sayfasına yalnız sonuç koduyla döner (belirteç veya kişisel veri taşınmaz).
+/// e-Belge ayar sayfasına yalnız sonuç koduyla döner (belirteç veya kişisel veri taşınmaz).
 /// </summary>
 [ApiController]
 [ApiVersionNeutral]
@@ -46,10 +46,11 @@ public sealed class EDocumentOAuthCallbackController : ControllerBase
     private string PanelUrl(EDocumentAuthorizationOutcome outcome)
     {
         var baseUrl = _appOptions.FrontendBaseUrl.TrimEnd('/');
-        var path = outcome.ClinicId is { } clinicId ? $"/panel/settings/clinics/{clinicId}" : "/panel/settings/clinics";
         var query = $"eDocumentConnection={Uri.EscapeDataString(outcome.Outcome)}";
+        if (outcome.ClinicId is { } clinicId)
+            query += $"&clinicId={clinicId}";
         if (!string.IsNullOrEmpty(outcome.Reason))
             query += $"&reason={Uri.EscapeDataString(outcome.Reason)}";
-        return $"{baseUrl}{path}?{query}";
+        return $"{baseUrl}/panel/settings/e-documents?{query}";
     }
 }

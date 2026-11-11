@@ -48,6 +48,7 @@ public sealed record EDocumentDto(
     string ClientName,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] EDocumentType DocumentType,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] EDocumentStatus Status,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] EDocumentOrigin Origin,
     string Provider,
     string ProviderName,
     bool IsTest,
@@ -88,7 +89,8 @@ public sealed record EDocumentListItemDto(
     DateTime CreatedAtUtc,
     DateTime? IssuedAtUtc,
     bool IsTest,
-    string? LastErrorMessage);
+    string? LastErrorMessage,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] EDocumentOrigin Origin);
 
 public sealed record EDocumentPreviewConnectionDto(
     [property: JsonConverter(typeof(JsonStringEnumConverter))] EDocumentConnectionStatus Status,
@@ -114,6 +116,8 @@ public sealed record EDocumentPreviewDto(
     IReadOnlyList<EDocumentPreviewGroupDto> Groups,
     IReadOnlyList<EDocumentSkippedChargeDto> Skipped);
 
+/// <param name="FailedDocumentId">Ücret kesilemeyen bir belgeye bağlıysa o belge (yeniden dene / vazgeç).</param>
+/// <param name="Reason">Belgenin neden kesilmediği / kesilemeyeceği (kullanıcı metni); hazırsa <c>null</c>.</param>
 public sealed record UndocumentedChargeDto(
     Guid ChargeId,
     Guid ClientId,
@@ -124,6 +128,9 @@ public sealed record UndocumentedChargeDto(
     Guid? SaleId,
     string Description,
     decimal Amount,
-    DateTime CreatedAtUtc);
+    decimal OutstandingAmount,
+    DateTime CreatedAtUtc,
+    Guid? FailedDocumentId,
+    string? Reason);
 
 public sealed record EDocumentPdfDto(byte[] Content, string FileName);

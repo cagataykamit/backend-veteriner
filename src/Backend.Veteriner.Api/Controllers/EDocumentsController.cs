@@ -4,6 +4,7 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.EDocuments.Automation;
 using Backend.Veteriner.Application.EDocuments.Commands.Actions;
 using Backend.Veteriner.Application.EDocuments.Commands.Issue;
 using Backend.Veteriner.Application.EDocuments.Contracts;
@@ -120,6 +121,35 @@ public sealed class EDocumentsController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <summary>Ödeme ekranında "e-Belge kes": ödemenin karşıladığı, tamamen ödenmiş belgesiz ücretler belge türüne göre kesilir. Ödeme kaydı etkilenmez.</summary>
+    [HttpPost("from-payment")]
+    [Authorize(Policy = PermissionCatalog.EDocuments.Issue)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(EDocumentBatchResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> IssueFromPayment([FromBody] EDocumentFromPaymentBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new IssueEDocumentsFromPaymentCommand(body.PaymentId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Menü rozeti ve hatırlatma: bağlantıdan sonra ödenmiş belgesiz ücret ve kesilemeyen belge sayısı.</summary>
+    [HttpGet("reminders")]
+    [Authorize(Policy = PermissionCatalog.EDocuments.Read)]
+    [ProducesResponseType(typeof(EDocumentRemindersDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetReminders([FromQuery] Guid? clinicId = null, CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetEDocumentRemindersQuery(clinicId), ct);
+        return result.ToActionResult(this);
+    }
+
     [HttpGet("{id:guid}")]
     [Authorize(Policy = PermissionCatalog.EDocuments.Read)]
     [ProducesResponseType(typeof(EDocumentDto), StatusCodes.Status200OK)]
@@ -229,6 +259,11 @@ public sealed class IssueEDocumentBody : EDocumentSourceBody
 {
     public Guid RequestId { get; init; }
     public string? Note { get; init; }
+}
+
+public sealed class EDocumentFromPaymentBody
+{
+    public Guid PaymentId { get; init; }
 }
 
 public sealed class EDocumentReasonBody
