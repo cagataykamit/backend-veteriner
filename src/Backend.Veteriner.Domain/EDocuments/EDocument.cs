@@ -33,6 +33,9 @@ public sealed class EDocument : AggregateRoot, IClinicScoped, ITenantOwned
     public EDocumentStatus Status { get; private set; }
     public EDocumentEnvironment Environment { get; private set; }
 
+    /// <summary>Belgeyi kim başlattı: elle, ödeme ekranından veya otomatik kesme ayarıyla.</summary>
+    public EDocumentOrigin Origin { get; private set; }
+
     /// <summary>Sağlayıcı anahtarı (bağlantıdaki <c>ProviderCode</c>); domain sağlayıcı adını bilmez.</summary>
     public string ProviderCode { get; private set; } = default!;
 
@@ -119,7 +122,8 @@ public sealed class EDocument : AggregateRoot, IClinicScoped, ITenantOwned
         IReadOnlyList<EDocumentLineDraft> lines,
         decimal? withholdingRate,
         Guid createdByUserId,
-        DateTime utcNow)
+        DateTime utcNow,
+        EDocumentOrigin origin = EDocumentOrigin.Manual)
     {
         if (tenantId == Guid.Empty || clinicId == Guid.Empty || clientId == Guid.Empty)
             return Invalid("Kiracı, klinik ve müşteri zorunludur.");
@@ -131,7 +135,7 @@ public sealed class EDocument : AggregateRoot, IClinicScoped, ITenantOwned
             return Invalid("Sağlayıcı geçersiz.");
         if (string.IsNullOrWhiteSpace(requestHash) || requestHash.Length > MaxRequestHashLength)
             return Invalid("İstek özeti geçersiz.");
-        if (!Enum.IsDefined(type) || !Enum.IsDefined(environment))
+        if (!Enum.IsDefined(type) || !Enum.IsDefined(environment) || !Enum.IsDefined(origin))
             return Invalid("Belge türü veya ortam geçersiz.");
         if (lines.Count == 0)
             return Invalid("Belgede en az bir satır olmalıdır.");
@@ -157,6 +161,7 @@ public sealed class EDocument : AggregateRoot, IClinicScoped, ITenantOwned
             Type = type,
             Status = EDocumentStatus.Draft,
             Environment = environment,
+            Origin = origin,
             ProviderCode = providerCode,
             ExternalReference = Guid.NewGuid(),
             RequestId = requestId,

@@ -46,3 +46,19 @@ public enum EDocumentBuyerKind
     Individual = 0,
     Corporate = 1
 }
+
+/// <summary>Belgeyi başlatan: kullanıcı elle, ödeme ekranında "e-Belge kes" ile veya otomatik kesme ayarıyla (ADR-036 AK-4, 2026-11-11).</summary>
+public enum EDocumentOrigin
+{
+    Manual = 0,
+    Payment = 1,
+    Automatic = 2
+}
+
+/// <summary>Klinik otomatik e-belge ayarı: kapalı, ödeme alınınca (tamamen ödenen ücret) veya gün sonunda.</summary>
+public enum EDocumentAutoIssueMode
+{
+    Off = 0,
+    OnPayment = 1,
+    EndOfDay = 2
+}

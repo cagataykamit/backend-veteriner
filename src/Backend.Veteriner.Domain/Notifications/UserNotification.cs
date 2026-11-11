@@ -28,6 +28,9 @@ public enum UserNotificationType
 
     /// <summary>Tüm veri dışa aktarma paketi hazırlanamadı (talep edene).</summary>
     DataExportFailed = 7,
+
+    /// <summary>Gün sonu e-belge özeti: otomatik kesilen, kesilemeyen ve belgesiz ödenmiş ücretler (ADR-036; belge kesme izni olanlara).</summary>
+    EDocumentsDailySummary = 8,
 }
 
 /// <summary>
