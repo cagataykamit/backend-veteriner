@@ -16,6 +16,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 | K13 | `POST .../validate` arka plan işi (`202`/`200` tekrar), `GET .../progress` doğrulama fazı (ADR-019 K13) | **Uygulandı** (backend; frontend sihirbazı henüz senkron yanıta göre — aşağıda geçiş) |
 | TIER-021 | `GET /imports/source-profiles`, `POST /imports/batches` alanı `sourceProfile`, parti nesnesinde `sourceProfile`, öneri güveni `Profile` (bölüm 4.5, 7.15) | **Uygulandı** (migration `AddDataMigrationSupport`) |
 | Tam geçiş (ADR-048) | Yeni tablolar `clinicalRecords`, `accountEntries`, `appointments`, `products`; müşteride `AcikBakiye`/`BakiyeTarihi`; devir ücreti; randevu hatırlatma dışlaması; okuma uçları `GET /pets/{id}/imported-clinical-records`, `GET /clients/{id}/imported-account-entries` (bölüm 12) | **Uygulandı** (migration `AddFullDataMigration`) |
+| E-vet yedeği | `sourceProfile = EVet` ile Genel > Yedek Al dosyası + raporlar (`evetPatientReportFile`, `evetVaccineReportFile`, `productsFile`); fatura kimliği, müşteri/hasta durumu, alerji alanları; türsüz hasta bağlantısı; ölçümlü klinik kayıt (bölüm 13) | **Uygulandı** (migration yok) |
 
 **Frontend için değişenler (B1):**
 - Yeni izinler `Imports.Read`, `Imports.Manage`, `Imports.Commit` yalnız yönetici düzeyine (Admin, Owner, ClinicAdmin) bağlanır. Seed çalışıp kullanıcı çıkış-giriş yapana kadar bu uçlar `403` döner; menü öğesi izinle gizlenmelidir.
@@ -76,6 +77,15 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 - `tables[].columns[].confidence` yeni değer alabilir: **`Profile`** (seçilen programın hazır eşlemesi). Sıra: `Exact` → `Profile` → `Alias`. Profil eşlemelerinin hepsi şu an **doğrulanmamıştır** (`verified = false`); ekran bunu kullanıcıya söylemeli ve eşlemeyi her zaman düzeltilebilir bırakmalıdır.
 - Profil seçimi içe aktarmayı hiçbir pakette kilitlemez; yeni izin yoktur.
 
+**Frontend için değişenler (E-vet yedeği, 2026-11-11; geriye uyumlu ekleme, bölüm 13):**
+- `sourceProfile = EVet` iken `file` E-vet'in **Genel > Yedek Al** Excel dosyası olabilir; sunucu onu eşleme adımından önce kanonik tablolara çevirir (müşteri, hasta, aşı, klinik geçmiş, randevu). Sütunlar kanonik adlarla gelir (`confidence = Exact`); kullanıcı eşleme yapmaz, yalnız değer eşlemesi (tür, aşı adı) gerekebilir.
+- Yedekle birlikte üç isteğe bağlı CSV alanı: `productsFile` (E-vet Rapor > Depo > Ürün Listesi; gruplu biçim çözülür), **`evetPatientReportFile`** (Rapor > Hasta Listesi; hasta → müşteri protokolü), **`evetVaccineReportFile`** (Rapor > Resmi > Aşı Bilgi; seri no ve ürün adı). Yeni alanlar yalnız `EVet` profilinde ve yedekle birlikte kabul edilir; aksi `400 Imports.UnsupportedFile`. `EVet` dışında `file` ile CSV birlikte gönderilemez (değişmedi).
+- Yükleme yanıtının `warnings[]` dizisinde `code = "Imports.EVetConversion"` öğeleri dönüştürmenin özetini verir (bağlantı kaynağı, atlanan görevler ve nedenleri, sonraki aşı tarihi sayısı, seri eşleşmesi, pasif ürün). Ekran bunları bilgi olarak göstermelidir.
+- `GET /imports/source-profiles`: E-vet profilinin notu ve eşlemeleri gerçek dosyaya göre güncellendi, `verified = true`.
+- Yeni kanonik alanlar (her profilde, şablonda da): müşteri `KimlikNo`, `VergiDairesi`, `Durum`; hasta `Alerji`, `Durum`, `VefatTarihi` (bölüm 4.3). Yeni satır kodları: `Imports.TaxIdInvalid`, `Imports.StatusUnrecognized`, `Imports.InactiveClient`, `Imports.DeceasedDateIgnored` (bölüm 6.4).
+- **Davranış değişiklikleri:** klinik geçmişte yalnız kilo (> 0) veya ateş taşıyan satır artık boş sayılmaz (`ClinicalRecordEmpty` değişti, bölüm 12.3); hastaya bağlanan tablolarda `Tur` boşsa sahibin aynı adlı tek hastası bağlanır (bölüm 6.4); satır tavanları tablo başına 50.000, parti toplamı 100.000 oldu (bölüm 4.1).
+- Yeni migration ve izin yoktur.
+
 ## 1) Kapsam ve sınırlar
 
 - **Var:** Müşteri (`Client`), hasta (`Pet`) ve **uygulanmış** aşı geçmişi (`Vaccination`, `Status = Applied`).
@@ -134,7 +144,7 @@ Taslak = `Uploaded`, `Mapped`, `Validating`, `Validated`, `ValidationFailed` (a�
 | CSV kodlama | UTF-8 (BOM'lu/BOM'suz). BOM yoksa ve UTF-8 geçersizse Windows-1254 denenir; istek `encoding` alanıyla zorlanabilir. Karakter bozulması (`�`) varsa `Imports.EncodingSuspect` uyarısı. |
 | CSV ayırıcı | Otomatik: `;` `,` `\t` (Türkçe Excel `;` üretir); `delimiter` ile zorlanabilir. Tırnaklı alanlar RFC 4180. |
 | Başlık | İlk dolu satır başlıktır. Başlık eşleştirme: büyük/küçük harf ve Türkçe harf farkı yok sayılır (`Telefon`, `telefon`, `TELEFON`, `Mikrocip` = `Mikroçip`). |
-| Boyut | Dosya ≤ **10 MB**; tablo başına ≤ **10.000** veri satırı, parti toplamı ≤ **25.000** (`Imports.FileTooLarge`, `Imports.TooManyRows`). Sayılar pilot hacmine göredir (5–10 bin hasta); değerler yapılandırılabilir. **Deneme kiracısında** tablo başına ≤ **500** satır; aşımda `Trial.ImportLimitExceeded` (422) — bkz. `TRIAL_LIMITS_API_CONTRACT.md`. |
+| Boyut | Dosya ≤ **10 MB**; tablo başına ≤ **50.000** veri satırı, parti toplamı ≤ **100.000** (2026-11-11; önce 10.000 / 25.000: E-vet yedeğinde randevu sayfası 28 bin satır) (`Imports.FileTooLarge`, `Imports.TooManyRows`). Sayılar pilot hacmine göredir (5–10 bin hasta); değerler yapılandırılabilir. **Deneme kiracısında** tablo başına ≤ **500** satır; aşımda `Trial.ImportLimitExceeded` (422) — bkz. `TRIAL_LIMITS_API_CONTRACT.md`. |
 | Boş satırlar | Tamamen boş satırlar sayılmaz ve yok sayılır. |
 | Formül/Biçim | XLSX'te hücrenin **görüntülenen/önbellek değeri** okunur; formül çalıştırılmaz. Dış bağlantılar yok sayılır. |
 
@@ -142,11 +152,11 @@ Taslak = `Uploaded`, `Mapped`, `Validating`, `Validated`, `ValidationFailed` (a�
 
 | Konu | Kural |
 |------|-------|
-| Alan–biçim eşleşmesi | `file` yalnız `.xlsx`; `customersFile`/`petsFile`/`vaccinationsFile` yalnız `.csv`. `file` ile CSV alanları birlikte verilemez. Hiç dosya yoksa `Imports.EmptyFile`, boş (0 bayt) dosya `Imports.EmptyFile`. Başka uzantı (`.xls`, `.xlsm`, `.txt`…) `Imports.UnsupportedFile`. |
+| Alan–biçim eşleşmesi | `file` yalnız `.xlsx`; `customersFile`/`petsFile`/`vaccinationsFile` yalnız `.csv`. `file` ile CSV alanları birlikte verilemez (istisna: E-vet profilinde yedek + `productsFile` ve E-vet raporları, bölüm 13). Hiç dosya yoksa `Imports.EmptyFile`, boş (0 bayt) dosya `Imports.EmptyFile`. Başka uzantı (`.xls`, `.xlsm`, `.txt`…) `Imports.UnsupportedFile`. |
 | İmza / MIME | İçerik uzantıya değil imzaya bakılır: xlsx = zip (`PK\x03\x04`); OLE2 imzası (`D0 CF 11 E0`: eski `.xls` veya parolalı xlsx) reddedilir; CSV'de zip/OLE/PDF/EXE imzası veya NUL bayt (ilk 8 KB) reddedilir. `Content-Type` güvenilmez ama verilmişse izinli kümede olmalıdır (xlsx: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, `application/octet-stream`, `application/zip`, `application/x-zip-compressed`; csv: `text/csv`, `application/csv`, `text/plain`, `text/comma-separated-values`, `application/vnd.ms-excel`, `application/octet-stream`); aksi `Imports.UnsupportedFile`. |
 | XLSX güvenliği | Dosya belleğe alınmadan önce zip denetlenir: giriş sayısı ≤ 1.000, **gerçek** açılmış boyut ≤ 100 MB (başlıktaki boyuta güvenilmez; zip bombası), `vbaProject.bin` (makro) varsa veya XML parçalarında `<!DOCTYPE`/`<!ENTITY` varsa (XXE) `Imports.UnsupportedFile`. Dış bağlantı parçaları okunmaz. Çalışma kitabında en çok 20 sayfa. |
 | XLSX sayfaları | Sayfa adları katlanarak (bölüm 5 katlaması) tanınır: `Musteriler`/`Musteri`/`Customers` = müşteri; `Hastalar`/`Hasta`/`Hayvanlar`/`Hayvan`/`Pets` = hasta; `Asilar`/`Asi`/`Vaccinations` = aşı. Tanınmayan sayfalar (örn. `Aciklama`) yok sayılır; hiçbiri tanınmazsa `Imports.UnsupportedFile` (tek sayfalı düz liste ilk sürümde yok, K1). Yalnız başlığı olan, veri satırı olmayan sayfa atlanır ve `Imports.TableEmpty` uyarısı verilir; hiçbir tabloda veri yoksa `Imports.EmptyFile`. |
-| Tavanlar | Başlık sütunu ≤ 60; tek hücre ≤ 10.000 karakter; tablo başına ≤ 10.000, toplam ≤ 25.000 veri satırı (boş satırlar sayılmaz). Aşımda dosya reddedilir: boyut/hücre `Imports.FileTooLarge`, satır `Imports.TooManyRows`, sütun `Imports.UnsupportedFile`. Satır sayısı okunurken sayılır, aşıldığı anda okuma durur. Deneme kiracısında tablo başına tavan 500 ve kod `Trial.ImportLimitExceeded` (422; `TRIAL_LIMITS_API_CONTRACT.md`). Tavanlar `Imports:Limits` yapılandırmasıyla değişir; istek gövdesi üst sınırı (7 dosya için 72 MB) aşılırsa taşıma katmanı `413` döner. |
+| Tavanlar | Başlık sütunu ≤ 60; tek hücre ≤ 10.000 karakter; tablo başına ≤ 50.000, toplam ≤ 100.000 veri satırı (boş satırlar sayılmaz). Aşımda dosya reddedilir: boyut/hücre `Imports.FileTooLarge`, satır `Imports.TooManyRows`, sütun `Imports.UnsupportedFile`. Satır sayısı okunurken sayılır, aşıldığı anda okuma durur. Deneme kiracısında tablo başına tavan 500 ve kod `Trial.ImportLimitExceeded` (422; `TRIAL_LIMITS_API_CONTRACT.md`). Tavanlar `Imports:Limits` yapılandırmasıyla değişir; istek gövdesi üst sınırı (7 dosya için 72 MB) aşılırsa taşıma katmanı `413` döner. |
 | Formül / enjeksiyon | Formül hücresinde yalnız dosyadaki önbellek değeri okunur (yoksa boş); formül **hiçbir zaman** değerlendirilmez. `=`, `+`, `-`, `@` ile başlayan metin hücresi (örn. `+90 532…`, `-5`) düz **metin** olarak, olduğu gibi saklanır; yorumlanmaz. Dışarı yazılan dosyalarda (şablon, hata raporu) bu karakterlerle başlayan metin hücrelerinin başına `'` eklenir. |
 | Hücre değerleri | Satır kaynağı `başlık → metin` sözlüğü olarak saklanır (`SourceJson`). XLSX: metin olduğu gibi; sayı değişmez kültürle (bilimsel gösterim yok, `5321234567`); tarih hücresi `yyyy-MM-dd` (saat varsa `yyyy-MM-ddTHH:mm:ss`); mantıksal `true`/`false`; hata hücresi (`#N/A`) boş. Yalnız boşluk içeren hücre boştur (`null`). |
 | Başlık sütunları | İlk dolu satır başlıktır. Başlığı boş sütun: verisi yoksa yok sayılır, varsa `Sütun N` adı verilir. Yinelenen başlık `Ad (2)`, `Ad (3)` olur. Başlık 200 karaktere kırpılır. |
@@ -176,6 +186,9 @@ Taslak = `Uploaded`, `Mapped`, `Validating`, `Validated`, `ValidationFailed` (a�
 | `Telefon` | Hayır (önerilir) | Türkiye cep standardı: `05XXXXXXXXX`, `5XXXXXXXXX`, `+90 5XX XXX XX XX`, `905XXXXXXXXX` → `905XXXXXXXXX`. Sabit hat/yabancı/geçersiz → **uyarı**, telefon boş aktarılır, özgün değer raporda görünür `[K5]`. Excel sayı hücresindeki `5321234567` (baştaki 0 kaybı) kabul edilir. |
 | `Eposta` | Hayır | Mevcut müşteri e-posta kuralı (≤ 320, geçerli adres, küçük harfe çevrilir). Geçersiz → **uyarı**, e-posta boş aktarılır. |
 | `Adres` | Hayır | ≤ 500 karakter; fazlası hata. |
+| `KimlikNo` | Hayır | Fatura kimliği (ADR-036; boşluklar atılır). 11 hane geçerli TCKN → bireysel (`NationalId`); 10 hane geçerli VKN → kurumsal (`TaxNumber`, unvan = `AdSoyad`, vergi dairesi `VergiDairesi`). Geçersiz → **uyarı** `Imports.TaxIdInvalid`, müşteri kimliksiz aktarılır. Kural `TurkishTaxIdentity` / `Client.ApplyInvoicingIdentity`. Yalnız oluşturulan müşteriye yazılır (eşleşen mevcut müşteri ezilmez, K4). |
+| `VergiDairesi` | Hayır | ≤ 100; yalnız `KimlikNo` geçerli VKN ise kullanılır. |
+| `Durum` | Hayır | `Aktif`/boş → aktif; `Pasif` → müşteri aktarılır ve **hatırlatma istemiyor** (`RemindersOptedOut`) işaretlenir, bilgi `Imports.InactiveClient` (Vetinity'de pasif müşteri durumu yok; eski programda pasif müşteriye hatırlatma gitmesin). Tanınmayan → uyarı `Imports.StatusUnrecognized`, aktif. |
 
 **Hasta tablosu (`pets`)**
 
@@ -193,7 +206,10 @@ Taslak = `Uploaded`, `Mapped`, `Validating`, `Validated`, `ValidationFailed` (a�
 | `Renk` | Hayır | `PetColor` ile eşleşirse `ColorId`; eşleşmezse **veri kaybolmasın diye** `Notes` başına `Renk: <değer>` eklenir (uyarı yok). |
 | `Agirlik` | Hayır | Ondalık virgül/nokta, `kg` eki atılır; 0 ≤ değer < 10.000, 2 ondalık (mevcut `decimal(6,2)`). |
 | `KarneNo` | Hayır | `PassportOrTagNumber` (≤ 50). |
-| `Not` | Hayır | `Notes` (≤ 2000, `Renk` satırıyla birlikte). Aşımda hata. |
+| `Alerji` | Hayır | Hastaya **alerji uyarısı** (`AlertFlags = Allergy`, uyarı notu = metin). Metin uyarı notu sınırını (200) aşarsa not "Alerji ayrıntısı hasta notunda." olur ve metin `Notes`'a `Alerji: …` olarak eklenir. |
+| `Durum` | Hayır | `Aktif`/boş → aktif; `Vefat`/`Ölü` → hasta **vefat** (`Pet.SetStatus`, birimin son adımında: geçmiş kayıtlar önce yazılır). Tanınmayan → uyarı `Imports.StatusUnrecognized`, aktif. |
+| `VefatTarihi` | Hayır | Yalnız vefatta; bölüm 4.4. Okunamayan, gelecekte veya doğumdan önce → uyarı `Imports.DeceasedDateIgnored`, tarihsiz vefat. |
+| `Not` | Hayır | `Notes` (≤ 2000, `Renk` ve uzun `Alerji` satırıyla birlikte). Aşımda hata. |
 
 **Aşı tablosu (`vaccinations`)**
 
@@ -219,7 +235,7 @@ Klinik yükleme öncesi eski programını seçer: **Genel Excel / CSV** (`Generi
 
 - **Gerçek dışa aktarma dosyası görülmedi.** Her profil satırı kamuya açık bilgiden ya da rakip incelemesinde görülen sütun adından gelir ve `verified = false`'tur. Kaynağı bulunamayan başlık profile yazılmaz; genel takma ad listesinde kalır. Gerçek dosya görülünce yalnız `ImportSourceProfiles` düzeltilir ve ilgili satır `Verified = true` yapılır.
 - **Kolayvet:** kamuya açık sütun adı bulunamadı; profil eşlemesizdir, genel takma adlar kullanılır. Dayanak: Kolayvet sitesi hasta ve müşteri verisinin Excel/PDF olarak dışa alınabildiğini yazıyor (`kolayvet.com/ozellikler/ozellikler/gelismis-ice-disa-aktarma`).
-- **E-vet:** rakip incelemesinde görülen ekran ve rapor sütunları (ürün deposu `competitors/e-vet.md`). Müşteri: `Adı`, `Müşteri` → `AdSoyad`; `Protokol No` → `MusteriNo`; `Gsm` → `Telefon`; `Email` → `Eposta`. Hasta: `Hasta Adı`, `Hasta` → `HayvanAdi`; `Protokol` → `HayvanNo`; `Tür` → `Tur`; `Hasta Irkı`, `Irk` → `Irk`; `Cinsiyet`; `Doğum Tarihi` → `DogumTarihi`; `Sahip` → `SahipAdSoyad`; `Gsm` → `SahipTelefon`; `Çip No` → `Mikrocip` (HBS listesinden). Aşı geçmişi için E-vet dışa aktarması görülmedi; aşı sayfasında genel takma adlar kullanılır. E-vet'in "Yedek Al" ekranı Müşteri ve Hasta listesini Excel olarak veriyor; dosyanın başlıkları görülmedi.
+- **E-vet (2026-11-11, gerçek dosyayla doğrulandı, `verified = true`):** "Genel > Yedek Al" Excel dosyası eşleme adımından önce kanonik tablolara çevrilir (bölüm 13); sütun önerisi gerekmez. Profil eşlemeleri yalnız yedeğin tek sayfasının ayrıca CSV olarak yüklendiği durum içindir ve yedekteki gerçek başlıklardır: müşteri `Müşteriler` → `AdSoyad`, `Protokol No` → `MusteriNo`, `Gsm`, `Email`, `Bakiye` → `AcikBakiye`, `Kimlik No` → `KimlikNo`, `Vergi Dairesi`, `Durum`; hasta `Hastalar` (yedek) / `Hasta Adı` (rapor) → `HayvanAdi`, `Protokol No` → `HayvanNo`, `Müşteriler` → `SahipAdSoyad`, `Hasta Türü` → `Tur`, `Irk` / `Hasta Irkı` → `Irk`, `Cinsiyet`, `Doğum Tarihi`, `Çip No` → `Mikrocip`, `Kart No` → `KarneNo`, `Renk`, `Ağırlık`, `Alerjik Durumu` → `Alerji`, `Ölüm Zamanı` → `VefatTarihi`, `Durum`. (Eski, ekran görüntüsünden türetilmiş doğrulanmamış eşlemeler kaldırıldı.)
 - Genel takma adlara bu dilimde eklenenler: `Hasta Irkı`, `Hayvan Irkı` (`Irk`), `Çip Numarası` (`Mikrocip`), `Kilo (kg)` (`Agirlik`), `Aşı Uygulama Tarihi` (`UygulamaTarihi`).
 - Seçilen profil partide saklanır (`ImportBatches.SourceProfile`, istatistik ve destek için) ve parti nesnesinde `sourceProfile` olarak döner. Kişisel veri değildir.
 - Depoda örnek rakip dosyası **yoktur** (kişisel veri riski); testler yalnız başlık satırıyla çalışır.
@@ -321,8 +337,12 @@ Kural kodları, önem dereceleri ve varsayılan mesajlar kodda **tek yerde** tan
 | `Imports.PetNotFound` | Error | Aşı satırının hastası dosyada veya kiracıda bulunamadı / belirsiz. |
 | `Imports.PetRowInvalid` | Error | Hasta satırı hatalı olduğundan aşı aktarılamaz. |
 | `Imports.DuplicateVaccination` | Info | Aynı hasta + aynı aşı tanımı + aynı uygulama günü dosyada önceden var veya kiracıda kayıtlı; eylem `Skip`. |
+| `Imports.TaxIdInvalid` | Warning | `KimlikNo` geçerli 11 haneli TCKN veya 10 haneli VKN değil; fatura bilgisi boş aktarılır (`value` özgün). |
+| `Imports.StatusUnrecognized` | Warning | Müşteri (`Aktif`/`Pasif`) veya hasta (`Aktif`/`Vefat`/`Ölü`) durumu tanınmadı; aktif aktarılır. |
+| `Imports.InactiveClient` | Info | Eski programda pasif müşteri; hatırlatma istemiyor olarak işaretlenir. |
+| `Imports.DeceasedDateIgnored` | Warning | Vefat tarihi okunamadı, gelecekte ya da doğumdan önce; tarihsiz vefat aktarılır. |
 
-Bağlantı çözümü: **Hasta→müşteri:** `MusteriNo` doluysa yalnız dosyadaki müşteri satırı aranır (bulunamazsa `OwnerNotFound`, `MusteriNo` kiracıdaki kayıtlara bağlanmaz). `MusteriNo` yoksa/eşlenmemişse `SahipAdSoyad + SahipTelefon`: telefon geçerliyse önce dosyadaki müşteri (ad+telefon), sonra kiracıdaki müşteri (ad+telefon); telefon boş/geçersizse (`PhoneInvalid` uyarısı) dosyadaki müşteri tablosunda **aynı katlanmış adlı tek** müşteri aranır (birden çok ya da yoksa `OwnerNotFound`; kiracı tarafında telefonsuz ad eşleşmesi yapılmaz). Müşteri satırı mevcut müşteriyle eşleştiyse (`Match`/`Skip` modu) hasta o kiracı müşterisine bağlanır. **Aşı→hasta:** `HayvanNo` doluysa dosyadaki hasta satırı; yoksa sahip (yukarıdaki kural) + `HayvanAdi` + `Tur` ile dosyadaki hasta, sonra sahibin kiracıdaki hastaları. Hasta mevcut hastayla eşleştiyse (aynı müşteri + Türkçe duyarlı ad anahtarı + tür) aşı o hastaya bağlanır.
+Bağlantı çözümü: **Hasta→müşteri:** `MusteriNo` doluysa yalnız dosyadaki müşteri satırı aranır (bulunamazsa `OwnerNotFound`, `MusteriNo` kiracıdaki kayıtlara bağlanmaz). `MusteriNo` yoksa/eşlenmemişse `SahipAdSoyad + SahipTelefon`: telefon geçerliyse önce dosyadaki müşteri (ad+telefon), sonra kiracıdaki müşteri (ad+telefon); telefon boş/geçersizse (`PhoneInvalid` uyarısı) dosyadaki müşteri tablosunda **aynı katlanmış adlı tek** müşteri aranır (birden çok ya da yoksa `OwnerNotFound`; kiracı tarafında telefonsuz ad eşleşmesi yapılmaz). Müşteri satırı mevcut müşteriyle eşleştiyse (`Match`/`Skip` modu) hasta o kiracı müşterisine bağlanır. **Aşı→hasta:** `HayvanNo` doluysa dosyadaki hasta satırı; yoksa sahip (yukarıdaki kural) + `HayvanAdi` + `Tur` ile dosyadaki hasta, sonra sahibin kiracıdaki hastaları. Hasta mevcut hastayla eşleştiyse (aynı müşteri + Türkçe duyarlı ad anahtarı + tür) aşı o hastaya bağlanır. **`Tur` boşsa (2026-11-11):** sahibin aynı adlı **tek** hastası bağlanır (önce dosyada, dosyada yoksa kiracıda); aynı adlı birden çok hasta (farklı tür) `PetNotFound` ("Tür olmadığı için hasta ayırt edilemedi"). Kural aşı, klinik geçmiş ve randevu tablolarında aynıdır; eşleme düzeyindeki zorunlu alan grubu (`SahipAdSoyad + SahipTelefon + HastaAdi + Tur` veya `HastaNo`) değişmedi.
 
 Katalog değerleri satır bağlamında `ImportValueResolver` ile çözülür (bölüm 5): tür → ırk (türün ırkları) → renk; aşı → hastanın türü. Sonuç `Empty` zorunlu alanda `RequiredMissing`; `Unmapped` tür/aşı `Error`, ırk/renk `Info` (serbest metin).
 
@@ -689,7 +709,7 @@ Silinmeyen kayıt `Kept` ve nedeni (kodlar aşağıdaki B5 tablosunda; taslaktak
 - `GET /imports/template?format=csv&table=` yeni değerleri kabul eder; XLSX şablonu yedi sayfa + `Aciklama` taşır (sayfa adı tablodaki ilk ad).
 - `GET .../rows?table=` ve hata raporu yeni tabloları kabul eder; hata raporu sayfa adları XLSX sayfa adlarıdır (`KlinikGecmis`, `HesapHareketleri`, `Randevular`, `Urunler`).
 - **Klinik zorunluluğu (`clinicId`):** aşı, klinik geçmiş, hesap hareketi veya randevu tablosu içeren partide `clinicId` zorunludur (`400 Imports.ClinicRequired`, yüklemede). Müşteri tablosunda `AcikBakiye` eşlenmiş ve partide klinik yoksa doğrulama dosya düzeyinde durur (`blockers`: `Imports.ClinicRequired`; eşleme düzeyinde, satır okunmadan). Ürün tablosu kliniğe bağlı değildir (ürün kiracı geneli).
-- Deneme kiracısı tablo başına 500 satır sınırı yeni tablolara da uygulanır. Tablo başına ≤ 10.000 ve parti toplamı ≤ 25.000 değişmez.
+- Deneme kiracısı tablo başına 500 satır sınırı yeni tablolara da uygulanır. Tablo başına ≤ 50.000 ve parti toplamı ≤ 100.000 (bölüm 4.1).
 
 ### 12.2 Parti nesnesi, sayaçlar, izinler
 
@@ -726,7 +746,7 @@ Silinmeyen kayıt `Kept` ve nedeni (kodlar aşağıdaki B5 tablosunda; taslaktak
 | `Kilo` | Hayır | Hasta `Agirlik` kuralı; geçersiz → uyarı `Imports.WeightInvalid`, boş. |
 | `Ates` | Hayır | °C, ondalık virgül/nokta; 25–45 dışı veya sayı değil → uyarı `Imports.TemperatureInvalid`, boş. |
 
-- `Sikayet`, `Anamnez`, `Bulgular`, `Tani`, `Tedavi`, `Recete`, `LabSonuc`, `Not` alanlarından **en az biri** dolu olmalı; aksi hata `Imports.ClinicalRecordEmpty`. Alan uzunluğu aşımı `Imports.FieldTooLong` (hata).
+- `Sikayet`, `Anamnez`, `Bulgular`, `Tani`, `Tedavi`, `Recete`, `LabSonuc`, `Not` alanlarından **en az biri** dolu olmalı **ya da** geçerli `Kilo` (> 0) veya `Ates` olmalı; aksi hata `Imports.ClinicalRecordEmpty`. **Değişti (2026-11-11):** önceden yalnız metin alanları sayılıyordu; eski programlarda muayenelerin çoğu yalnız tartım (E-vet yedeğinde 13.628 muayenenin ~10.100'ü metinsiz) ve bu ölçümler kilo geçmişidir. `Kilo = 0` ölçüm sayılmaz. Alan uzunluğu aşımı `Imports.FieldTooLong` (hata).
 - Mükerrer: aynı hasta + aynı tarih + aynı içerik (sekiz metin alanının katlanmış birleşimi) dosyada önceden var ya da kiracıda **içe aktarılmış** bir kayıt olarak var → bilgi `Imports.DuplicateClinicalRecord`, eylem `Skip`. Elle girilmiş muayenelerle karşılaştırılmaz (farklı tablo, farklı biçim).
 
 **Hesap hareketleri (`accountEntries`)**: her satır bir salt okunur eski program hareketidir (`ImportedAccountEntry`); bakiyeyi etkilemez.
@@ -844,3 +864,55 @@ Tek migration **`AddFullDataMigration`** (yalnız yerel dev DB'ye uygulanır; ca
 - `rollback-preview.kept` ek anahtarı `matchedProducts` (mevcut ürünle eşleşen satırlar; hiç silinmez).
 - `GET .../rows` `values` yeni tablolar için normalize kaydın camelCase alanlarıdır (bölüm 7.7 kuralı); ekran kullanmak zorunda değildir.
 - `GET /clients/{id}/balance` satırları (ücret satırı içeriyorsa) ve ücret DTO'su `isImported` taşır (ek alan); başka bakiye/ödeme DTO'su değişmez.
+
+## 13) E-vet yedeği (2026-11-11; geriye uyumlu ekleme)
+
+Pilot klinik E-vet SMART'tan geliyor. E-vet'in en zengin dışa aktarması **Genel > Yedek Al** Excel dosyasıdır (düz tablolar). Dosya ve raporlar gerçek dosyayla incelendi (kişisel veri depoya girmedi). `sourceProfile = EVet` iken sunucu yedeği **yükleme anında** kanonik tablolara çevirir; hazırlık satırları kanonik başlıklarla saklanır, eşleme `Exact` önerilir ve sonraki adımlar (doğrulama, uygulama, geri alma) bölüm 1–12 kurallarıyla aynen işler. Dönüştürücü tek yer: `Imports/Reading/EVet` (`EVetBackupConverter`, `EVetReports`, `EVetProductList`). Yalnız biçim ve E-vet'e özgü anlam orada çözülür; doğrulama kuralı oraya taşınmaz.
+
+### 13.1 Girdi
+
+| Form alanı | Dosya | Zorunlu | Kullanım |
+|---|---|---|---|
+| `file` | Genel > Yedek Al (`.xlsx`): **Müşteri, Hasta, Randevular, Muayene** işaretli; **Giriş Bilgileri işaretsiz** (kullanıcı bilgisi gerekmez) | Evet (E-vet yolu) | Sayfalar katlanmış adla tanınır: `Müşteri Listesi`, `Hasta Listesi`, `Randevu Listesi`, `Muayene Listesi`. Bunlardan hiçbiri yoksa çalışma kitabı genel okuyucuya gider (Vetinity şablonu E-vet profiliyle de yüklenebilir). |
+| `evetPatientReportFile` | Rapor > Hasta Listesi (`.csv`, `;`) | Hayır (önerilir) | İç içe rapordan hasta protokolü → müşteri protokolü. Tanınmazsa `400 Imports.UnsupportedFile`. |
+| `evetVaccineReportFile` | Rapor > Resmi > Aşı Bilgi (`.csv`; tarih aralığı 01.01.2020 – bugün) | Hayır | Aşı seri numarası ve ticari ürün adı. Tanınmazsa `400 Imports.UnsupportedFile`. |
+| `productsFile` | Rapor > Depo > Ürün Listesi (`.csv`) | Hayır | Başlık satırı (`Ürün`, `Barkod-1`, `Satış Fiyatı`) tanınırsa gruplu rapor çözülür; tanınmazsa genel CSV okuyucusu (yedeksiz yüklemede de). |
+
+- Raporlar yalnız `EVet` profilinde ve yedekle birlikte kabul edilir (bölüm 4.1). Tarihler yedekte tarih hücresi ya da Excel seri sayısı, raporlarda `gg.aa.yyyy[ SS:dd]` olarak okunur.
+- İçerik özeti: yalnız yedek varsa yedeğin SHA-256'sı (önceki kural); rapor/ürün dosyası da varsa `file=<h>;products=<h>;evetPatientReport=<h>;evetVaccineReport=<h>` (verilenler) metninin SHA-256'sı.
+- Tavanlar dönüştürülmüş tablolara uygulanır (bölüm 4.1); ham sayfa okunurken de aynı tablo tavanı geçerlidir. Deneme kiracısının 500 satır sınırı yedeği reddeder (`Trial.ImportLimitExceeded`).
+
+### 13.2 Dönüştürme
+
+**Müşteri** (`Müşteri Listesi`): `Protokol No` → `MusteriNo`; `Müşteriler` → `AdSoyad`; `Gsm`, yoksa `Tel1` → `Telefon`; `Email` → `Eposta`; `Adres, Köy - Mahalle, İlçe / Şehir` → `Adres`; `Bakiye` 2 ondalığa yuvarlanır (kayan nokta artığı `0,0000001` sıfırdır) → `AcikBakiye`; `Vergi No`, yoksa `Kimlik No` (yalnız rakam) → `KimlikNo`; `Vergi Dairesi`; `Durum`. Müşteri `Açıklama`, `Meslek`, `Doğum Tarihi`, `Tel2` alanlarının Vetinity'de karşılığı yoktur; aktarılmaz.
+
+**Hasta** (`Hasta Listesi`): `Protokol No` → `HayvanNo`. Sahip: Hasta Listesi raporundaki protokol eşlemesi (müşteri yedekte varsa), yoksa yedekteki sahip adıyla **tek** müşteri (`MusteriNo`); ikisi de yoksa `MusteriNo` boş kalır ve doğrulama ad kuralını uygular (aynı adlı müşteriler varsa `OwnerNotFound`). `Cinsiyet` hücresi ayrıştırılır: `Kısırlaştırılmış Dişi/Erkek` → cinsiyet + `Kisir = Evet`; `Kısır` → yalnız kısır; `Bilinmiyor` → boş. `Hasta Türü` → `Tur`, `Irk`, `Doğum Tarihi`, `Çip No` → `Mikrocip`, `Kart No` (küpe) → `KarneNo`, `Renk`, `Ağırlık` (0 = ölçülmedi, boş), `Alerjik Durumu` → `Alerji`. Not: `Bilgi`, `Açıklama`, `Kalıtsal hastalık: …`, `Kan grubu: …`, `Besin tipi: …`.
+- **Mikroçip:** rakam dışı karakter içeren veya yedekte başka (sahip + ad olarak farklı) hastada da kayıtlı çip, hastanın notuna `Mikroçip (eski program): …` olarak yazılır, çip alanı boş kalır (ilk görülen hasta çipi tutar). Böylece hasta ve geçmişi düşmez, çip çakışması (K10) yayılmaz.
+- **Durum:** `Ölü` → `Durum = Vefat`, `Ölüm Zamanı` → `VefatTarihi`, `Pasif Nedeni` nota (`Eski program vefat notu: …`). `Pasif` → Vetinity'de karşılığı yok: hasta **aktif** aktarılır, notuna `Eski programda pasif. <neden>` yazılır; bu hastalara sonraki aşı tarihi ve gelecek randevu yazılmaz (vefat edenlere de).
+
+**Muayene** (`Muayene Listesi`) → klinik geçmiş: hasta `(Hasta Sahibi, Hasta Adı)` çiftiyle hasta sayfasında **tek** hastaya bağlanırsa `HayvanNo`; değilse `HayvanNo` boş kalır ve doğrulama türsüz ad kuralını uygular (belirsizse `PetNotFound`, bölüm 6.4). `Tarih` → `Tarih` (gün), `KayitTuru = Muayene`, `Veteriner Hekim` → `Hekim`, `Ağırlık` → `Kilo` (0 boş), `Vücut Sıcaklığı` → `Ates` (1 ondalık), `Semptom` → `Sikayet`, `Hastalık Teşhisi` → `Tani`, `Anamnez`, `Tedavi Şekli` → `Tedavi`, `Açıklama` → `Not`, `Diğer Parametreler` (muayene bulgusu şablonu: genel durum, mukoza, lenf yumrusu, dehidrasyon…) yalnız dolu (`-` olmayan) öğeleriyle → `Bulgular`.
+
+**Randevu Listesi** (görevler) → aşı ve randevu:
+
+| Görev | Sonuç |
+|---|---|
+| `Aşı Paketi` dolu ve `Durum = Tamamlandı` (görev tipi `Aşılama` ya da `Tamamlandı` olabilir) | **Aşı geçmişi**: `AsiAdi = Aşı Paketi` (katalog/değer eşleme, bölüm 5), `UygulamaTarihi`, `Uygulayan = Veteriner`, not `Ürün: …; Bilgi; Açıklama`. |
+| `Aşı Paketi` dolu ve `Durum = Yapılacak` | Aynı hastanın aynı **aşı serisindeki** (bölüm 13.3) son uygulamasından sonraki en erken görev tarihi o uygulamanın **`SonrakiAsiTarihi`** olur (geçmişte kalmışsa da: gecikmiş aşı). Seride hiç uygulama yoksa ve tarih gelecekteyse **randevu** (`RandevuTuru = Aşı`, not `Aşı: <paket>`); geçmişteyse aktarılmaz. |
+| Diğer görev, `Yapılacak` ve gelecekte | **Randevu**: `Tarih`/`Saat` görev başlangıcı, `Hekim = Veteriner`, `Neden = Görev Tipi`, `Kontrol…` → `RandevuTuru = Kontrol`, not `Bilgi; Açıklama`. |
+| Hastasız, `İptal`, hasta işi olmayan tür (`Maaş`, `BORÇ HATIRLATMA`, `ÖDEME SÖZÜ`, `Bilgi`, `Hatırlatma`, `Randevu Talep`), geçmişte kalmış/tamamlanmış aşı dışı görev, vefat/pasif hastanın gelecek işi | Aktarılmaz; sayıları nedenleriyle `warnings` içinde (`Imports.EVetConversion`). Geçmiş ziyaretin içeriği muayene listesindedir (ADR-048 T5). |
+
+Görev → hasta bağlantısı muayeneyle aynıdır (`Müşteriler`, `Hastalar` çifti).
+
+**Aşı Bilgi raporu** (seri no): satır, aynı sahip + hasta + gündeki tamamlanmış aşıya bağlanır: o gün yedekte tek aşı ve raporda tek satır varsa doğrudan; birden çoksa raporun ürün adı aşı serisini içeriyorsa (`Rabisin ( Kuduz )` ↔ `KUDUZ`, `Felocell Cvr (Kedi Karma)` ↔ `KEDİ KARMA 1`) ve eşleşme tekse. Eşleşen aşıya `Seri` ve not `Ürün: …` eklenir. `Doğrudan Satış` satırları (hastaya yapılmamış satış) atlanır.
+
+**Ürün Listesi raporu:** tür başlığı (yalnız ilk hücre dolu, ardından boş satır) → `Kategori` ve `UrunTuru` (`Aşı` → Aşı, `İlaç` → İlaç, `Hizmet` ve `Laboratuvar` → Hizmet, diğerleri → Diğer); alt grup/üretici başlığı (ardından boş satır yok) ve `Barkod-2` → `Aciklama` (`Grup: …; Barkod 2: …`); `Ürün` → `Ad`, `Barkod-1` → `Barkod`, `Satış Fiyatı` (`₺1.250,50`) → `SatisFiyati`. Pasif ürün (`[-]`) aktarılmaz. Alış fiyatı ve KDV aktarılmaz (kanonik alan yok).
+
+### 13.3 Aşı serisi ve katalog eşlemesi
+
+Aşı serisi anahtarı (tek yer `ImportValueResolver.VaccineSeriesKey`): katlanmış addan baştaki/sondaki `yıllık`, sondaki doz numarası ve `N aylık`, baştaki `kedi`/`köpek` atılır (`YILLIK KEDİ KARMA` = `KEDİ KARMA 2` = `karma`; `İÇ PARAZİT 2 AYLIK` = `icparazit`). Değer çözücü (bölüm 5) aşı adında katalog/takma ad eşleşmesi bulamazsa aynı anahtarla bir kez daha dener; bu kural her profilde geçerlidir. Eşleşmeyen paketler (`İÇ+DIŞ PARAZİT`, `MANTAR`, ticari parazit ürünleri…) bölüm 5'teki değer eşlemesiyle kullanıcı tarafından eşlenir veya atlanır.
+
+### 13.4 Bilinen sınırlar
+
+- Yedekte hesap hareketi yok; bakiye müşteri listesindeki `Bakiye` sütunundan gelir (ADR-048 T3). Rapor > Bakiyesi Olan Müşteriler yalnız karşılaştırma içindir, yüklenmez.
+- Müşteri açıklaması, meslek, doğum tarihi, ikinci telefon, hasta yaş grubu, çiftleştir/sahiplendir işaretleri aktarılmaz (karşılık yok).
+- Seri numarası yalnız Aşı Bilgi raporundaki aşılar için gelir (rapor ticari aşıları içerir; parazit ilaçlarını içermez).
