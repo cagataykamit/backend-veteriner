@@ -108,6 +108,25 @@ public sealed class ImportValueResolver
             ["habes"] = "habesabyssinian",
             ["orientallonghair"] = "oriental",
             ["orientalshorthair"] = "oriental",
+            ["britishbluepoint"] = "britishshorthair",
+            ["britishshorthairgoldenny11"] = "britishshorthair",
+            ["britishshorthairtortie"] = "britishshorthair",
+            ["britishangora"] = "britishlonghair",
+            ["domesticshorthair"] = "melez",
+            ["amerikancocker"] = "amerikancockerspaniel",
+            ["americancocker"] = "amerikancockerspaniel",
+            ["rusterrier"] = "russiyahterrieri",
+            ["russiyahterrier"] = "russiyahterrieri",
+            ["blackrussianterrier"] = "russiyahterrieri",
+            ["bretonyaepanyolu"] = "epanyolbreton",
+            ["brittany"] = "epanyolbreton",
+            ["tibetterrier"] = "tibetterrieri",
+            ["avustralyaterrier"] = "avustralyaterrieri",
+            ["avustralyacobani"] = "avustralyacobankopegi",
+            ["ingilizcobankopegibobtail"] = "eskiingilizcobankopegibobtail",
+            ["bobtail"] = "eskiingilizcobankopegibobtail",
+            ["papagan"] = "papagandiger",
+            ["safkaningilizati"] = "ingilizati",
             ["turkishangora"] = "ankarakedisi",
             ["ankara"] = "ankarakedisi",
             ["turkishvan"] = "vankedisi",
@@ -133,6 +152,19 @@ public sealed class ImportValueResolver
             ["acikkahve"] = "acikkahverengi",
             ["karisik"] = "cokrenkli",
             ["mix"] = "cokrenkli",
+            ["sarisiyah"] = "siyahsari",
+            ["siyahgri"] = "grisiyah",
+            ["kahvekrem"] = "kahverengikrem",
+            ["kremkahve"] = "kahverengikrem",
+            ["beyazbej"] = "bejbeyaz",
+            ["kahvekircilli"] = "kahverengikircilli",
+            ["acikkahvekircilli"] = "kahverengikircilli",
+            ["beyazsampanya"] = "sampanya",
+            ["portakalbeyaz"] = "turuncubeyaz",
+            ["beyazturuncu"] = "turuncubeyaz",
+            ["saribeyazsiyah"] = "alacali",
+            ["beyazsarikircil"] = "cokrenkli",
+            ["sarman"] = "turuncu",
         },
         [ImportValueKind.Vaccine] = new()
         {
@@ -226,6 +258,22 @@ public sealed class ImportValueResolver
     /// son uygulamasına bağlamak (E-vet dönüştürücüsü) ve katalog eşlemesi aynı kuralı kullanır.
     /// </summary>
     public static string VaccineSeriesKey(string? vaccineName) => ReduceVaccineKey(ImportTextFolding.Fold(vaccineName));
+
+    /// <summary>
+    /// Eski programın aşı paketinde aşı olmayan uygulama (tedavi, bağışıklık destek ürünü): adında <c>tedavi</c> geçer ya da bilinen
+    /// tedavi ürünüdür. Aşı geçmişine değil klinik geçmişe yazılır; aşı kataloğuna eklenmez.
+    /// </summary>
+    public static bool IsTreatment(string? vaccineName)
+    {
+        var key = ImportTextFolding.Fold(vaccineName);
+        return key.Contains("tedavi", StringComparison.Ordinal) || TreatmentProducts.Contains(VaccineSeriesKey(vaccineName));
+    }
+
+    /// <summary>Aşı paketine yazılan, aşı olmayan ürünler (katlanmış seri anahtarı): bağışıklık destek ve homeopatik ürünler.</summary>
+    private static readonly HashSet<string> TreatmentProducts = new(StringComparer.Ordinal)
+    {
+        "zylexis", "theranekron", "theranekrond", "baypamun",
+    };
 
     private static string ReduceVaccineKey(string key)
     {

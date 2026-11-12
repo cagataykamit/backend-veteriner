@@ -54,6 +54,14 @@ public sealed class PetColorConfiguration : IEntityTypeConfiguration<PetColor>
             Seed(PetColorSeedConstants.Dun, "DUN", "Boz", 25),
             Seed(PetColorSeedConstants.Beige, "BEIGE", "Bej", 26),
             Seed(PetColorSeedConstants.Blue, "BLUE", "Mavi", 27),
+            Seed(PetColorSeedConstants.BlackYellow, "BLACK_YELLOW", "Siyah-Sarı", 28),
+            Seed(PetColorSeedConstants.GrayBlack, "GRAY_BLACK", "Gri-Siyah", 29),
+            Seed(PetColorSeedConstants.BrownCream, "BROWN_CREAM", "Kahverengi-Krem", 30),
+            Seed(PetColorSeedConstants.BeigeWhite, "BEIGE_WHITE", "Bej-Beyaz", 31),
+            Seed(PetColorSeedConstants.BrownBrindle, "BROWN_BRINDLE", "Kahverengi-Kırçıllı", 32),
+            Seed(PetColorSeedConstants.Champagne, "CHAMPAGNE", "Şampanya", 33),
+            Seed(PetColorSeedConstants.Chocolate, "CHOCOLATE", "Çikolata", 34),
+            Seed(PetColorSeedConstants.OrangeWhite, "ORANGE_WHITE", "Turuncu-Beyaz", 35),
             // Diğer ve Bilinmiyor listenin sonunda kalır.
             Seed(PetColorSeedConstants.Other, "OTHER", "Diğer", 98),
             Seed(PetColorSeedConstants.Unknown, "UNKNOWN", "Bilinmiyor", 99));

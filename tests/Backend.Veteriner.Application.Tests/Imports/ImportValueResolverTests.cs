@@ -59,16 +59,23 @@ public sealed class ImportValueResolverTests
     private static readonly Guid BrownWhite = Guid.NewGuid();
     private static readonly Guid YellowWhite = Guid.NewGuid();
     private static readonly Guid LightBrown = Guid.NewGuid();
+    private static readonly Guid GrayBlack = Guid.NewGuid();
+    private static readonly Guid Orange = Guid.NewGuid();
+    private static readonly Guid OrangeWhite = Guid.NewGuid();
+    private static readonly Guid BritishShorthair = Guid.NewGuid();
 
     private static readonly ImportValueResolver Extended = new(new ImportCatalogs(
         Species: [new(Dog, "Köpek", "DOG", null), new(Cat, "Kedi", "CAT", null), new(GuineaPig, "Kobay (Gine Domuzu)", "GUINEA_PIG", null), new(Exotic, "Egzotik", "EXOTIC", null), new(Other, "Diğer", "OTHER", null)],
-        Breeds: [new(ScottishFold, "Scottish Fold", null, Cat), new(Setter, "İngiliz Setter", null, Dog), new(Malinois, "Belçika Malinois", null, Dog)],
+        Breeds: [new(ScottishFold, "Scottish Fold", null, Cat), new(BritishShorthair, "British Shorthair", null, Cat), new(Setter, "İngiliz Setter", null, Dog), new(Malinois, "Belçika Malinois", null, Dog)],
         Colors:
         [
             new(Calico, "Alacalı", "CALICO", null),
             new(BrownWhite, "Kahverengi-Beyaz", "BROWN_WHITE", null),
             new(YellowWhite, "Sarı-Beyaz", "YELLOW_WHITE", null),
             new(LightBrown, "Açık Kahverengi", "LIGHT_BROWN", null),
+            new(GrayBlack, "Gri-Siyah", "GRAY_BLACK", null),
+            new(Orange, "Turuncu", "ORANGE", null),
+            new(OrangeWhite, "Turuncu-Beyaz", "ORANGE_WHITE", null),
         ],
         Vaccines:
         [
@@ -150,6 +157,7 @@ public sealed class ImportValueResolverTests
         Extended.Resolve(ImportValueKind.Breed, "Setter", Dog).TargetId.Should().Be(Setter);
         Extended.Resolve(ImportValueKind.Breed, "Belçika Kurdu", Dog).TargetId.Should().Be(Malinois);
         Extended.Resolve(ImportValueKind.Breed, "Terrier", Dog).Kind.Should().Be(ImportValueResolutionKind.Unmapped);
+        Extended.Resolve(ImportValueKind.Breed, "British Blue Point", Cat).TargetId.Should().Be(BritishShorthair);
     }
 
     [Theory]
@@ -158,6 +166,9 @@ public sealed class ImportValueResolverTests
     [InlineData("Beyaz - Sarı", "YELLOW_WHITE")]
     [InlineData("Sarı Beyaz", "YELLOW_WHITE")]
     [InlineData("Açık Kahve", "LIGHT_BROWN")]
+    [InlineData("Gri Siyah", "GRAY_BLACK")]
+    [InlineData("Sarman", "ORANGE")]
+    [InlineData("Portakal Beyaz", "ORANGE_WHITE")]
     public void EVet_Color_Spellings_Should_Resolve(string source, string code)
         => Extended.Resolve(ImportValueKind.Color, source).TargetId.Should().Be(ExtendedColors[code]);
 
@@ -167,6 +178,9 @@ public sealed class ImportValueResolverTests
         ["BROWN_WHITE"] = BrownWhite,
         ["YELLOW_WHITE"] = YellowWhite,
         ["LIGHT_BROWN"] = LightBrown,
+        ["GRAY_BLACK"] = GrayBlack,
+        ["ORANGE"] = Orange,
+        ["ORANGE_WHITE"] = OrangeWhite,
     };
 
     [Theory]

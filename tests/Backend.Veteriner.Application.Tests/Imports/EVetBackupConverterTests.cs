@@ -82,6 +82,7 @@ public sealed class EVetBackupConverterTests
             ["Ayşe Yılmaz", "Tarçın", "DİKİŞ ALINMASI", new DateTime(2025, 6, 10, 15, 0, 0), null, "Dr. B", "Aranacak", "Arandı, gelmedi", "Yapılacak"],
             ["Can Demir", "Karabaş", "Kısırlaştırma", new DateTime(2025, 2, 1, 9, 0, 0), null, "Dr. A", null, null, "Tamamlandı"],
             ["Ayşe Yılmaz", "Tarçın", "Bilgi", new DateTime(2025, 2, 1, 9, 0, 0), null, "Dr. A", null, "Not", "Tamamlandı"],
+            ["Can Demir", "Karabaş", "Aşılama", new DateTime(2025, 3, 1, 9, 0, 0), "UYUZ TEDAVİSİ", "Dr. A", null, null, "Tamamlandı"],
         ]),
         ("Muayene Listesi",
         [
@@ -453,7 +454,7 @@ public sealed class EVetBackupConverterTests
         var records = Rows(result, ImportTable.ClinicalRecords);
 
         // Muayene satırları önce, görevler 1.000.000 + Excel satırıyla (aynı tabloda çakışmasın).
-        source.Rows.Select(r => r.RowNumber).Should().Equal(2, 3, 4, 1_000_006, 1_000_014, 1_000_015);
+        source.Rows.Select(r => r.RowNumber).Should().Equal(2, 3, 4, 1_000_006, 1_000_014, 1_000_015, 1_000_017);
         var checkup = records[3];
         (checkup["HayvanNo"], checkup["Tarih"], checkup["KayitTuru"], checkup["Hekim"], checkup["Not"])
             .Should().Be(("205", "2025-01-01", "Kontrol Muayanesi", "Dr. B", "E-vet görevi: Tamamlandı"));
@@ -462,8 +463,29 @@ public sealed class EVetBackupConverterTests
         records.Should().NotContain(r => r["KayitTuru"] == "Bilgi", "hasta işi olmayan tür");
 
         result.Warnings.Should().Contain(w => w.Table == ImportTable.ClinicalRecords
-                                              && w.Message.Contains("3 aşı dışı görev (2 tamamlanmış, 1 gelinmemiş)"));
+                                              && w.Message.Contains("4 aşı dışı görev (3 tamamlanmış, 1 gelinmemiş)")
+                                              && w.Message.Contains("1 tedavi"));
     }
+
+    [Fact]
+    public void Treatment_In_Vaccine_Package_Should_Become_Clinical_Record_Not_Vaccination()
+    {
+        var result = Read(Files());
+        var treatment = Rows(result, ImportTable.ClinicalRecords).Single(r => r["KayitTuru"] == "Tedavi");
+
+        (treatment["HayvanNo"], treatment["Tarih"], treatment["Tedavi"], treatment["Not"])
+            .Should().Be(("202", "2025-03-01", "UYUZ TEDAVİSİ", "E-vet görevi: Tamamlandı"));
+        Rows(result, ImportTable.Vaccinations).Should().NotContain(v => v["AsiAdi"] == "UYUZ TEDAVİSİ");
+    }
+
+    [Theory]
+    [InlineData("UYUZ TEDAVİSİ", true)]
+    [InlineData("ZYLEXİS", true)]
+    [InlineData("Theranekron D6", true)]
+    [InlineData("KUDUZ", false)]
+    [InlineData("İÇ+DIŞ PARAZİT", false)]
+    public void Treatment_Names_Should_Be_Told_Apart_From_Vaccines(string name, bool expected)
+        => ImportValueResolver.IsTreatment(name).Should().Be(expected);
 
     // ================================================================ Muayene
 
@@ -543,7 +565,7 @@ public sealed class EVetBackupConverterTests
         Row(ImportTable.ClinicalRecords, 3).Issues.Should().Contain(i => i.Code == ImportRules.PetNotFound.Code, "belirsiz eşleşme hatadır");
         Row(ImportTable.ClinicalRecords, 4).Status.Should().NotBe(ImportRowValidationStatus.Error, "yalnız kilo taşıyan kayıt boş değildir");
         output.Rows.Where(r => r.Table == ImportTable.ClinicalRecords && r.RowNumber > EVetBackupConverter.TaskClinicalRowOffset)
-            .Should().HaveCount(3).And.OnlyContain(r => r.Status != ImportRowValidationStatus.Error, "geçmiş görev kaydı geçerlidir");
+            .Should().HaveCount(4).And.OnlyContain(r => r.Status != ImportRowValidationStatus.Error, "geçmiş görev ve tedavi kaydı geçerlidir");
         output.Rows.Where(r => r.Table == ImportTable.Appointments).Should().OnlyContain(r => r.Status != ImportRowValidationStatus.Error);
     }
 }
