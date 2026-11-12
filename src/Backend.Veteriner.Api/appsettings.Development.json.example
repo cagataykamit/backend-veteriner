@@ -177,6 +177,10 @@
       "IdentityBaseUrl": "https://id-staging.parasut.com/realms/parasut/protocol/openid-connect",
       "ApiBaseUrl": "https://api-staging.parasut.com/v4",
       "RedirectUri": "https://localhost:7173/api/e-documents/parasut/callback"
+    },
+    "Nilvera": {
+      "Environment": "Test",
+      "ApiBaseUrl": "https://apitest.nilvera.com"
     }
   },
 
