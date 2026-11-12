@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Application.Imports.Validation;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
@@ -70,6 +71,13 @@ internal static class EVetCells
     /// <summary>Tarih hücresini <c>yyyy-MM-dd</c> yapar; okunamazsa özgün değer kalır (motor hatayı raporlar).</summary>
     public static string? Date(string? value)
         => ParseDateTime(value) is { } date ? date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : Clean(value);
+
+    /// <summary>Not metnine yazılan tarih (<c>gg.aa.yyyy</c>); okunamazsa null (yazılmaz).</summary>
+    public static string? NoteDate(string? value)
+        => ParseDateTime(value) is { } date ? date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture) : null;
+
+    /// <summary>Onay kutusu hücresi: yedekte <c>TRUE</c>/<c>FALSE</c> (okuyucu <c>true</c>/<c>false</c> da verir).</summary>
+    public static bool IsChecked(string? value) => ImportTextFolding.Fold(value) is "true" or "1" or "evet";
 
     /// <summary>Tutar: 2 ondalığa yuvarlanır, kuruş altı artık (<c>0,0000001</c>) sıfır sayılır ve boş döner.</summary>
     public static string? Amount(string? value)

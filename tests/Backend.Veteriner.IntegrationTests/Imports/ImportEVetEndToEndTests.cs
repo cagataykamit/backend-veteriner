@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -35,7 +36,7 @@ public sealed class ImportEVetEndToEndTests : IClassFixture<CustomWebApplication
     [
         "Imports.Read", "Imports.Manage", "Imports.Commit", "Clients.Create", "Clients.Read", "Pets.Create", "Pets.Read",
         "Vaccinations.Create", "Examinations.Create", "Examinations.Read", "Charges.Create", "Charges.Read",
-        "Appointments.Create", "Appointments.Read",
+        "Appointments.Create", "Appointments.Read", "Products.Create", "Products.Read",
     ];
 
     private readonly CustomWebApplicationFactory _factory;
@@ -55,8 +56,8 @@ public sealed class ImportEVetEndToEndTests : IClassFixture<CustomWebApplication
 
         var bytes = Workbook(
             ("Müşteri Listesi", [
-                ["Kayıt Tarihi", "Müşteriler", "Bakiye", "Protokol No", "Kimlik No", "Gsm", "Vergi Dairesi", "Vergi No", "Durum"],
-                ["2024-01-01", owner, "1250.5000001", "101", "10000000146", "905321234567", null, null, "Aktif"],
+                ["Kayıt Tarihi", "Müşteriler", "Bakiye", "Protokol No", "Kimlik No", "Gsm", "Vergi Dairesi", "Vergi No", "Durum", "Meslek", "Açıklama"],
+                ["2024-01-01", owner, "1250.5000001", "101", "10000000146", "905321234567", null, null, "Aktif", "Öğretmen", "Akşam arayın"],
                 ["2024-01-01", company, "0", "102", null, "905331234567", "Kadıköy", "1234567890", "Pasif"]]),
             ("Hasta Listesi", [
                 ["Müşteriler", "Hastalar", "Protokol No", "Hasta Türü", "Cinsiyet", "Ağırlık", "Alerjik Durumu", "Ölüm Zamanı", "Durum"],
@@ -76,7 +77,18 @@ public sealed class ImportEVetEndToEndTests : IClassFixture<CustomWebApplication
                 ["2025-06-01T11:00:00", owner, "Pamuk", "Dr. A", "4.3", null],
                 ["2025-06-02T11:00:00", owner, "Duman", "Dr. A", "0", "Kusma"]]));
 
-        var id = await UploadAsync(http, ctx, bytes);
+        var productList =
+            ";;;;;;;;14.10.2026;;\n"
+            + "Ürün Listesi;;;;;;;;;;\n"
+            + ";#;Ürün;Barkod-1;Barkod-2;Alış KDV;Alış Fiyatı;Satış KDV;Satış Fiyatı;Durum;\n"
+            + "Aşı;;;;;;;;;;\n"
+            + ";;;;;;;;;;\n"
+            + $";1;Iev Kuduz {ctx.Suffix};;;10;₺100,00;10;₺250,00;;[+]\n"
+            + "Hizmet;;;;;;;;;;\n"
+            + ";;;;;;;;;;\n"
+            + $";2;Iev Muayene {ctx.Suffix};;;0;₺0,00;20;₺500,00;;[+]\n";
+
+        var id = await UploadAsync(http, ctx, bytes, productList);
         var validationId = (await ImportValidationTestRunner.ValidateAsync(_factory.Services, http, id)).GetProperty("validationId").GetGuid();
         var preview = await GetJsonAsync(http, $"/api/v1/imports/batches/{id}/preview");
         preview.GetProperty("canCommit").GetBoolean().Should().BeTrue(preview.ToString());
@@ -99,6 +111,13 @@ public sealed class ImportEVetEndToEndTests : IClassFixture<CustomWebApplication
             var corporate = clients.Single(c => c.FullName == company);
             (corporate.PersonType, corporate.TaxNumber, corporate.TaxOffice, corporate.LegalName, corporate.RemindersOptedOut)
                 .Should().Be((ClientPersonType.Corporate, "1234567890", "Kadıköy", company, true));
+            person.Notes.Should().Be("Akşam arayın\nMeslek: Öğretmen\nEski programa kayıt: 01.01.2024");
+            corporate.Notes.Should().Be("Eski programa kayıt: 01.01.2024");
+
+            var products = await db.Products.AsNoTracking().Where(p => p.TenantId == ctx.TenantId).OrderBy(p => p.Name).ToListAsync();
+            products.Select(p => (p.Name, p.VatRate, p.PurchasePrice, p.UnitPrice)).Should().Equal(
+                ($"Iev Kuduz {ctx.Suffix}", 10m, 100m, 250m),
+                ($"Iev Muayene {ctx.Suffix}", 20m, (decimal?)null, 500m));
             (await db.Charges.AsNoTracking().SingleAsync(c => c.ImportBatchId == id)).Amount.Should().Be(1250.50m);
 
             var pets = await db.Pets.AsNoTracking().Where(p => p.TenantId == ctx.TenantId).ToListAsync();
@@ -137,6 +156,7 @@ public sealed class ImportEVetEndToEndTests : IClassFixture<CustomWebApplication
             (await db.ImportBatches.AsNoTracking().SingleAsync(b => b.Id == id)).Status.Should().Be(ImportBatchStatus.RolledBack);
             (await db.Clients.CountAsync(c => c.TenantId == ctx.TenantId)).Should().Be(0);
             (await db.Pets.CountAsync(p => p.TenantId == ctx.TenantId)).Should().Be(0);
+            (await db.Products.CountAsync(p => p.TenantId == ctx.TenantId)).Should().Be(0, "KDV'li ürün değişmiş sayılmaz, geri alınır");
             (await db.ImportedClinicalRecords.CountAsync(r => r.ImportBatchId == id)).Should().Be(0);
         }
     }
@@ -192,7 +212,7 @@ public sealed class ImportEVetEndToEndTests : IClassFixture<CustomWebApplication
         return content;
     }
 
-    private static async Task<Guid> UploadAsync(HttpClient http, SeedCtx ctx, byte[] bytes)
+    private static async Task<Guid> UploadAsync(HttpClient http, SeedCtx ctx, byte[] bytes, string? productList = null)
     {
         var form = new MultipartFormDataContent
         {
@@ -201,6 +221,12 @@ public sealed class ImportEVetEndToEndTests : IClassFixture<CustomWebApplication
             { new StringContent("EVet"), "sourceProfile" },
         };
         form.Add(Xlsx(bytes), "file", "backup.xlsx");
+        if (productList is not null)
+        {
+            var csv = new ByteArrayContent([.. Encoding.UTF8.GetPreamble(), .. Encoding.UTF8.GetBytes(productList)]);
+            csv.Headers.ContentType = new MediaTypeHeaderValue("text/csv");
+            form.Add(csv, "productsFile", "urunler.csv");
+        }
 
         var response = await http.PostAsync("/api/v1/imports/batches", form);
         response.IsSuccessStatusCode.Should().BeTrue(await response.Content.ReadAsStringAsync());

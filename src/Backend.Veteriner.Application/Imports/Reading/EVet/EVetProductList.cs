@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Imports.Mapping;
+using Backend.Veteriner.Application.Imports.Validation;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Shared;
 
@@ -8,11 +9,12 @@ namespace Backend.Veteriner.Application.Imports.Reading.EVet;
 /// E-vet Rapor &gt; Depo &gt; Ürün Listesi (CSV, <c>;</c>). Gruplu rapordur: ürün türü başlığı (yalnız ilk hücre dolu, ardından boş
 /// satır), altında üretici/alt grup başlıkları (ardından boş satır yok) ve ürün satırları
 /// (<c>;#;Ürün;Barkod-1;Barkod-2;Alış KDV;Alış Fiyatı;Satış KDV;Satış Fiyatı;Durum;[+]</c>). Pasif ürün (<c>[-]</c>) atlanır.
+/// Satış KDV'si ürünün KDV oranı, alış fiyatı bilgi amaçlı alış fiyatı olur (<c>₺0,00</c> doğrulamada boş sayılır).
 /// Sonuç kanonik ürün tablosudur (IMPORT_API_CONTRACT.md §12.3, §13).
 /// </summary>
 internal static class EVetProductList
 {
-    private static readonly string[] Headers = ["Ad", "UrunTuru", "Kategori", "SatisFiyati", "Barkod", "Aciklama"];
+    private static readonly string[] Headers = ["Ad", "UrunTuru", "Kategori", "SatisFiyati", "Barkod", "Aciklama", "KdvOrani", "AlisFiyati"];
 
     /// <summary>E-vet tür başlığı → kanonik ürün türü (katlanmış). Listede olmayan tür <c>Diğer</c>dir.</summary>
     private static readonly Dictionary<string, string> KindByType = new(StringComparer.Ordinal)
@@ -37,6 +39,9 @@ internal static class EVetProductList
         var barcode = Column("barkod1");
         var barcode2 = Column("barkod2");
         var price = Column("satisfiyati");
+        var salesVat = Column("satiskdv");
+        var purchasePrice = Column("alisfiyati");
+        var purchaseVat = Column("aliskdv");
 
         var rows = new List<ImportSourceRow>();
         string? type = null;
@@ -79,14 +84,17 @@ internal static class EVetProductList
                 return ImportTableAssembler.TooManyRows(ImportTable.Products, limits);
 
             var kind = type is null ? null : KindByType.GetValueOrDefault(ImportTextFolding.Fold(type), "Diğer");
+            var vat = EVetCells.Clean(EVetReports.At(cells, salesVat));
+            var cost = EVetCells.Clean(EVetReports.At(cells, purchasePrice));
             var description = EVetCells.Join(
                 "; ",
                 group is null ? null : $"Grup: {group}",
-                EVetReports.At(cells, barcode2) is { } second ? $"Barkod 2: {second.Trim()}" : null);
+                EVetReports.At(cells, barcode2) is { } second ? $"Barkod 2: {second.Trim()}" : null,
+                PurchaseVatNote(EVetCells.Clean(EVetReports.At(cells, purchaseVat)), vat, cost));
 
             rows.Add(new ImportSourceRow(
                 records[i].RowNumber,
-                [productName.Trim(), kind, type, EVetCells.Clean(EVetReports.At(cells, price)), EVetCells.Clean(EVetReports.At(cells, barcode)), description]));
+                [productName.Trim(), kind, type, EVetCells.Clean(EVetReports.At(cells, price)), EVetCells.Clean(EVetReports.At(cells, barcode)), description, vat, cost]));
         }
 
         if (passive > 0)
@@ -99,6 +107,14 @@ internal static class EVetProductList
 
         return Result<ImportSourceTable?>.Success(rows.Count == 0 ? null : new ImportSourceTable(ImportTable.Products, Headers, rows));
     }
+
+    /// <summary>Alış KDV'si yalnız alış fiyatı doluysa ve satış KDV'sinden farklıysa açıklamaya yazılır (<c>Alış KDV: %10</c>).</summary>
+    private static string? PurchaseVatNote(string? purchaseVat, string? salesVat, string? purchasePrice)
+        => purchaseVat is not null
+           && ImportValueParsers.ParseAmount(purchasePrice).Value is > 0
+           && ImportValueParsers.ParseVatRate(purchaseVat).Value != ImportValueParsers.ParseVatRate(salesVat).Value
+            ? $"Alış KDV: %{purchaseVat.TrimStart('%').Trim()}"
+            : null;
 
     private static bool IsHeader(ImportRawRow record)
     {

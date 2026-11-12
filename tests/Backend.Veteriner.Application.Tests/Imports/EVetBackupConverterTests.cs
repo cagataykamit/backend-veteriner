@@ -23,13 +23,13 @@ public sealed class EVetBackupConverterTests
     private static readonly object?[] CustomerHeader =
     [
         "Kayıt Tarihi", "Müşteriler", "Bakiye", "Protokol No", "Kimlik No", "Gsm", "Tel1", "Email", "Vergi Dairesi", "Vergi No",
-        "Şehir", "İlçe", "Köy - Mahalle", "Adres", "Durum",
+        "Şehir", "İlçe", "Köy - Mahalle", "Adres", "Durum", "Tel2", "Doğum Tarihi", "Meslek", "Bilgi", "Açıklama",
     ];
 
     private static readonly object?[] PetHeader =
     [
         "Müşteriler", "Hastalar", "Protokol No", "Çip No", "Kart No", "Doğum Tarihi", "Hasta Türü", "Irk", "Cinsiyet", "Renk",
-        "Ağırlık", "Kalıtsal Hastalık", "Ölüm Zamanı", "Pasif Nedeni", "Durum",
+        "Ağırlık", "Kalıtsal Hastalık", "Ölüm Zamanı", "Pasif Nedeni", "Durum", "Kayıt Tarihi", "Çiftleştir", "Sahiplendir",
     ];
 
     private static readonly object?[] TaskHeader =
@@ -47,16 +47,20 @@ public sealed class EVetBackupConverterTests
         ("Müşteri Listesi",
         [
             CustomerHeader,
-            [Registered, "Ayşe Yılmaz", 1250.0000001, 101, "10000000146", "905321234567", null, null, null, null, "İstanbul", "Kadıköy", "Moda", "Örnek Sok. 1", "Aktif"],
-            [Registered, "Can Demir", 0.0000001, 102, null, null, "905339876543", null, "Kadıköy", "1234567890", null, null, null, null, "Pasif"],
+            [Registered, "Ayşe Yılmaz", 1250.0000001, 101, "10000000146", "905321234567", "02160000001", null, null, null, "İstanbul", "Kadıköy", "Moda", "Örnek Sok. 1", "Aktif",
+                "05320000002", new DateTime(1980, 5, 4), "Öğretmen", null, "Akşam arayın"],
+            [Registered, "Can Demir", 0.0000001, 102, null, null, "905339876543", null, "Kadıköy", "1234567890", null, null, null, null, "Pasif",
+                null, null, null, "Bilgi notu", null],
             [Registered, "Ayşe Yılmaz", -50.5, 103, null, "905551112233", null, null, null, null, null, null, null, null, "Aktif"],
         ]),
         ("Hasta Listesi",
         [
             PetHeader,
-            ["Ayşe Yılmaz", "Pamuk", 201, "985000000000001", null, new DateTime(2020, 1, 1), "Kedi", "Tekir", "Kısırlaştırılmış Dişi", "Beyaz", 4.2000001, "Böbrek", null, null, "Aktif"],
+            ["Ayşe Yılmaz", "Pamuk", 201, "985000000000001", null, new DateTime(2020, 1, 1), "Kedi", "Tekir", "Kısırlaştırılmış Dişi", "Beyaz", 4.2000001, "Böbrek", null, null, "Aktif",
+                Registered, true, false],
             ["Can Demir", "Karabaş", 202, "985000000000001", "TR001", null, "Köpek", "Kangal", "Erkek", null, 0d, null, new DateTime(2025, 9, 2), "Yaşlılık", "Ölü"],
-            ["Ayşe Yılmaz", "Boncuk", 203, null, null, null, "Köpek", "Melez", "Kısır", null, null, null, null, "Sahiplendirildi", "Pasif"],
+            ["Ayşe Yılmaz", "Boncuk", 203, null, null, null, "Köpek", "Melez", "Kısır", null, null, null, null, "Sahiplendirildi", "Pasif",
+                null, "FALSE", "TRUE"],
             ["Ayşe Yılmaz", "Pamuk", 204, null, null, null, "Kedi", "Tekir", "Dişi", null, null, null, null, null, "Aktif"],
             ["Ayşe Yılmaz", "Tarçın", 205, "abc 123", null, null, "Kedi", "Tekir", "Bilinmiyor", null, null, null, null, null, "Aktif"],
         ]),
@@ -106,8 +110,8 @@ public sealed class EVetBackupConverterTests
         ";;;;;;;;;;;14.10.2026;;\n"
         + "AŞI BİLGİ RAPORU;;;;;;;;;;;;;\n"
         + "#;Tarih;Hasta Sahibi;T.C.;Hasta;Tür;Çip No;Ürün;Seri No;S.K.T;Birim;Miktar;Fiyat;Toplam\n"
-        + "1;01.10.2025 10:05;Ayşe Yılmaz;;Tarçın;Kedi;-;Felocell Cvr (Kedi Karma);SER-1;;Doz;1,00;100,00;100,00\n"
-        + "2;01.03.2024 10:00;Can Demir;;Karabaş;Köpek;-;Rabisin ( Kuduz );SER-2;;Doz;1,00;100,00;100,00\n"
+        + "1;01.10.2025 10:05;Ayşe Yılmaz;;Tarçın;Kedi;-;Felocell Cvr (Kedi Karma);SER-1;31.12.2026;Doz;1,00;100,00;100,00\n"
+        + "2;01.03.2024 10:00;Can Demir;;Karabaş;Köpek;-;Rabisin ( Kuduz );SER-2;belirsiz;Doz;1,00;100,00;100,00\n"
         + "3;05.05.2025 11:00;Ayşe Yılmaz;;Doğrudan Satış;-;-;Rabisin;SER-3;;Doz;1,00;100,00;100,00\n";
 
     private const string ProductReport =
@@ -118,7 +122,7 @@ public sealed class EVetBackupConverterTests
         + ";;;;;;;;;;\n"
         + ";1;Kuduz Aşısı;8690000000001;;10;₺100,00;10;₺250,00;;[+]\n"
         + "MSD;;;;;;;;;;\n"
-        + ";2;Nobivac;8690000000002;X2;10;₺100,00;10;₺1.250,50;;[+]\n"
+        + ";2;Nobivac;8690000000002;X2;18;₺1.100,25;20;₺1.250,50;;[+]\n"
         + ";3;Eski Aşı;;;10;₺1,00;10;₺2,00;;[-]\n"
         + "Hizmet;;;;;;;;;;\n"
         + ";;;;;;;;;;\n"
@@ -252,6 +256,18 @@ public sealed class EVetBackupConverterTests
         customers[2]["AcikBakiye"].Should().Be("-50.50");
     }
 
+    [Fact]
+    public void Customer_Fields_Without_Counterpart_Should_Become_Note_Lines()
+    {
+        var customers = Rows(Read(Files()), ImportTable.Customers);
+
+        customers[0]["Not"].Should().Be(
+            "Akşam arayın\nMeslek: Öğretmen\nDoğum tarihi: 04.05.1980\nİkinci telefon: 02160000001, 05320000002\nEski programa kayıt: 01.01.2024",
+            "Gsm telefon olduğunda Tel1 de ikinci telefondur");
+        customers[1]["Not"].Should().Be("Bilgi notu\nEski programa kayıt: 01.01.2024", "Gsm boşken Tel1 telefon olarak kullanılır");
+        customers[2]["Not"].Should().Be("Eski programa kayıt: 01.01.2024");
+    }
+
     // ================================================================ Hasta
 
     [Fact]
@@ -296,8 +312,9 @@ public sealed class EVetBackupConverterTests
         pets["202"]["VefatTarihi"].Should().Be("2025-09-02");
         pets["202"]["Not"].Should().Contain("Eski program vefat notu: Yaşlılık");
         pets["203"]["Durum"].Should().BeNull("pasifin karşılığı yok: aktif kalır");
-        pets["203"]["Not"].Should().Be("Eski programda pasif. Sahiplendirildi");
-        pets["201"]["Not"].Should().Be("Kalıtsal hastalık: Böbrek");
+        pets["203"]["Not"].Should().Be("Eski programda sahiplendirilecek olarak işaretli\nEski programda pasif. Sahiplendirildi");
+        pets["201"]["Not"].Should().Be(
+            "Kalıtsal hastalık: Böbrek\nEski programa kayıt: 01.01.2024\nEski programda çiftleştirilecek olarak işaretli");
     }
 
     [Fact]
@@ -403,9 +420,11 @@ public sealed class EVetBackupConverterTests
 
         var karma = vaccinations.Single(v => v["AsiAdi"] == "KEDİ KARMA 1");
         karma["Seri"].Should().Be("SER-1", "aynı gün iki aşı var; ürün adı karma serisini içeriyor");
-        karma["Not"].Should().Be("Ürün: Felocell Cvr (Kedi Karma); İlk doz");
+        karma["Not"].Should().Be("Ürün: Felocell Cvr (Kedi Karma); SKT: 31.12.2026; İlk doz");
         vaccinations.Single(v => v["AsiAdi"] == "İÇ+DIŞ PARAZİT")["Seri"].Should().BeNull();
-        vaccinations.Single(v => v["HayvanNo"] == "202")["Seri"].Should().Be("SER-2");
+        var rabies = vaccinations.Single(v => v["HayvanNo"] == "202");
+        rabies["Seri"].Should().Be("SER-2");
+        rabies["Not"].Should().Be("Ürün: Rabisin ( Kuduz )", "okunamayan S.K.T yazılmaz");
     }
 
     [Fact]
@@ -474,8 +493,13 @@ public sealed class EVetBackupConverterTests
             ("Kuduz Aşısı", "Aşı", "Aşı", "₺250,00"),
             ("Nobivac", "Aşı", "Aşı", "₺1.250,50"),
             ("Muayene", "Hizmet", "Hizmet", "₺500,00"));
-        products[1]["Aciklama"].Should().Be("Grup: MSD; Barkod 2: X2");
+        products[1]["Aciklama"].Should().Be("Grup: MSD; Barkod 2: X2; Alış KDV: %18", "alış fiyatı dolu ve alış KDV'si satıştan farklı");
+        products[0]["Aciklama"].Should().BeNull("alış KDV'si satış KDV'siyle aynı");
         products[0]["Barkod"].Should().Be("8690000000001");
+        products.Select(p => (p["KdvOrani"], p["AlisFiyati"])).Should().Equal(
+            ("10", "₺100,00"),
+            ("20", "₺1.100,25"),
+            ("20", "₺0,00"));
         result.Warnings.Should().Contain(w => w.Message.Contains("1 pasif ürün"));
     }
 
@@ -514,7 +538,7 @@ public sealed class EVetBackupConverterTests
 
         var karmaRow = (ImportNormalizedVaccination)Row(ImportTable.Vaccinations, 2).Normalized;
         (karmaRow.VaccineDefinitionId, karmaRow.DueAt, karmaRow.Notes).Should().Be(
-            (karma, new DateOnly(2025, 10, 22), "Seri: SER-1; Uygulayan: Dr. A; Ürün: Felocell Cvr (Kedi Karma); İlk doz"));
+            (karma, new DateOnly(2025, 10, 22), "Seri: SER-1; Uygulayan: Dr. A; Ürün: Felocell Cvr (Kedi Karma); SKT: 31.12.2026; İlk doz"));
 
         Row(ImportTable.ClinicalRecords, 3).Issues.Should().Contain(i => i.Code == ImportRules.PetNotFound.Code, "belirsiz eşleşme hatadır");
         Row(ImportTable.ClinicalRecords, 4).Status.Should().NotBe(ImportRowValidationStatus.Error, "yalnız kilo taşıyan kayıt boş değildir");

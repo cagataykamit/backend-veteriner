@@ -36,7 +36,7 @@ internal static class EVetBackupConverter
     };
 
     private static readonly string[] CustomerHeaders =
-        ["MusteriNo", "AdSoyad", "Telefon", "Eposta", "Adres", "AcikBakiye", "KimlikNo", "VergiDairesi", "Durum"];
+        ["MusteriNo", "AdSoyad", "Telefon", "Eposta", "Adres", "AcikBakiye", "KimlikNo", "VergiDairesi", "Durum", "Not"];
 
     private static readonly string[] PetHeaders =
     [
@@ -148,17 +148,29 @@ internal static class EVetBackupConverter
                 sheet[row, "Köy - Mahalle"],
                 EVetCells.Join(" / ", sheet[row, "İlçe"], sheet[row, "Şehir"]));
 
+            // Telefon olarak kullanılmayan numaralar (Gsm doluysa Tel1 de) ve karşılığı olmayan alanlar müşteri notuna yazılır.
+            var phone = sheet[row, "Gsm"] ?? sheet[row, "Tel1"];
+            var otherPhones = new[] { sheet[row, "Tel1"], sheet[row, "Tel2"] }.Where(t => t is not null && t != phone).Distinct();
+            var notes = EVetCells.Join("\n",
+                sheet[row, "Açıklama"],
+                sheet[row, "Bilgi"],
+                Labeled("Meslek", sheet[row, "Meslek"]),
+                Labeled("Doğum tarihi", EVetCells.NoteDate(sheet[row, "Doğum Tarihi"])),
+                Labeled("İkinci telefon", EVetCells.Join(", ", otherPhones.ToArray())),
+                Labeled("Eski programa kayıt", EVetCells.NoteDate(sheet[row, "Kayıt Tarihi"])));
+
             rows.Add(new ImportSourceRow(row.RowNumber,
             [
                 protocol,
                 name,
-                sheet[row, "Gsm"] ?? sheet[row, "Tel1"],
+                phone,
                 sheet[row, "Email"],
                 address,
                 EVetCells.Amount(sheet[row, "Bakiye"]),
                 identity,
                 sheet[row, "Vergi Dairesi"],
                 sheet[row, "Durum"],
+                notes,
             ]));
         }
 
@@ -225,6 +237,9 @@ internal static class EVetBackupConverter
                 Labeled("Kalıtsal hastalık", sheet[row, "Kalıtsal Hastalık"]),
                 Labeled("Kan grubu", sheet[row, "Kan Grubu"]),
                 Labeled("Besin tipi", sheet[row, "Besin Tipi"]),
+                Labeled("Eski programa kayıt", EVetCells.NoteDate(sheet[row, "Kayıt Tarihi"])),
+                EVetCells.IsChecked(sheet[row, "Çiftleştir"]) ? "Eski programda çiftleştirilecek olarak işaretli" : null,
+                EVetCells.IsChecked(sheet[row, "Sahiplendir"]) ? "Eski programda sahiplendirilecek olarak işaretli" : null,
             };
 
             // Rakam dışı ya da başka hastada da kayıtlı çip (E-vet'te benzersizlik yok) nota taşınır: hasta düşmesin, çip
@@ -644,7 +659,12 @@ internal static class EVetBackupConverter
                 DueAt?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 Report?.Serial,
                 sheet[row, "Veteriner"],
-                EVetCells.Join("; ", Report?.Product is { } product ? $"Ürün: {product}" : null, sheet[row, "Bilgi"], sheet[row, "Açıklama"]),
+                EVetCells.Join(
+                    "; ",
+                    Report?.Product is { } product ? $"Ürün: {product}" : null,
+                    Report?.ExpiresOn is { } expiry ? $"SKT: {expiry}" : null,
+                    sheet[row, "Bilgi"],
+                    sheet[row, "Açıklama"]),
             ]);
 
         public (string Pair, DateOnly Day) DayKey => (EVetCells.PairKey(ownerName, petName), DateOnly.FromDateTime(Start));

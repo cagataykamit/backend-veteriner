@@ -3,8 +3,8 @@ using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Application.Imports.Reading.EVet;
 
-/// <summary>Aşı Bilgi raporunun bir uygulaması: ticari ürün adı ve seri numarası.</summary>
-internal sealed record EVetVaccineReportRow(string? Product, string? Serial);
+/// <summary>Aşı Bilgi raporunun bir uygulaması: ticari ürün adı, seri numarası ve son kullanma tarihi (<c>gg.aa.yyyy</c>; okunamazsa null).</summary>
+internal sealed record EVetVaccineReportRow(string? Product, string? Serial, string? ExpiresOn = null);
 
 /// <summary>
 /// Yedeği tamamlayan iki E-vet raporu (CSV, <c>;</c>). Hasta Listesi (Rapor &gt; Hasta Listesi) hasta protokolünü müşteri
@@ -135,7 +135,7 @@ internal sealed class EVetReports
             var key = (EVetCells.PairKey(Cell("hastasahibi"), pet), DateOnly.FromDateTime(date));
             if (!result.TryGetValue(key, out var list))
                 result[key] = list = [];
-            list.Add(new EVetVaccineReportRow(EVetCells.Clean(Cell("urun")), EVetCells.Clean(Cell("serino"))));
+            list.Add(new EVetVaccineReportRow(EVetCells.Clean(Cell("urun")), EVetCells.Clean(Cell("serino")), EVetCells.NoteDate(Cell("skt"))));
 
             string? Cell(string name) => columns.TryGetValue(name, out var index) ? At(cells, index) : null;
         }
@@ -146,5 +146,6 @@ internal sealed class EVetReports
     internal static IEnumerable<ImportRawRow> Records(byte[] content)
         => CsvTableReader.Records(CsvTableReader.Decode(content, forcedUtf8: null), ';');
 
-    internal static string? At(IReadOnlyList<string?> cells, int index) => index < cells.Count ? cells[index] : null;
+    /// <summary>Hücre; sütun yoksa (<paramref name="index"/> &lt; 0, eski rapor sürümü) veya satır kısaysa null.</summary>
+    internal static string? At(IReadOnlyList<string?> cells, int index) => index >= 0 && index < cells.Count ? cells[index] : null;
 }
