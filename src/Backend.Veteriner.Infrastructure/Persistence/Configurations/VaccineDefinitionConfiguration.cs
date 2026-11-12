@@ -29,6 +29,7 @@ public sealed class VaccineDefinitionConfiguration : IEntityTypeConfiguration<Va
 
         b.Property(x => x.DefaultNextDueDays);
         b.Property(x => x.IsCore).IsRequired();
+        b.Property(x => x.Category).HasConversion<int?>();
         b.Property(x => x.IsActive).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);

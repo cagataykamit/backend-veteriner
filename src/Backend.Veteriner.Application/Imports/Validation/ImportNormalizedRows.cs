@@ -74,7 +74,8 @@ public sealed record ImportNormalizedPet(
     string? Notes,
     string? AlertNote = null,
     bool Deceased = false,
-    DateOnly? DeceasedOn = null)
+    DateOnly? DeceasedOn = null,
+    Guid? PatternId = null)
     : ImportNormalizedRow;
 
 /// <summary>

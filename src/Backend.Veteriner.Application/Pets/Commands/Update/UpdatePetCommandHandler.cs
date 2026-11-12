@@ -84,7 +84,8 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
         if (request.BreedId is { } breedId)
         {
             var breed = await _breedsRead.FirstOrDefaultAsync(new BreedByIdWithSpeciesSpec(breedId), ct);
-            if (breed is null || !breed.IsActive)
+            // Katalogdan kaldırılan ırk hastada değişmeden kalabilir; yeni seçim aktif olmalı.
+            if (breed is null || (!breed.IsActive && breed.Id != pet.BreedId))
                 return Result.Failure(
                     "Pets.BreedNotFound",
                     "Irk bulunamadı veya pasif; geçerli bir BreedId gönderin.");
@@ -95,16 +96,11 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
             breedRef = breed;
         }
 
-        PetColor? colorRef = null;
-        if (request.ColorId is { } colorId)
-        {
-            var color = await _colorsRead.FirstOrDefaultAsync(new PetColorByIdSpec(colorId), ct);
-            if (color is null || !color.IsActive)
-                return Result.Failure(
-                    "Pets.ColorNotFound",
-                    "Renk bulunamadı veya pasif; geçerli bir ColorId gönderin.");
-            colorRef = color;
-        }
+        var coat = await PetCoatResolver.ResolveAsync(
+            _colorsRead, request.ColorId, request.PatternId, ct, currentColorId: pet.ColorId, currentPatternId: pet.PatternId);
+        if (!coat.IsSuccess)
+            return Result.Failure(coat.Error);
+        var colorRef = coat.Value!.Color;
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         if (request.BirthDate.HasValue && request.BirthDate.Value > DateOnly.FromDateTime(utcNow))
@@ -137,7 +133,8 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
             request.MicrochipNumber,
             request.PassportOrTagNumber,
             request.SpecialProtocolNumber,
-            request.IsNeutered);
+            request.IsNeutered,
+            request.PatternId);
 
         try
         {

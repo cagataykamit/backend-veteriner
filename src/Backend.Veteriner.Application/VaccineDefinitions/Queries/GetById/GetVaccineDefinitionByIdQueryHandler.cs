@@ -46,7 +46,8 @@ public sealed class GetVaccineDefinitionByIdQueryHandler
             v.Description,
             v.DefaultNextDueDays,
             v.IsCore,
-            v.IsActive);
+            v.IsActive,
+            v.Category);
 
         return Result<VaccineDefinitionDto>.Success(dto);
     }

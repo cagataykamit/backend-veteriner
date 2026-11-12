@@ -145,13 +145,18 @@ public sealed partial class ImportValidationEngine
 
         // Renk (katalogda yoksa not)
         Guid? colorId = null;
+        Guid? patternId = null;
         string? colorNote = null;
         if (reader.Raw("Renk") is { } rawColor)
         {
             var color = _resolver.Resolve(ImportValueKind.Color, rawColor);
             if (color.Kind == ImportValueResolutionKind.Resolved)
             {
-                colorId = color.TargetId;
+                // Desen satırına eşlenen değer (ör. "Tekir") hastanın desen alanına yazılır.
+                if (_resolver.IsPattern(color.TargetId!.Value))
+                    patternId = color.TargetId;
+                else
+                    colorId = color.TargetId;
             }
             else
             {
@@ -201,7 +206,7 @@ public sealed partial class ImportValidationEngine
 
         var normalized = new ImportNormalizedPet(
             owner?.Key, reference, name, speciesId, breedId, breedText, gender, birthDate, neutered,
-            chip.Value, colorId, weight, passport, notes.Length == 0 ? null : notes, alertNote, deceased, deceasedOn);
+            chip.Value, colorId, weight, passport, notes.Length == 0 ? null : notes, alertNote, deceased, deceasedOn, patternId);
 
         if (HasError(issues) || owner is null)
             return Complete(node, Finish(ImportTable.Pets, reader.RowNumber, issues, normalized));

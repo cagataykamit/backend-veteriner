@@ -67,7 +67,8 @@ public sealed class GetVaccineDefinitionsListQueryHandler
                 v.Description,
                 v.DefaultNextDueDays,
                 v.IsCore,
-                v.IsActive))
+                v.IsActive,
+                v.Category))
             .ToList();
 
         return Result<PagedResult<VaccineDefinitionDto>>.Success(

@@ -380,4 +380,40 @@ public sealed class CreatePetCommandHandlerTests
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Pets.ColorNotFound");
     }
+
+    [Theory]
+    [InlineData(true, "Pets.ColorIsPattern")]
+    [InlineData(false, "Pets.PatternIsColor")]
+    public async Task Handle_Should_ReturnFailure_When_Coat_Field_Gets_Wrong_Kind(bool patternInColorField, string expectedCode)
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var rowId = Guid.NewGuid();
+        // Renk alanına desen ya da desen alanına renk satırı gönderilir.
+        var cmd = patternInColorField
+            ? new CreatePetCommand(cid, "Pamuk", TestSpeciesIds.Cat, ColorId: rowId)
+            : new CreatePetCommand(cid, "Pamuk", TestSpeciesIds.Cat, PatternId: rowId);
+        var row = patternInColorField
+            ? new PetColor("TABBY", "Tekir (Tabby)", 101, PetColorKind.Pattern)
+            : new PetColor("BLACK", "Siyah", 1);
+
+        var tenant = new Tenant("X", DateTime.UtcNow);
+        AlignTenantId(tenant, tid);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Client(tid, "Ali", DateTime.UtcNow, null));
+        _speciesRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<SpeciesByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Species("CAT", "Kedi"));
+        _colorsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Backend.Veteriner.Application.PetColors.Specs.PetColorByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(row);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be(expectedCode);
+    }
 }

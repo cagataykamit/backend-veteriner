@@ -31,6 +31,7 @@ public sealed class PetConfiguration : IEntityTypeConfiguration<Pet>
 
         b.Property(x => x.BreedId).IsRequired(false);
         b.Property(x => x.ColorId).IsRequired(false);
+        b.Property(x => x.PatternId).IsRequired(false);
 
         b.Property(x => x.Weight)
             .HasColumnType("decimal(6,2)");
@@ -94,10 +95,17 @@ public sealed class PetConfiguration : IEntityTypeConfiguration<Pet>
             .HasForeignKey(x => x.ColorId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        // Renk satırları silinmez; ikinci SET NULL yolu SQL Server'da çoklu kademe hatası verir.
+        b.HasOne(x => x.PatternRef)
+            .WithMany()
+            .HasForeignKey(x => x.PatternId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.ClientId });
         b.HasIndex(x => new { x.TenantId, x.Status });
         b.HasIndex(x => x.SpeciesId);
         b.HasIndex(x => x.ColorId);
+        b.HasIndex(x => x.PatternId);
     }
 }

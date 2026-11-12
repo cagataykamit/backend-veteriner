@@ -30,6 +30,9 @@ public sealed class Pet : AggregateRoot, ITenantOwned, IChangeTracked
     public string? Breed { get; private set; }
     public Guid? ColorId { get; private set; }
 
+    /// <summary>Kürk deseni (tekir, kaplan çizgili…); renk kataloğunda <see cref="PetColorKind.Pattern"/> satırına bağlı, opsiyonel.</summary>
+    public Guid? PatternId { get; private set; }
+
     /// <summary>Global ırk kaydı (FK); serbest metin <see cref="Breed"/> (string) ile birlikte kullanılabilir.</summary>
     public Guid? BreedId { get; private set; }
 
@@ -91,6 +94,8 @@ public sealed class Pet : AggregateRoot, ITenantOwned, IChangeTracked
     public Breed? BreedRef { get; private set; }
     /// <summary>Okuma/projeksiyon için (EF ilişkisi).</summary>
     public PetColor? ColorRef { get; private set; }
+    /// <summary>Okuma/projeksiyon için (EF ilişkisi).</summary>
+    public PetColor? PatternRef { get; private set; }
 
     private Pet() { }
 
@@ -109,7 +114,8 @@ public sealed class Pet : AggregateRoot, ITenantOwned, IChangeTracked
         string? microchipNumber = null,
         string? passportOrTagNumber = null,
         string? specialProtocolNumber = null,
-        bool isNeutered = false)
+        bool isNeutered = false,
+        Guid? patternId = null)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -129,6 +135,7 @@ public sealed class Pet : AggregateRoot, ITenantOwned, IChangeTracked
         BreedId = breedId;
         Gender = gender;
         ColorId = colorId;
+        PatternId = patternId;
         Weight = weight;
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
         MicrochipNumber = NormalizeOptionalIdentityNumber(microchipNumber);
@@ -150,7 +157,8 @@ public sealed class Pet : AggregateRoot, ITenantOwned, IChangeTracked
         string? microchipNumber = null,
         string? passportOrTagNumber = null,
         string? specialProtocolNumber = null,
-        bool isNeutered = false)
+        bool isNeutered = false,
+        Guid? patternId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Hayvan adı boş olamaz.", nameof(name));
@@ -163,12 +171,25 @@ public sealed class Pet : AggregateRoot, ITenantOwned, IChangeTracked
         BreedId = breedId;
         Gender = gender;
         ColorId = colorId;
+        PatternId = patternId;
         Weight = weight;
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
         MicrochipNumber = NormalizeOptionalIdentityNumber(microchipNumber);
         PassportOrTagNumber = NormalizeOptionalIdentityNumber(passportOrTagNumber);
         SpecialProtocolNumber = NormalizeOptionalIdentityNumber(specialProtocolNumber);
         IsNeutered = isNeutered;
+    }
+
+    /// <summary>
+    /// Sistem kataloğu düzeltmesi: ırk yerine kullanılmış kürk adını (ör. "Tekir") ırk + renk/desen olarak yeniden
+    /// sınıflar. Hekimin girdiği renk ve desen korunur; yalnız boş olanlar doldurulur.
+    /// </summary>
+    public void ReclassifyCoatFromBreed(Guid breedId, string breedName, Guid? colorId, Guid? patternId)
+    {
+        BreedId = breedId;
+        Breed = breedName;
+        ColorId ??= colorId;
+        PatternId ??= patternId;
     }
 
     /// <summary>

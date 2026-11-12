@@ -15,7 +15,11 @@ public sealed class VaccineDefinition : AggregateRoot
     public string Code { get; private set; } = default!;
     public string? Description { get; private set; }
     public int? DefaultNextDueDays { get; private set; }
+    /// <summary>Sistem satırı kilidi: <c>true</c> ise kiracı güncelleyemez. Klinik sınıf için <see cref="Category"/>.</summary>
     public bool IsCore { get; private set; }
+
+    /// <summary>Klinik sınıf (WSAVA çekirdek / çekirdek dışı / önerilmeyen ya da antiparaziter); kiracı tanımında opsiyonel.</summary>
+    public VaccineCategory? Category { get; private set; }
     public bool IsActive { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
@@ -124,6 +128,18 @@ public sealed class VaccineDefinition : AggregateRoot
         IsCore = isCore;
         UpdatedAtUtc = utcNow;
         return Result.Success();
+    }
+
+    public void SetCategory(VaccineCategory? category, DateTime utcNow)
+    {
+        if (category is { } value && !Enum.IsDefined(value))
+            throw new ArgumentOutOfRangeException(nameof(category));
+
+        if (Category == category)
+            return;
+
+        Category = category;
+        UpdatedAtUtc = utcNow;
     }
 
     public void Activate(DateTime utcNow)

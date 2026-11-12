@@ -62,4 +62,18 @@ public sealed class VaccineDefinitionTests
         v.SpeciesId.Should().Be(speciesId);
         v.IsCore.Should().BeTrue();
     }
+
+    [Fact]
+    public void SetCategory_Should_Be_Separate_From_System_Lock()
+    {
+        var v = VaccineDefinition.CreateGlobal("FIP", "FIP", Now);
+        v.Category.Should().BeNull();
+
+        v.SetCategory(VaccineCategory.NotRecommended, Now);
+
+        v.Category.Should().Be(VaccineCategory.NotRecommended);
+        v.IsCore.Should().BeTrue();
+        var act = () => v.SetCategory((VaccineCategory)99, Now);
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
 }

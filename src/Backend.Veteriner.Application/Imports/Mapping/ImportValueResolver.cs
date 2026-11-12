@@ -12,7 +12,8 @@ public sealed record ImportCatalogs(
     IReadOnlyList<ImportCatalogEntry> Species,
     IReadOnlyList<ImportCatalogEntry> Breeds,
     IReadOnlyList<ImportCatalogEntry> Colors,
-    IReadOnlyList<ImportCatalogEntry> Vaccines)
+    IReadOnlyList<ImportCatalogEntry> Vaccines,
+    IReadOnlySet<Guid>? PatternIds = null)
 {
     public IReadOnlyList<ImportCatalogEntry> Of(ImportValueKind kind) => kind switch
     {
@@ -80,8 +81,8 @@ public sealed class ImportValueResolver
             ["siamese"] = "siyam",
             ["irankedisi"] = "persian",
             ["iran"] = "persian",
-            ["almancobankopegi"] = "almankurdu",
-            ["germanshepherd"] = "almankurdu",
+            ["almancobankopegi"] = "almancobankopegialmankurdu",
+            ["germanshepherd"] = "almancobankopegialmankurdu",
             ["malteseterrier"] = "maltese",
             ["maltesebichon"] = "maltese",
             ["fransizbulldog"] = "frenchbulldog",
@@ -98,8 +99,8 @@ public sealed class ImportValueResolver
             ["dobermanpinscher"] = "dobermann",
             ["drahthaar"] = "almanteltuylupointerdrahthaar",
             ["almanteltuylupointer"] = "almanteltuylupointerdrahthaar",
-            ["cocker"] = "cockerspaniel",
-            ["ingilizcocker"] = "cockerspaniel",
+            ["cocker"] = "ingilizcockerspaniel",
+            ["ingilizcocker"] = "ingilizcockerspaniel",
             ["egzoticshorthair"] = "exoticshorthair",
             ["norwegianforest"] = "norwegianforestcat",
             ["norvecormankedisi"] = "norwegianforestcat",
@@ -109,21 +110,21 @@ public sealed class ImportValueResolver
             ["vizsla"] = "vizslamacarkisatuylupointer",
             ["macartazisivizsla"] = "vizslamacarkisatuylupointer",
             ["macarvizsla"] = "vizslamacarkisatuylupointer",
-            ["belcikakurdu"] = "belcikamalinois",
-            ["belgianmalinois"] = "belcikamalinois",
-            ["malinois"] = "belcikamalinois",
+            ["belcikakurdu"] = "belcikacobankopegimalinois",
+            ["belgianmalinois"] = "belcikacobankopegimalinois",
+            ["malinois"] = "belcikacobankopegimalinois",
             ["pekinez"] = "pekingese",
             ["americanstaffordshireterrier"] = "amerikanstaffordshireterrier",
             ["zagarkopegi"] = "zagar",
             ["abyssinian"] = "habesabyssinian",
             ["habes"] = "habesabyssinian",
-            ["orientallonghair"] = "oriental",
-            ["orientalshorthair"] = "oriental",
+            ["oriental"] = "orientalshorthair",
             ["britishbluepoint"] = "britishshorthair",
             ["britishshorthairgoldenny11"] = "britishshorthair",
             ["britishshorthairtortie"] = "britishshorthair",
             ["britishangora"] = "britishlonghair",
-            ["domesticshorthair"] = "melez",
+            ["domesticshorthair"] = "evkedisikisatuylu",
+            ["domesticlonghair"] = "evkedisiuzuntuylu",
             ["amerikancocker"] = "amerikancockerspaniel",
             ["americancocker"] = "amerikancockerspaniel",
             ["rusterrier"] = "russiyahterrier",
@@ -136,20 +137,65 @@ public sealed class ImportValueResolver
             ["ingilizcobankopegibobtail"] = "eskiingilizcobankopegibobtail",
             ["bobtail"] = "eskiingilizcobankopegibobtail",
             ["papagan"] = "papagandiger",
-            ["safkaningilizati"] = "ingilizati",
+            ["safkaningilizati"] = "safkaningilizthoroughbred",
+            ["ingilizati"] = "safkaningilizthoroughbred",
+            ["thoroughbred"] = "safkaningilizthoroughbred",
             ["lohmanbrown"] = "lohmannbrown",
-            ["turkishangora"] = "ankarakedisi",
-            ["ankara"] = "ankarakedisi",
+            ["turkishangora"] = "ankarakedisiturkishangora",
+            ["ankara"] = "ankarakedisiturkishangora",
             ["turkishvan"] = "vankedisi",
             ["bilinmiyor"] = "diger",
             ["mix"] = "melez",
             ["kirma"] = "melez",
+            // 2026-11-13 kaynak araştırması: eski katalog adları yeni FCI/FIFe/tescil adlarına.
+            ["almankurdu"] = "almancobankopegialmankurdu",
+            ["kangal"] = "kangalcobankopegikangal",
+            ["cockerspaniel"] = "ingilizcockerspaniel",
+            ["englishcockerspaniel"] = "ingilizcockerspaniel",
+            ["pointer"] = "ingilizpointerpointer",
+            ["englishpointer"] = "ingilizpointerpointer",
+            ["pinscher"] = "almanpinscher",
+            ["spitz"] = "almanspitz",
+            ["germanspitz"] = "almanspitz",
+            ["belcikamalinois"] = "belcikacobankopegimalinois",
+            ["mastiff"] = "ingilizmastifimastiff",
+            ["polonyaavkopegi"] = "polonyaavkopegigończypolski",
+            ["ankarakedisi"] = "ankarakedisiturkishangora",
+            ["angoratavsani"] = "ankaratavsaniangora",
+            ["arapati"] = "safkanarap",
+            ["pony"] = "midillipony",
+            ["midilli"] = "midillipony",
+            ["holstein"] = "holstaynholstein",
+            ["holstayn"] = "holstaynholstein",
+            ["montofon"] = "esmermontofon",
+            ["esmer"] = "esmermontofon",
+            ["brownswiss"] = "esmermontofon",
+            ["merinos"] = "merinosdiger",
+            ["ivesi"] = "ivesianadoluivesisi",
+            ["beta"] = "betabetta",
+            ["betta"] = "betabetta",
+            ["ciklet"] = "ciklit",
+            // Kürk adı ırk değildir (TDK, FIFe): ev kedisi ırkına gider; renk/desen hekimce girilir.
+            ["tekir"] = "evkedisikisatuylu",
+            ["sarman"] = "evkedisikisatuylu",
+            ["smokin"] = "evkedisikisatuylu",
         },
         // Renk yazım farkları (sıra ve kısaltma); hedef katalog rengidir.
         [ImportValueKind.Color] = new()
         {
             ["ucrenkli"] = "ucrenklicalico",
-            ["tricolor"] = "ucrenklicalico",
+            // 2026-11-13: renk ile desen ayrıldı; eski "Kırçıllı" yazımları kaplan çizgili desenine, birleşik satırlar desene gider.
+            ["kircilli"] = "kaplancizgilibrindle",
+            ["kircil"] = "kircilroan",
+            ["mavi"] = "maviseyreltiksiyah",
+            ["tekir"] = "tekirtabby",
+            ["kaplumbaga"] = "kaplumbagakabugutortoiseshell",
+            ["siyahbakir"] = "siyahbakirblackandtan",
+            ["samur"] = "samursable",
+            ["dumanli"] = "dumanlismoke",
+            ["gumus"] = "gumussilver",
+            ["lila"] = "lilalilac",
+            ["tarcin"] = "tarcincinnamon",
             ["kahve"] = "kahverengi",
             ["kahvebeyaz"] = "kahverengibeyaz",
             ["beyazkahve"] = "kahverengibeyaz",
@@ -158,7 +204,8 @@ public sealed class ImportValueResolver
             ["beyazsari"] = "saribeyaz",
             ["beyazsiyah"] = "siyahbeyaz",
             ["beyazgri"] = "gribeyaz",
-            ["beyazkircilli"] = "kircillibeyaz",
+            ["beyazkircilli"] = "kaplancizgilibrindle",
+            ["kircillibeyaz"] = "kaplancizgilibrindle",
             ["acikkahve"] = "acikkahverengi",
             ["karisik"] = "cokrenkli",
             ["mix"] = "cokrenkli",
@@ -167,8 +214,9 @@ public sealed class ImportValueResolver
             ["kahvekrem"] = "kahverengikrem",
             ["kremkahve"] = "kahverengikrem",
             ["beyazbej"] = "bejbeyaz",
-            ["kahvekircilli"] = "kahverengikircilli",
-            ["acikkahvekircilli"] = "kahverengikircilli",
+            ["kahvekircilli"] = "kaplancizgilibrindle",
+            ["kahverengikircilli"] = "kaplancizgilibrindle",
+            ["acikkahvekircilli"] = "kaplancizgilibrindle",
             ["beyazsampanya"] = "sampanya",
             ["portakalbeyaz"] = "turuncubeyaz",
             ["beyazturuncu"] = "turuncubeyaz",
@@ -180,20 +228,33 @@ public sealed class ImportValueResolver
         [ImportValueKind.Vaccine] = new()
         {
             ["rabies"] = "kuduz",
-            ["mixed"] = "karma",
-            ["bronsin"] = "bronsinbordetella",
-            ["bordetella"] = "bronsinbordetella",
-            ["kennelcough"] = "bronsinbordetella",
-            ["kopekoksurugu"] = "bronsinbordetella",
-            ["losemi"] = "losemifelv",
-            ["felv"] = "losemifelv",
-            ["corona"] = "koronavirus",
+            // 2026-11-13: karma türe göre ayrıldı (köpek DHPPi±L, kedi FVRCP); "|" ile ayrılan hedeflerden hastanın türündeki seçilir.
+            ["karma"] = "kopekkarmadhppil|kedikarmafvrcp",
+            ["karmakuduz"] = "kopekkarmakuduz|kedikarmakuduz",
+            ["bronsinbordetella"] = "bordetellaparainfluenzabronsin",
+            ["losemifelv"] = "kedilosemisifelv",
+            ["koronavirus"] = "kopekkoronavirusenteriticcov",
+            ["dpdistemperparvo"] = "kopekdpdistemperparvovirus",
+            ["parvo"] = "kopekparvoviruscpv2",
+            ["newcastle"] = "newcastlehastaligi",
+            ["sarbon"] = "sarbonantraks",
+            ["brusella"] = "sigirbrusellozus19|koyunkecibrusellozurev1",
+            ["bruselloz"] = "sigirbrusellozus19|koyunkecibrusellozurev1",
+            ["klamidya"] = "kediklamidyozuchlamydiafelis",
+            ["mixed"] = "kopekkarmadhppil|kedikarmafvrcp",
+            ["bronsin"] = "bordetellaparainfluenzabronsin",
+            ["bordetella"] = "bordetellaparainfluenzabronsin",
+            ["kennelcough"] = "bordetellaparainfluenzabronsin",
+            ["kopekoksurugu"] = "bordetellaparainfluenzabronsin",
+            ["losemi"] = "kedilosemisifelv",
+            ["felv"] = "kedilosemisifelv",
+            ["corona"] = "kopekkoronavirusenteriticcov",
             ["borelyoz"] = "lymeborelyoz",
             ["icdis"] = "icdisparazit",
             ["icvedisparazit"] = "icdisparazit",
             ["mera"] = "enterotoksemi",
-            ["puppydp"] = "dpdistemperparvo",
-            ["dp"] = "dpdistemperparvo",
+            ["puppydp"] = "kopekdpdistemperparvovirus",
+            ["dp"] = "kopekdpdistemperparvovirus",
             ["leptospira"] = "leptospiroz",
             ["lepto"] = "leptospiroz",
             ["mantar"] = "mantardermatofitoz",
@@ -233,9 +294,11 @@ public sealed class ImportValueResolver
 
     private readonly Dictionary<ImportValueKind, ILookup<string, ImportCatalogEntry>> _byKey = new();
     private readonly Dictionary<(ImportValueKind Kind, string Key), Guid?> _userMappings = new();
+    private readonly IReadOnlySet<Guid> _patternIds;
 
     public ImportValueResolver(ImportCatalogs catalogs, IEnumerable<ImportValueMapping> userMappings)
     {
+        _patternIds = catalogs.PatternIds ?? new HashSet<Guid>();
         foreach (var kind in Enum.GetValues<ImportValueKind>())
         {
             _byKey[kind] = catalogs.Of(kind)
@@ -252,6 +315,9 @@ public sealed class ImportValueResolver
                 _userMappings[(kind, ImportTextFolding.Fold(mapping.Source))] = mapping.TargetId;
         }
     }
+
+    /// <summary>Renk kataloğundaki kayıt desen mi (hastada renk yerine desen alanına yazılır).</summary>
+    public bool IsPattern(Guid colorId) => _patternIds.Contains(colorId);
 
     /// <param name="parentId">
     /// Irk için hayvanın türü (zorunlu: türsüz ırk eşlenmez); aşı için hastanın türü (tanımın türü doluysa aynı olmalı).
@@ -322,9 +388,17 @@ public sealed class ImportValueResolver
         if (TryUnique(kind, key, parentId, out resolved))
             return true;
 
-        return BuiltInAliases.TryGetValue(kind, out var aliases)
-               && aliases.TryGetValue(key, out var aliasTarget)
-               && TryUnique(kind, aliasTarget, parentId, out resolved);
+        if (!BuiltInAliases.TryGetValue(kind, out var aliases) || !aliases.TryGetValue(key, out var aliasTarget))
+            return false;
+
+        // Türe göre ayrılmış kayıtlar ("|" ile birden çok hedef): kapsamda tek eşleşen hedef seçilir.
+        foreach (var target in aliasTarget.Split('|'))
+        {
+            if (TryUnique(kind, target, parentId, out resolved))
+                return true;
+        }
+
+        return false;
     }
 
     private bool TryUnique(ImportValueKind kind, string key, Guid? parentId, out ImportValueResolution resolution)
