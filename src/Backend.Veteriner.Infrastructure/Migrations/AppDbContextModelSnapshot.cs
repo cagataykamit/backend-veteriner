@@ -2839,6 +2839,13 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<int>("AutoIssueMode")
                         .HasColumnType("int");
 
+                    b.Property<string>("AutoIssuePauseReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("AutoIssuePausedAtUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<Guid>("ClinicId")
                         .HasColumnType("uniqueidentifier");
 

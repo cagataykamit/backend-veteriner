@@ -54,4 +54,23 @@ public sealed class ClinicEDocumentSettingsTests
     [Fact]
     public void Invalid_Mode_Should_Be_Rejected()
         => New().Update((EDocumentAutoIssueMode)9, new TimeOnly(23, 0), false, UserId, Now).Error.Code.Should().Be("EDocuments.Validation");
+
+    [Fact]
+    public void Pause_Should_Apply_Once_Only_When_Automatic_And_Clear_On_Save()
+    {
+        var s = New();
+        s.PauseAutoIssue("Kontör bitti.", Now).Should().BeFalse("otomatik kapalıyken durdurulacak bir şey yok");
+
+        s.Update(EDocumentAutoIssueMode.OnPayment, new TimeOnly(23, 0), false, UserId, Now);
+        s.PauseAutoIssue("Kontör bitti.", Now.AddMinutes(5)).Should().BeTrue();
+        s.IsAutoIssuePaused.Should().BeTrue();
+        s.AutoIssuePauseReason.Should().Be("Kontör bitti.");
+        s.PauseAutoIssue("Başka hata", Now.AddMinutes(6)).Should().BeFalse("bildirim bir kez gider");
+        s.AutoIssuePauseReason.Should().Be("Kontör bitti.");
+
+        s.Update(EDocumentAutoIssueMode.OnPayment, new TimeOnly(23, 0), false, UserId, Now.AddHours(1));
+        s.IsAutoIssuePaused.Should().BeFalse();
+        s.AutoIssuePauseReason.Should().BeNull();
+        s.AutoIssueEnabledAtUtc.Should().Be(Now, "sürdürmek başlangıcı değiştirmez; durduğu sürede yazılan ücretler de kesilir");
+    }
 }

@@ -31,6 +31,12 @@ public enum UserNotificationType
 
     /// <summary>Gün sonu e-belge özeti: otomatik kesilen, kesilemeyen ve belgesiz ödenmiş ücretler (ADR-036; belge kesme izni olanlara).</summary>
     EDocumentsDailySummary = 8,
+
+    /// <summary>Otomatik e-belge kalıcı bir sağlayıcı sorunuyla (yetki, kontör, bağlantı) durduruldu (ADR-036; klinik ayarını değiştirebilenlere).</summary>
+    EDocumentsAutoIssuePaused = 9,
+
+    /// <summary>Belgesi kesilmiş ücretin ödemesi iptal edildi; belge kendiliğinden iptal edilmez (ADR-036; belge iptal yetkisi olanlara).</summary>
+    EDocumentPaymentVoided = 10,
 }
 
 /// <summary>

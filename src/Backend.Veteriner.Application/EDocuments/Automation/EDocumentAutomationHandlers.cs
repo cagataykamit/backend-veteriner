@@ -30,7 +30,9 @@ internal static class ClinicEDocumentSettingsMapping
             s?.AutoIssueEnabledAtUtc,
             taxpayerType,
             Kind(taxpayerType, ChargeLineKind.Service),
-            Kind(taxpayerType, ChargeLineKind.Product));
+            Kind(taxpayerType, ChargeLineKind.Product),
+            s?.AutoIssuePausedAtUtc,
+            s?.AutoIssuePauseReason);
 
     private static EDocumentKindForLine? Kind(ClinicTaxpayerType? type, ChargeLineKind line)
         => type is { } t

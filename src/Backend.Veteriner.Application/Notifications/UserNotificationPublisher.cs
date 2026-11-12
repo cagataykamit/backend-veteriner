@@ -55,6 +55,12 @@ public interface IUserNotificationPublisher
 
     /// <summary>Gün sonu e-belge özeti (ADR-036 AK-4 hatırlatma): kliniğe erişen belge kesme izni olanlara.</summary>
     Task EDocumentsDailySummaryAsync(Guid tenantId, Guid clinicId, int issued, int failed, int undocumented, CancellationToken ct);
+
+    /// <summary>Otomatik e-belge kalıcı bir sağlayıcı sorunuyla durdu: kliniğe erişen ve klinik ayarını değiştirebilenlere (sürdürebilenler).</summary>
+    Task EDocumentsAutoIssuePausedAsync(Guid tenantId, Guid clinicId, string reason, CancellationToken ct);
+
+    /// <summary>Belgesi kesilmiş ücretin ödemesi iptal edildi: belge iptal yetkisi olanlara, belge başına bir bildirim.</summary>
+    Task EDocumentPaymentVoidedAsync(Guid tenantId, Guid clinicId, Guid documentId, string? documentNumber, CancellationToken ct);
 }
 
 public sealed class UserNotificationPublisher : IUserNotificationPublisher
@@ -64,6 +70,8 @@ public sealed class UserNotificationPublisher : IUserNotificationPublisher
     public const string PortalDataRequestTarget = "PortalDataRequest";
     public const string DataExportTarget = "DataExport";
     public const string EDocumentsTarget = "EDocuments";
+    public const string EDocumentSettingsTarget = "EDocumentSettings";
+    public const string EDocumentTarget = "EDocument";
 
     private static readonly CultureInfo Turkish = CultureInfo.GetCultureInfo("tr-TR");
 
@@ -234,6 +242,47 @@ public sealed class UserNotificationPublisher : IUserNotificationPublisher
                 body,
                 EDocumentsTarget,
                 clinicId,
+                utcNow), ct);
+        }
+    }
+
+    public async Task EDocumentsAutoIssuePausedAsync(Guid tenantId, Guid clinicId, string reason, CancellationToken ct)
+    {
+        var userIds = await _recipients.ListAsync(tenantId, clinicId, PermissionCatalog.Clinics.Update, TenantWideClaimNames.All, ct);
+        var body = $"{reason} Sorunu giderip Ayarlar › e-Belge'de otomatik kesmeyi sürdürün.";
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        foreach (var userId in userIds)
+        {
+            await _notifications.AddAsync(UserNotification.Create(
+                tenantId,
+                clinicId,
+                userId,
+                UserNotificationType.EDocumentsAutoIssuePaused,
+                "Otomatik e-belge durduruldu",
+                body.Length > UserNotification.BodyMaxLength ? body[..UserNotification.BodyMaxLength] : body,
+                EDocumentSettingsTarget,
+                clinicId,
+                utcNow), ct);
+        }
+    }
+
+    public async Task EDocumentPaymentVoidedAsync(Guid tenantId, Guid clinicId, Guid documentId, string? documentNumber, CancellationToken ct)
+    {
+        var userIds = await _recipients.ListAsync(tenantId, clinicId, PermissionCatalog.EDocuments.Cancel, TenantWideClaimNames.All, ct);
+        var label = string.IsNullOrWhiteSpace(documentNumber) ? "Belgenin" : $"{documentNumber} numaralı belgenin";
+        var body = $"{label} kapsadığı ödeme iptal edildi; belge iptal edilmedi. Tahsilat gerçekten geri verildiyse belgeyi iptal edin.";
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        foreach (var userId in userIds)
+        {
+            await _notifications.AddAsync(UserNotification.Create(
+                tenantId,
+                clinicId,
+                userId,
+                UserNotificationType.EDocumentPaymentVoided,
+                "Ödemesi iptal edilen e-belge",
+                body,
+                EDocumentTarget,
+                documentId,
                 utcNow), ct);
         }
     }
