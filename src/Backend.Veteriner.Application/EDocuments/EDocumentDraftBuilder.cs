@@ -49,6 +49,7 @@ public sealed record EDocumentDraftSet(
 public sealed class EDocumentDraftBuilder
 {
     public const string MissingTaxNumberField = "taxNumber";
+    public const string MissingFullNameField = "fullName";
 
     private readonly IReadRepository<Charge> _chargesRead;
     private readonly IRepository<Charge> _chargesWrite;
@@ -132,7 +133,10 @@ public sealed class EDocumentDraftBuilder
             selection.VisitId));
     }
 
-    /// <summary>Müşteriden alıcı: peşin müşteri bilinmeyen alıcı; kurumsalda vergi numarası zorunlu; bireyselde TCKN yoksa bilinmeyen alıcı kimliği.</summary>
+    /// <summary>
+    /// Müşteriden alıcı: peşin müşteri bilinmeyen alıcı; kurumsalda vergi numarası zorunlu; bireyselde ad + soyad zorunlu, TCKN yoksa
+    /// bilinmeyen alıcı kimliği.
+    /// </summary>
     public static (EDocumentBuyer? Buyer, IReadOnlyList<string> Missing) BuildBuyer(Client client)
     {
         if (client.IsWalkIn)
@@ -158,8 +162,14 @@ public sealed class EDocumentDraftBuilder
             client.BillingDistrict,
             client.BillingAddressLine,
             client.Email);
-        return (individual.Value, []);
+        return individual.IsSuccess ? (individual.Value, []) : (null, [MissingFullNameField]);
     }
+
+    /// <summary>Eksik alıcı alanının kullanıcı metni (kesme hatası ve belgesiz ücret nedeni aynı metni kullanır).</summary>
+    public static string MissingBuyerMessage(IReadOnlyList<string> missing)
+        => missing.Contains(MissingFullNameField)
+            ? "Müşterinin adı ve soyadı birlikte yazılmamış; müşteri adını ad ve soyadıyla düzeltin."
+            : "Kurumsal müşterinin vergi numarası eksik; müşterinin fatura bilgilerini tamamlayın.";
 
     private async Task<Result<(IReadOnlyList<Charge> Charges, Guid? SaleId)>> LoadChargesAsync(
         Guid tenantId, Guid clinicId, EDocumentSelection selection, bool track, CancellationToken ct)
