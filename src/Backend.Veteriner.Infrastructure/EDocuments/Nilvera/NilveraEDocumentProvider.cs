@@ -133,8 +133,8 @@ public sealed class NilveraEDocumentProvider : IEDocumentProvider, IEDocumentCre
         {
             var service = Service.For(refs.Type);
             var status = await StatusAsync(account.Credentials, service, Reference(refs.ExternalReference), ct);
-            if (status is { Code: "succeed" })
-                throw new NilveraException(new ProviderError(EDocumentErrorKind.ProviderRejected, "Belge Nilvera'da kesilmiş; vazgeçilemez, iptal edin."));
+            if (status is not null && status.Code is not ("error" or "rejected"))
+                throw new NilveraException(new ProviderError(EDocumentErrorKind.ProviderRejected, "Belge Nilvera'da oluşturulmuş; vazgeçilemez, iptal edin."));
             return true;
         });
 
@@ -172,7 +172,12 @@ public sealed class NilveraEDocumentProvider : IEDocumentProvider, IEDocumentCre
         }
     }
 
-    /// <summary>Belgenin Nilvera'daki durumu: kesildiyse numara ve tutarla birlikte; yoksa / bekliyorsa <c>null</c> veya bekliyor.</summary>
+    /// <summary>
+    /// Belgenin Nilvera'daki durumu: kesildiyse numara ve tutarla birlikte; yoksa <c>null</c>, bekliyorsa bekliyor.
+    /// e-Arşiv / e-SMM'de durum ucu belgenin değil GİB raporunun durumunu verir (kesilen belge rapor oluşana dek
+    /// <c>unknown</c> "Rapor Oluşturulmadı" kalır; test ortamında görüldü). Bu türlerde belge numara almışsa ve durum
+    /// <c>error</c> değilse kesilmiş sayılır. e-Fatura GİB'e iletilince (<c>succeed</c>) kesilmiş sayılır.
+    /// </summary>
     private async Task<ProviderIssueOutcome?> ReadOutcomeAsync(string apiKey, EDocumentType type, Guid reference, CancellationToken ct)
     {
         var service = Service.For(type);
@@ -184,11 +189,14 @@ public sealed class NilveraEDocumentProvider : IEDocumentProvider, IEDocumentCre
         switch (status.Code)
         {
             case "succeed":
+            case not ("error" or "rejected") when type != EDocumentType.EInvoice:
                 var details = await _client.SendAsync(
                     apiKey, HttpMethod.Get, $"/{service.Api}/{service.Collection}/{uuid}/Details", null,
                     $"/{service.Api}/{service.Collection}/{{uuid}}/Details", ct);
                 EnsureSuccess(details, "belge ayrıntısı");
                 var number = details.Body?[service.NumberField]?.ToString();
+                if (string.IsNullOrWhiteSpace(number))
+                    return ProviderIssueOutcome.Pending(uuid, uuid);
                 var total = Decimal(details.Body?[service.AmountField]);
                 return new ProviderIssueOutcome(ProviderIssueState.Issued, uuid, uuid, null, number, uuid, total);
             case "error":

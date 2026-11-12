@@ -215,16 +215,33 @@ public sealed class NilveraEDocumentProviderTests
     }
 
     [Theory]
-    [InlineData("waiting")]
     [InlineData("unknown")]
-    public async Task Check_Unfinished_Status_Should_Stay_Pending(string status)
+    [InlineData("waiting")]
+    public async Task Check_Numbered_ESmm_Should_Be_Issued_Before_Gib_Report(string status)
     {
-        _server.On("GET", $"/evoucher/Vouchers/{Reference}/Status", HttpStatusCode.OK, $$"""{"StatusCode":"{{status}}"}""");
+        // Test ortamında görüldü: kesilen e-SMM / e-Arşiv rapor oluşana dek "unknown" / "Rapor Oluşturulmadı" kalır.
+        _server.On("GET", $"/evoucher/Vouchers/{Reference}/Status", HttpStatusCode.OK,
+            $$"""{"StatusDetail":"Rapor Oluşturulmadı.","StatusCode":"{{status}}","ReportStatus":"NotReported","CancelStatus":false}""");
+        _server.On("GET", $"/evoucher/Vouchers/{Reference}/Details", HttpStatusCode.OK,
+            """{"VoucherNumber":"ODO2026000000019","VoucherAmount":3000.00}""");
 
         var result = await Provider().CheckAsync(Account(), Refs(EDocumentType.ESmm), CancellationToken.None);
 
+        result.Value!.State.Should().Be(ProviderIssueState.Issued);
+        result.Value.DocumentNumber.Should().Be("ODO2026000000019");
+        result.Value.Total.Should().Be(3000.00m);
+    }
+
+    [Fact]
+    public async Task Check_EInvoice_Waiting_Should_Stay_Pending()
+    {
+        _server.On("GET", $"/einvoice/Sale/{Reference}/Status", HttpStatusCode.OK, """{"InvoiceStatus":{"Code":"waiting"}}""");
+
+        var result = await Provider().CheckAsync(Account(), Refs(EDocumentType.EInvoice), CancellationToken.None);
+
         result.Value!.State.Should().Be(ProviderIssueState.Pending);
         result.Value.ProviderJobId.Should().Be(Reference);
+        _server.Requests.Should().NotContain(r => r.Path.Contains("/Details"));
     }
 
     [Fact]
