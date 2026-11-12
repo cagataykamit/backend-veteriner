@@ -61,6 +61,24 @@ public sealed class ClinicEDocumentConnectionController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <summary>API anahtarıyla bağlanan sağlayıcı: anahtar sınanır, hesabı belirlenir, şifreli saklanır (yanıtta dönmez).</summary>
+    [HttpPost("credentials")]
+    [Authorize(Policy = PermissionCatalog.Clinics.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(EDocumentConnectionDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ConnectWithCredentials(
+        [FromRoute] Guid clinicId, [FromBody] EDocumentCredentialsBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new ConnectEDocumentWithCredentialsCommand(clinicId, body.Provider, body.ApiKey), ct);
+        return result.ToActionResult(this);
+    }
+
     /// <summary>Kullanıcının birden çok firması varsa bağlanacak hesabı seçer.</summary>
     [HttpPut("account")]
     [Authorize(Policy = PermissionCatalog.Clinics.Update)]
@@ -109,6 +127,12 @@ public sealed class ClinicEDocumentConnectionController : ControllerBase
 public sealed class EDocumentAuthorizeBody
 {
     public string? Provider { get; init; }
+}
+
+public sealed class EDocumentCredentialsBody
+{
+    public string? Provider { get; init; }
+    public string? ApiKey { get; init; }
 }
 
 public sealed class EDocumentAccountBody

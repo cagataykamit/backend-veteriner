@@ -215,6 +215,102 @@ public sealed class CompleteEDocumentAuthorizationCommandHandler
     private static string Clip(string value) => value.Length > 60 ? value[..60] : value;
 }
 
+/// <summary>
+/// API anahtarıyla bağlanma: anahtar sağlayıcıda sınanır, ait olduğu hesap bağlantıya yazılır, anahtar şifreli saklanır.
+/// Geçersiz anahtar bağlantıyı değiştirmez (mevcut bağlantı korunur). Anahtar günlüğe ve yanıta yazılmaz.
+/// </summary>
+public sealed class ConnectEDocumentWithCredentialsCommandHandler
+    : IRequestHandler<ConnectEDocumentWithCredentialsCommand, Result<EDocumentConnectionDto>>
+{
+    private readonly EDocumentAccess _access;
+    private readonly IEDocumentProviderResolver _providers;
+    private readonly EDocumentConnectionService _service;
+    private readonly EDocumentProviderGateway _gateway;
+    private readonly IRepository<EDocumentConnection> _connections;
+    private readonly IUnitOfWork _uow;
+    private readonly TimeProvider _timeProvider;
+
+    public ConnectEDocumentWithCredentialsCommandHandler(
+        EDocumentAccess access,
+        IEDocumentProviderResolver providers,
+        EDocumentConnectionService service,
+        EDocumentProviderGateway gateway,
+        IRepository<EDocumentConnection> connections,
+        IUnitOfWork uow,
+        TimeProvider timeProvider)
+    {
+        _access = access;
+        _providers = providers;
+        _service = service;
+        _gateway = gateway;
+        _connections = connections;
+        _uow = uow;
+        _timeProvider = timeProvider;
+    }
+
+    public async ValueTask<Result<EDocumentConnectionDto>> Handle(ConnectEDocumentWithCredentialsCommand request, CancellationToken ct)
+    {
+        var access = await _access.ResolveClinicSettingsAsync(PermissionCatalog.Clinics.Update, request.ClinicId, ct);
+        if (!access.IsSuccess)
+            return Result<EDocumentConnectionDto>.Failure(access.Error);
+
+        var code = request.Provider?.Trim() ?? string.Empty;
+        var provider = _providers.Find(code);
+        var credentialProvider = _providers.FindCredential(code);
+        if (provider is null || credentialProvider is null)
+            return Result<EDocumentConnectionDto>.Failure("EDocuments.Validation", "Desteklenmeyen e-belge sağlayıcısı.");
+        if (!provider.IsConfigured)
+            return Result<EDocumentConnectionDto>.Failure(EDocumentProviderGateway.ProviderNotConfigured());
+
+        var apiKey = request.ApiKey?.Trim();
+        if (string.IsNullOrEmpty(apiKey))
+            return Result<EDocumentConnectionDto>.Failure("EDocuments.Validation", "API anahtarı girilmelidir.");
+        if (apiKey.Length > ConnectEDocumentWithCredentialsCommand.MaxApiKeyLength)
+            return Result<EDocumentConnectionDto>.Failure("EDocuments.Validation", "API anahtarı çok uzun; anahtarı yeniden kopyalayın.");
+
+        var identified = await credentialProvider.IdentifyAsync(apiKey, ct);
+        if (!identified.IsSuccess)
+        {
+            var error = identified.Error!;
+            return Result<EDocumentConnectionDto>.Failure(error.Kind == EDocumentErrorKind.Authorization
+                ? new Error("EDocuments.Validation", error.Message)
+                : EDocumentErrors.FromProvider(error));
+        }
+
+        var caller = access.Value!;
+        var account = identified.Value!;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var connection = await _connections.FirstOrDefaultAsync(
+            new EDocumentConnectionByClinicSpec(caller.TenantId, request.ClinicId, tracked: true), ct);
+        var isNew = connection is null;
+        connection ??= EDocumentConnection.Create(caller.TenantId, request.ClinicId, provider.ProviderCode, provider.Environment, now);
+        connection.Authorize(
+            provider.ProviderCode,
+            provider.Environment,
+            _gateway.ProtectCredentials(identified.RefreshedCredentials ?? apiKey),
+            account.AccountId,
+            account.Name,
+            caller.UserId,
+            now);
+
+        await _service.VerifyAsync(connection, ct);
+
+        try
+        {
+            if (isNew)
+                await _connections.AddAsync(connection, ct);
+            await _uow.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            return Result<EDocumentConnectionDto>.Failure(
+                "EDocuments.ConcurrencyConflict", "Bağlantı aynı anda başka bir işlemle güncellendi; sayfayı yenileyin.");
+        }
+
+        return Result<EDocumentConnectionDto>.Success(await _service.ToDtoAsync(request.ClinicId, connection, ct));
+    }
+}
+
 public sealed class SelectEDocumentAccountCommandHandler : IRequestHandler<SelectEDocumentAccountCommand, Result<EDocumentConnectionDto>>
 {
     private readonly EDocumentAccess _access;

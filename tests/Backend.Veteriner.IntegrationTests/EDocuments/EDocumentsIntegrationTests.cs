@@ -44,6 +44,7 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
     ];
 
     private readonly FakeProvider _provider = new();
+    private readonly KeyProvider _keyProvider = new();
     private readonly WebApplicationFactory<global::Program> _factory;
 
     public EDocumentsIntegrationTests(CustomWebApplicationFactory factory)
@@ -51,8 +52,53 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
         _factory = factory.WithWebHostBuilder(b => b.ConfigureTestServices(services =>
         {
             services.RemoveAll<IEDocumentProvider>();
+            services.RemoveAll<IEDocumentCredentialProvider>();
             services.AddSingleton<IEDocumentProvider>(_provider);
+            services.AddSingleton<IEDocumentProvider>(_keyProvider);
+            services.AddSingleton<IEDocumentCredentialProvider>(_keyProvider);
         }));
+    }
+
+    [Fact]
+    public async Task Api_Key_Connection_Should_Verify_Key_Store_It_Encrypted_And_Never_Return_It()
+    {
+        var ctx = await SeedAsync();
+        var url = $"/api/v1/clinics/{ctx.ClinicId}/e-document-connection";
+
+        var options = await ctx.GetAsync(url);
+        options.GetProperty("availableProviders").EnumerateArray()
+            .Single(p => p.GetProperty("provider").GetString() == KeyProvider.Code)
+            .GetProperty("connectionMethod").GetString().Should().Be("Credentials");
+
+        var wrong = await ctx.Http.PostAsJsonAsync($"{url}/credentials", new { provider = KeyProvider.Code, apiKey = "yanlis-anahtar" });
+        wrong.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await wrong.Content.ReadAsStringAsync()).Should().Contain("API anahtarı geçersiz").And.NotContain("yanlis-anahtar");
+        (await ctx.GetAsync(url)).GetProperty("provider").GetString().Should().Be(FakeProvider.Code, "geçersiz anahtar mevcut bağlantıyı bozmaz");
+
+        var oauthOnly = await ctx.Http.PostAsJsonAsync($"{url}/credentials", new { provider = FakeProvider.Code, apiKey = KeyProvider.ValidKey });
+        oauthOnly.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var connected = await ctx.Http.PostAsJsonAsync($"{url}/credentials", new { provider = KeyProvider.Code, apiKey = $"  {KeyProvider.ValidKey}  " });
+        var text = await connected.Content.ReadAsStringAsync();
+        connected.StatusCode.Should().Be(HttpStatusCode.OK, text);
+        text.Should().NotContain(KeyProvider.ValidKey);
+        var dto = JsonDocument.Parse(text).RootElement;
+        dto.GetProperty("status").GetString().Should().Be("Connected");
+        dto.GetProperty("provider").GetString().Should().Be(KeyProvider.Code);
+        dto.GetProperty("accountId").GetString().Should().Be("1234567801");
+        dto.GetProperty("lastVerificationOk").GetBoolean().Should().BeTrue();
+
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var stored = await db.Set<EDocumentConnection>().AsNoTracking().SingleAsync(c => c.ClinicId == ctx.ClinicId);
+        stored.ProtectedCredentials.Should().NotBeNullOrEmpty().And.NotContain(KeyProvider.ValidKey);
+        scope.ServiceProvider.GetRequiredService<ISecretProtector>()
+            .Unprotect(EDocumentProviderGateway.CredentialsPurpose, stored.ProtectedCredentials!).Should().Be(KeyProvider.ValidKey);
+        var payloads = await db.AuditLogs.AsNoTracking()
+            .Where(a => a.ActorUserId == ctx.UserId && a.Action == "Clinic.EDocumentConnection.Connect")
+            .Select(a => a.RequestPayload)
+            .ToListAsync();
+        payloads.Should().NotBeEmpty().And.AllSatisfy(p => p.Should().NotContain(KeyProvider.ValidKey).And.NotContain("yanlis-anahtar"));
     }
 
     [Fact]
@@ -397,6 +443,46 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
             response.StatusCode.Should().Be(HttpStatusCode.OK, text);
             return JsonDocument.Parse(text).RootElement;
         }
+    }
+
+    /// <summary>API anahtarıyla bağlanan sağlayıcı: yalnız <see cref="ValidKey"/> geçerli, hesabı VKN'dir.</summary>
+    private sealed class KeyProvider : IEDocumentProvider, IEDocumentCredentialProvider
+    {
+        public const string Code = "anahtarli";
+        public const string ValidKey = "gecerli-test-anahtari";
+
+        public string ProviderCode => Code;
+        public string DisplayName => "Anahtarlı Sağlayıcı";
+        public bool IsConfigured => true;
+        public EDocumentEnvironment Environment => EDocumentEnvironment.Test;
+
+        public Task<ProviderResult<ProviderAccountInfo>> IdentifyAsync(string credentials, CancellationToken ct)
+            => Task.FromResult(credentials == ValidKey
+                ? ProviderResult<ProviderAccountInfo>.Ok(new ProviderAccountInfo("1234567801", "Test Kurum", "1234567801"))
+                : ProviderResult<ProviderAccountInfo>.Fail(new ProviderError(EDocumentErrorKind.Authorization, "API anahtarı geçersiz.")));
+
+        public Task<ProviderResult<ProviderAccountCheck>> VerifyAsync(EDocumentProviderAccount account, CancellationToken ct)
+            => Task.FromResult(account.Credentials == ValidKey
+                ? ProviderResult<ProviderAccountCheck>.Ok(new ProviderAccountCheck("Test Kurum", null))
+                : ProviderResult<ProviderAccountCheck>.Fail(new ProviderError(EDocumentErrorKind.Authorization, "API anahtarı geçersiz.")));
+
+        public Task<ProviderResult<string?>> FindEInvoiceRecipientAsync(EDocumentProviderAccount account, string taxNumber, CancellationToken ct)
+            => throw new NotSupportedException();
+
+        public Task<ProviderResult<ProviderIssueOutcome>> IssueAsync(EDocumentProviderAccount account, EDocumentSendRequest request, CancellationToken ct)
+            => throw new NotSupportedException();
+
+        public Task<ProviderResult<ProviderIssueOutcome>> CheckAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct)
+            => throw new NotSupportedException();
+
+        public Task<ProviderResult<ProviderCancelOutcome>> CancelAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct)
+            => throw new NotSupportedException();
+
+        public Task<ProviderResult<bool>> DiscardDraftAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct)
+            => throw new NotSupportedException();
+
+        public Task<ProviderResult<ProviderPdf>> GetPdfAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct)
+            => throw new NotSupportedException();
     }
 
     /// <summary>Sağlayıcı davranışını taklit eder: e-SMM eşzamanlı kesilir, e-Arşiv / e-Fatura sonucu sonradan gelir.</summary>

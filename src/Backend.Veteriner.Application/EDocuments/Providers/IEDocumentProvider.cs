@@ -52,6 +52,18 @@ public interface IEDocumentOAuthProvider
     Task<ProviderResult<IReadOnlyList<ProviderAccountInfo>>> ListAccountsAsync(string credentials, CancellationToken ct);
 }
 
+/// <summary>
+/// API anahtarıyla bağlanan entegratör (Nilvera): klinik kendi hesabında ürettiği anahtarı girer; anahtar sağlayıcıya özel
+/// kimlik bilgisidir, şifreli saklanır. OAuth kullanan entegratör bunu uygulamaz.
+/// </summary>
+public interface IEDocumentCredentialProvider
+{
+    string ProviderCode { get; }
+
+    /// <summary>Anahtarla sağlayıcıya bağlanıp anahtarın ait olduğu hesabı döndürür (geçersiz anahtar <see cref="EDocumentErrorKind.Authorization"/>).</summary>
+    Task<ProviderResult<ProviderAccountInfo>> IdentifyAsync(string credentials, CancellationToken ct);
+}
+
 public sealed record EDocumentProviderAccount(string AccountId, string Credentials);
 
 public sealed record ProviderAccountInfo(string AccountId, string Name, string? TaxNumber);
