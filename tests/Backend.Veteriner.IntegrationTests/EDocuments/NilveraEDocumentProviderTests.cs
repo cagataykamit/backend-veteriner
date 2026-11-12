@@ -34,7 +34,7 @@ public sealed class NilveraEDocumentProviderTests
         => new(
             type,
             Guid.Parse(Reference),
-            new DateOnly(2026, 11, 12),
+            new DateTime(2026, 11, 12, 14, 35, 7),
             new EDocumentSendBuyer(EDocumentBuyerKind.Individual, "Ayşe Yılmaz", "10000000146", false, null, "İstanbul", "Kadıköy", null, "ayse@example.com"),
             [new EDocumentSendLine("Muayene", 1m, null, 1000m, 20m), new EDocumentSendLine("Aşı", 2m, "Adet", 250m, 10m)],
             withholding,
@@ -101,6 +101,7 @@ public sealed class NilveraEDocumentProviderTests
         info["InvoiceType"]!.ToString().Should().Be("SATIS");
         info["SendType"]!.ToString().Should().Be("ELEKTRONIK");
         info["CurrencyCode"]!.ToString().Should().Be("TRY");
+        info["IssueDate"]!.ToString().Should().Be("2026-11-12T14:35:07");
         info["LineExtensionAmount"]!.GetValue<decimal>().Should().Be(1500m);
         info["KdvTotal"]!.GetValue<decimal>().Should().Be(250m);
         info["GeneralKDV20Total"]!.GetValue<decimal>().Should().Be(200m);

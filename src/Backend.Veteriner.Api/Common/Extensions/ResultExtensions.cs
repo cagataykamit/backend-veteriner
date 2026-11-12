@@ -111,7 +111,8 @@ public static class ResultExtensions
 
         // e-belge (E_DOCUMENTS_API_CONTRACT.md): durum / bağ çakışmaları 409, sağlayıcı yapılandırması veya erişimi 503, reddi 502.
         if (normalized is "edocuments.notconnected" or "edocuments.invalidstate" or "edocuments.chargealreadydocumented"
-            or "edocuments.chargevoided" or "edocuments.importedcharge" or "edocuments.requestidconflict" or "edocuments.concurrencyconflict"
+            or "edocuments.chargevoided" or "edocuments.importedcharge" or "edocuments.requestidconflict"
+            or "edocuments.concurrencyconflict" or "edocuments.providermismatch"
             or "edocuments.cancelwindowexpired" or "edocuments.pdfnotready" or "charges.edocumentattached")
         {
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");

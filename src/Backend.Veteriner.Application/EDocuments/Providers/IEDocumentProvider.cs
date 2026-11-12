@@ -99,18 +99,23 @@ public sealed record EDocumentSendBuyer(
     string? AddressLine,
     string? Email);
 
+/// <param name="IssuedAtLocal">Düzenlenme anı, İstanbul saati (belgenin oluşturulduğu an; yeniden denemede değişmez).</param>
 /// <param name="EInvoiceRecipient">e-Fatura'da alıcının gelen kutusu adresi.</param>
 /// <param name="ExistingInvoiceId">Önceki denemede oluşan sağlayıcı fatura kaydı (yeniden denemede).</param>
 public sealed record EDocumentSendRequest(
     EDocumentType Type,
     Guid ExternalReference,
-    DateOnly IssueDate,
+    DateTime IssuedAtLocal,
     EDocumentSendBuyer Buyer,
     IReadOnlyList<EDocumentSendLine> Lines,
     decimal? WithholdingRate,
     string? Note,
     string? EInvoiceRecipient,
-    string? ExistingInvoiceId);
+    string? ExistingInvoiceId)
+{
+    /// <summary>Düzenlenme günü (İstanbul).</summary>
+    public DateOnly IssueDate => DateOnly.FromDateTime(IssuedAtLocal);
+}
 
 public sealed record EDocumentProviderRefs(
     EDocumentType Type,

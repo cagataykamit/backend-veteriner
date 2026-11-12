@@ -141,7 +141,7 @@ public sealed class GetEDocumentPdfQueryHandler : IRequestHandler<GetEDocumentPd
 
         var connection = await _connections.FirstOrDefaultAsync(
             new EDocumentConnectionByClinicSpec(document.TenantId, document.ClinicId, tracked: true), ct);
-        var opened = _gateway.Open(connection);
+        var opened = _gateway.OpenFor(document, connection);
         if (!opened.IsSuccess)
             return Result<EDocumentPdfDto>.Failure(opened.Error);
 

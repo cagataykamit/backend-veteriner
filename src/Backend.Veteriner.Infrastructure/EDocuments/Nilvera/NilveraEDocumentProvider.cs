@@ -281,7 +281,8 @@ public sealed class NilveraEDocumentProvider : IEDocumentProvider, IEDocumentCre
         var notes = new JsonArray();
         if (!string.IsNullOrWhiteSpace(request.Note))
             notes.Add(request.Note);
-        var issueDate = request.IssueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "T00:00:00";
+        // Düzenlenme saati PDF'te görünür; yerel (İstanbul) saat saniyesiyle gönderilir.
+        var issueDate = request.IssuedAtLocal.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture);
 
         if (request.Type == EDocumentType.ESmm)
         {

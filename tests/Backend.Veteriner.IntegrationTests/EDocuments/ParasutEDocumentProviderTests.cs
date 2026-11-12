@@ -48,7 +48,7 @@ public sealed class ParasutEDocumentProviderTests
         => new(
             type,
             Guid.Parse("3b241101-e2bb-4255-8caf-4136c566a962"),
-            new DateOnly(2026, 11, 11),
+            new DateTime(2026, 11, 11, 9, 5, 0),
             new EDocumentSendBuyer(EDocumentBuyerKind.Individual, "Ayşe Yılmaz", identity, unknown, null, "İstanbul", "Kadıköy", null, null),
             [new EDocumentSendLine("Muayene", 1m, null, 1000m, 20m)],
             null,
