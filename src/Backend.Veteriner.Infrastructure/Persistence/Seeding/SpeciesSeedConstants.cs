@@ -34,4 +34,7 @@ public static class SpeciesSeedConstants
     public static readonly Guid Duck = Guid.Parse("2c1c8f3a-6b0b-4d1e-9f2a-111111010214");
     public static readonly Guid Goose = Guid.Parse("2c1c8f3a-6b0b-4d1e-9f2a-111111010215");
     public static readonly Guid Turkey = Guid.Parse("2c1c8f3a-6b0b-4d1e-9f2a-111111010216");
+
+    /// <summary>Türü belirtilmemiş egzotik hayvan (eski programlarda yaygın genel tür; E-vet geçişi 2026-11-12).</summary>
+    public static readonly Guid Exotic = Guid.Parse("2c1c8f3a-6b0b-4d1e-9f2a-111111010217");
 }

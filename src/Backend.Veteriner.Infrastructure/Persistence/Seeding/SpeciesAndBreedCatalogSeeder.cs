@@ -38,6 +38,7 @@ public static class SpeciesAndBreedCatalogSeeder
         ("DUCK", "Ördek", 79, SpeciesSeedConstants.Duck),
         ("GOOSE", "Kaz", 80, SpeciesSeedConstants.Goose),
         ("TURKEY", "Hindi", 81, SpeciesSeedConstants.Turkey),
+        ("EXOTIC", "Egzotik", 90, SpeciesSeedConstants.Exotic),
         ("OTHER", "Diğer", 999, SpeciesSeedConstants.Other),
     ];
 
@@ -310,6 +311,9 @@ public static class SpeciesAndBreedCatalogSeeder
             ..B("TURKEY",
                 "Bronz Hindi",
                 "Beyaz Hindi",
+                "Diğer"),
+            ..B("EXOTIC",
+                "Bilinmeyen",
                 "Diğer"),
             ..B("OTHER",
                 "Bilinmeyen",

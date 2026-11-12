@@ -41,6 +41,7 @@ public sealed class ImportValueResolverTests
 
     // E-vet geçişinde görülen adlar için genişletilmiş katalog (sistem kataloğunun 2026-11-12 eklemeleri).
     private static readonly Guid Other = Guid.NewGuid();
+    private static readonly Guid Exotic = Guid.NewGuid();
     private static readonly Guid GuineaPig = Guid.NewGuid();
     private static readonly Guid ScottishFold = Guid.NewGuid();
     private static readonly Guid InternalExternal = Guid.NewGuid();
@@ -54,7 +55,7 @@ public sealed class ImportValueResolverTests
     private static readonly Guid Enterotoxemia = Guid.NewGuid();
 
     private static readonly ImportValueResolver Extended = new(new ImportCatalogs(
-        Species: [new(Dog, "Köpek", "DOG", null), new(Cat, "Kedi", "CAT", null), new(GuineaPig, "Gine Domuzu", "GUINEA_PIG", null), new(Other, "Diğer", "OTHER", null)],
+        Species: [new(Dog, "Köpek", "DOG", null), new(Cat, "Kedi", "CAT", null), new(GuineaPig, "Gine Domuzu", "GUINEA_PIG", null), new(Exotic, "Egzotik", "EXOTIC", null), new(Other, "Diğer", "OTHER", null)],
         Breeds: [new(ScottishFold, "Scottish Fold", null, Cat)],
         Colors: [],
         Vaccines:
@@ -121,7 +122,8 @@ public sealed class ImportValueResolverTests
     [Fact]
     public void Exotic_And_Common_Species_Words_Should_Resolve()
     {
-        Extended.Resolve(ImportValueKind.Species, "Egzotik").TargetId.Should().Be(Other);
+        Extended.Resolve(ImportValueKind.Species, "Egzotik").TargetId.Should().Be(Exotic);
+        Extended.Resolve(ImportValueKind.Species, "Exotic").TargetId.Should().Be(Exotic);
         Extended.Resolve(ImportValueKind.Species, "Kobay").TargetId.Should().Be(GuineaPig);
         Extended.Resolve(ImportValueKind.Species, "ARABA").Kind.Should().Be(ImportValueResolutionKind.Unmapped);
     }
