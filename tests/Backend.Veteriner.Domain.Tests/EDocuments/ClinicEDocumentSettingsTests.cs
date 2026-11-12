@@ -71,6 +71,6 @@ public sealed class ClinicEDocumentSettingsTests
         s.Update(EDocumentAutoIssueMode.OnPayment, new TimeOnly(23, 0), false, UserId, Now.AddHours(1));
         s.IsAutoIssuePaused.Should().BeFalse();
         s.AutoIssuePauseReason.Should().BeNull();
-        s.AutoIssueEnabledAtUtc.Should().Be(Now, "sürdürmek başlangıcı değiştirmez; durduğu sürede yazılan ücretler de kesilir");
+        s.AutoIssueEnabledAtUtc.Should().Be(Now, "sürdürmek başlangıcı değiştirmez; durduğu sürede ödenen ücretler de kesilir");
     }
 }

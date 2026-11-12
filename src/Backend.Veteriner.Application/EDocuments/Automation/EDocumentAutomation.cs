@@ -15,7 +15,7 @@ public sealed record EDocumentAutomationRun(IReadOnlyList<EDocument> Documents, 
 /// <summary>
 /// Otomatik e-belge ve gün sonu hatırlatması (ADR-036 AK-4, kullanıcı kararı 2026-11-11), klinik başına bir tur:
 /// <list type="bullet">
-/// <item>"Ödeme alınınca": her turda uygun ücretler (tamamen ödenmiş, iptal edilmemiş, belgesiz, ayar açıldıktan sonra yazılmış) kesilir.</item>
+/// <item>"Ödeme alınınca": her turda uygun ücretler (iptal edilmemiş, belgesiz, ödemesi ayar açıkken tamamlanmış) kesilir.</item>
 /// <item>"Gün sonunda": ayar saatinde (İstanbul) günde bir kez aynı ücretler kesilir.</item>
 /// <item>Gün sonu saatinde (otomatik kapalı olsa da) belge kesme izni olanlara özet bildirimi: otomatik kesilen, kesilemeyen ve
 /// belgesiz ödenmiş ücret sayısı; hepsi sıfırsa bildirim yok.</item>

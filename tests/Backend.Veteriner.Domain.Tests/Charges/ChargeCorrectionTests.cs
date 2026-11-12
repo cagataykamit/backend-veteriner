@@ -120,7 +120,7 @@ public sealed class ChargeCorrectionTests
 
         charge.Void(UserId, Reason, Now).Error.Code.Should().Be("Charges.AlreadyVoided");
         charge.Correct("Muayene", 1m, 500m, Reason).Error.Code.Should().Be("Charges.AlreadyVoided");
-        charge.ApplyAllocation(10m).Error.Code.Should().Be("Charges.AlreadyVoided");
+        charge.ApplyAllocation(10m, DateTime.UtcNow).Error.Code.Should().Be("Charges.AlreadyVoided");
     }
 
     [Fact]
@@ -142,5 +142,24 @@ public sealed class ChargeCorrectionTests
         charge.ReleaseAllocation(301m).IsSuccess.Should().BeFalse();
         charge.ReleaseAllocation(300m).IsSuccess.Should().BeTrue();
         charge.AllocatedAmount.Should().Be(0m);
+    }
+
+    [Fact]
+    public void FullyPaidAt_Should_Be_Set_When_Allocation_Closes_And_Cleared_When_Balance_Reopens()
+    {
+        var charge = NewCharge(1000m);
+        charge.ApplyAllocation(400m, Now).IsSuccess.Should().BeTrue();
+        charge.FullyPaidAtUtc.Should().BeNull("kısmi tahsil ücreti kapatmaz");
+
+        charge.ApplyAllocation(600m, Now.AddHours(2)).IsSuccess.Should().BeTrue();
+        charge.FullyPaidAtUtc.Should().Be(Now.AddHours(2), "an, ücreti kapatan tahsilin anıdır");
+
+        charge.ReleaseAllocation(600m).IsSuccess.Should().BeTrue();
+        charge.FullyPaidAtUtc.Should().BeNull("ödeme geri alınınca ücret yeniden açıktır");
+
+        charge.ApplyAllocation(600m, Now.AddDays(1)).IsSuccess.Should().BeTrue();
+        charge.FullyPaidAtUtc.Should().Be(Now.AddDays(1));
+        charge.Correct("Muayene", 1m, 1200m, Reason).IsSuccess.Should().BeTrue();
+        charge.FullyPaidAtUtc.Should().BeNull("tutarı artıran düzeltme açık tutar doğurur");
     }
 }

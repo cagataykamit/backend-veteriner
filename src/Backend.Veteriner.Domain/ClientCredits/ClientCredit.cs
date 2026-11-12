@@ -121,7 +121,7 @@ public sealed class ClientCredit : AggregateRoot, IClinicScoped, ITenantOwned
                 $"Kredinin kalanı yetmiyor (kalan={RemainingAmount:0.00}).");
         }
 
-        var applied = charge.ApplyAllocation(amount);
+        var applied = charge.ApplyAllocation(amount, nowUtc);
         if (!applied.IsSuccess)
             return Result<ClientCreditApplication>.Failure(applied.Error);
 

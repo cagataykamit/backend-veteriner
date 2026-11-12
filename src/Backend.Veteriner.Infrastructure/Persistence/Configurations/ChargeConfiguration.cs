@@ -73,6 +73,9 @@ public sealed class ChargeConfiguration : IEntityTypeConfiguration<Charge>
             .HasForeignKey(x => x.EDocumentId)
             .OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.TenantId, x.EDocumentId });
+        // Otomatik e-belge turu: ayar açıkken ödemesi tamamlanan belgesiz ücretler.
+        b.HasIndex(x => new { x.TenantId, x.ClinicId, x.FullyPaidAtUtc })
+            .HasFilter("[FullyPaidAtUtc] IS NOT NULL AND [EDocumentId] IS NULL");
 
         b.HasIndex(x => new { x.TenantId, x.RequestId })
             .IsUnique()

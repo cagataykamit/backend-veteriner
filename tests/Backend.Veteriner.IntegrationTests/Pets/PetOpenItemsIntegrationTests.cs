@@ -78,7 +78,7 @@ public sealed class PetOpenItemsIntegrationTests : IClassFixture<CustomWebApplic
             db.ChargeSuggestions.Add(ChargeSuggestion.ForExaminationService(exam, service, 1, now).Value!);
 
             var paid = Charge.Create(s.TenantId, s.ClinicId, s.ClientId, s.PetId, null, null, "Muayene", 1, 1000m, s.UserId, now, null).Value!;
-            paid.ApplyAllocation(400m);
+            paid.ApplyAllocation(400m, DateTime.UtcNow);
             db.Charges.Add(paid);
             db.Charges.Add(Charge.Create(s.TenantId, s.ClinicId, s.ClientId, null, null, null, "Mama", 1, 50m, s.UserId, now, null).Value!);
 

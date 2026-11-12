@@ -318,6 +318,26 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
     }
 
     [Fact]
+    public async Task Auto_Issue_Should_Cover_Charges_Whose_Payment_Completes_While_Enabled_Regardless_Of_Creation_Time()
+    {
+        var ctx = await SeedAsync();
+        var clientId = await ctx.CreateClientAsync(new { personType = "Individual", nationalId = Tckn });
+        var paidBefore = await ctx.ChargeAsync(clientId, 120m, "Service");
+        await ctx.PayAsync(clientId, paidBefore, 120m);
+        var writtenBefore = await ctx.ChargeAsync(clientId, 80m, "Service");
+
+        await ctx.PutAsync($"/api/v1/clinics/{ctx.ClinicId}/e-document-settings", new { autoIssueMode = "OnPayment", endOfDayTime = "23:59", issueOnPaymentByDefault = false });
+        await ctx.PayAsync(clientId, writtenBefore, 80m);
+
+        await _factory.Services.GetRequiredService<Backend.Veteriner.Infrastructure.EDocuments.EDocumentAutomationProcessor>().RunOnceAsync(CancellationToken.None);
+
+        (await ctx.GetAsync($"/api/v1/charges/{writtenBefore}")).GetProperty("eDocumentId").ValueKind
+            .Should().Be(JsonValueKind.String, "ayar açılmadan yazılıp açıkken ödenen ücret kesilir");
+        (await ctx.GetAsync($"/api/v1/charges/{paidBefore}")).GetProperty("eDocumentId").ValueKind
+            .Should().Be(JsonValueKind.Null, "ayar açıldığında zaten ödenmiş eski ücret geriye dönük kesilmez");
+    }
+
+    [Fact]
     public async Task Auto_Issue_Should_Pause_On_Account_Wide_Error_Notify_And_Resume_When_Settings_Saved()
     {
         var ctx = await SeedAsync();

@@ -1623,6 +1623,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid?>("ExaminationId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime?>("FullyPaidAtUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<Guid?>("ImportBatchId")
                         .HasColumnType("uniqueidentifier");
 
@@ -1697,6 +1700,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("TenantId", "VoidedAtUtc"), new[] { "ClinicId", "ClientId", "Amount", "AllocatedAmount", "CreatedAtUtc" });
 
                     b.HasIndex("TenantId", "ClinicId", "CreatedAtUtc");
+
+                    b.HasIndex("TenantId", "ClinicId", "FullyPaidAtUtc")
+                        .HasFilter("[FullyPaidAtUtc] IS NOT NULL AND [EDocumentId] IS NULL");
 
                     b.ToTable("Charges", null, t =>
                         {

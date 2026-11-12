@@ -23,8 +23,8 @@ public sealed class ClinicEDocumentSettings : ITenantOwned
     public bool IssueOnPaymentByDefault { get; private set; }
 
     /// <summary>
-    /// Otomatik kesmenin açıldığı an: yalnız bu andan sonra yazılan ücretler otomatik belgelenir (ayarı açmak geçmiş ücretlerin
-    /// hepsini birden kesmez). Mod kapatılınca boşalır.
+    /// Otomatik kesmenin açıldığı an: yalnız bu andan sonra ödemesi tamamlanan ücretler otomatik belgelenir (ücretin ne
+    /// zaman yazıldığı fark etmez; açılışta zaten ödenmiş eski ücretler kesilmez). Mod kapatılınca boşalır; durdurma ("Sürdür") değiştirmez.
     /// </summary>
     public DateTime? AutoIssueEnabledAtUtc { get; private set; }
 
