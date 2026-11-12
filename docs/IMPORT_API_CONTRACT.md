@@ -902,7 +902,7 @@ Pilot klinik E-vet SMART'tan geliyor. E-vet'in en zengin dışa aktarması **Gen
 |---|---|---|---|
 | `file` | Genel > Yedek Al (`.xlsx`): **Müşteri, Hasta, Randevular, Muayene** işaretli; **Giriş Bilgileri işaretsiz** (kullanıcı bilgisi gerekmez) | Evet (E-vet yolu) | Sayfalar katlanmış adla tanınır: `Müşteri Listesi`, `Hasta Listesi`, `Randevu Listesi`, `Muayene Listesi`. Bunlardan hiçbiri yoksa çalışma kitabı genel okuyucuya gider (Vetinity şablonu E-vet profiliyle de yüklenebilir). |
 | `evetPatientReportFile` | Rapor > Hasta Listesi (`.csv`, `;`) | Hayır (önerilir) | İç içe rapordan hasta protokolü → müşteri protokolü. Tanınmazsa `400 Imports.UnsupportedFile`. |
-| `evetVaccineReportFile` | Rapor > Resmi > Aşı Bilgi (`.csv`; tarih aralığı 01.01.2020 – bugün) | Hayır | Aşı seri numarası ve ticari ürün adı. Tanınmazsa `400 Imports.UnsupportedFile`. |
+| `evetVaccineReportFile` | Rapor > Resmi > Aşı Bilgi (`.csv`; tarih aralığı E-vet'in kullanılmaya başlandığı tarihten bugüne) | Hayır | Aşı seri numarası ve ticari ürün adı. Tanınmazsa `400 Imports.UnsupportedFile`. |
 | `productsFile` | Rapor > Depo > Ürün Listesi (`.csv`) | Hayır | Başlık satırı (`Ürün`, `Barkod-1`, `Satış Fiyatı`) tanınırsa gruplu rapor çözülür; tanınmazsa genel CSV okuyucusu (yedeksiz yüklemede de). |
 
 - Raporlar yalnız `EVet` profilinde ve yedekle birlikte kabul edilir (bölüm 4.1). Tarihler yedekte tarih hücresi ya da Excel seri sayısı, raporlarda `gg.aa.yyyy[ SS:dd]` olarak okunur.
