@@ -158,7 +158,7 @@ Okuma `Clinics.Read`, yazma `Clinics.Update`. Bağlantıdan ayrıdır (koparıl�
 ```
 
 - `autoIssueMode`: `Off` | `OnPayment` (tamamen ödenen ücret arka plan işinin bir sonraki turunda, en çok `EDocuments:Processor:AutomationIntervalSeconds` gecikmeyle kesilir) | `EndOfDay` (günde bir kez `endOfDayTime`'da, İstanbul saati).
-- `autoIssueEnabledAtUtc`: otomatik kesmenin açıldığı an; **yalnız bundan sonra yazılan ücretler** otomatik kesilir (açmak geçmişi toplu kesmez). Kapatınca boşalır.
+- `autoIssueEnabledAtUtc`: otomatik kesmenin açıldığı an; **yalnız bundan sonra ödemesi tamamlanan ücretler** otomatik kesilir, ücretin ne zaman yazıldığı fark etmez (açılmadan yazılıp sonra ödenen ücret de kesilir; açılışta zaten ödenmiş eski ücretler geriye dönük kesilmez — kullanıcı kararı 2026-11-12). Kapatınca boşalır; yeniden açmak yeni an yazar (kapalıyken ödenenler kesilmez). Durdurma / sürdürme anı değiştirmez.
 - `issueOnPaymentByDefault`: ödeme ekranındaki "e-Belge kes" seçeneğinin varsayılanı.
 - `serviceDocument` / `productDocument`: mükellef türünden çıkan belge (`ESmm` | `Invoice` = alıcıya göre e-Arşiv / e-Fatura); mükellef türü yoksa null. Kural backend'de (§1.1), panel yalnız gösterir.
 - `autoIssuePausedAtUtc` / `autoIssuePauseReason`: otomatik kesme hesap genelinde kalıcı bir sağlayıcı sorunuyla durduysa an ve neden (§6); değilse null. Panel nedeni ve "Sürdür" düğmesini gösterir.
@@ -308,7 +308,7 @@ Bağlı her klinikte `endOfDayTime`'da (ayar yoksa 23:00, otomatik kapalı olsa 
 ## 6) Otomatik kesme (arka plan işi)
 
 - `EDocumentAutomationProcessor` (`EDocuments:Processor:AutomationIntervalSeconds`, varsayılan 60 sn) bağlı klinikleri tarar; her klinik kendi kiracı kapsamında işlenir.
-- Uygun ücret: tamamen ödenmiş (`allocatedAmount = amount`), iptal edilmemiş, belgesiz, `autoIssueEnabledAtUtc`'den sonra yazılmış; bağlantı sağlam; alıcı belge türü için yeterli (kurumsalda vergi no). Uygun olmayan veya hata alan ücret kesilmez, §4.6 listesinde nedeniyle görünür ve §4.9–§4.10 hatırlatmasına girer.
+- Uygun ücret: iptal edilmemiş, belgesiz, **ödemesi `autoIssueEnabledAtUtc`'den sonra tamamlanmış** (`Charge.FullyPaidAtUtc ≥ autoIssueEnabledAtUtc`; "Gün sonunda" modunda da aynı ölçüt, o güne kadar bekleyenler de kesilir); bağlantı sağlam; alıcı belge türü için yeterli (kurumsalda vergi no). Uygun olmayan veya hata alan ücret kesilmez, §4.6 listesinde nedeniyle görünür ve §4.9–§4.10 hatırlatmasına girer.
 - Gruplama müşteri başına, belge türüne göre; tekrar koruması anahtarla türetilen requestId + "bir ücret tek geçerli belge" bağı (otomatik ve elle kesme yarışsa da çift belge yok).
 - Otomatik belgenin `createdByUserId`'si ayarı en son kaydeden kullanıcıdır, `origin: Automatic`. Her otomatik belge denetim kaydına `EDocument.AutoIssue` olarak yazılır (aktör yok, yük `origin: "Automatic"`).
 - Gün sonu işaretlemesi işten önce kaydedilir (`ClinicEDocumentSettings.RowVersion`); iki örnek aynı günü ikinci kez çalıştırmaz.
@@ -316,6 +316,7 @@ Bağlı her klinikte `endOfDayTime`'da (ayar yoksa 23:00, otomatik kapalı olsa 
 - **Kalıcı hesap hatasında durma** (`EDocumentAutoIssueGuard`): yetki / anahtar reddi (bağlantı "yeniden bağlan" durumuna düşer), hesap askıda / kontör bitti (`AccountSuspended`), kota (`QuotaExceeded`) veya kullanılamayan bağlantı çıkınca tur durur, `ClinicEDocumentSettings.AutoIssuePausedAtUtc` / `AutoIssuePauseReason` yazılır, `EDocumentsAutoIssuePaused` bildirimi bir kez gider (§4.11). Durmuşken yeni belge kesilmez; bu sürede ödenen ücretler belgesiz bekler ve sürdürünce (ayarı kaydetmek) kesilir (`autoIssueEnabledAtUtc` değişmez). Sonucu sonradan gelen (asenkron) belgede aynı hata çıkarsa durum işi de durdurur. Belgeye özgü hatalar (alıcı bilgisi, verinin reddi) durdurmaz; geçici hatalar (zaman aşımı, 5xx, 429) artan aralıkla yeniden denenir (10 sn → 30 dk, en çok `MaxAttempts`).
 - **Ayar kapatılınca** yeni belge kesilmez; gönderilmiş (`Sending`) belgelerin sonucu yine alınır (sağlayıcıda oluşmuş olabilirler; yarıda bırakmak çift belge riskidir).
 - **İptal / vazgeçmeden sonra** otomatik kesme aynı ücreti yeniden kesmez (aynı anahtarlı requestId eski belgeyi bulur); yeniden kesim elle yapılır ve **yeni dış referans (UUID)** alır (test ortamında doğrulandı).
+- `Charge.FullyPaidAtUtc`: tahsilatın (ödeme tahsisi veya kredi mahsubu) ücreti kapattığı an; ödeme geri alınınca veya tutarı artıran düzeltmede boşalır, yeniden ödenince yeni an yazılır. Tutarı tahsis edilmiş tutara indiren düzeltmeyle kapanan ücrette an yazılmaz (otomatik kesilmez, elle kesilir). Migration `AddChargeFullyPaidAt` sütunu ekler, mevcut kapalı ücretleri son geçerli tahsilin anıyla doldurur ve `(TenantId, ClinicId, FullyPaidAtUtc)` koşullu indeksini (belgesiz, dolu) kurar; yalnız yerel geliştirme veritabanında uygulandı.
 - Migration: `AddEDocumentAutoIssuePause` (`ClinicEDocumentSettings.AutoIssuePausedAtUtc`, `AutoIssuePauseReason`; iki boş bırakılabilir sütun); yalnız yerel geliştirme veritabanında uygulandı.
 
 ## 7) Çift kesim koruması (iki sağlayıcıda ortak)
