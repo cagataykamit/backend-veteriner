@@ -56,6 +56,7 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
             services.AddSingleton<IEDocumentProvider>(_provider);
             services.AddSingleton<IEDocumentProvider>(_keyProvider);
             services.AddSingleton<IEDocumentCredentialProvider>(_keyProvider);
+            services.AddSingleton<IEDocumentProvider>(new ClosedProvider());
         }));
     }
 
@@ -69,6 +70,8 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
         options.GetProperty("availableProviders").EnumerateArray()
             .Single(p => p.GetProperty("provider").GetString() == KeyProvider.Code)
             .GetProperty("connectionMethod").GetString().Should().Be("Credentials");
+        options.GetProperty("availableProviders").EnumerateArray()
+            .Should().NotContain(p => p.GetProperty("provider").GetString() == ClosedProvider.Code, "kapalı entegratör kliniklere sunulmaz");
 
         var wrong = await ctx.Http.PostAsJsonAsync($"{url}/credentials", new { provider = KeyProvider.Code, apiKey = "yanlis-anahtar" });
         wrong.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -621,6 +624,26 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
 
         public Task<ProviderResult<ProviderPdf>> GetPdfAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct)
             => throw new NotSupportedException();
+    }
+
+    /// <summary>Ayarla kapatılmış entegratör (canlıda Paraşüt): listede görünmez, çağrılmaz.</summary>
+    private sealed class ClosedProvider : IEDocumentProvider
+    {
+        public const string Code = "kapali";
+
+        public string ProviderCode => Code;
+        public string DisplayName => "Kapalı Sağlayıcı";
+        public bool IsConfigured => false;
+        public EDocumentEnvironment Environment => EDocumentEnvironment.Test;
+        public bool CanCancel(EDocumentType type) => true;
+
+        public Task<ProviderResult<ProviderAccountCheck>> VerifyAsync(EDocumentProviderAccount account, CancellationToken ct) => throw new NotSupportedException();
+        public Task<ProviderResult<string?>> FindEInvoiceRecipientAsync(EDocumentProviderAccount account, string taxNumber, CancellationToken ct) => throw new NotSupportedException();
+        public Task<ProviderResult<ProviderIssueOutcome>> IssueAsync(EDocumentProviderAccount account, EDocumentSendRequest request, CancellationToken ct) => throw new NotSupportedException();
+        public Task<ProviderResult<ProviderIssueOutcome>> CheckAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct) => throw new NotSupportedException();
+        public Task<ProviderResult<ProviderCancelOutcome>> CancelAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct) => throw new NotSupportedException();
+        public Task<ProviderResult<bool>> DiscardDraftAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct) => throw new NotSupportedException();
+        public Task<ProviderResult<ProviderPdf>> GetPdfAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct) => throw new NotSupportedException();
     }
 
     /// <summary>Sağlayıcı davranışını taklit eder: e-SMM eşzamanlı kesilir, e-Arşiv / e-Fatura sonucu sonradan gelir.</summary>

@@ -38,6 +38,18 @@ public sealed class ParasutEDocumentProviderTests
         return new ParasutEDocumentProvider(client);
     }
 
+    [Fact]
+    public void Disabled_Option_Should_Make_Provider_Unconfigured()
+    {
+        var off = new ParasutOptions
+        {
+            Enabled = false, ClientId = "test-client", ClientSecret = "test-secret", RedirectUri = "https://localhost:7173/api/e-documents/parasut/callback",
+        };
+
+        off.IsConfigured.Should().BeFalse("canlıda Paraşüt kapalı: listelenmez, bağlanılamaz");
+        Provider().IsConfigured.Should().BeTrue("varsayılan açık");
+    }
+
     private static string Credentials(DateTime expiresAt)
         => JsonSerializer.Serialize(new { AccessToken = "access-1", RefreshToken = "refresh-1", ExpiresAtUtc = expiresAt });
 

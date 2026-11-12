@@ -42,7 +42,9 @@ public sealed class EDocumentConnectionService
             choices = accounts?.Select(a => new EDocumentAccountChoiceDto(a.AccountId, a.Name, a.TaxNumber)).ToList();
         }
 
+        // Yalnız sunulan (yapılandırılmış ve açık) entegratörler listelenir; kapalı olan soluk da gösterilmez.
         var available = _providers.All
+            .Where(p => p.IsConfigured)
             .Select(p => new EDocumentProviderOptionDto(p.ProviderCode, p.DisplayName, p.IsConfigured, _providers.FindOAuth(p.ProviderCode) is null ? "Credentials" : "OAuth"))
             .ToList();
 

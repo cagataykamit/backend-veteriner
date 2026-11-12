@@ -173,6 +173,7 @@
 
   "EDocuments": {
     "Parasut": {
+      "Enabled": true,
       "Environment": "Test",
       "IdentityBaseUrl": "https://id-staging.parasut.com/realms/parasut/protocol/openid-connect",
       "ApiBaseUrl": "https://api-staging.parasut.com/v4",
