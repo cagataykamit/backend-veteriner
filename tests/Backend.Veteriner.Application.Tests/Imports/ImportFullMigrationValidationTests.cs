@@ -163,11 +163,24 @@ public sealed class ImportFullMigrationValidationTests
     }
 
     [Fact]
-    public void Clinical_Record_Without_Content_Should_Be_An_Error()
+    public void Clinical_Record_Without_Content_Should_Be_Skipped_Not_An_Error()
     {
         var output = WithOwnerAndPet(ImportTable.ClinicalRecords, [["H-1", "12.05.2024", "Muayene"]]);
+        var row = Row(output, ImportTable.ClinicalRecords);
 
-        Codes(Row(output, ImportTable.ClinicalRecords)).Should().Contain(ImportRules.ClinicalRecordEmpty.Code);
+        Codes(row).Should().Contain(ImportRules.ClinicalRecordEmpty.Code);
+        row.Status.Should().NotBe(ImportRowValidationStatus.Error);
+        row.Normalized.Action.Should().Be(ImportRowAction.Skip);
+    }
+
+    [Fact]
+    public void Empty_Clinical_Record_Should_Be_Skipped_Even_When_Pet_Is_Missing()
+    {
+        var output = WithOwnerAndPet(ImportTable.ClinicalRecords, [["H-404", "12.05.2024", "Muayene"]]);
+        var row = Row(output, ImportTable.ClinicalRecords);
+
+        Codes(row).Should().Contain(ImportRules.ClinicalRecordEmpty.Code);
+        row.Normalized.Action.Should().Be(ImportRowAction.Skip);
     }
 
     [Theory]
