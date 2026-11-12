@@ -63,6 +63,8 @@ public sealed partial class ImportValidationEngine
         if (address is { Length: > MaxAddressLength })
             issues.Add(ImportRules.FieldTooLong.At("Adres", $"Adres en fazla {MaxAddressLength} karakter olabilir."));
 
+        var notes = ReadText(reader, "Not", Client.MaxNotesLength, issues);
+
         var (openingBalance, balanceDate) = ReadOpeningBalance(reader, issues);
         var (nationalId, taxNumber, taxOffice) = ReadInvoicingIdentity(reader, issues);
         var remindersOptedOut = ReadClientInactive(reader, issues);
@@ -82,7 +84,7 @@ public sealed partial class ImportValidationEngine
         }
 
         var normalized = new ImportNormalizedCustomer(
-            reference, fullName, phone, email, address, openingBalance, balanceDate, nationalId, taxNumber, taxOffice, remindersOptedOut);
+            reference, fullName, phone, email, address, openingBalance, balanceDate, nationalId, taxNumber, taxOffice, remindersOptedOut, notes);
         if (HasError(issues))
             return Complete(node, Finish(ImportTable.Customers, reader.RowNumber, issues, normalized));
 

@@ -66,6 +66,8 @@ public static class ImportCanonicalSchema
             "Vergi Dairesi"),
         new("Durum", "Hayır", "Aktif veya Pasif. Pasif müşteri aktarılır ve hatırlatma istemiyor olarak işaretlenir.", "Aktif", false,
             "Müşteri Durumu"),
+        new("Not", "Hayır", "Müşteri notu (en çok 2000 karakter); yalnız yeni müşteriye yazılır.", "Akşamları aranmak istiyor", false,
+            "Notlar", "Açıklama", "Müşteri Notu", "Müşteri Açıklaması", "Özel Not"),
     ];
 
 
@@ -232,6 +234,10 @@ public static class ImportCanonicalSchema
             "Üretici", "Firma", "Marka"),
         new("Aciklama", "Hayır", "Açıklama (en çok 4000 karakter).", "Yıllık", false,
             "Açıklama", "Not"),
+        new("KdvOrani", "Hayır", "KDV oranı (%): 20, %20 veya 18,5 gibi (0-100). Boşsa klinik varsayılanı.", "20", true,
+            "KDV", "KDV Oranı", "KDV %", "KDV Oranı (%)", "Satış KDV", "Satış KDV Oranı", "Vergi Oranı"),
+        new("AlisFiyati", "Hayır", "Birim alış fiyatı (TL), bilgi amaçlı; boş veya 0 ise boş.", "300,00", true,
+            "Alış Fiyatı", "Alış Fiyatı (TL)", "Alış", "Maliyet", "Birim Maliyet", "Geliş Fiyatı"),
     ];
 
     private static readonly Dictionary<ImportTable, ImportRequirement> Requirements = new()

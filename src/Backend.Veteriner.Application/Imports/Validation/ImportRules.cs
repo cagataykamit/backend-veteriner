@@ -184,6 +184,10 @@ public static class ImportRules
         "Ürün türü tanınmadı (Hizmet, İlaç, Aşı, Diğer); Diğer olarak aktarılacak.");
     public static readonly ImportRule CategoryUnmapped = new("Imports.CategoryUnmapped", ImportIssueSeverity.Info,
         "Kategori tanımlı kategorilerde yok; ürün kategorisiz aktarılacak.");
+    public static readonly ImportRule VatRateInvalid = new("Imports.VatRateInvalid", ImportIssueSeverity.Warning,
+        "KDV oranı okunamadı (0-100 arası, en çok 2 ondalık; örnek: 20 veya %20); ürün klinik varsayılan KDV'siyle aktarılacak.");
+    public static readonly ImportRule PurchasePriceInvalid = new("Imports.PurchasePriceInvalid", ImportIssueSeverity.Warning,
+        "Alış fiyatı okunamadı (örnek: 1.250,50); alış fiyatı boş aktarılacak.");
 
     // Uygulama (B4; satır sonucu yazılırken sorun listesine eklenir, doğrulama durumu değişmez)
     public static readonly ImportRule OwnerUnitFailed = new("Imports.OwnerUnitFailed", ImportIssueSeverity.Error,

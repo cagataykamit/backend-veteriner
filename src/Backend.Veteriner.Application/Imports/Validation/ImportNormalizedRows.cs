@@ -36,6 +36,7 @@ public abstract record ImportNormalizedRow
 /// Müşteri satırı. <see cref="OpeningBalance"/> aktarılacak sıfır dışı devir bakiyesidir (ADR-048 T3): müşteri oluşturulursa
 /// artı tutar devir ücreti, eksi tutar devir alacağı açar; eşleşen/mükerrer satırda null'dır. <see cref="NationalId"/> (bireysel) veya
 /// <see cref="TaxNumber"/> (kurumsal) geçerli fatura kimliğidir; <see cref="RemindersOptedOut"/> eski programda pasif müşteridir.
+/// <see cref="Notes"/> yalnız oluşturulan müşteriye yazılır.
 /// </summary>
 public sealed record ImportNormalizedCustomer(
     string? Reference,
@@ -48,7 +49,8 @@ public sealed record ImportNormalizedCustomer(
     string? NationalId = null,
     string? TaxNumber = null,
     string? TaxOffice = null,
-    bool RemindersOptedOut = false)
+    bool RemindersOptedOut = false,
+    string? Notes = null)
     : ImportNormalizedRow;
 
 /// <summary>
@@ -139,7 +141,10 @@ public sealed record ImportNormalizedAppointment(
     string? Notes)
     : ImportNormalizedRow;
 
-/// <summary>Ürün/hizmet kartı satırı (stok miktarı yok; ADR-048 T7). <c>TargetId</c> eşleşen mevcut üründür.</summary>
+/// <summary>
+/// Ürün/hizmet kartı satırı (stok miktarı yok; ADR-048 T7). <c>TargetId</c> eşleşen mevcut üründür. <see cref="VatRate"/> boşsa
+/// klinik varsayılanı; <see cref="PurchasePrice"/> bilgi amaçlıdır. İkisi de yalnız oluşturulan ürüne yazılır.
+/// </summary>
 public sealed record ImportNormalizedProduct(
     string? Name,
     ProductKind Kind,
@@ -149,7 +154,9 @@ public sealed record ImportNormalizedProduct(
     string? Barcode,
     string? Sku,
     string? Manufacturer,
-    string? Description)
+    string? Description,
+    decimal? VatRate = null,
+    decimal? PurchasePrice = null)
     : ImportNormalizedRow;
 
 /// <summary><c>NormalizedJson</c> okuma/yazma; tek yer.</summary>

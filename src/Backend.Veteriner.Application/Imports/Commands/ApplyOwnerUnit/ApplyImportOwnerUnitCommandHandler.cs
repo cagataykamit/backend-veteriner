@@ -226,7 +226,8 @@ public sealed class ApplyImportOwnerUnitCommandHandler
                 data.Phone,
                 data.Address,
                 RemindersOptedOut: data.RemindersOptedOut ? true : null,
-                InvoicingIdentity: InvoicingIdentityOf(data)),
+                InvoicingIdentity: InvoicingIdentityOf(data),
+                Notes: data.Notes),
             ct);
         if (!created.IsSuccess)
             return Fail(row, created.Error);
@@ -661,7 +662,8 @@ public sealed class ApplyImportOwnerUnitCommandHandler
             var created = await SendAsync(
                 new CreateProductCommand(
                     data.CategoryId, data.Name!, data.Sku, data.Barcode, data.Description, data.Unit, data.UnitPrice,
-                    Charge.DefaultCurrency, data.Kind, ControlledSubstanceClass.None, Manufacturer: data.Manufacturer),
+                    Charge.DefaultCurrency, data.Kind, ControlledSubstanceClass.None, Manufacturer: data.Manufacturer,
+                    VatRate: data.VatRate, PurchasePrice: data.PurchasePrice),
                 ct);
             if (!created.IsSuccess)
                 return Fail(row, created.Error);
