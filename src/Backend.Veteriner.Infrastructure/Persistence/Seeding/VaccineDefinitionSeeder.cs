@@ -21,6 +21,30 @@ public static class VaccineDefinitionSeeder
         ("EXTERNAL_PARASITE", "Dış Parazit"),
         ("CORONA", "Corona"),
         ("LYME", "Lyme"),
+        // Kedi/köpek: kombine ve Türkiye'de yaygın uygulamalar (E-vet geçişi, 2026-11-12).
+        ("INTERNAL_EXTERNAL_PARASITE", "İç-Dış Parazit"),
+        ("MIXED_RABIES", "Karma + Kuduz"),
+        ("DERMATOPHYTOSIS", "Mantar"),
+        ("DISTEMPER_PARVO", "DP (Distemper-Parvo)"),
+        ("PARVO", "Parvo"),
+        ("LEPTOSPIROSIS", "Leptospiroz"),
+        // Tavşan, kuş
+        ("RHD", "Tavşan Hemorajik Hastalığı (RHD)"),
+        ("MYXOMATOSIS", "Miksomatoz"),
+        ("NEWCASTLE", "Newcastle"),
+        // At
+        ("TETANUS", "Tetanoz"),
+        ("EQUINE_INFLUENZA", "At Gribi"),
+        // Çiftlik hayvanları
+        ("FOOT_AND_MOUTH", "Şap"),
+        ("BRUCELLOSIS", "Brusella"),
+        ("ENTEROTOXEMIA", "Enterotoksemi"),
+        ("MASTITIS", "Mastitis"),
+        ("SHEEP_GOAT_POX", "Koyun-Keçi Çiçeği"),
+        ("ANTHRAX", "Şarbon"),
+        ("BLACKLEG", "Yanıkara"),
+        ("LUMPY_SKIN", "Nodüler Ekzantem (LSD)"),
+        ("PPR", "Küçük Ruminant Vebası (PPR)"),
     ];
 
     public static async Task SeedAsync(AppDbContext db, ILogger? logger = null, CancellationToken ct = default)
