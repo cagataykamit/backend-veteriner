@@ -53,11 +53,23 @@ public sealed class ImportValueResolverTests
     private static readonly Guid Tetanus = Guid.NewGuid();
     private static readonly Guid Mastitis = Guid.NewGuid();
     private static readonly Guid Enterotoxemia = Guid.NewGuid();
+    private static readonly Guid Setter = Guid.NewGuid();
+    private static readonly Guid Malinois = Guid.NewGuid();
+    private static readonly Guid Calico = Guid.NewGuid();
+    private static readonly Guid BrownWhite = Guid.NewGuid();
+    private static readonly Guid YellowWhite = Guid.NewGuid();
+    private static readonly Guid LightBrown = Guid.NewGuid();
 
     private static readonly ImportValueResolver Extended = new(new ImportCatalogs(
         Species: [new(Dog, "Köpek", "DOG", null), new(Cat, "Kedi", "CAT", null), new(GuineaPig, "Gine Domuzu", "GUINEA_PIG", null), new(Exotic, "Egzotik", "EXOTIC", null), new(Other, "Diğer", "OTHER", null)],
-        Breeds: [new(ScottishFold, "Scottish Fold", null, Cat)],
-        Colors: [],
+        Breeds: [new(ScottishFold, "Scottish Fold", null, Cat), new(Setter, "İngiliz Setter", null, Dog), new(Malinois, "Belçika Malinois", null, Dog)],
+        Colors:
+        [
+            new(Calico, "Alacalı", "CALICO", null),
+            new(BrownWhite, "Kahverengi-Beyaz", "BROWN_WHITE", null),
+            new(YellowWhite, "Sarı-Beyaz", "YELLOW_WHITE", null),
+            new(LightBrown, "Açık Kahverengi", "LIGHT_BROWN", null),
+        ],
         Vaccines:
         [
             new(Mixed, "Karma", "MIXED", null),
@@ -133,7 +145,27 @@ public sealed class ImportValueResolverTests
     {
         Extended.Resolve(ImportValueKind.Breed, "Scottisch Fold", Cat).TargetId.Should().Be(ScottishFold);
         Extended.Resolve(ImportValueKind.Breed, "Scottisch Fold", Dog).Kind.Should().Be(ImportValueResolutionKind.Unmapped);
+        Extended.Resolve(ImportValueKind.Breed, "Setter", Dog).TargetId.Should().Be(Setter);
+        Extended.Resolve(ImportValueKind.Breed, "Belçika Kurdu", Dog).TargetId.Should().Be(Malinois);
+        Extended.Resolve(ImportValueKind.Breed, "Terrier", Dog).Kind.Should().Be(ImportValueResolutionKind.Unmapped);
     }
+
+    [Theory]
+    [InlineData("Üç Renkli", "CALICO")]
+    [InlineData("Kahve Beyaz", "BROWN_WHITE")]
+    [InlineData("Beyaz - Sarı", "YELLOW_WHITE")]
+    [InlineData("Sarı Beyaz", "YELLOW_WHITE")]
+    [InlineData("Açık Kahve", "LIGHT_BROWN")]
+    public void EVet_Color_Spellings_Should_Resolve(string source, string code)
+        => Extended.Resolve(ImportValueKind.Color, source).TargetId.Should().Be(ExtendedColors[code]);
+
+    private static readonly Dictionary<string, Guid> ExtendedColors = new()
+    {
+        ["CALICO"] = Calico,
+        ["BROWN_WHITE"] = BrownWhite,
+        ["YELLOW_WHITE"] = YellowWhite,
+        ["LIGHT_BROWN"] = LightBrown,
+    };
 
     [Theory]
     [InlineData("YILLIK KEDİ KARMA", "karma")]

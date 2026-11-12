@@ -22,4 +22,14 @@ public static class PetColorSeedConstants
     public static readonly Guid MultiColor = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020015");
     public static readonly Guid Other = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020016");
     public static readonly Guid Unknown = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020017");
+
+    // Türkiye'de yaygın tüy renkleri (E-vet geçişi 2026-11-12).
+    public static readonly Guid Brindle = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020018");
+    public static readonly Guid BrindleWhite = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020019");
+    public static readonly Guid YellowWhite = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020020");
+    public static readonly Guid BrownBlack = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020021");
+    public static readonly Guid LightBrown = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020022");
+    public static readonly Guid Dun = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020023");
+    public static readonly Guid Beige = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020024");
+    public static readonly Guid Blue = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020025");
 }

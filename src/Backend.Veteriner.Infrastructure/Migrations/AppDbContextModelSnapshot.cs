@@ -1366,9 +1366,73 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         },
                         new
                         {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020018"),
+                            Code = "BRINDLE",
+                            DisplayOrder = 20,
+                            IsActive = true,
+                            Name = "Kırçıllı"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020019"),
+                            Code = "BRINDLE_WHITE",
+                            DisplayOrder = 21,
+                            IsActive = true,
+                            Name = "Kırçıllı-Beyaz"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020020"),
+                            Code = "YELLOW_WHITE",
+                            DisplayOrder = 22,
+                            IsActive = true,
+                            Name = "Sarı-Beyaz"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020021"),
+                            Code = "BROWN_BLACK",
+                            DisplayOrder = 23,
+                            IsActive = true,
+                            Name = "Kahverengi-Siyah"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020022"),
+                            Code = "LIGHT_BROWN",
+                            DisplayOrder = 24,
+                            IsActive = true,
+                            Name = "Açık Kahverengi"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020023"),
+                            Code = "DUN",
+                            DisplayOrder = 25,
+                            IsActive = true,
+                            Name = "Boz"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020024"),
+                            Code = "BEIGE",
+                            DisplayOrder = 26,
+                            IsActive = true,
+                            Name = "Bej"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020025"),
+                            Code = "BLUE",
+                            DisplayOrder = 27,
+                            IsActive = true,
+                            Name = "Mavi"
+                        },
+                        new
+                        {
                             Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020016"),
                             Code = "OTHER",
-                            DisplayOrder = 16,
+                            DisplayOrder = 98,
                             IsActive = true,
                             Name = "Diğer"
                         },
@@ -1376,7 +1440,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         {
                             Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020017"),
                             Code = "UNKNOWN",
-                            DisplayOrder = 17,
+                            DisplayOrder = 99,
                             IsActive = true,
                             Name = "Bilinmiyor"
                         });
