@@ -179,7 +179,7 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
         (10, "Maviş", "BIRD", "Sultan Papağanı", PetGender.Female, 30, 0.09m, false, false, null),
         (11, "Zeus", "DOG", "Alman Kurdu", PetGender.Male, 40, 36.2m, false, true, null),
         (11, "Lokum", "CAT", "Persian", PetGender.Female, 33, 4.0m, true, true, "Uzun tüy; düzenli tarama önerildi."),
-        (1, "Toffee", "DOG", "Maltese Terrier", PetGender.Male, 20, 4.3m, false, true, null),
+        (1, "Toffee", "DOG", "Maltese", PetGender.Male, 20, 4.3m, false, true, null),
     ];
 
     private async Task<People> WriteClientsAndPetsAsync(Context ctx, CancellationToken ct)

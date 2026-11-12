@@ -1351,7 +1351,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         new
                         {
                             Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020014"),
-                            Code = "CALICO",
+                            Code = "PIEBALD",
                             DisplayOrder = 14,
                             IsActive = true,
                             Name = "Alacalı"
@@ -1491,6 +1491,14 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             DisplayOrder = 35,
                             IsActive = true,
                             Name = "Turuncu-Beyaz"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020034"),
+                            Code = "CALICO",
+                            DisplayOrder = 36,
+                            IsActive = true,
+                            Name = "Üç Renkli (Calico)"
                         },
                         new
                         {
