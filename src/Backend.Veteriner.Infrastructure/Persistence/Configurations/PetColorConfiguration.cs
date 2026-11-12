@@ -44,7 +44,7 @@ public sealed class PetColorConfiguration : IEntityTypeConfiguration<PetColor>
             Seed(PetColorSeedConstants.GrayWhite, "GRAY_WHITE", "Gri-Beyaz", 11),
             Seed(PetColorSeedConstants.Spotted, "SPOTTED", "Benekli", 12),
             Seed(PetColorSeedConstants.Striped, "STRIPED", "Çizgili", 13),
-            Seed(PetColorSeedConstants.Calico, "CALICO", "Alacalı", 14),
+            Seed(PetColorSeedConstants.Piebald, "PIEBALD", "Alacalı", 14),
             Seed(PetColorSeedConstants.MultiColor, "MULTI_COLOR", "Çok Renkli", 15),
             Seed(PetColorSeedConstants.Brindle, "BRINDLE", "Kırçıllı", 20),
             Seed(PetColorSeedConstants.BrindleWhite, "BRINDLE_WHITE", "Kırçıllı-Beyaz", 21),
@@ -62,6 +62,7 @@ public sealed class PetColorConfiguration : IEntityTypeConfiguration<PetColor>
             Seed(PetColorSeedConstants.Champagne, "CHAMPAGNE", "Şampanya", 33),
             Seed(PetColorSeedConstants.Chocolate, "CHOCOLATE", "Çikolata", 34),
             Seed(PetColorSeedConstants.OrangeWhite, "ORANGE_WHITE", "Turuncu-Beyaz", 35),
+            Seed(PetColorSeedConstants.Calico, "CALICO", "Üç Renkli (Calico)", 36),
             // Diğer ve Bilinmiyor listenin sonunda kalır.
             Seed(PetColorSeedConstants.Other, "OTHER", "Diğer", 98),
             Seed(PetColorSeedConstants.Unknown, "UNKNOWN", "Bilinmiyor", 99));

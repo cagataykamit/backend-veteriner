@@ -18,7 +18,8 @@ public static class PetColorSeedConstants
     public static readonly Guid GrayWhite = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020011");
     public static readonly Guid Spotted = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020012");
     public static readonly Guid Striped = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020013");
-    public static readonly Guid Calico = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020014");
+    // Alaca: birkaç renkli, yamalı tüy (kod 2026-11-12 öncesi CALICO idi).
+    public static readonly Guid Piebald = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020014");
     public static readonly Guid MultiColor = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020015");
     public static readonly Guid Other = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020016");
     public static readonly Guid Unknown = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020017");
@@ -40,4 +41,7 @@ public static class PetColorSeedConstants
     public static readonly Guid Champagne = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020031");
     public static readonly Guid Chocolate = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020032");
     public static readonly Guid OrangeWhite = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020033");
+
+    // Üç renkli kedi (siyah-turuncu-beyaz); alacadan ayrı desen.
+    public static readonly Guid Calico = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020034");
 }

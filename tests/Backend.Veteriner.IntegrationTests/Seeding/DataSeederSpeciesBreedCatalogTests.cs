@@ -125,4 +125,46 @@ public sealed class DataSeederSpeciesBreedCatalogTests
         await DataSeeder.SeedAsync(db, hasher);
         (await db.Species.AsNoTracking().SingleAsync(s => s.Code == "GUINEA_PIG")).Name.Should().Be("Kobay");
     }
+
+    [Fact]
+    public async Task SeedAsync_Should_Move_Reptile_Off_Goose_Order_But_Keep_Admin_Order()
+    {
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
+        await ResetDatabaseAsync(db);
+        var hasher = new StubBcryptPasswordHasher();
+
+        // Migration Sürüngen'i 80 (Kaz ile aynı) sırayla ekler; seed sürüngenlerin yanına alır.
+        await DataSeeder.SeedAsync(db, hasher);
+        (await db.Species.AsNoTracking().SingleAsync(s => s.Code == "REPTILE")).DisplayOrder.Should().Be(63);
+        (await db.Species.AsNoTracking().SingleAsync(s => s.Code == "GOOSE")).DisplayOrder.Should().Be(80);
+
+        var reptile = await db.Species.SingleAsync(s => s.Code == "REPTILE");
+        reptile.Update(reptile.Code, reptile.Name, 95, reptile.IsActive);
+        await db.SaveChangesAsync();
+        await DataSeeder.SeedAsync(db, hasher);
+        (await db.Species.AsNoTracking().SingleAsync(s => s.Code == "REPTILE")).DisplayOrder.Should().Be(95);
+    }
+
+    [Fact]
+    public async Task SeedAsync_Should_Rename_Old_Breed_And_Vaccine_Names_To_Literature_Names_Keeping_Ids()
+    {
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
+        await ResetDatabaseAsync(db);
+        var hasher = new StubBcryptPasswordHasher();
+        await DataSeeder.SeedAsync(db, hasher);
+
+        // Eski sistem adları (2026-11-12 öncesi)
+        var maltese = await db.Breeds.SingleAsync(b => b.SpeciesId == SpeciesSeedConstants.Dog && b.Name == "Maltese");
+        maltese.Update("Maltese Terrier", maltese.IsActive);
+        var corona = await db.VaccineDefinitions.SingleAsync(v => v.TenantId == null && v.Code == "CORONA");
+        corona.UpdateDetails(corona.Code, "Corona", corona.Description, corona.DefaultNextDueDays, corona.SpeciesId, corona.IsCore, DateTime.UtcNow);
+        await db.SaveChangesAsync();
+
+        await DataSeeder.SeedAsync(db, hasher);
+
+        (await db.Breeds.AsNoTracking().SingleAsync(b => b.Id == maltese.Id)).Name.Should().Be("Maltese");
+        (await db.Breeds.CountAsync()).Should().Be(227);
+        (await db.VaccineDefinitions.AsNoTracking().SingleAsync(v => v.Id == corona.Id)).Name.Should().Be("Koronavirüs");
+        (await db.Species.AsNoTracking().SingleAsync(s => s.Code == "FERRET")).Name.Should().Be("Ferret (Gelincik)");
+    }
 }

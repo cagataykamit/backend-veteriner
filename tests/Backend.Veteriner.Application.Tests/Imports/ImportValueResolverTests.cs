@@ -33,8 +33,8 @@ public sealed class ImportValueResolverTests
         [
             new(Rabies, "Kuduz", "RABIES", null),
             new(Mixed, "Karma", "MIXED", null),
-            new(FeLv, "Lösemi", "LEUKEMIA", Cat),
-            new(Bronchine, "Bronşin", "BRONCHINE", Dog),
+            new(FeLv, "Lösemi (FeLV)", "LEUKEMIA", Cat),
+            new(Bronchine, "Bronşin (Bordetella)", "BRONCHINE", Dog),
         ]);
 
     private static ImportValueResolver Resolver(params ImportValueMapping[] userMappings) => new(Catalogs, userMappings);
@@ -55,7 +55,15 @@ public sealed class ImportValueResolverTests
     private static readonly Guid Enterotoxemia = Guid.NewGuid();
     private static readonly Guid Setter = Guid.NewGuid();
     private static readonly Guid Malinois = Guid.NewGuid();
+    private static readonly Guid Piebald = Guid.NewGuid();
     private static readonly Guid Calico = Guid.NewGuid();
+    private static readonly Guid Maltese = Guid.NewGuid();
+    private static readonly Guid Husky = Guid.NewGuid();
+    private static readonly Guid Dobermann = Guid.NewGuid();
+    private static readonly Guid Vizsla = Guid.NewGuid();
+    private static readonly Guid Brittany = Guid.NewGuid();
+    private static readonly Guid Ppr = Guid.NewGuid();
+    private static readonly Guid Ferret = Guid.NewGuid();
     private static readonly Guid BrownWhite = Guid.NewGuid();
     private static readonly Guid YellowWhite = Guid.NewGuid();
     private static readonly Guid LightBrown = Guid.NewGuid();
@@ -65,11 +73,12 @@ public sealed class ImportValueResolverTests
     private static readonly Guid BritishShorthair = Guid.NewGuid();
 
     private static readonly ImportValueResolver Extended = new(new ImportCatalogs(
-        Species: [new(Dog, "Köpek", "DOG", null), new(Cat, "Kedi", "CAT", null), new(GuineaPig, "Kobay (Gine Domuzu)", "GUINEA_PIG", null), new(Exotic, "Egzotik", "EXOTIC", null), new(Other, "Diğer", "OTHER", null)],
-        Breeds: [new(ScottishFold, "Scottish Fold", null, Cat), new(BritishShorthair, "British Shorthair", null, Cat), new(Setter, "İngiliz Setter", null, Dog), new(Malinois, "Belçika Malinois", null, Dog)],
+        Species: [new(Dog, "Köpek", "DOG", null), new(Cat, "Kedi", "CAT", null), new(GuineaPig, "Kobay (Gine Domuzu)", "GUINEA_PIG", null), new(Exotic, "Egzotik", "EXOTIC", null), new(Ferret, "Ferret (Gelincik)", "FERRET", null), new(Other, "Diğer", "OTHER", null)],
+        Breeds: [new(ScottishFold, "Scottish Fold", null, Cat), new(BritishShorthair, "British Shorthair", null, Cat), new(Setter, "İngiliz Setter", null, Dog), new(Malinois, "Belçika Malinois", null, Dog), new(Maltese, "Maltese", null, Dog), new(Husky, "Sibirya Kurdu (Siberian Husky)", null, Dog), new(Dobermann, "Dobermann", null, Dog), new(Vizsla, "Vizsla (Macar Kısa Tüylü Pointer)", null, Dog), new(Brittany, "Epagneul Breton (Brittany)", null, Dog)],
         Colors:
         [
-            new(Calico, "Alacalı", "CALICO", null),
+            new(Piebald, "Alacalı", "PIEBALD", null),
+            new(Calico, "Üç Renkli (Calico)", "CALICO", null),
             new(BrownWhite, "Kahverengi-Beyaz", "BROWN_WHITE", null),
             new(YellowWhite, "Sarı-Beyaz", "YELLOW_WHITE", null),
             new(LightBrown, "Açık Kahverengi", "LIGHT_BROWN", null),
@@ -83,12 +92,13 @@ public sealed class ImportValueResolverTests
             new(InternalExternal, "İç-Dış Parazit", "INTERNAL_EXTERNAL_PARASITE", null),
             new(External, "Dış Parazit", "EXTERNAL_PARASITE", null),
             new(Internal, "İç Parazit", "INTERNAL_PARASITE", null),
-            new(Fungal, "Mantar", "DERMATOPHYTOSIS", null),
+            new(Fungal, "Mantar (Dermatofitoz)", "DERMATOPHYTOSIS", null),
             new(MixedRabies, "Karma + Kuduz", "MIXED_RABIES", null),
             new(DistemperParvo, "DP (Distemper-Parvo)", "DISTEMPER_PARVO", null),
             new(Tetanus, "Tetanoz", "TETANUS", null),
             new(Mastitis, "Mastitis", "MASTITIS", null),
             new(Enterotoxemia, "Enterotoksemi", "ENTEROTOXEMIA", null),
+            new(Ppr, "Koyun ve Keçi Vebası (PPR)", "PPR", null),
         ]), []);
 
     public static TheoryData<string, string> EVetVaccineNames => new()
@@ -104,6 +114,7 @@ public sealed class ImportValueResolverTests
         { "Drontal", nameof(Internal) },
         { "MANTAR", nameof(Fungal) },
         { "MANTAR 2", nameof(Fungal) },
+        { "Dermatofitoz", nameof(Fungal) },
         { "Kedi Karma + Kuduz", nameof(MixedRabies) },
         { "Köpek Karma +Kuduz", nameof(MixedRabies) },
         { "PUPPY DP", nameof(DistemperParvo) },
@@ -111,6 +122,9 @@ public sealed class ImportValueResolverTests
         { "TETANOZ 1", nameof(Tetanus) },
         { "Mastitis Aşısı", nameof(Mastitis) },
         { "Mera Aşısı", nameof(Enterotoxemia) },
+        { "Küçük Ruminant Vebası", nameof(Ppr) },
+        { "Küçük Ruminantların Vebası (PPR)", nameof(Ppr) },
+        { "Koyun Vebası", nameof(Ppr) },
     };
 
     [Theory]
@@ -130,6 +144,7 @@ public sealed class ImportValueResolverTests
         [nameof(Tetanus)] = Tetanus,
         [nameof(Mastitis)] = Mastitis,
         [nameof(Enterotoxemia)] = Enterotoxemia,
+        [nameof(Ppr)] = Ppr,
     };
 
     [Theory]
@@ -146,6 +161,8 @@ public sealed class ImportValueResolverTests
         Extended.Resolve(ImportValueKind.Species, "Kobay").TargetId.Should().Be(GuineaPig);
         Extended.Resolve(ImportValueKind.Species, "Gine Domuzu").TargetId.Should().Be(GuineaPig);
         Extended.Resolve(ImportValueKind.Species, "Guinea Pig").TargetId.Should().Be(GuineaPig);
+        Extended.Resolve(ImportValueKind.Species, "Gelincik").TargetId.Should().Be(Ferret);
+        Extended.Resolve(ImportValueKind.Species, "Ferret").TargetId.Should().Be(Ferret);
         Extended.Resolve(ImportValueKind.Species, "ARABA").Kind.Should().Be(ImportValueResolutionKind.Unmapped);
     }
 
@@ -160,8 +177,26 @@ public sealed class ImportValueResolverTests
         Extended.Resolve(ImportValueKind.Breed, "British Blue Point", Cat).TargetId.Should().Be(BritishShorthair);
     }
 
+    [Fact]
+    public void Old_Or_Common_Spellings_Should_Resolve_To_Literature_Breed_Names()
+    {
+        Extended.Resolve(ImportValueKind.Breed, "Maltese Terrier", Dog).TargetId.Should().Be(Maltese);
+        Extended.Resolve(ImportValueKind.Breed, "Husky", Dog).TargetId.Should().Be(Husky);
+        Extended.Resolve(ImportValueKind.Breed, "Sibirya Kurdu", Dog).TargetId.Should().Be(Husky);
+        Extended.Resolve(ImportValueKind.Breed, "Doberman", Dog).TargetId.Should().Be(Dobermann);
+        Extended.Resolve(ImportValueKind.Breed, "Epanyol Breton", Dog).TargetId.Should().Be(Brittany);
+        Extended.Resolve(ImportValueKind.Breed, "Brittany", Dog).TargetId.Should().Be(Brittany);
+        Extended.Resolve(ImportValueKind.Breed, "Macar Tazısı (Vizsla)", Dog).TargetId.Should().Be(Vizsla);
+        // Macar tazısı (Magyar agár) Vizsla değildir; kullanıcı eşler.
+        Extended.Resolve(ImportValueKind.Breed, "Macar Tazısı", Dog).Kind.Should().Be(ImportValueResolutionKind.Unmapped);
+    }
+
     [Theory]
     [InlineData("Üç Renkli", "CALICO")]
+    [InlineData("Calico", "CALICO")]
+    [InlineData("Sarı Beyaz Siyah", "CALICO")]
+    [InlineData("Alacalı", "PIEBALD")]
+    [InlineData("Alaca", "PIEBALD")]
     [InlineData("Kahve Beyaz", "BROWN_WHITE")]
     [InlineData("Beyaz - Sarı", "YELLOW_WHITE")]
     [InlineData("Sarı Beyaz", "YELLOW_WHITE")]
@@ -175,6 +210,7 @@ public sealed class ImportValueResolverTests
     private static readonly Dictionary<string, Guid> ExtendedColors = new()
     {
         ["CALICO"] = Calico,
+        ["PIEBALD"] = Piebald,
         ["BROWN_WHITE"] = BrownWhite,
         ["YELLOW_WHITE"] = YellowWhite,
         ["LIGHT_BROWN"] = LightBrown,

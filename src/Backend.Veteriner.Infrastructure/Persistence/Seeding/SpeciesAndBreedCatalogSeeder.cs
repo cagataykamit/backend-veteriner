@@ -18,14 +18,14 @@ public static class SpeciesAndBreedCatalogSeeder
         ("BIRD", "Kuş", 30, SpeciesSeedConstants.Bird),
         ("RABBIT", "Tavşan", 40, SpeciesSeedConstants.Rabbit),
         ("GUINEA_PIG", "Kobay (Gine Domuzu)", 41, SpeciesSeedConstants.GuineaPig),
-        ("FERRET", "Gelincik", 42, SpeciesSeedConstants.Ferret),
+        ("FERRET", "Ferret (Gelincik)", 42, SpeciesSeedConstants.Ferret),
         ("CHINCHILLA", "Çinçilla", 43, SpeciesSeedConstants.Chinchilla),
         ("HEDGEHOG", "Kirpi", 44, SpeciesSeedConstants.Hedgehog),
         ("HAMSTER", "Hamster", 50, SpeciesSeedConstants.Hamster),
         ("TURTLE", "Kaplumbağa", 60, SpeciesSeedConstants.Turtle),
         ("LIZARD", "Kertenkele", 61, SpeciesSeedConstants.Lizard),
         ("SNAKE", "Yılan", 62, SpeciesSeedConstants.Snake),
-        ("REPTILE", "Sürüngen", 80, SpeciesSeedConstants.Reptile),
+        ("REPTILE", "Sürüngen", 63, SpeciesSeedConstants.Reptile),
         ("FISH", "Balık", 70, SpeciesSeedConstants.Fish),
         ("HORSE", "At", 71, SpeciesSeedConstants.Horse),
         ("DONKEY", "Eşek", 72, SpeciesSeedConstants.Donkey),
@@ -42,10 +42,40 @@ public static class SpeciesAndBreedCatalogSeeder
         ("OTHER", "Diğer", 999, SpeciesSeedConstants.Other),
     ];
 
-    /// <summary>Klinikte yaygın adı öne alınan türler (2026-11-12: kobay).</summary>
+    /// <summary>
+    /// Klinikte yaygın adı öne alınan ya da literatüre göre düzeltilen türler (2026-11-12: kobay; ferret yabani gelincikten
+    /// ayrı türdür, <i>Mustela furo</i>).
+    /// </summary>
     private static readonly (string Code, string OldName, string NewName)[] SpeciesRenames =
     [
         ("GUINEA_PIG", "Gine Domuzu", "Kobay (Gine Domuzu)"),
+        ("FERRET", "Gelincik", "Ferret (Gelincik)"),
+    ];
+
+    /// <summary>
+    /// Sırası düzeltilen türler (2026-11-12: Sürüngen, Kaz ile aynı sırada, 80, idi; sürüngenlerin yanına alınır).
+    /// Yalnız sistemin verdiği eski sıra duruyorsa uygulanır; yöneticinin elle verdiği sıra korunur.
+    /// </summary>
+    private static readonly (string Code, int OldOrder, int NewOrder)[] SpeciesReorders =
+    [
+        ("REPTILE", 80, 63),
+    ];
+
+    /// <summary>
+    /// FCI/FIFe adına göre düzeltilen ırklar (2026-11-12): Maltese terrier değil bişon (FCI 65), Vizsla tazı değil pointer
+    /// (FCI 57), Siberian Husky (FCI 270), Dobermann (FCI 143), Drahthaar (FCI 98), Epagneul Breton (FCI 95), Lohmann Brown
+    /// (Lohmann Tierzucht).
+    /// </summary>
+    private static readonly (string SpeciesCode, string OldName, string NewName)[] BreedRenames =
+    [
+        ("DOG", "Maltese Terrier", "Maltese"),
+        ("DOG", "Macar Tazısı (Vizsla)", "Vizsla (Macar Kısa Tüylü Pointer)"),
+        ("DOG", "Husky", "Sibirya Kurdu (Siberian Husky)"),
+        ("DOG", "Doberman", "Dobermann"),
+        ("DOG", "Drahthaar", "Alman Tel Tüylü Pointer (Drahthaar)"),
+        ("CAT", "Norwegian Forest", "Norwegian Forest Cat"),
+        ("CHICKEN", "Lohman Brown", "Lohmann Brown"),
+        ("DOG", "Epanyol Breton", "Epagneul Breton (Brittany)"),
     ];
 
     private static readonly (string SpeciesCode, string Name)[] BreedCatalog =
@@ -74,7 +104,7 @@ public static class SpeciesAndBreedCatalogSeeder
                 speciesAdded);
         }
 
-        // Katalog adı değişen türler: yalnız eski sistem adı duruyorsa yeni ada geçer (yöneticinin elle verdiği ad korunur).
+        // Katalog adı/sırası değişen türler: yalnız eski sistem değeri duruyorsa yeniye geçer (yöneticinin elle verdiği değer korunur).
         var renamed = 0;
         foreach (var (code, oldName, newName) in SpeciesRenames)
         {
@@ -86,10 +116,20 @@ public static class SpeciesAndBreedCatalogSeeder
             renamed++;
         }
 
+        foreach (var (code, oldOrder, newOrder) in SpeciesReorders)
+        {
+            var row = await db.Species.FirstOrDefaultAsync(s => s.Code == code && s.DisplayOrder == oldOrder, ct);
+            if (row is null)
+                continue;
+
+            row.Update(row.Code, row.Name, newOrder, row.IsActive);
+            renamed++;
+        }
+
         if (renamed > 0)
         {
             await db.SaveChangesAsync(ct);
-            logger?.LogInformation("SpeciesAndBreedCatalogSeeder: {Count} species row(s) renamed.", renamed);
+            logger?.LogInformation("SpeciesAndBreedCatalogSeeder: {Count} species row(s) renamed or reordered.", renamed);
         }
 
         var catalogCodes = SpeciesCatalog.Select(x => x.Code.Trim().ToUpperInvariant()).ToArray();
@@ -97,6 +137,28 @@ public static class SpeciesAndBreedCatalogSeeder
             .AsNoTracking()
             .Where(s => catalogCodes.Contains(s.Code))
             .ToDictionaryAsync(s => s.Code, s => s.Id, StringComparer.Ordinal, ct);
+
+        // Irk adı düzeltmesi ekleme döngüsünden önce: yeni ad yoksa eski kayıt yeniden adlandırılır (hastaların ırk bağı korunur).
+        var breedsRenamed = 0;
+        foreach (var (speciesCode, oldName, newName) in BreedRenames)
+        {
+            if (!speciesIds.TryGetValue(speciesCode, out var speciesId)
+                || await db.Breeds.AnyAsync(b => b.SpeciesId == speciesId && b.Name == newName, ct))
+                continue;
+
+            var row = await db.Breeds.FirstOrDefaultAsync(b => b.SpeciesId == speciesId && b.Name == oldName, ct);
+            if (row is null)
+                continue;
+
+            row.Update(newName, row.IsActive);
+            breedsRenamed++;
+        }
+
+        if (breedsRenamed > 0)
+        {
+            await db.SaveChangesAsync(ct);
+            logger?.LogInformation("SpeciesAndBreedCatalogSeeder: {Count} breed row(s) renamed.", breedsRenamed);
+        }
 
         var breedAdded = 0;
         foreach (var (speciesCode, breedName) in BreedCatalog)
@@ -149,7 +211,7 @@ public static class SpeciesAndBreedCatalogSeeder
                 "Kangal",
                 "Akbaş",
                 "Anadolu Çoban Köpeği",
-                "Maltese Terrier",
+                "Maltese",
                 "Poodle",
                 "Toy Poodle",
                 "French Bulldog",
@@ -157,9 +219,9 @@ public static class SpeciesAndBreedCatalogSeeder
                 "Pomeranian",
                 "Beagle",
                 "Rottweiler",
-                "Doberman",
+                "Dobermann",
                 "Cocker Spaniel",
-                "Husky",
+                "Sibirya Kurdu (Siberian Husky)",
                 "Border Collie",
                 "Chihuahua",
                 "Dachshund",
@@ -173,8 +235,8 @@ public static class SpeciesAndBreedCatalogSeeder
                 "İngiliz Setter",
                 "Pointer",
                 "Alman Kısa Tüylü Pointer",
-                "Drahthaar",
-                "Macar Tazısı (Vizsla)",
+                "Alman Tel Tüylü Pointer (Drahthaar)",
+                "Vizsla (Macar Kısa Tüylü Pointer)",
                 "Zağar",
                 "Afgan Tazısı",
                 "Pinscher",
@@ -199,12 +261,12 @@ public static class SpeciesAndBreedCatalogSeeder
                 "Cavalier King Charles Spaniel",
                 "King Charles Spaniel",
                 "Amerikan Cocker Spaniel",
-                "Epanyöl Breton",
+                "Epagneul Breton (Brittany)",
                 "Polonya Av Köpeği",
-                "Rus Siyah Terrieri",
+                "Rus Siyah Terrier",
                 "Border Terrier",
-                "Tibet Terrieri",
-                "Avustralya Terrieri",
+                "Tibet Terrier",
+                "Avustralya Terrier",
                 "Affenpinscher",
                 "Amerikan Akita",
                 "Presa Canario",
@@ -234,7 +296,7 @@ public static class SpeciesAndBreedCatalogSeeder
                 "Sphynx",
                 "Ragdoll",
                 "Exotic Shorthair",
-                "Norwegian Forest",
+                "Norwegian Forest Cat",
                 // Sarman ve Smokin Türkiye'de tüy deseni olarak ırk yerine kullanılır (Tekir gibi).
                 "Sarman",
                 "Smokin",
@@ -373,7 +435,7 @@ public static class SpeciesAndBreedCatalogSeeder
                 "Diğer"),
             ..B("CHICKEN",
                 "Atak-S",
-                "Lohman Brown",
+                "Lohmann Brown",
                 "Sussex",
                 "Rhode Island Red",
                 "Brahma",
