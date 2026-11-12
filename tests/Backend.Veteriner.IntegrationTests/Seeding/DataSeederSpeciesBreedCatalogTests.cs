@@ -51,8 +51,8 @@ public sealed class DataSeederSpeciesBreedCatalogTests
         speciesCodes.Should().Contain("LIZARD");
         speciesCodes.Should().Contain("CATTLE");
 
-        // Migration: 9 (REPTILE dahil) + katalog: 17 yeni = 26
-        (await db.Species.CountAsync()).Should().Be(26);
+        // Migration: 9 (REPTILE dahil) + katalog: 18 yeni (EXOTIC dahil) = 27
+        (await db.Species.CountAsync()).Should().Be(27);
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public sealed class DataSeederSpeciesBreedCatalogTests
 
         await DataSeeder.SeedAsync(db, new StubBcryptPasswordHasher());
 
-        (await db.Breeds.CountAsync()).Should().Be(171);
+        (await db.Breeds.CountAsync()).Should().Be(173);
 
         var dogId = await db.Species.AsNoTracking().Where(s => s.Code == "DOG").Select(s => s.Id).SingleAsync();
         var golden = await db.Breeds.AsNoTracking().SingleAsync(b =>
@@ -99,7 +99,7 @@ public sealed class DataSeederSpeciesBreedCatalogTests
         await DataSeeder.SeedAsync(db, hasher);
         await DataSeeder.SeedAsync(db, hasher);
 
-        (await db.Species.CountAsync()).Should().Be(26);
-        (await db.Breeds.CountAsync()).Should().Be(171);
+        (await db.Species.CountAsync()).Should().Be(27);
+        (await db.Breeds.CountAsync()).Should().Be(173);
     }
 }
