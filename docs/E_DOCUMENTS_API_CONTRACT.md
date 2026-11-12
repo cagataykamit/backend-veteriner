@@ -75,7 +75,7 @@ Issued → CancelRequested → Cancelled
 
 ## 3) Sağlayıcı bağlantısı (klinik başına)
 
-Klinik başına tek bağlantı (Tenant + Clinic benzersiz). Kimlik bilgileri (OAuth erişim/yenileme belirteçleri) **ASP.NET Data Protection ile şifreli** saklanır, hiçbir yanıtta dönmez, günlüğe yazılmaz. İzin: okuma `Clinics.Read`, yazma `Clinics.Update` (Admin, Owner, ClinicAdmin). Atanmamış klinik `Clinics.AccessDenied` (403).
+Klinik başına tek bağlantı (Tenant + Clinic benzersiz). Kimlik bilgileri (OAuth erişim/yenileme belirteçleri ya da API anahtarı) **ASP.NET Data Protection ile şifreli** saklanır, hiçbir yanıtta dönmez, günlüğe yazılmaz. İzin: okuma `Clinics.Read`, yazma `Clinics.Update` (Admin, Owner, ClinicAdmin). Atanmamış klinik `Clinics.AccessDenied` (403).
 
 ### 3.1 `GET /clinics/{clinicId}/e-document-connection`
 
@@ -100,8 +100,9 @@ Klinik başına tek bağlantı (Tenant + Clinic benzersiz). Kimlik bilgileri (OA
 - `status`: `NotConnected` (kayıt yok veya koparıldı) | `Connected` | `AccountSelectionRequired` (hesapta birden çok firma var, §3.4) | `ReauthorizationRequired` (yenileme belirteci geçersiz; yeniden bağlanmalı).
 - `environment`: `Test` | `Live` — sunucu ayarından (`EDocuments:Parasut:Environment`); belgeye de yazılır. Test ortamında kesilen belge gerçek değildir.
 - `accountChoices`: yalnız `AccountSelectionRequired` iken `[{ "accountId", "accountName", "taxNumber" }]`.
-- `connectionMethod`: `OAuth` (sağlayıcının ekranında onay, §3.2) | `Credentials` (ileride anahtar/kullanıcı alanlarıyla bağlanan sağlayıcılar). Panel sağlayıcı listesini ve kartı buna göre çizer; belge akışlarında sağlayıcı adı geçmez.
-- `configured: false` = sunucuda uygulama kimliği yok; bağlanma `EDocuments.ProviderNotConfigured` (503) döner.
+- `connectionMethod`: `OAuth` (sağlayıcının ekranında onay, §3.2; Paraşüt) | `Credentials` (klinik sağlayıcı portalında ürettiği API anahtarını girer, §3.8; Nilvera). Panel sağlayıcı listesini ve kartı buna göre çizer; belge akışlarında sağlayıcı adı geçmez.
+- `configured: false` = sunucuda sağlayıcı ayarı eksik (Paraşüt: uygulama kimliği; Nilvera: taban adres); bağlanma `EDocuments.ProviderNotConfigured` (503) döner.
+- `environment` sağlayıcının sunucu ayarından gelir (`EDocuments:{Sağlayıcı}:Environment`).
 
 ### 3.2 `POST /clinics/{clinicId}/e-document-connection/authorize`
 
@@ -128,6 +129,14 @@ Bağlantıyı sınar (belirteç yenilenir, firma erişilebilir mi, e-belge kulla
 ### 3.6 `DELETE /clinics/{clinicId}/e-document-connection`
 
 Bağlantıyı koparır: şifreli kimlik bilgisi silinir, durum `NotConnected`. Kesilmiş belgeler kalır (PDF/iptal için yeniden bağlanmak gerekir). 204. Denetim: `Clinic.EDocumentConnection.Disconnect`.
+
+### 3.8 `POST /clinics/{clinicId}/e-document-connection/credentials`
+
+API anahtarıyla bağlanan sağlayıcı (`connectionMethod: "Credentials"`). Gövde `{ "provider": "nilvera", "apiKey": "…" }`. Anahtar baştan/sondan kırpılır, en çok 500 karakter. Sunucu anahtarla sağlayıcıya bağlanır ve anahtarın ait olduğu hesabı bulur (Nilvera: `GET /general/Company`; `accountId` = firmanın VKN/TCKN'si, `accountName` = unvanı), anahtarı şifreleyip saklar, bağlantıyı sınar. Yanıt §3.1; anahtar hiçbir yanıtta dönmez, günlüğe yazılmaz, denetim kaydında maskelenir (`ApiKey` alanı). Denetim: `Clinic.EDocumentConnection.Connect`.
+
+- Mevcut bağlantı (başka sağlayıcıyla olsa da) bu anahtarla değiştirilir. Anahtarı değiştirmek için aynı uç yeniden çağrılır.
+- Hatalar: anahtar boş / çok uzun, sağlayıcı anahtarla bağlanmıyor (OAuth sağlayıcısı) veya bilinmiyor → `EDocuments.Validation` (400). Sağlayıcı anahtarı reddetti (401) → `EDocuments.Validation` (400, "API anahtarı geçersiz…"); **mevcut bağlantı değişmez**. Sağlayıcı geçici hata → `EDocuments.ProviderUnavailable` (503). Eşzamanlı yazım → `EDocuments.ConcurrencyConflict` (409).
+- Bağlıyken anahtar sağlayıcıda geri alınırsa sonraki çağrı 401 alır ve bağlantı `ReauthorizationRequired` olur (§3.1); klinik yeni anahtar girer.
 
 ---
 
@@ -269,10 +278,18 @@ Bağlı her klinikte `endOfDayTime`'da (ayar yoksa 23:00, otomatik kapalı olsa 
 
 ## 5) Sağlayıcı soyutlaması (uygulama notu)
 
-- `IEDocumentProvider` (Application): mükellef sorgusu, belge gönder, durum sorgula, iptal, PDF, bağlantı sına; `IEDocumentOAuthProvider` OAuth bağlanma adımları. Paraşüt uygulaması `Infrastructure/EDocuments/Parasut`. Domain'de sağlayıcı adı geçmez; bağlantı `providerCode` metniyle sağlayıcıyı seçer. İkinci entegratör yeni bir `IEDocumentProvider` kaydıdır.
-- Hata sınıfları adaptörde çevrilir: geçersiz veri, yetki (bağlantı `ReauthorizationRequired`), hesap askıda (Paraşüt 402), kontör, sağlayıcı reddi, geçici (otomatik yeniden deneme).
+- `IEDocumentProvider` (Application): mükellef sorgusu, belge gönder, durum sorgula, iptal, PDF, bağlantı sına; `IEDocumentOAuthProvider` OAuth bağlanma adımları; `IEDocumentCredentialProvider` API anahtarıyla bağlanma (anahtar → hesap). Uygulamalar `Infrastructure/EDocuments/Parasut` ve `Infrastructure/EDocuments/Nilvera`. Domain'de sağlayıcı adı geçmez; bağlantı `providerCode` metniyle sağlayıcıyı seçer. Yeni entegratör yeni bir `IEDocumentProvider` kaydı (ve bağlanma yöntemine göre OAuth ya da anahtar arayüzü) demektir.
+- Hata sınıfları adaptörde çevrilir: geçersiz veri, yetki (bağlantı `ReauthorizationRequired`), hesap askıda (Paraşüt 402) / kontör yetersiz (Nilvera 422 kod 2000), sağlayıcı reddi, geçici (otomatik yeniden deneme).
 - Paraşüt akışı: alıcı cari (`contacts`, vergi no ile aranır, yoksa oluşturulur) → satır ürünü (`products`; Paraşüt satırda ürün/hizmet ister; satır açıklamasından türetilen sabit kodla `VTN-…` aranır, yoksa oluşturulur) → satış faturası (`sales_invoices`, `external_reference_key` = belgenin dış referansı; tekrarında mevcut fatura kullanılır) → e-SMM (`e_smms`, eşzamanlı) / e-Arşiv (`e_archives`) / e-Fatura (`e_invoices`, `scenario: basic`, `to` = gelen kutusu adresi) → iş takibi (`trackable_jobs`) → `active_e_document`. İptal `DELETE sales_invoices/{id}/cancel`. PDF `…/{id}/pdf` (adres süreli, saklanmaz).
-- Ayarlar (`EDocuments:Parasut`): `ClientId`, `ClientSecret` (user-secrets / ortam değişkeni; repoda yok), `Environment` (`Test`/`Live`), `IdentityBaseUrl`, `ApiBaseUrl`, `RedirectUri`. `EDocuments:Processor`: `Enabled`, `IntervalSeconds`, `BatchSize`, `MaxAttempts`. Data Protection anahtar halkası: `DataProtection:KeysPath` (canlıda kalıcı ve yedekli dizin; boşsa varsayılan konum ve açılışta uyarı).
+- Nilvera akışı (V1, `developer.nilvera.com`; şemalar `apitest.nilvera.com/{servis}/swagger/v1/swagger.json`, 2026-11-12 okundu). Kimlik `Authorization: Bearer {API anahtarı}`; servisler `earchive`, `einvoice`, `evoucher` (e-SMM; `esmm` değil), `general`.
+  - Seri: `GET /{servis}/Series`; varsayılan ve etkin seri, yoksa ilk etkin seri (e-Arşiv'de seri zorunlu). Etkin seri yoksa `InvalidData` ("Nilvera portalında seri tanımlayın").
+  - Gönderim: `POST /{servis}/Send/Model`; gövde e-Arşiv `{ArchiveInvoice:{InvoiceInfo, CustomerInfo, InvoiceLines, Notes}}`, e-Fatura `{EInvoice:{…}, CustomerAlias}` (`InvoiceProfile: TEMELFATURA`), e-SMM `{Voucher:{VoucherInfo, CustomerInfo, VoucherLines, Notes}}`. **ETTN (`UUID`) = belgenin dış referansı**; satıcı (`CompanyInfo`) gönderilmez, Nilvera aktif firmayı doldurur. Satırlar KDV hariç birim fiyat, birim kodu UN/ECE (`C62` adet…); belge toplamları (`LineExtensionAmount`, `KdvTotal`, `GeneralKDV{oran}Total`, `PayableAmount`) gönderilir. e-SMM satırında miktar yok: `GrossWage` = satır tutarı, gelir vergisi stopajı `GVWithholdingPercent` / `GVWithholdingTotal`.
+  - Tekrar koruması: aynı ETTN ikinci kez `409` döner → durum sorgulanır; belge varsa oradan devam edilir, yoksa (başka bir 409, ör. VKN uyuşmazlığı) hata gösterilir.
+  - Durum: `GET /earchive/Invoices/{ETTN}/Status`, `/evoucher/Vouchers/{ETTN}/Status` (`StatusCode: unknown|waiting|succeed|error`), `/einvoice/Sale/{ETTN}/Status` (`InvoiceStatus.Code`, `Answer.AnswerCode: rejected` → hata). `succeed` → `…/Details` ile numara (`InvoiceNumber` / `VoucherNumber`) ve tutar okunur, belge `Issued`. Bildirim yok; durum arka plan işiyle sorgulanır (§2).
+  - İptal: `PUT /earchive/Invoices/{ETTN}/Cancel`, `PUT /evoucher/Vouchers/{ETTN}/Cancel`; 422 2026/2034 (zaten iptal) başarı, 2028/2029/2036/2037 (kuyrukta / sonra dene) yeniden denenir. **e-Fatura iptali Nilvera API'sinde yok** → `ProviderRejected`.
+  - PDF: `GET …/{ETTN}/pdf`; ham `application/pdf` ya da JSON base64 metin kabul edilir. Vazgeçme: Nilvera'ya taslak yazılmadığı için silinecek kayıt yoktur; belge Nilvera'da `succeed` ise vazgeçme reddedilir.
+  - Mükellef sorgusu: `GET /general/GlobalCompany/GetGlobalCustomerInfo/{vkn}?globalUserType=Invoice`; `Aliases[]` içinde `DeletionTime` boş ilk etiket gelen kutusu adresidir; 404 mükellef değil.
+- Ayarlar (`EDocuments:Parasut`): `ClientId`, `ClientSecret` (user-secrets / ortam değişkeni; repoda yok), `Environment` (`Test`/`Live`), `IdentityBaseUrl`, `ApiBaseUrl`, `RedirectUri`. `EDocuments:Nilvera`: `Environment`, `ApiBaseUrl` (canlı `https://api.nilvera.com`, test `https://apitest.nilvera.com`), `TimeoutSeconds`; sunucuda gizli değer yok (anahtar kliniğe ait, bağlantıda şifreli). `EDocuments:Processor`: `Enabled`, `IntervalSeconds`, `BatchSize`, `MaxAttempts`. Data Protection anahtar halkası: `DataProtection:KeysPath` (canlıda kalıcı ve yedekli dizin; boşsa varsayılan konum ve açılışta uyarı).
 
 ## 6) Otomatik kesme (arka plan işi)
 
