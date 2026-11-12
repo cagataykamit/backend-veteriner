@@ -17,7 +17,7 @@ public static class SpeciesAndBreedCatalogSeeder
         ("DOG", "Köpek", 20, SpeciesSeedConstants.Dog),
         ("BIRD", "Kuş", 30, SpeciesSeedConstants.Bird),
         ("RABBIT", "Tavşan", 40, SpeciesSeedConstants.Rabbit),
-        ("GUINEA_PIG", "Gine Domuzu", 41, SpeciesSeedConstants.GuineaPig),
+        ("GUINEA_PIG", "Kobay (Gine Domuzu)", 41, SpeciesSeedConstants.GuineaPig),
         ("FERRET", "Gelincik", 42, SpeciesSeedConstants.Ferret),
         ("CHINCHILLA", "Çinçilla", 43, SpeciesSeedConstants.Chinchilla),
         ("HEDGEHOG", "Kirpi", 44, SpeciesSeedConstants.Hedgehog),
@@ -40,6 +40,12 @@ public static class SpeciesAndBreedCatalogSeeder
         ("TURKEY", "Hindi", 81, SpeciesSeedConstants.Turkey),
         ("EXOTIC", "Egzotik", 90, SpeciesSeedConstants.Exotic),
         ("OTHER", "Diğer", 999, SpeciesSeedConstants.Other),
+    ];
+
+    /// <summary>Klinikte yaygın adı öne alınan türler (2026-11-12: kobay).</summary>
+    private static readonly (string Code, string OldName, string NewName)[] SpeciesRenames =
+    [
+        ("GUINEA_PIG", "Gine Domuzu", "Kobay (Gine Domuzu)"),
     ];
 
     private static readonly (string SpeciesCode, string Name)[] BreedCatalog =
@@ -66,6 +72,24 @@ public static class SpeciesAndBreedCatalogSeeder
             logger?.LogInformation(
                 "SpeciesAndBreedCatalogSeeder: {Count} species row(s) added.",
                 speciesAdded);
+        }
+
+        // Katalog adı değişen türler: yalnız eski sistem adı duruyorsa yeni ada geçer (yöneticinin elle verdiği ad korunur).
+        var renamed = 0;
+        foreach (var (code, oldName, newName) in SpeciesRenames)
+        {
+            var row = await db.Species.FirstOrDefaultAsync(s => s.Code == code && s.Name == oldName, ct);
+            if (row is null)
+                continue;
+
+            row.Update(row.Code, newName, row.DisplayOrder, row.IsActive);
+            renamed++;
+        }
+
+        if (renamed > 0)
+        {
+            await db.SaveChangesAsync(ct);
+            logger?.LogInformation("SpeciesAndBreedCatalogSeeder: {Count} species row(s) renamed.", renamed);
         }
 
         var catalogCodes = SpeciesCatalog.Select(x => x.Code.Trim().ToUpperInvariant()).ToArray();

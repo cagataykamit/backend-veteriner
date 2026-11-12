@@ -61,7 +61,7 @@ public sealed class ImportValueResolverTests
     private static readonly Guid LightBrown = Guid.NewGuid();
 
     private static readonly ImportValueResolver Extended = new(new ImportCatalogs(
-        Species: [new(Dog, "Köpek", "DOG", null), new(Cat, "Kedi", "CAT", null), new(GuineaPig, "Gine Domuzu", "GUINEA_PIG", null), new(Exotic, "Egzotik", "EXOTIC", null), new(Other, "Diğer", "OTHER", null)],
+        Species: [new(Dog, "Köpek", "DOG", null), new(Cat, "Kedi", "CAT", null), new(GuineaPig, "Kobay (Gine Domuzu)", "GUINEA_PIG", null), new(Exotic, "Egzotik", "EXOTIC", null), new(Other, "Diğer", "OTHER", null)],
         Breeds: [new(ScottishFold, "Scottish Fold", null, Cat), new(Setter, "İngiliz Setter", null, Dog), new(Malinois, "Belçika Malinois", null, Dog)],
         Colors:
         [
@@ -137,6 +137,8 @@ public sealed class ImportValueResolverTests
         Extended.Resolve(ImportValueKind.Species, "Egzotik").TargetId.Should().Be(Exotic);
         Extended.Resolve(ImportValueKind.Species, "Exotic").TargetId.Should().Be(Exotic);
         Extended.Resolve(ImportValueKind.Species, "Kobay").TargetId.Should().Be(GuineaPig);
+        Extended.Resolve(ImportValueKind.Species, "Gine Domuzu").TargetId.Should().Be(GuineaPig);
+        Extended.Resolve(ImportValueKind.Species, "Guinea Pig").TargetId.Should().Be(GuineaPig);
         Extended.Resolve(ImportValueKind.Species, "ARABA").Kind.Should().Be(ImportValueResolutionKind.Unmapped);
     }
 

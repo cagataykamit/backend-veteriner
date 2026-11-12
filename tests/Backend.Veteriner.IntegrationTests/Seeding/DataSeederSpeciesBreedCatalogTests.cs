@@ -102,4 +102,27 @@ public sealed class DataSeederSpeciesBreedCatalogTests
         (await db.Species.CountAsync()).Should().Be(27);
         (await db.Breeds.CountAsync()).Should().Be(209);
     }
+
+    [Fact]
+    public async Task SeedAsync_Should_Rename_Old_GuineaPig_Name_But_Keep_Admin_Edits()
+    {
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
+        await ResetDatabaseAsync(db);
+        var hasher = new StubBcryptPasswordHasher();
+        await DataSeeder.SeedAsync(db, hasher);
+
+        var guinea = await db.Species.SingleAsync(s => s.Code == "GUINEA_PIG");
+        guinea.Name.Should().Be("Kobay (Gine Domuzu)");
+
+        guinea.Update(guinea.Code, "Gine Domuzu", guinea.DisplayOrder, guinea.IsActive);
+        await db.SaveChangesAsync();
+        await DataSeeder.SeedAsync(db, hasher);
+        (await db.Species.AsNoTracking().SingleAsync(s => s.Code == "GUINEA_PIG")).Name.Should().Be("Kobay (Gine Domuzu)");
+
+        var edited = await db.Species.SingleAsync(s => s.Code == "GUINEA_PIG");
+        edited.Update(edited.Code, "Kobay", edited.DisplayOrder, edited.IsActive);
+        await db.SaveChangesAsync();
+        await DataSeeder.SeedAsync(db, hasher);
+        (await db.Species.AsNoTracking().SingleAsync(s => s.Code == "GUINEA_PIG")).Name.Should().Be("Kobay");
+    }
 }
