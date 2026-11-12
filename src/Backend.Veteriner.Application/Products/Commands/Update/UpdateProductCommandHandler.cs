@@ -37,6 +37,13 @@ public sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProductC
                 "Tenants.ContextMissing",
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
 
+        if ((request.ClearVatRate && request.VatRate is not null) || (request.ClearPurchasePrice && request.PurchasePrice is not null))
+            return Result.Failure(Product.ValidationCode, "Aynı alan için hem değer hem temizleme gönderilemez.");
+
+        var pricing = Product.ValidateTaxAndPurchasePrice(request.VatRate, request.PurchasePrice);
+        if (!pricing.IsSuccess)
+            return pricing;
+
         var product = await _productsWrite.FirstOrDefaultAsync(new ProductByIdTrackedSpec(tenantId, request.Id), ct);
         if (product is null)
             return Result.Failure("Products.NotFound", "Ürün bulunamadı veya kiracıya ait değil.");
@@ -92,7 +99,9 @@ public sealed class UpdateProductCommandHandler : IRequestHandler<UpdateProductC
             request.PharmacologicalForm ?? product.PharmacologicalForm,
             request.PresentationForm ?? product.PresentationForm,
             request.Packaging ?? product.Packaging,
-            request.Manufacturer ?? product.Manufacturer);
+            request.Manufacturer ?? product.Manufacturer,
+            request.ClearVatRate ? null : request.VatRate ?? product.VatRate,
+            request.ClearPurchasePrice ? null : request.PurchasePrice ?? product.PurchasePrice);
 
         try
         {

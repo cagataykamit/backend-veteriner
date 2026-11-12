@@ -1,4 +1,5 @@
 using Backend.Veteriner.Domain.Products;
+using Backend.Veteriner.Domain.Shared;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -32,6 +33,10 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         b.Property(x => x.PresentationForm).HasMaxLength(100);
         b.Property(x => x.Packaging).HasMaxLength(100);
         b.Property(x => x.Manufacturer).HasMaxLength(Product.ManufacturerMaxLength);
+
+        // BATCH_STOCK_API_CONTRACT.md §2.1: mevcut satırlar boş kalır (KDV = klinik varsayılanı).
+        b.Property(x => x.VatRate).HasPrecision(5, TaxRatePercent.Decimals);
+        b.Property(x => x.PurchasePrice).HasPrecision(18, Product.PurchasePriceDecimals);
 
         b.Property(x => x.IsActive).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();

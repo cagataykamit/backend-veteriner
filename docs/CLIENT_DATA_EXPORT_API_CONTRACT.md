@@ -27,7 +27,7 @@ Amaç: KVKK bilgi talebinde klinik çalışanı müşteri kartından tek belge �
   "client": {
     "id": "guid", "fullName": "Ayşe Yılmaz", "phone": "905551112233", "email": "ayse@example.com",
     "address": "İzmir", "createdAtUtc": "2025-03-01T10:00:00Z",
-    "preferredContactChannel": "Phone", "remindersOptedOut": false,
+    "preferredContactChannel": "Phone", "remindersOptedOut": false, "notes": "Öğretmen; akşam aranmak ister",
     "invoicing": { "personType": "Individual", "nationalIdMasked": "100******46", "taxNumberMasked": null,
       "taxOffice": null, "legalName": null, "billingProvince": "İzmir", "billingDistrict": "Konak", "billingAddressLine": "…" }
   },

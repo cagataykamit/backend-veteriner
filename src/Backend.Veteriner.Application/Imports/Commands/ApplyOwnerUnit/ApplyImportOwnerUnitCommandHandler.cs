@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Appointments.Commands.Import;
 using Backend.Veteriner.Application.Clients.Commands.Create;
+using Backend.Veteriner.Application.Clients.Contracts.Dtos;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
@@ -15,6 +16,7 @@ using Backend.Veteriner.Application.Products.Specs;
 using Backend.Veteriner.Application.Vaccinations.Commands.Import;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Pets;
@@ -31,7 +33,7 @@ namespace Backend.Veteriner.Application.Imports.Commands.ApplyOwnerUnit;
 /// <see cref="CreatePetCommand"/>, aşı <see cref="CreateImportedVaccinationCommand"/>, klinik geçmiş
 /// <see cref="CreateImportedClinicalRecordCommand"/>, hesap hareketi <see cref="CreateImportedAccountEntryCommand"/>, randevu
 /// <see cref="CreateImportedAppointmentCommand"/>, ürün <see cref="CreateProductCommand"/>; devir bakiyesi
-/// <see cref="Charge.CreateOpeningBalance"/> (ADR-048). Önizlemedeki eşleşmeler uygulama
+/// <see cref="Charge.CreateOpeningBalance"/>, devir alacağı <see cref="ClientCredit.FromImport"/> (ADR-048). Önizlemedeki eşleşmeler uygulama
 /// anında yeniden çözülür (K4: arada eklenen müşteri/hasta <c>Matched</c>; K10: arada çipi kaydedilen hasta hata; aynı
 /// gün aşısı <c>Skipped</c>). Satır sonuçları ve parti kirası birimin sonunda aynı <c>SaveChanges</c>'te yazılır: kira
 /// başka işçiye geçtiyse rowversion çakışması birimi geri aldırır (aynı satır iki kez yazılmaz).
@@ -53,10 +55,12 @@ public sealed class ApplyImportOwnerUnitCommandHandler
     private readonly IRepository<ImportBatchRow> _rows;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
+    private readonly IRepository<Pet> _petsWrite;
     private readonly IReadRepository<Vaccination> _vaccinations;
     private readonly IReadRepository<Appointment> _appointments;
     private readonly IReadRepository<Product> _products;
     private readonly IRepository<Charge> _charges;
+    private readonly IRepository<ClientCredit> _credits;
     private readonly ISender _sender;
     private readonly TimeProvider _timeProvider;
 
@@ -66,10 +70,12 @@ public sealed class ApplyImportOwnerUnitCommandHandler
         IRepository<ImportBatchRow> rows,
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
+        IRepository<Pet> petsWrite,
         IReadRepository<Vaccination> vaccinations,
         IReadRepository<Appointment> appointments,
         IReadRepository<Product> products,
         IRepository<Charge> charges,
+        IRepository<ClientCredit> credits,
         ISender sender,
         TimeProvider timeProvider)
     {
@@ -78,10 +84,12 @@ public sealed class ApplyImportOwnerUnitCommandHandler
         _rows = rows;
         _clients = clients;
         _pets = pets;
+        _petsWrite = petsWrite;
         _vaccinations = vaccinations;
         _appointments = appointments;
         _products = products;
         _charges = charges;
+        _credits = credits;
         _sender = sender;
         _timeProvider = timeProvider;
     }
@@ -129,7 +137,10 @@ public sealed class ApplyImportOwnerUnitCommandHandler
         return Result<ImportOwnerUnitResult>.Success(new ImportOwnerUnitResult(AlreadyApplied: false));
     }
 
-    /// <summary>Sahip birimi sırası: müşteri (+ devir bakiyesi) → hesap hareketi → hasta → aşı → klinik geçmiş → randevu.</summary>
+    /// <summary>
+    /// Sahip birimi sırası: müşteri (+ devir bakiyesi) → hesap hareketi → hasta → aşı → klinik geçmiş → randevu → vefat durumu
+    /// (geçmiş kayıtlar yazıldıktan sonra; vefat eden hastaya yeni kayıt açılmaz kuralı geçmişi engellemesin).
+    /// </summary>
     private async Task<Result> ApplyOwnerAsync(UnitState unit, string ownerKey, CancellationToken ct)
     {
         var steps = new Func<Task<Result>>[]
@@ -140,6 +151,7 @@ public sealed class ApplyImportOwnerUnitCommandHandler
             () => ApplyVaccinationsAsync(unit, ct),
             () => ApplyClinicalRecordsAsync(unit, ct),
             () => ApplyAppointmentsAsync(unit, ct),
+            () => ApplyDeceasedStatusAsync(unit, ct),
         };
 
         foreach (var step in steps)
@@ -207,13 +219,39 @@ public sealed class ApplyImportOwnerUnitCommandHandler
             return Result.Success();
         }
 
-        var created = await SendAsync(new CreateClientCommand(data.FullName!, data.Email, data.Phone, data.Address), ct);
+        var created = await SendAsync(
+            new CreateClientCommand(
+                data.FullName!,
+                data.Email,
+                data.Phone,
+                data.Address,
+                RemindersOptedOut: data.RemindersOptedOut ? true : null,
+                InvoicingIdentity: InvoicingIdentityOf(data),
+                Notes: data.Notes),
+            ct);
         if (!created.IsSuccess)
             return Fail(row, created.Error);
 
         unit.ClientId = created.Value!.Id;
         unit.Add(row, ImportRowApplyStatus.Created, ClientEntity, unit.ClientId, matched: false);
-        return data.OpeningBalance is > 0 ? await CreateOpeningBalanceAsync(unit, row, data, ct) : Result.Success();
+        return data.OpeningBalance switch
+        {
+            > 0 => await CreateOpeningBalanceAsync(unit, row, data, ct),
+            < 0 => await CreateOpeningCreditAsync(unit, row, data, ct),
+            _ => Result.Success(),
+        };
+    }
+
+    /// <summary>Doğrulanmış fatura kimliği: TCKN → bireysel; VKN → kurumsal (unvan müşteri adı, vergi dairesiyle).</summary>
+    private static ClientInvoicingIdentityDto? InvoicingIdentityOf(ImportNormalizedCustomer data)
+    {
+        if (data.NationalId is { } nationalId)
+            return new ClientInvoicingIdentityDto(ClientPersonType.Individual, nationalId, null, null, null, null, null, null);
+
+        if (data.TaxNumber is { } taxNumber)
+            return new ClientInvoicingIdentityDto(ClientPersonType.Corporate, null, taxNumber, data.TaxOffice, data.FullName, null, null, null);
+
+        return null;
     }
 
     /// <summary>
@@ -244,6 +282,32 @@ public sealed class ApplyImportOwnerUnitCommandHandler
 
         await _charges.AddAsync(charge.Value!, ct);
         await _charges.SaveChangesAsync(ct);
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Devir alacağı (ADR-048 T3): eksi bakiyenin mutlak değeri kadar, yalnız oluşturulan müşteriye tek müşteri kredisi; ödeme
+    /// yazılmaz, bu yüzden ciroya, gün sonuna, kasaya ve e-belgeye girmez. Açanı devir ücretiyle aynı kuraldır.
+    /// </summary>
+    private async Task<Result> CreateOpeningCreditAsync(
+        UnitState unit, ImportBatchRow row, ImportNormalizedCustomer data, CancellationToken ct)
+    {
+        if (unit.Batch.ClinicId is not { } clinicId)
+            return Fail(row, ImportRules.ClinicRequired.Code, ImportRules.ClinicRequired.Message);
+
+        var credit = ClientCredit.FromImport(
+            unit.TenantId,
+            clinicId,
+            unit.ClientId!.Value,
+            -data.OpeningBalance!.Value,
+            unit.Options.CommittedByUserId ?? unit.Batch.CreatedByUserId,
+            _timeProvider.GetUtcNow().UtcDateTime,
+            unit.Batch.Id);
+        if (!credit.IsSuccess)
+            return Fail(row, credit.Error);
+
+        await _credits.AddAsync(credit.Value!, ct);
+        await _credits.SaveChangesAsync(ct);
         return Result.Success();
     }
 
@@ -341,13 +405,43 @@ public sealed class ApplyImportOwnerUnitCommandHandler
                 data.Notes,
                 data.Microchip,
                 data.PassportOrTagNumber,
-                IsNeutered: data.IsNeutered),
+                IsNeutered: data.IsNeutered,
+                AlertFlags: data.AlertNote is null ? null : [nameof(PetAlertFlags.Allergy)],
+                AlertNote: data.AlertNote),
             ct);
         if (!created.IsSuccess)
             return Result<Guid>.Failure(ImportOwnerUnitErrors.ForRow(row.Id, created.Error));
 
         unit.Add(row, ImportRowApplyStatus.Created, PetEntity, created.Value, matched: false);
+        if (data.Deceased)
+            unit.DeceasedPets.Add((row, created.Value, data.DeceasedOn));
         return Result<Guid>.Success(created.Value);
+    }
+
+    /// <summary>
+    /// Vefat durumu yalnız birimde oluşturulan hastaya yazılır (eşleşen mevcut hasta ezilmez, K4); kural <see cref="Pet.SetStatus"/>.
+    /// Ayrı komut yerine aynı işlemde yazılır: durum değişikliği satır verisidir, tek tek audit'lenmez (bölüm 10).
+    /// </summary>
+    private async Task<Result> ApplyDeceasedStatusAsync(UnitState unit, CancellationToken ct)
+    {
+        if (unit.DeceasedPets.Count == 0)
+            return Result.Success();
+
+        var today = OperationDayBounds.ToLocalDate(_timeProvider.GetUtcNow().UtcDateTime);
+        foreach (var (row, petId, deceasedOn) in unit.DeceasedPets)
+        {
+            // Hasta bu birimde (aynı bağlamda) oluşturuldu ve izleniyor; kimlikle okuma izlenen örneği verir.
+            var pet = await _petsWrite.GetByIdAsync(petId, ct);
+            if (pet is null || pet.TenantId != unit.TenantId)
+                return Fail(row, "Pets.NotFound", "Oluşturulan hasta bulunamadı.");
+
+            var status = pet.SetStatus(PetStatus.Deceased, deceasedOn, today);
+            if (!status.IsSuccess)
+                return Fail(row, status.Error);
+        }
+
+        await _petsWrite.SaveChangesAsync(ct);
+        return Result.Success();
     }
 
     // ---------------------------------------------------------------- Aşı
@@ -568,7 +662,8 @@ public sealed class ApplyImportOwnerUnitCommandHandler
             var created = await SendAsync(
                 new CreateProductCommand(
                     data.CategoryId, data.Name!, data.Sku, data.Barcode, data.Description, data.Unit, data.UnitPrice,
-                    Charge.DefaultCurrency, data.Kind, ControlledSubstanceClass.None, Manufacturer: data.Manufacturer),
+                    Charge.DefaultCurrency, data.Kind, ControlledSubstanceClass.None, Manufacturer: data.Manufacturer,
+                    VatRate: data.VatRate, PurchasePrice: data.PurchasePrice),
                 ct);
             if (!created.IsSuccess)
                 return Fail(row, created.Error);
@@ -650,6 +745,9 @@ public sealed class ApplyImportOwnerUnitCommandHandler
         public HashSet<Guid> ExistingPetIds { get; } = new();
         public Dictionary<Guid, HashSet<(Guid DefinitionId, DateOnly Day)>> VaccinationDays { get; } = new();
         public Dictionary<Guid, HashSet<DateTime>> AppointmentStarts { get; } = new();
+
+        /// <summary>Birimde oluşturulan ve vefat olarak işaretlenecek hastalar (birimin son adımı).</summary>
+        public List<(ImportBatchRow Row, Guid PetId, DateOnly? DeceasedOn)> DeceasedPets { get; } = new();
         public List<Outcome> Outcomes { get; } = new();
         public ImportBatchRow FirstRow => _rows[0];
 

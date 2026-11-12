@@ -57,6 +57,7 @@ public sealed class ImportsController : ControllerBase
     /// <summary>
     /// Dosyayı okuyup parti oluşturur (<c>Uploaded</c>). Yeni parti 201; aynı <c>requestId</c> ve aynı içerikle tekrar 200
     /// aynı parti. Gövde <c>multipart/form-data</c>: <c>file</c> (XLSX) veya <c>customersFile</c>/<c>petsFile</c>/<c>vaccinationsFile</c> (CSV).
+    /// E-vet profilinde <c>file</c> (Yedek Al) ile <c>productsFile</c>, <c>evetPatientReportFile</c>, <c>evetVaccineReportFile</c> birlikte gelebilir.
     /// </summary>
     [HttpPost("batches")]
     [Authorize(Policy = PermissionCatalog.Imports.Manage)]
@@ -78,7 +79,8 @@ public sealed class ImportsController : ControllerBase
         if (new[]
             {
                 form.File, form.CustomersFile, form.PetsFile, form.VaccinationsFile, form.ClinicalRecordsFile,
-                form.AccountEntriesFile, form.AppointmentsFile, form.ProductsFile,
+                form.AccountEntriesFile, form.AppointmentsFile, form.ProductsFile, form.EVetPatientReportFile,
+                form.EVetVaccineReportFile,
             }
             .Any(f => f is not null && f.Length > _limits.MaxFileBytes))
         {
@@ -96,7 +98,9 @@ public sealed class ImportsController : ControllerBase
             await ReadAsync(form.ClinicalRecordsFile, ct),
             await ReadAsync(form.AccountEntriesFile, ct),
             await ReadAsync(form.AppointmentsFile, ct),
-            await ReadAsync(form.ProductsFile, ct));
+            await ReadAsync(form.ProductsFile, ct),
+            await ReadAsync(form.EVetPatientReportFile, ct),
+            await ReadAsync(form.EVetVaccineReportFile, ct));
 
         var result = await _mediator.Send(
             new CreateImportBatchCommand(

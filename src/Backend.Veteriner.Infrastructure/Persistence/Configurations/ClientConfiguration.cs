@@ -100,6 +100,10 @@ public sealed class ClientConfiguration : IEntityTypeConfiguration<Client>
         b.Property(x => x.BillingAddressLine)
             .HasMaxLength(Client.MaxBillingAddressLineLength);
 
+        // Müşteri iç notu (PET_STATUS_CLIENT_CONTACT_API_CONTRACT.md §2.1); mevcut satırlar boş kalır.
+        b.Property(x => x.Notes)
+            .HasMaxLength(Client.MaxNotesLength);
+
         b.Property(x => x.RowVersion)
             .IsRowVersion()
             .IsConcurrencyToken();

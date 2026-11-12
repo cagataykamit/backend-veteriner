@@ -11,7 +11,7 @@ namespace Backend.Veteriner.Application.Tests.Imports;
 public sealed class ImportSourceProfileTests
 {
     [Fact]
-    public void Profiles_Should_Map_Only_To_Canonical_Fields_And_Be_Unverified()
+    public void Profiles_Should_Map_Only_To_Canonical_Fields()
     {
         foreach (var profile in ImportSourceProfiles.All)
         {
@@ -19,15 +19,21 @@ public sealed class ImportSourceProfileTests
             {
                 ImportCanonicalSchema.IsCanonical(mapping.Table, mapping.Field).Should().BeTrue($"{profile.Code} {mapping.Header}");
                 mapping.Source.Should().NotBeNullOrWhiteSpace();
-                mapping.Verified.Should().BeFalse("gerçek dışa aktarma dosyası görülmedi");
             }
 
             // Aynı tabloda aynı (katlanmış) başlık iki alana gidemez.
             profile.Mappings
                 .GroupBy(m => (m.Table, ImportTextFolding.Fold(m.Header)))
                 .Should().OnlyContain(g => g.Count() == 1);
-            profile.Verified.Should().BeFalse();
         }
+    }
+
+    [Fact]
+    public void EVet_Profile_Should_Be_Verified_With_Real_Files_And_Others_Not()
+    {
+        ImportSourceProfiles.Get(ImportSourceProfile.EVet).Verified.Should().BeTrue("yedek ve raporlar gerçek dosyayla görüldü");
+        ImportSourceProfiles.Get(ImportSourceProfile.Kolayvet).Verified.Should().BeFalse();
+        ImportSourceProfiles.Get(ImportSourceProfile.Generic).Verified.Should().BeFalse();
     }
 
     [Fact]
@@ -42,12 +48,12 @@ public sealed class ImportSourceProfileTests
     [Fact]
     public void EVet_Profile_Should_Suggest_Its_Headers_Before_General_Aliases()
     {
-        var headers = new[] { "Adı", "Protokol No", "Gsm", "Email", "Kart No" };
+        var headers = new[] { "Müşteriler", "Protokol No", "Gsm", "Email", "Kart No" };
 
         var generic = ImportCanonicalSchema.Suggest(ImportTable.Customers, headers);
         var evet = ImportCanonicalSchema.Suggest(ImportTable.Customers, headers, ImportSourceProfile.EVet);
 
-        // Genel listede "Adı" müşteri adı değildir, "Protokol No" bilinmez.
+        // Genel listede "Müşteriler" müşteri adı değildir, "Protokol No" bilinmez.
         generic.Select(s => s.Suggested).Should().Equal(null, null, "Telefon", "Eposta", null);
         evet.Select(s => (s.Suggested, s.Confidence)).Should().Equal(
             ("AdSoyad", ImportSuggestionConfidence.Profile),
@@ -60,7 +66,7 @@ public sealed class ImportSourceProfileTests
     [Fact]
     public void Exact_Template_Header_Should_Still_Win_Over_Profile()
     {
-        var suggestions = ImportCanonicalSchema.Suggest(ImportTable.Customers, ["Adı", "AdSoyad"], ImportSourceProfile.EVet);
+        var suggestions = ImportCanonicalSchema.Suggest(ImportTable.Customers, ["Müşteriler", "AdSoyad"], ImportSourceProfile.EVet);
 
         suggestions.Select(s => (s.Suggested, s.Confidence)).Should().Equal(
             (null, ImportSuggestionConfidence.None),
@@ -77,15 +83,14 @@ public sealed class ImportSourceProfileTests
             .Should().Be(new ImportColumnSuggestion(header, "Irk", ImportSuggestionConfidence.Profile));
 
     [Fact]
-    public void EVet_Pet_Sheet_Should_Link_Owner_By_Name_And_Gsm()
+    public void EVet_Backup_Pet_Sheet_Headers_Should_Be_Suggested()
     {
-        var headers = new[] { "Sahip", "Gsm", "Hasta", "Protokol", "Tür", "Irk", "Cinsiyet", "Doğum Tarihi", "ÇİP NO" };
+        var headers = new[] { "Müşteriler", "Hastalar", "Protokol No", "Hasta Türü", "Irk", "Cinsiyet", "Doğum Tarihi", "ÇİP NO", "Ölüm Zamanı" };
 
         var suggestions = ImportCanonicalSchema.Suggest(ImportTable.Pets, headers, ImportSourceProfile.EVet);
 
         suggestions.Select(s => s.Suggested).Should().Equal(
-            "SahipAdSoyad", "SahipTelefon", "HayvanAdi", "HayvanNo", "Tur", "Irk", "Cinsiyet", "DogumTarihi", "Mikrocip");
-        ImportCanonicalSchema.MissingRequired(ImportTable.Pets, suggestions.Select(s => s.Suggested!)).Should().BeEmpty();
+            "SahipAdSoyad", "HayvanAdi", "HayvanNo", "Tur", "Irk", "Cinsiyet", "DogumTarihi", "Mikrocip", "VefatTarihi");
     }
 
     [Fact]
@@ -118,9 +123,9 @@ public sealed class ImportSourceProfileTests
         var batch = ImportBatch.Create(Guid.NewGuid(), null, Guid.NewGuid(), null, Guid.NewGuid(), DateTime.UtcNow, ImportSourceProfile.EVet).Value!;
         batch.AttachFile(new string('a', 64), 2, 0, 0).IsSuccess.Should().BeTrue();
 
-        var tables = ImportTableInfoLoader.Build(batch, new Dictionary<ImportTable, IReadOnlyList<string>> { [ImportTable.Customers] = ["Adı"] });
+        var tables = ImportTableInfoLoader.Build(batch, new Dictionary<ImportTable, IReadOnlyList<string>> { [ImportTable.Customers] = ["Müşteriler"] });
 
-        tables.Single().Columns.Single().Should().Be(new ImportColumnDto("Adı", "AdSoyad", ImportSuggestionConfidence.Profile, null));
+        tables.Single().Columns.Single().Should().Be(new ImportColumnDto("Müşteriler", "AdSoyad", ImportSuggestionConfidence.Profile, null));
     }
 
     [Fact]
@@ -130,8 +135,8 @@ public sealed class ImportSourceProfileTests
 
         var evet = result.Value!.Single(p => p.Code == ImportSourceProfile.EVet);
         evet.DisplayName.Should().Be("E-vet");
-        evet.Verified.Should().BeFalse();
-        evet.Mappings.Should().Contain(new ImportProfileMappingDto("pets", "Hasta Irkı", "Irk", evet.Mappings.First(m => m.Header == "Hasta Irkı").Source, false));
+        evet.Verified.Should().BeTrue();
+        evet.Mappings.Should().Contain(new ImportProfileMappingDto("pets", "Hasta Irkı", "Irk", evet.Mappings.First(m => m.Header == "Hasta Irkı").Source, true));
         evet.Mappings.Select(m => m.Table).Distinct().Should().BeEquivalentTo("customers", "pets");
     }
 }

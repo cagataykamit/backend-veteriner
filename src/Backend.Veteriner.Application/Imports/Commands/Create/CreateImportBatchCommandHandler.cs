@@ -92,7 +92,7 @@ public sealed class CreateImportBatchCommandHandler
         }
 
         // Ucuz denetimler (uzantı, imza, boyut, özet) ayrıştırmadan önce: tekrar ve mükerrer dosya kararları buna dayanır.
-        var prepared = _reader.Prepare(request.Files, request.Encoding, request.Delimiter);
+        var prepared = _reader.Prepare(request.Files, request.Encoding, request.Delimiter, SourceProfileOf(request));
         if (!prepared.IsSuccess)
             return Result<ImportBatchCreateResultDto>.Failure(prepared.Error);
 

@@ -184,3 +184,17 @@ Yeni izin **yoktur**: oluşturma `Payments.Create` ile ödeme içinde; mahsup `P
 - Test odağı (domain): 1.000 TL ödeme / 600 ücret → 400 kredi; avans (tahsis yok); `Σ + credit ≠ amount` reddi; FIFO iki krediden tek ücrete mahsup; mahsup açık tutarı aşamaz; kalan yetmez; geri alma sayaçları; iade yalnız kalanın tamamı ve kapalı kredide red; ödeme iptali kullanılmış/iade edilmiş krediyle 409, kullanılmamışla birlikte iptal; ücret iptali mahsupla engelli.
 - Entegrasyon (LocalDB): uçtan uca ödeme→kredi→mahsup→bakiye (`creditBalance`, `outstandingAmount`); portal bakiyesinde `creditBalance`; sayaç = Σ satırlar değişmezi; `requestId` tekrarı; kiracı ve klinik izolasyonu; Sekreter mahsup yapabilir, Veteriner 403; iade yalnız `Payments.Correct`; gün sonu dökümünde `CreditRefund` satırı ve kasa netinden düşmesi.
 - Migration yalnız yerel DB'ye uygulanır; canlı listesi ürün deposu `operations/CANLI-ISLETIM-KILAVUZU.md` §11.1.
+
+## 13) Devir alacağı (ADR-048 T3 eki, 2026-11-11)
+
+İçe aktarmada eski programdaki eksi (alacak) bakiye, yeni oluşan müşteriye **devir alacağı** olarak açılır (`IMPORT_API_CONTRACT.md` §12.5). K1'in tek istisnasıdır: devir alacağı bir ödemeden doğmaz, eski programda alınmış paradır.
+
+- **Model:** aynı `ClientCredit`. `Source = OpeningBalance` (=2), `SourcePaymentId = null`, `ImportBatchId` dolu. Tek oluşturma yolu `ClientCredit.FromImport`. Migration `AddImportedClientCredits`: `SourcePaymentId` nullable, `ImportBatchId` (FK `ImportBatches`, NO ACTION), `CHECK` kaynak ↔ alan tutarlılığı, filtreli benzersiz indeks `(ImportBatchId, ClientId)`.
+- **Akış değişmez:** mahsup (FIFO'da oluşturma sırasıyla), mahsubu geri alma ve iade diğer kredilerle aynıdır. Devir alacağının kaynak ödemesi olmadığı için ödeme iptaliyle etkileşmez (K7 uygulanmaz).
+- **Mali yalıtım:** oluşması mali olay değildir; ciro, gün sonu, kasa beklenen nakit, kasa sayımı ve e-belge etkilenmez (krediler gün sonuna yalnız iade olarak girer, §9). Kalanın iadesi diğer iadeler gibi kasa çıkışıdır.
+- **Görünürlük:** `GET /clients/{id}/balance` `creditBalance` ve portal `creditBalance` alacağı içerir. Borç raporu yalnız borçluları listeler.
+- **Okuma DTO değişiklikleri (geriye uyumlu, alan ekleme + nullable):**
+  - `GET /clients/{clientId}/credits`: `source` yeni değer `"OpeningBalance"`; `sourcePaymentId` **nullable** (`null` = devir alacağı); yeni alan `isImported` (bool, `ImportBatchId` dolu).
+  - `GET /charges/{id}/allocations`: devir alacağından mahsup satırında (`kind: "Credit"`) `paymentId`, `paidAtUtc`, `method` **`null`**dur (kaynak ödeme yok).
+- **Geri alma:** içe aktarma geri alınınca kullanılmamış devir alacağı müşteriyle birlikte silinir. Mahsup satırı (geri alınmış olsa da) varsa ya da alacak iade edilmişse müşteri kalır (`OpeningBalanceChanged`).
+- **Arayüz etiketi:** `OpeningBalance` → "Devir alacağı (eski program)".

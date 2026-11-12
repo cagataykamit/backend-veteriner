@@ -124,14 +124,14 @@ public sealed class ConvertChargeSuggestionCommandHandler
             visitId = exam?.VisitId;
         }
 
-        // Satır türü kalemin katalog ürününden türer (ADR-036); KDV oranı boş = klinik varsayılanı.
-        // Paket kaleminin ürünü yoktur (EXAM-007): satır türü varsayılan (hizmet) kalır.
+        // Satır türü ve KDV oranı kalemin katalog ürününden türer (ADR-036; ürün oranı boş = klinik varsayılanı).
+        // Paket kaleminin ürünü yoktur (EXAM-007): satır türü varsayılan (hizmet), oran klinik varsayılanı kalır.
         var product = suggestion.ProductId is { } productId
             ? await _products.FirstOrDefaultAsync(new ProductByIdSpec(tenantId, productId), ct)
             : null;
         var tax = product is null
             ? null
-            : new ChargeTaxDto(ChargeLineKinds.FromProductKind(product.Kind), null);
+            : new ChargeTaxDto(ChargeLineKinds.FromProductKind(product.Kind), product.VatRate);
 
         var charged = await _sender.Send(
             new CreateChargeCommand(

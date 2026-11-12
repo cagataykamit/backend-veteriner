@@ -60,7 +60,8 @@ public sealed class GetClientByIdQueryHandler : IRequestHandler<GetClientByIdQue
             client.KvkkConsentTemplateVersion,
             client.KvkkConsentTemplateHash,
             ExaminationRowVersion.Encode(client.RowVersion),
-            ClientInvoicingSummaryDto.From(client));
+            ClientInvoicingSummaryDto.From(client),
+            client.Notes);
         return Result<ClientDetailDto>.Success(dto);
     }
 }

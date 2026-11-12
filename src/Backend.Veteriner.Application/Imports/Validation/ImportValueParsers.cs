@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
+using Backend.Veteriner.Domain.Shared;
 using FluentValidation;
 
 namespace Backend.Veteriner.Application.Imports.Validation;
@@ -311,6 +312,22 @@ public static class ImportValueParsers
 
         temperature = Math.Round(temperature, 1, MidpointRounding.AwayFromZero);
         return temperature is < 25m or > 45m ? (null, false) : (temperature, true);
+    }
+
+    /// <summary>
+    /// KDV oranı (%): <c>20</c>, <c>%20</c>, <c>20 %</c>, <c>18,5</c>; kural <see cref="TaxRatePercent"/> (0–100, en çok 2 ondalık).
+    /// Boş <c>(null, true)</c>; okunamayan veya kural dışı <c>(null, false)</c>.
+    /// </summary>
+    public static (decimal? Value, bool Valid) ParseVatRate(string? value)
+    {
+        var text = value?.Replace("%", string.Empty).Replace(" ", string.Empty).Replace(',', '.');
+        if (string.IsNullOrEmpty(text))
+            return (null, value is null || value.Trim().Length == 0);
+
+        return decimal.TryParse(text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var rate)
+               && TaxRatePercent.IsValid(rate)
+            ? (rate, true)
+            : (null, false);
     }
 
     /// <summary>

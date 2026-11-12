@@ -49,7 +49,7 @@ public sealed class ImportedClinicalRecord : IClinicScoped, ITenantOwned
 
     private ImportedClinicalRecord() { }
 
-    /// <summary>İçerik alanları (en az biri dolu olmalı).</summary>
+    /// <summary>İçerik alanları: metin alanlarından biri dolu ya da ölçüm (kilo &gt; 0, ateş) olmalı (<see cref="HasContent"/>).</summary>
     public sealed record Content(
         string? RecordType,
         string? Complaint,
@@ -62,7 +62,17 @@ public sealed class ImportedClinicalRecord : IClinicScoped, ITenantOwned
         string? Notes,
         string? VeterinarianName,
         decimal? WeightKg,
-        decimal? TemperatureC);
+        decimal? TemperatureC)
+    {
+        /// <summary>
+        /// Kayıt boş değil: metin alanlarından biri dolu ya da ölçüm var (eski programlarda muayenelerin çoğu yalnız tartımdır;
+        /// kilo 0 ölçüm sayılmaz). Kural tek yerde; içe aktarma doğrulaması da bunu kullanır.
+        /// </summary>
+        public bool HasContent()
+            => new[] { Complaint, History, Findings, Diagnosis, Treatment, Prescription, LabResults, Notes }.Any(t => !string.IsNullOrWhiteSpace(t))
+               || WeightKg > 0
+               || TemperatureC is not null;
+    }
 
     public static Result<ImportedClinicalRecord> Create(
         Guid tenantId,
@@ -94,11 +104,8 @@ public sealed class ImportedClinicalRecord : IClinicScoped, ITenantOwned
             VeterinarianName = Clean(content.VeterinarianName),
         };
 
-        if (c.Complaint is null && c.History is null && c.Findings is null && c.Diagnosis is null && c.Treatment is null
-            && c.Prescription is null && c.LabResults is null && c.Notes is null)
-        {
-            return Invalid("Klinik geçmiş kaydının en az bir içerik alanı dolu olmalıdır.");
-        }
+        if (!c.HasContent())
+            return Invalid("Klinik geçmiş kaydının en az bir içerik alanı ya da ölçümü (kilo, ateş) dolu olmalıdır.");
 
         if (TooLong(c.RecordType, MaxRecordTypeLength) || TooLong(c.Complaint, MaxComplaintLength)
             || TooLong(c.History, MaxHistoryLength) || TooLong(c.Findings, MaxFindingsLength)

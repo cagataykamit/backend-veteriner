@@ -168,7 +168,7 @@ Yazma, iç içe isteğe bağlı nesne `tax`:
 
 - `POST /charges`: `tax` null → `Service` + `vatRate` null.
 - `PUT /charges/{id}` (düzeltme): `tax` **null = dokunma**; verilirse ikisi birlikte yazılır. "En az bir alan değişmeli" kuralı `tax` değişikliğini de sayar.
-- `POST /charge-suggestions/{id}/convert`: satır türü kalemin ürününden türetilir (§1, `ChargeLineKinds.FromProductKind`); `vatRate` null.
+- `POST /charge-suggestions/{id}/convert`: satır türü kalemin ürününden türetilir (§1, `ChargeLineKinds.FromProductKind`); `vatRate` **ürünün `vatRate` değeridir** (2026-11-12; ürün oranı boşsa `null` = klinik varsayılanı; `BATCH_STOCK_API_CONTRACT.md` §2.1). Ürünsüz kalemde `null`.
 - Geçersiz oran / tür: `Charges.Validation` (400).
 - `ChargeDto` yanıtına `lineKind` ve `vatRate` eklenir; liste, detay ve veri kopyası (`charges` bölümü) taşır.
 - Belge bağlantısı (`documentId`, okunur) Dilim 3'te eklenecek; bu dilimde alan **yok**.

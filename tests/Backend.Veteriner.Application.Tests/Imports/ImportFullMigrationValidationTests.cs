@@ -90,11 +90,21 @@ public sealed class ImportFullMigrationValidationTests
         customer.BalanceDate.Should().Be(new DateOnly(2026, 8, 31));
     }
 
+    [Fact]
+    public void Credit_Balance_Should_Be_Kept_On_A_New_Customer_Without_A_Warning()
+    {
+        var output = Run(new() { [ImportTable.Customers] = Table(ImportTable.Customers, [null, "Ayşe Yılmaz", "05321234567", null, "-300,25"]) });
+
+        var row = Row(output, ImportTable.Customers);
+        row.Status.Should().Be(ImportRowValidationStatus.Valid);
+        ((ImportNormalizedCustomer)row.Normalized).OpeningBalance.Should().Be(-300.25m);
+        row.Normalized.Action.Should().Be(ImportRowAction.Create);
+    }
+
     [Theory]
-    [InlineData("-300", "Imports.CreditBalanceNotImported")]
     [InlineData("on bin", "Imports.AmountInvalid")]
     [InlineData("100 USD", "Imports.AmountInvalid")]
-    public void Credit_Or_Unreadable_Balance_Should_Warn_And_Import_The_Customer_Without_Balance(string balance, string code)
+    public void Unreadable_Balance_Should_Warn_And_Import_The_Customer_Without_Balance(string balance, string code)
     {
         var output = Run(new() { [ImportTable.Customers] = Table(ImportTable.Customers, [null, "Ayşe Yılmaz", "05321234567", null, balance]) });
 

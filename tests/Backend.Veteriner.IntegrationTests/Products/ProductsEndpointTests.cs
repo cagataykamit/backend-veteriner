@@ -284,6 +284,55 @@ public sealed class ProductsEndpointTests : IClassFixture<CustomWebApplicationFa
     }
 
     [Fact]
+    public async Task Vat_Rate_And_Purchase_Price_Should_Round_Trip_And_Follow_Put_Rules()
+    {
+        var client = _factory.CreateClient();
+        var (_, token) = await SeedTenantAndIssueTokenAsync(new[] { "Products.Read", "Products.Create", "Products.Update" });
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var invalid = await client.PostAsJsonAsync("/api/v1/products", new
+        {
+            name = "KDV hatalı", unit = "Adet", unitPrice = 10, currency = "TRY", vatRate = 100.5m,
+        });
+        invalid.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadProblemCodeAsync(invalid)).Should().Be("Products.Validation");
+
+        var create = await client.PostAsJsonAsync("/api/v1/products", new
+        {
+            name = $"KDV-{Guid.NewGuid():N}"[..14], unit = "Adet", unitPrice = 100, currency = "TRY", vatRate = 10m, purchasePrice = 62.5m,
+        });
+        create.StatusCode.Should().Be(HttpStatusCode.Created, await create.Content.ReadAsStringAsync());
+        var created = await create.Content.ReadFromJsonAsync<JsonElement>();
+        var id = created.GetProperty("id").GetGuid();
+        created.GetProperty("vatRate").GetDecimal().Should().Be(10m);
+        created.GetProperty("purchasePrice").GetDecimal().Should().Be(62.5m);
+        var name = created.GetProperty("name").GetString();
+
+        async Task<JsonElement> Detail() => await (await client.GetAsync($"/api/v1/products/{id}")).Content.ReadFromJsonAsync<JsonElement>();
+        Task<HttpResponseMessage> Put(object extra) => client.PutAsJsonAsync($"/api/v1/products/{id}",
+            JsonSerializer.SerializeToElement(new { id, name, unit = "Adet", unitPrice = 100, currency = "TRY" })
+                .EnumerateObject().Concat(JsonSerializer.SerializeToElement(extra).EnumerateObject())
+                .ToDictionary(p => p.Name, p => p.Value));
+
+        // Eski istemci (alanları göndermeyen) değerleri silmez.
+        (await Put(new { })).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var untouched = await Detail();
+        (untouched.GetProperty("vatRate").GetDecimal(), untouched.GetProperty("purchasePrice").GetDecimal()).Should().Be((10m, 62.5m));
+
+        var both = await Put(new { vatRate = 20m, clearVatRate = true });
+        both.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadProblemCodeAsync(both)).Should().Be("Products.Validation");
+
+        (await Put(new { vatRate = 1m, clearPurchasePrice = true })).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var changed = await Detail();
+        changed.GetProperty("vatRate").GetDecimal().Should().Be(1m);
+        changed.GetProperty("purchasePrice").ValueKind.Should().Be(JsonValueKind.Null);
+
+        (await Put(new { clearVatRate = true })).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await Detail()).GetProperty("vatRate").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
     public async Task Write_Should_Be_Blocked_For_ReadOnlyTenant()
     {
         var client = _factory.CreateClient();

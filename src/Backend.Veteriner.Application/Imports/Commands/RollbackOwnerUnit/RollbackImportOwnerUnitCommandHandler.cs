@@ -8,6 +8,7 @@ using Backend.Veteriner.Application.Imports.Validation;
 using Backend.Veteriner.Application.Pets.IntegrationEvents;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Pets;
@@ -20,7 +21,7 @@ namespace Backend.Veteriner.Application.Imports.Commands.RollbackOwnerUnit;
 
 /// <summary>
 /// Birimin bağımlılıklarını bu işlemde yeniden okur, önizlemeyle aynı kuralla (<see cref="ImportRollbackPlanner"/>) karar
-/// verir ve aşı, klinik geçmiş, randevu → hasta → hesap hareketi, devir ücreti → müşteri; ürün sırasıyla siler (§12.9).
+/// verir ve aşı, klinik geçmiş, randevu → hasta → hesap hareketi, devir ücreti, devir alacağı → müşteri; ürün sırasıyla siler (§12.9).
 /// Silinen müşteri/hasta/randevu için silme olayı (<c>client.deleted.v1</c> / <c>pet.deleted.v1</c> /
 /// <c>appointment.deleted.v1</c>) aynı işlemde outbox'a yazılır. Satır sonuçları ve kira yenilemesi aynı işlemdedir: kira
 /// başka işçiye geçtiyse rowversion çakışması birimi geri aldırır. Ürün kodunda başka silme yolu yoktur (§9).
@@ -38,6 +39,7 @@ public sealed class RollbackImportOwnerUnitCommandHandler
     private readonly IRepository<ImportedAccountEntry> _accountEntries;
     private readonly IRepository<Appointment> _appointments;
     private readonly IRepository<Charge> _charges;
+    private readonly IRepository<ClientCredit> _credits;
     private readonly IRepository<Product> _products;
     private readonly ImportRollbackPlanLoader _plans;
     private readonly IClientIntegrationEventOutbox _clientEvents;
@@ -57,6 +59,7 @@ public sealed class RollbackImportOwnerUnitCommandHandler
         IRepository<ImportedAccountEntry> accountEntries,
         IRepository<Appointment> appointments,
         IRepository<Charge> charges,
+        IRepository<ClientCredit> credits,
         IRepository<Product> products,
         ImportRollbackPlanLoader plans,
         IClientIntegrationEventOutbox clientEvents,
@@ -75,6 +78,7 @@ public sealed class RollbackImportOwnerUnitCommandHandler
         _accountEntries = accountEntries;
         _appointments = appointments;
         _charges = charges;
+        _credits = credits;
         _products = products;
         _plans = plans;
         _clientEvents = clientEvents;
@@ -192,11 +196,19 @@ public sealed class RollbackImportOwnerUnitCommandHandler
         }
 
         var clientIds = ToDelete(ImportTable.Customers);
-        var openingBalanceIds = clientIds.Where(plan.OpeningBalances.ContainsKey).Select(id => plan.OpeningBalances[id]).ToArray();
-        if (openingBalanceIds.Length > 0)
+        var openingBalances = clientIds.Where(plan.OpeningBalances.ContainsKey).Select(id => plan.OpeningBalances[id]).ToList();
+        var openingChargeIds = openingBalances.Where(b => !b.IsCredit).Select(b => b.Id).ToArray();
+        if (openingChargeIds.Length > 0)
         {
-            var charges = await _charges.ListAsync(new ImportRollbackOpeningBalancesSpec(tenantId, batchId, openingBalanceIds), ct);
+            var charges = await _charges.ListAsync(new ImportRollbackOpeningBalancesSpec(tenantId, batchId, openingChargeIds), ct);
             await _charges.DeleteRangeAsync(charges, ct);
+        }
+
+        var openingCreditIds = openingBalances.Where(b => b.IsCredit).Select(b => b.Id).ToArray();
+        if (openingCreditIds.Length > 0)
+        {
+            var credits = await _credits.ListAsync(new ImportRollbackOpeningCreditsSpec(tenantId, batchId, openingCreditIds), ct);
+            await _credits.DeleteRangeAsync(credits, ct);
         }
 
         if (clientIds.Length > 0)

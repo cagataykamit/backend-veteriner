@@ -46,6 +46,15 @@ public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
         "NationalId", "TaxNumber", "TaxIdentityNumber"
     };
 
+    /// <summary>
+    /// Serbest metin not alanları (case-insensitive; müşteri notu, PET_STATUS_CLIENT_CONTACT_API_CONTRACT.md §2.1): kişisel veri
+    /// taşıyabilir; dolu metin <c>***</c> olarak yazılır, boş/null olduğu gibi kalır (alanın dolu olduğu görünür).
+    /// </summary>
+    private static readonly HashSet<string> FreeTextPayloadKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Notes"
+    };
+
     private readonly IClientContext _client;
     private readonly IAuditLogWriter _auditLogWriter;
     private readonly ILogger<AuditBehavior<TRequest, TResponse>> _logger;
@@ -176,6 +185,9 @@ public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
                         writer.WriteStringValue("***");
                     else if (IdentityNumberPayloadKeys.Contains(prop.Name) && prop.Value.ValueKind == JsonValueKind.String)
                         writer.WriteStringValue(TurkishTaxIdentity.Mask(prop.Value.GetString()));
+                    else if (FreeTextPayloadKeys.Contains(prop.Name) && prop.Value.ValueKind == JsonValueKind.String
+                             && !string.IsNullOrWhiteSpace(prop.Value.GetString()))
+                        writer.WriteStringValue("***");
                     else
                         WriteElementMaskingSensitive(writer, prop.Value);
                 }

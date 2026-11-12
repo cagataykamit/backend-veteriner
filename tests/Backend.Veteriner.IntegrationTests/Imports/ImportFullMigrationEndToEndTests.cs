@@ -9,6 +9,7 @@ using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Imports.Commit;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Reminders;
@@ -28,7 +29,8 @@ namespace Backend.IntegrationTests.Imports;
 /// <summary>
 /// Tam geçiş uçtan uca (ADR-048, IMPORT_API_CONTRACT.md §12; gerçek SQL Server/LocalDB): yedi tablolu dosya yükle →
 /// doğrula → uygula → okuma uçları → hatırlatma dışlaması/serbest bırakma → geri al. Devir ücretinin bakiyede ve borç
-/// raporunda göründüğü, gün sonu cirosunda görünmediği; parti dışı kaydın geri almayı engellediği doğrulanır. Sentetik veri.
+/// raporunda göründüğü, gün sonu cirosunda görünmediği; devir alacağının bakiyede kredi olarak göründüğü, gün sonu ve kasaya
+/// girmediği; parti dışı kaydın geri almayı engellediği doğrulanır. Sentetik veri.
 /// </summary>
 [Collection("imports-api")]
 public sealed class ImportFullMigrationEndToEndTests : IClassFixture<CustomWebApplicationFactory>
@@ -58,7 +60,8 @@ public sealed class ImportFullMigrationEndToEndTests : IClassFixture<CustomWebAp
             ("Musteriler", [
                 ["MusteriNo", "AdSoyad", "Telefon", "Eposta", "AcikBakiye", "BakiyeTarihi"],
                 ["M1", $"Ayşe {sfx}", "05321234567", $"ayse.{sfx.ToLowerInvariant()}@example.test", "1.250,50", "31.10.2026"],
-                ["M2", $"Veli {sfx}", "05331234567", null, null, null]]),
+                ["M2", $"Veli {sfx}", "05331234567", null, null, null],
+                ["M3", $"Selin {sfx}", "05341234567", null, "-300,25", null]]),
             ("Hastalar", [
                 ["MusteriNo", "HastaNo", "HastaAdi", "Tur"],
                 ["M1", "H1", "Pamuk", ctx.SpeciesName],
@@ -91,10 +94,10 @@ public sealed class ImportFullMigrationEndToEndTests : IClassFixture<CustomWebAp
 
         var batch = await GetJsonAsync(http, $"/api/v1/imports/batches/{id}");
         batch.GetProperty("status").GetString().Should().Be("Committed");
-        foreach (var (table, created) in new[] { ("customers", 2), ("pets", 2), ("clinicalRecords", 2), ("accountEntries", 2), ("appointments", 1), ("products", 2) })
+        foreach (var (table, created) in new[] { ("customers", 3), ("pets", 2), ("clinicalRecords", 2), ("accountEntries", 2), ("appointments", 1), ("products", 2) })
             batch.GetProperty("summary").GetProperty(table).GetProperty("created").GetInt32().Should().Be(created, table);
 
-        Guid m1, m2, h1;
+        Guid m1, m2, m3, h1;
         await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -102,6 +105,7 @@ public sealed class ImportFullMigrationEndToEndTests : IClassFixture<CustomWebAp
             rows.Should().NotContain(r => r.ApplyStatus == ImportRowApplyStatus.Pending || r.ApplyStatus == ImportRowApplyStatus.Failed);
             m1 = rows.Single(r => r.Table == ImportTable.Customers && r.RowNumber == 2).TargetEntityId!.Value;
             m2 = rows.Single(r => r.Table == ImportTable.Customers && r.RowNumber == 3).TargetEntityId!.Value;
+            m3 = rows.Single(r => r.Table == ImportTable.Customers && r.RowNumber == 4).TargetEntityId!.Value;
             h1 = rows.Single(r => r.Table == ImportTable.Pets && r.RowNumber == 2).TargetEntityId!.Value;
 
             var devir = await db.Charges.AsNoTracking().SingleAsync(c => c.TenantId == ctx.TenantId && c.ImportBatchId == id);
@@ -110,6 +114,14 @@ public sealed class ImportFullMigrationEndToEndTests : IClassFixture<CustomWebAp
             devir.Description.Should().Be("Devir bakiyesi (eski program, 31.10.2026)");
             devir.PetId.Should().BeNull();
             devir.CreatedByUserId.Should().NotBe(Guid.Empty);
+
+            // Devir alacağı (T3 eki): eksi bakiye ödemesiz, içe aktarma işaretli müşteri kredisidir.
+            var alacak = await db.ClientCredits.AsNoTracking().SingleAsync(c => c.TenantId == ctx.TenantId);
+            alacak.ClientId.Should().Be(m3);
+            alacak.Amount.Should().Be(300.25m);
+            alacak.Source.Should().Be(ClientCreditSource.OpeningBalance);
+            alacak.SourcePaymentId.Should().BeNull();
+            alacak.ImportBatchId.Should().Be(id);
 
             (await db.ImportedClinicalRecords.CountAsync(r => r.ImportBatchId == id)).Should().Be(2);
             (await db.ImportedAccountEntries.CountAsync(e => e.ImportBatchId == id)).Should().Be(2);
@@ -149,10 +161,21 @@ public sealed class ImportFullMigrationEndToEndTests : IClassFixture<CustomWebAp
         var outstanding = await GetJsonAsync(http, $"/api/v1/reports/outstanding-balances?clinicId={ctx.ClinicId}");
         outstanding.GetProperty("totalOutstandingAmount").GetDecimal().Should().Be(1250.50m);
 
+        var creditBalance = await GetJsonAsync(http, $"/api/v1/clients/{m3}/balance");
+        creditBalance.GetProperty("creditBalance").GetDecimal().Should().Be(300.25m);
+        creditBalance.GetProperty("outstandingAmount").GetDecimal().Should().Be(0m);
+        var credits = await GetJsonAsync(http, $"/api/v1/clients/{m3}/credits");
+        credits[0].GetProperty("source").GetString().Should().Be("OpeningBalance");
+        credits[0].GetProperty("sourcePaymentId").ValueKind.Should().Be(JsonValueKind.Null);
+        credits[0].GetProperty("isImported").GetBoolean().Should().BeTrue();
+
         var today = OperationDayBounds.ToLocalDate(DateTime.UtcNow).ToString("yyyy-MM-dd");
         var daily = await GetJsonAsync(http, $"/api/v1/reports/daily-transactions?from={today}&to={today}&clinicId={ctx.ClinicId}&pageSize=200");
         daily.GetProperty("totals").GetProperty("grossChargeAmount").GetDecimal().Should().Be(0m, "devir eski dönemin cirosudur");
-        daily.GetProperty("items").GetArrayLength().Should().Be(0);
+        daily.GetProperty("items").GetArrayLength().Should().Be(0, "devir alacağı da mali olay değildir");
+        var cash = await GetJsonAsync(http, $"/api/v1/reports/cash-summary?from={today}&to={today}&clinicId={ctx.ClinicId}");
+        cash.GetProperty("totals").GetProperty("collectedAmount").GetDecimal().Should().Be(0m, "devir alacağı kasaya girmez");
+        cash.GetProperty("totals").GetProperty("netAmount").GetDecimal().Should().Be(0m);
 
         // Hatırlatma (§12.6): içe aktarılan randevu serbest bırakılana kadar aday değildir.
         await RunReminderProcessorAsync();
@@ -176,7 +199,7 @@ public sealed class ImportFullMigrationEndToEndTests : IClassFixture<CustomWebAp
         await AddManualChargeAsync(ctx, m2);
         var rollbackPreview = await GetJsonAsync(http, $"/api/v1/imports/batches/{id}/rollback-preview");
         rollbackPreview.GetProperty("canRollback").GetBoolean().Should().BeFalse();
-        rollbackPreview.GetProperty("deletable").GetProperty("openingBalances").GetInt32().Should().Be(1);
+        rollbackPreview.GetProperty("deletable").GetProperty("openingBalances").GetInt32().Should().Be(2, "devir ücreti ve devir alacağı");
         rollbackPreview.GetProperty("deletable").GetProperty("clinicalRecords").GetInt32().Should().Be(2);
         rollbackPreview.GetProperty("deletable").GetProperty("products").GetInt32().Should().Be(2);
         rollbackPreview.GetProperty("blocked").GetProperty("clients").GetInt32().Should().Be(1);
@@ -199,6 +222,7 @@ public sealed class ImportFullMigrationEndToEndTests : IClassFixture<CustomWebAp
             (await db.ImportBatches.AsNoTracking().SingleAsync(b => b.Id == id)).Status.Should().Be(ImportBatchStatus.PartiallyRolledBack);
             (await db.Clients.AsNoTracking().Where(c => c.TenantId == ctx.TenantId).Select(c => c.Id).ToListAsync()).Should().Equal(m2);
             (await db.Charges.CountAsync(c => c.TenantId == ctx.TenantId && c.ImportBatchId == id)).Should().Be(0, "devir müşteriyle silindi");
+            (await db.ClientCredits.CountAsync(c => c.TenantId == ctx.TenantId)).Should().Be(0, "devir alacağı müşteriyle silindi");
             (await db.ImportedClinicalRecords.CountAsync(r => r.ImportBatchId == id)).Should().Be(0);
             (await db.ImportedAccountEntries.CountAsync(e => e.ImportBatchId == id)).Should().Be(0);
             (await db.Appointments.CountAsync(a => a.TenantId == ctx.TenantId)).Should().Be(0);

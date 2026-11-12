@@ -134,12 +134,14 @@ public sealed class ImportRollbackDependencyReader : IImportRollbackDependencyRe
                 .Select(r => new { r.PetId, r.Id })
                 .ToListAsync(ct);
 
+        // Değişti = oluşturulduktan sonra güncellendi. Oluşturma anında yazılan fatura kimliği (içe aktarmada KimlikNo) aynı anı
+        // taşır ve değişiklik sayılmaz.
         var clientIds = targets.ClientIds.ToArray();
         var clientModified = clientIds.Length == 0
             ? new Dictionary<Guid, bool>()
             : await _db.Clients.AsNoTracking()
                 .Where(c => c.TenantId == tenantId && clientIds.Contains(c.Id))
-                .ToDictionaryAsync(c => c.Id, c => c.UpdatedAtUtc != null, ct);
+                .ToDictionaryAsync(c => c.Id, c => c.UpdatedAtUtc != null && c.UpdatedAtUtc > c.CreatedAtUtc, ct);
 
         var clientPets = clientIds.Length == 0
             ? []
@@ -167,7 +169,22 @@ public sealed class ImportRollbackDependencyReader : IImportRollbackDependencyRe
             ? []
             : await _db.Charges.IgnoreQueryFilters(QueryFilterNames.Ignorable).AsNoTracking()
                 .Where(c => c.TenantId == tenantId && c.ImportBatchId == batchId && clientIds.Contains(c.ClientId))
-                .Select(c => new { c.ClientId, c.Id, Changed = c.VoidedAtUtc != null || c.AllocatedAmount > 0 })
+                .Select(c => new { c.ClientId, c.Id, Changed = c.VoidedAtUtc != null || c.AllocatedAmount > 0, IsCredit = false })
+                .ToListAsync(ct);
+
+        // Partinin devir alacakları (ADR-048 T3); herhangi bir mahsup satırı (geri alınmış da), iade ve iptal "değişti" sayılır.
+        var openingCredits = clientIds.Length == 0
+            ? []
+            : await _db.ClientCredits.AsNoTracking()
+                .Where(c => c.TenantId == tenantId && c.ImportBatchId == batchId && clientIds.Contains(c.ClientId))
+                .Select(c => new
+                {
+                    c.ClientId,
+                    c.Id,
+                    Changed = c.RefundedAtUtc != null || c.VoidedAtUtc != null || c.UsedAmount > 0
+                              || _db.ClientCreditApplications.Any(a => a.CreditId == c.Id),
+                    IsCredit = true,
+                })
                 .ToListAsync(ct);
 
         var productIds = targets.ProductIds.ToArray();
@@ -196,9 +213,9 @@ public sealed class ImportRollbackDependencyReader : IImportRollbackDependencyRe
             Appointments = appointments.ToDictionary(
                 a => a.Id,
                 a => new ImportRollbackAppointmentFact(a.PetId, a.Changed, a.Visits, a.Examinations)),
-            OpeningBalances = openingBalances
+            OpeningBalances = openingBalances.Concat(openingCredits)
                 .GroupBy(c => c.ClientId)
-                .ToDictionary(g => g.Key, g => new ImportRollbackOpeningBalanceFact(g.First().Id, g.Any(c => c.Changed))),
+                .ToDictionary(g => g.Key, g => new ImportRollbackOpeningBalanceFact(g.First().Id, g.Any(c => c.Changed), g.First().IsCredit)),
             Products = products.ToDictionary(
                 kv => kv.Key,
                 kv =>

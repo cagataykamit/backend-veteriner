@@ -14,6 +14,7 @@ using Backend.Veteriner.Infrastructure.Persistence;
 using ClosedXML.Excel;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Backend.IntegrationTests.Imports;
@@ -308,7 +309,11 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
     public async Task Table_At_Row_Limit_Should_Upload_And_One_Over_Should_Be_Rejected_Without_Leftovers()
     {
         var ctx = await SeedAsync();
-        var client = ClientFor(ctx.Token);
+        // Tavan yapılandırılabilir (Imports:Limits); sınır davranışı küçük bir tavanla denenir (varsayılan 50.000 satır yavaş).
+        await using var limited = _factory.WithWebHostBuilder(b => b.ConfigureAppConfiguration((_, c) =>
+            c.AddInMemoryCollection(new Dictionary<string, string?> { ["Imports:Limits:MaxRowsPerTable"] = "10000" })));
+        var client = limited.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
         var salt = Guid.NewGuid().ToString("N");
 
         byte[] Csv(int rows) => Encoding.UTF8.GetBytes(
@@ -683,8 +688,8 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
         var ctx = await SeedAsync();
         var client = ClientFor(ctx.Token);
         var bytes = Workbook(
-            ("Musteriler", [["ADI", "Protokol No", "Gsm"], ["Ayşe Yılmaz", "P-1", "05321234567"]]),
-            ("Hastalar", [["Sahip", "Gsm", "Hasta", "Tür", "Hasta Irkı"], ["Ayşe Yılmaz", "05321234567", "Pamuk", "Kedi", "Tekir"]]));
+            ("Musteriler", [["MÜŞTERİLER", "Protokol No", "Gsm"], ["Ayşe Yılmaz", "P-1", "05321234567"]]),
+            ("Hastalar", [["Müşteriler", "Hastalar", "Hasta Türü", "Hasta Irkı", "Ölüm Zamanı"], ["Ayşe Yılmaz", "Pamuk", "Kedi", "Tekir", null]]));
 
         var response = await PostAsync(
             client, Guid.NewGuid(), null, null, [("sourceProfile", "EVet")], ("file", "evet.xlsx", bytes, XlsxType));
@@ -697,7 +702,7 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
         customers.Select(c => c.GetProperty("suggested").GetString()).Should().Equal("AdSoyad", "MusteriNo", "Telefon");
         customers.Select(c => c.GetProperty("confidence").GetString()).Should().Equal("Profile", "Profile", "Profile");
         tables[1].GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("suggested").GetString())
-            .Should().Equal("SahipAdSoyad", "SahipTelefon", "HayvanAdi", "Tur", "Irk");
+            .Should().Equal("SahipAdSoyad", "HayvanAdi", "Tur", "Irk", "VefatTarihi");
 
         var id = json.GetProperty("id").GetGuid();
         var detail = await (await client.GetAsync($"/api/v1/imports/batches/{id}")).Content.ReadFromJsonAsync<JsonElement>();
@@ -745,7 +750,7 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
     }
 
     [Fact]
-    public async Task Source_Profiles_Endpoint_Should_List_Unverified_Profiles_And_Require_Permission()
+    public async Task Source_Profiles_Endpoint_Should_List_Profiles_With_Verified_EVet_And_Require_Permission()
     {
         var ctx = await SeedAsync();
 
@@ -754,8 +759,8 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var profiles = (await response.Content.ReadFromJsonAsync<JsonElement>()).EnumerateArray().ToList();
         profiles.Select(p => p.GetProperty("code").GetString()).Should().Equal("Generic", "Kolayvet", "EVet");
-        profiles.Should().OnlyContain(p => !p.GetProperty("verified").GetBoolean());
-        profiles[2].GetProperty("mappings").EnumerateArray().Should().OnlyContain(m => !m.GetProperty("verified").GetBoolean());
+        profiles.Select(p => p.GetProperty("verified").GetBoolean()).Should().Equal(false, false, true);
+        profiles[2].GetProperty("mappings").EnumerateArray().Should().OnlyContain(m => m.GetProperty("verified").GetBoolean());
 
         (await ClientFor(await TokenAsync(ctx, new[] { "Clients.Read" })).GetAsync("/api/v1/imports/source-profiles"))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);

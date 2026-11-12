@@ -106,6 +106,10 @@ public sealed class UpdateClientCommandHandler : IRequestHandler<UpdateClientCom
                 return applied;
         }
 
+        var notes = client.ApplyNotes(request.Notes);
+        if (!notes.IsSuccess)
+            return notes;
+
         client.UpdateDetails(request.FullName, request.Email, request.Phone, request.Address, utcNow);
 
         try

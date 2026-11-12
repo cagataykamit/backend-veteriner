@@ -29,12 +29,15 @@ public sealed record ClientCreditApplicationItemDto(
     DateTime? ReversedAtUtc,
     string? ReverseReason);
 
-/// <summary>Müşteri kredisi (docs/CLIENT_CREDIT_API_CONTRACT.md §7).</summary>
+/// <summary>
+/// Müşteri kredisi (docs/CLIENT_CREDIT_API_CONTRACT.md §7). Devir alacağında (§13) <see cref="SourcePaymentId"/> boş,
+/// <see cref="IsImported"/> doludur.
+/// </summary>
 public sealed record ClientCreditDto(
     Guid Id,
     Guid ClinicId,
     Guid ClientId,
-    Guid SourcePaymentId,
+    Guid? SourcePaymentId,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] ClientCreditSource Source,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] ClientCreditStatus Status,
     decimal Amount,
@@ -48,7 +51,8 @@ public sealed record ClientCreditDto(
     [property: JsonConverter(typeof(JsonStringEnumConverter))] PaymentMethod? RefundMethod,
     string? RefundReason,
     DateTime? VoidedAtUtc,
-    IReadOnlyList<ClientCreditApplicationItemDto> Applications);
+    IReadOnlyList<ClientCreditApplicationItemDto> Applications,
+    bool IsImported);
 
 public sealed record ClientCreditApplyLineDto(Guid ChargeId, decimal Amount);
 
@@ -137,7 +141,8 @@ internal static class ClientCreditMapping
                 .Select(a => new ClientCreditApplicationItemDto(
                     a.Id, a.ChargeId, chargeDescriptions.GetValueOrDefault(a.ChargeId, string.Empty), a.Amount,
                     a.CreatedAtUtc, a.ReversedAtUtc, a.ReverseReason))
-                .ToList());
+                .ToList(),
+            c.IsImported);
 
     public static Result Conflict()
         => Result.Failure("ClientCredits.ConcurrencyConflict", "Kredi ya da ücret eşzamanlı olarak güncellendi; yeniden okunup işlem tekrarlanmalı.");

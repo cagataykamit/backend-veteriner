@@ -44,6 +44,22 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-015-ba
 
 Sınıf değiştirmek mevcut partileri etkilemez; yalnız sonraki girişlerin zorunluluğunu belirler.
 
+### 2.1 KDV oranı ve alış fiyatı (2026-11-12)
+
+Eski programdan gelen kliniğin "bende vardı, burada yok" dememesi için (E-vet Ürün Listesi'nde satış KDV'si her üründe, alış fiyatı bir kısmında dolu) ürüne iki **opsiyonel** alan eklenir. `ProductDto`, `POST /products`, `PUT /products/{id}`:
+
+| Alan | Tip | Kural |
+|---|---|---|
+| `vatRate` | decimal? | Ürünün KDV oranı (%). `null` = klinik varsayılanı (`ClinicTaxpayerSettings.defaultVatRate`). Kural `TaxRatePercent` (0–100, en çok 2 ondalık); aşım `Products.Validation` (400). |
+| `purchasePrice` | decimal? | Birim alış fiyatı (TL), **bilgi amaçlı**: stok değeri, maliyet raporu ya da ücret hesabı bu alanı okumaz. ≥ 0, en çok 2 ondalık; aşım `Products.Validation`. |
+| `clearVatRate` | bool (yalnız `PUT`) | `true` → `vatRate` temizlenir (klinik varsayılanına döner). |
+| `clearPurchasePrice` | bool (yalnız `PUT`) | `true` → `purchasePrice` temizlenir. |
+
+- `PUT`: `vatRate` / `purchasePrice` **`null` = dokunma** (eski istemci silmez); temizlemek için `clear…: true`. Hem değer hem `clear…: true` gönderilirse `Products.Validation`.
+- **Ücrete etkisi:** üründen oluşan ücretin KDV oranı ürünün `vatRate` değeridir (`null` ise ücretin `vatRate`'i de `null` = klinik varsayılanı). Bugün tek yol ücret önerisinin ücrete çevrilmesidir (`INVOICING_IDENTITY_API_CONTRACT.md` §5). Ürünün oranı sonradan değişirse önceden oluşmuş ücretler değişmez.
+- Veri kopyası `urunler.csv` iki sütun taşır: `KdvOrani`, `AlisFiyati` (`DATA_EXPORT_API_CONTRACT.md`).
+- Migration `AddProductTaxAndClientNotes` (`Products.VatRate decimal(5,2) NULL`, `Products.PurchasePrice decimal(18,2) NULL`); yeni izin yok.
+
 ---
 
 ## 3) Yetkiler

@@ -60,6 +60,14 @@ public static class ImportCanonicalSchema
             "Açık Bakiye", "Bakiye", "Borç", "Borç Bakiyesi", "Kalan Borç", "Devir", "Devir Bakiyesi", "Cari Bakiye"),
         new("BakiyeTarihi", "Hayır", "Bakiyenin hangi tarihteki durum olduğu (devir ücreti açıklamasına yazılır).", "31.10.2026", true,
             "Bakiye Tarihi", "Devir Tarihi"),
+        new("KimlikNo", "Hayır", "Fatura kimliği: 11 haneli T.C. kimlik no (bireysel) veya 10 haneli vergi no (kurumsal). Geçersizse fatura bilgisi boş kalır.", "10000000146", true,
+            "Kimlik No", "TC Kimlik No", "T.C. Kimlik No", "TCKN", "T.C.", "Vergi No", "Vergi Numarası", "VKN"),
+        new("VergiDairesi", "Hayır", "Kurumsal müşterinin vergi dairesi (en çok 100 karakter).", "Kadıköy", false,
+            "Vergi Dairesi"),
+        new("Durum", "Hayır", "Aktif veya Pasif. Pasif müşteri aktarılır ve hatırlatma istemiyor olarak işaretlenir.", "Aktif", false,
+            "Müşteri Durumu"),
+        new("Not", "Hayır", "Müşteri notu (en çok 4000 karakter); yalnız yeni müşteriye yazılır.", "Akşamları aranmak istiyor", false,
+            "Notlar", "Açıklama", "Müşteri Notu", "Müşteri Açıklaması", "Özel Not"),
     ];
 
 
@@ -92,7 +100,13 @@ public static class ImportCanonicalSchema
         new("Agirlik", "Hayır", "Kilogram; ondalık virgül veya nokta.", "4,5", false,
             "Ağırlık", "Kilo", "Kg", "Ağırlık (kg)", "Kilo (kg)"),
         new("KarneNo", "Hayır", "Pasaport / karne numarası (en çok 50 karakter).", "K-77", true,
-            "Karne No", "Karne", "Pasaport No", "Pasaport"),
+            "Karne No", "Karne", "Pasaport No", "Pasaport", "Kart No", "Küpe No"),
+        new("Alerji", "Hayır", "Alerji bilgisi; hastaya alerji uyarısı olarak eklenir.", "Penisilin", false,
+            "Alerjik Durumu", "Alerjiler", "Alerji Durumu"),
+        new("Durum", "Hayır", "Aktif veya Vefat (Ölü). Boşsa aktif.", "Aktif", false,
+            "Hasta Durumu", "Yaşam Durumu"),
+        new("VefatTarihi", "Hayır", "Vefat tarihi (yalnız vefat eden hastada).", "02.09.2025", true,
+            "Vefat Tarihi", "Ölüm Tarihi", "Ölüm Zamanı"),
         new("Not", "Hayır", "Serbest not (en çok 2000 karakter).", "Sakin", false,
             "Notlar", "Açıklama", "Özel Not"),
     ];
@@ -133,7 +147,7 @@ public static class ImportCanonicalSchema
             "Muayene Tarihi", "Kayıt Tarihi", "İşlem Tarihi", "Geliş Tarihi", "Date"),
         new("KayitTuru", "Hayır", "Muayene, Kontrol, Ameliyat... (en çok 100 karakter).", "Muayene", false,
             "Kayıt Türü", "Kayıt Tipi", "Muayene Türü", "İşlem"),
-        new("Sikayet", "Hayır*", "Şikâyet / geliş nedeni (en çok 2000 karakter). *Şikâyet, anamnez, bulgular, tanı, tedavi, reçete, lab sonucu veya nottan en az biri dolu olmalı.", "İştahsızlık", false,
+        new("Sikayet", "Hayır*", "Şikâyet / geliş nedeni (en çok 2000 karakter). *Şikâyet, anamnez, bulgular, tanı, tedavi, reçete, lab sonucu, not, kilo veya ateşten en az biri dolu olmalı.", "İştahsızlık", false,
             "Şikayet", "Şikâyet", "Şikayeti", "Başvuru Nedeni", "Geliş Nedeni"),
         new("Anamnez", "Hayır*", "Öykü (en çok 4000 karakter).", "3 gündür yemiyor", false,
             "Öykü", "Hikaye", "Hikâye"),
@@ -220,6 +234,10 @@ public static class ImportCanonicalSchema
             "Üretici", "Firma", "Marka"),
         new("Aciklama", "Hayır", "Açıklama (en çok 4000 karakter).", "Yıllık", false,
             "Açıklama", "Not"),
+        new("KdvOrani", "Hayır", "KDV oranı (%): 20, %20 veya 18,5 gibi (0-100). Boşsa klinik varsayılanı.", "20", true,
+            "KDV", "KDV Oranı", "KDV %", "KDV Oranı (%)", "Satış KDV", "Satış KDV Oranı", "Vergi Oranı"),
+        new("AlisFiyati", "Hayır", "Birim alış fiyatı (TL), bilgi amaçlı; boş veya 0 ise boş.", "300,00", true,
+            "Alış Fiyatı", "Alış Fiyatı (TL)", "Alış", "Maliyet", "Birim Maliyet", "Geliş Fiyatı"),
     ];
 
     private static readonly Dictionary<ImportTable, ImportRequirement> Requirements = new()

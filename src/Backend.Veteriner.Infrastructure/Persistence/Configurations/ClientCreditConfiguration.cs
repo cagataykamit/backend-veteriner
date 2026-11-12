@@ -2,6 +2,7 @@ using Backend.Veteriner.Domain.CashRegisters;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.ClientCredits;
 using Backend.Veteriner.Domain.Clients;
+using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Shared;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +21,10 @@ public sealed class ClientCreditConfiguration : IEntityTypeConfiguration<ClientC
             t.HasCheckConstraint(
                 "CK_ClientCredits_Refund_Consistent",
                 "([RefundedAtUtc] IS NULL AND [RefundedAmount] IS NULL AND [RefundedByUserId] IS NULL) OR ([RefundedAtUtc] IS NOT NULL AND [RefundedAmount] > 0 AND [RefundedByUserId] IS NOT NULL)");
+            // Devir alacağı (Source = 2) ödemesizdir ve içe aktarma işaretlidir; diğer krediler her zaman bir ödemeden doğar.
+            t.HasCheckConstraint(
+                "CK_ClientCredits_Source_Consistent",
+                "([Source] = 2 AND [SourcePaymentId] IS NULL AND [ImportBatchId] IS NOT NULL) OR ([Source] <> 2 AND [SourcePaymentId] IS NOT NULL)");
         });
 
         b.HasKey(x => x.Id);
@@ -27,7 +32,7 @@ public sealed class ClientCreditConfiguration : IEntityTypeConfiguration<ClientC
         b.Property(x => x.TenantId).IsRequired();
         b.Property(x => x.ClinicId).IsRequired();
         b.Property(x => x.ClientId).IsRequired();
-        b.Property(x => x.SourcePaymentId).IsRequired();
+        b.Property(x => x.SourcePaymentId);
         b.Property(x => x.Source).IsRequired();
         b.Property(x => x.Amount).HasPrecision(18, 2).IsRequired();
         b.Property(x => x.UsedAmount).HasPrecision(18, 2).IsRequired().HasDefaultValue(0m);
@@ -50,7 +55,17 @@ public sealed class ClientCreditConfiguration : IEntityTypeConfiguration<ClientC
         b.HasIndex(x => new { x.TenantId, x.ClientId, x.ClinicId });
 
         // Bir ödeme en fazla bir kredi üretir (FIN-005 K1).
-        b.HasIndex(x => new { x.TenantId, x.SourcePaymentId }).IsUnique();
+        b.HasIndex(x => new { x.TenantId, x.SourcePaymentId }).IsUnique().HasFilter("[SourcePaymentId] IS NOT NULL");
+
+        // Devir alacağı (ADR-048 T3): partide müşteri başına en çok bir; parti geri alması bu indeksten okur.
+        b.Property(x => x.ImportBatchId);
+        b.Ignore(x => x.IsImported);
+        b.HasIndex(x => new { x.ImportBatchId, x.ClientId }).IsUnique().HasFilter("[ImportBatchId] IS NOT NULL");
+        b.HasOne<ImportBatch>()
+            .WithMany()
+            .HasForeignKey(x => x.ImportBatchId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
     }
 }
 

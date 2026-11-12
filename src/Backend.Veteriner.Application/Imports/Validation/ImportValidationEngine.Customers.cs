@@ -1,5 +1,7 @@
 using Backend.Veteriner.Application.Imports.Mapping;
+using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Imports;
+using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Application.Imports.Validation;
 
@@ -61,7 +63,11 @@ public sealed partial class ImportValidationEngine
         if (address is { Length: > MaxAddressLength })
             issues.Add(ImportRules.FieldTooLong.At("Adres", $"Adres en fazla {MaxAddressLength} karakter olabilir."));
 
+        var notes = ReadText(reader, "Not", Client.MaxNotesLength, issues);
+
         var (openingBalance, balanceDate) = ReadOpeningBalance(reader, issues);
+        var (nationalId, taxNumber, taxOffice) = ReadInvoicingIdentity(reader, issues);
+        var remindersOptedOut = ReadClientInactive(reader, issues);
 
         var node = new CustomerNode(reader.RowNumber);
         if (reference is not null)
@@ -77,7 +83,8 @@ public sealed partial class ImportValidationEngine
             }
         }
 
-        var normalized = new ImportNormalizedCustomer(reference, fullName, phone, email, address, openingBalance, balanceDate);
+        var normalized = new ImportNormalizedCustomer(
+            reference, fullName, phone, email, address, openingBalance, balanceDate, nationalId, taxNumber, taxOffice, remindersOptedOut, notes);
         if (HasError(issues))
             return Complete(node, Finish(ImportTable.Customers, reader.RowNumber, issues, normalized));
 
@@ -128,8 +135,8 @@ public sealed partial class ImportValidationEngine
     }
 
     /// <summary>
-    /// Açık bakiye (ADR-048 T3): yalnız pozitif tutar aktarılır; alacak ve okunamayan tutar uyarıdır (müşteri yine aktarılır).
-    /// Bakiye tarihi yalnız devir açıklaması içindir.
+    /// Açık bakiye (ADR-048 T3): artı tutar devir borcu, eksi tutar devir alacağıdır; okunamayan tutar uyarıdır (müşteri yine
+    /// aktarılır). Bakiye tarihi yalnız devir ücretinin açıklaması içindir.
     /// </summary>
     private (decimal? Balance, DateOnly? BalanceDate) ReadOpeningBalance(ImportRowReader reader, List<ImportIssue> issues)
     {
@@ -141,13 +148,7 @@ public sealed partial class ImportValidationEngine
             return (null, null);
         }
 
-        if (amount is < 0)
-        {
-            issues.Add(ImportRules.CreditBalanceNotImported.At("AcikBakiye", value: raw));
-            return (null, null);
-        }
-
-        if (amount is not > 0)
+        if (amount is null or 0)
             return (null, null);
 
         DateOnly? balanceDate = null;
@@ -161,6 +162,50 @@ public sealed partial class ImportValidationEngine
         }
 
         return (amount, balanceDate);
+    }
+
+    /// <summary>
+    /// Fatura kimliği: 11 hane geçerli TCKN → bireysel, 10 hane geçerli VKN → kurumsal (vergi dairesiyle). Geçersiz numara
+    /// uyarıdır, müşteri kimliksiz aktarılır; kural <see cref="TurkishTaxIdentity"/> ve <c>Client.ApplyInvoicingIdentity</c>'dedir.
+    /// </summary>
+    private static (string? NationalId, string? TaxNumber, string? TaxOffice) ReadInvoicingIdentity(
+        ImportRowReader reader, List<ImportIssue> issues)
+    {
+        var raw = reader.Raw("KimlikNo");
+        if (raw is null)
+            return (null, null, null);
+
+        var digits = TurkishTaxIdentity.Normalize(raw.Replace(" ", string.Empty));
+        if (TurkishTaxIdentity.IsValidNationalId(digits))
+            return (digits, null, null);
+
+        if (TurkishTaxIdentity.IsValidTaxNumber(digits))
+        {
+            var office = ImportValueParsers.NormalizeText(reader.Raw("VergiDairesi"));
+            if (office is { Length: > Client.MaxTaxOfficeLength })
+                issues.Add(ImportRules.FieldTooLong.At("VergiDairesi", $"Vergi dairesi en fazla {Client.MaxTaxOfficeLength} karakter olabilir."));
+            return (null, digits, office);
+        }
+
+        issues.Add(ImportRules.TaxIdInvalid.At("KimlikNo", value: raw));
+        return (null, null, null);
+    }
+
+    /// <summary>Durum: boş/Aktif → false; Pasif → hatırlatma istemiyor (bilgi); tanınmayan → uyarı, aktif.</summary>
+    private static bool ReadClientInactive(ImportRowReader reader, List<ImportIssue> issues)
+    {
+        var raw = reader.Raw("Durum");
+        switch (ImportTextFolding.Fold(raw))
+        {
+            case "" or "aktif" or "active":
+                return false;
+            case "pasif" or "inactive":
+                issues.Add(ImportRules.InactiveClient.At("Durum"));
+                return true;
+            default:
+                issues.Add(ImportRules.StatusUnrecognized.At("Durum", value: raw));
+                return false;
+        }
     }
 
     /// <summary>Eşleşen veya mükerrer müşteri satırına bakiye eklenmez (mevcut veri ezilmez, K4).</summary>

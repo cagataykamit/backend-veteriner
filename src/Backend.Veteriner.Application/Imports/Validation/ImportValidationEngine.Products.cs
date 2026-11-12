@@ -77,7 +77,22 @@ public sealed partial class ImportValidationEngine
         var manufacturer = ReadText(reader, "Uretici", Product.ManufacturerMaxLength, issues);
         var description = ReadText(reader, "Aciklama", MaxProductDescriptionLength, issues);
 
-        var normalized = new ImportNormalizedProduct(name, kind, categoryId, unit, price, barcode, sku, manufacturer, description);
+        // KDV ve alış fiyatı bilgi niteliğinde: okunamazsa uyarı, ürün yine aktarılır (oran klinik varsayılanı, alış fiyatı boş).
+        var rawVatRate = reader.Raw("KdvOrani");
+        var (vatRate, vatRateValid) = ImportValueParsers.ParseVatRate(rawVatRate);
+        if (!vatRateValid)
+            issues.Add(ImportRules.VatRateInvalid.At("KdvOrani", value: rawVatRate));
+
+        decimal? purchasePrice = null;
+        var rawPurchasePrice = reader.Raw("AlisFiyati");
+        var (parsedPurchasePrice, purchasePriceValid) = ImportValueParsers.ParseAmount(rawPurchasePrice);
+        if (!purchasePriceValid || parsedPurchasePrice is < 0)
+            issues.Add(ImportRules.PurchasePriceInvalid.At("AlisFiyati", value: rawPurchasePrice));
+        else if (parsedPurchasePrice is > 0)
+            purchasePrice = parsedPurchasePrice;
+
+        var normalized = new ImportNormalizedProduct(
+            name, kind, categoryId, unit, price, barcode, sku, manufacturer, description, vatRate, purchasePrice);
         if (HasError(issues))
             return Finish(ImportTable.Products, reader.RowNumber, issues, normalized);
 

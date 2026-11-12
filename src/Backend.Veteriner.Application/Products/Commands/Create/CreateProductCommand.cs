@@ -8,6 +8,8 @@ using System.Text.Json.Serialization;
 
 namespace Backend.Veteriner.Application.Products.Commands.Create;
 
+/// <param name="VatRate">KDV oranı (%); <c>null</c> = klinik varsayılanı. Kural <see cref="Product.ValidateTaxAndPurchasePrice"/>.</param>
+/// <param name="PurchasePrice">Birim alış fiyatı (TL), yalnız bilgi.</param>
 public sealed record CreateProductCommand(
     Guid? ProductCategoryId,
     string Name,
@@ -22,7 +24,9 @@ public sealed record CreateProductCommand(
     string? PharmacologicalForm = null,
     string? PresentationForm = null,
     string? Packaging = null,
-    string? Manufacturer = null)
+    string? Manufacturer = null,
+    decimal? VatRate = null,
+    decimal? PurchasePrice = null)
     : IRequest<Result<ProductDto>>, IActivationSignalRequest
 {
     public ActivationSignalKind ActivationSignal => ActivationSignalKind.ProductCreated;

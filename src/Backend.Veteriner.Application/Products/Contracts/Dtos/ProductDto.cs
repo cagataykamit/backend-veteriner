@@ -3,6 +3,8 @@ using Backend.Veteriner.Domain.Products;
 
 namespace Backend.Veteriner.Application.Products.Contracts.Dtos;
 
+/// <param name="VatRate">Ürünün KDV oranı (%); <c>null</c> = klinik varsayılanı (BATCH_STOCK_API_CONTRACT.md §2.1).</param>
+/// <param name="PurchasePrice">Birim alış fiyatı (TL), yalnız bilgi.</param>
 public sealed record ProductDto(
     Guid Id,
     Guid? ProductCategoryId,
@@ -20,4 +22,6 @@ public sealed record ProductDto(
     string? PharmacologicalForm,
     string? PresentationForm,
     string? Packaging,
-    string? Manufacturer);
+    string? Manufacturer,
+    decimal? VatRate,
+    decimal? PurchasePrice);

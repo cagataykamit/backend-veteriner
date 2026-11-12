@@ -126,8 +126,6 @@ public static class ImportRules
         "Hasta satırı hatalı olduğu için bu satır aktarılamaz.");
 
     // Açık bakiye (müşteri; ADR-048 T3)
-    public static readonly ImportRule CreditBalanceNotImported = new("Imports.CreditBalanceNotImported", ImportIssueSeverity.Warning,
-        "Alacak (negatif) bakiye bu sürümde aktarılmaz; müşteri bakiyesiz aktarılacak, tutarı elle düzeltin.");
     public static readonly ImportRule AmountInvalid = new("Imports.AmountInvalid", ImportIssueSeverity.Warning,
         "Tutar okunamadı (örnek: 1.250,50); tutar aktarılmayacak.");
     public static readonly ImportRule BalanceNotAppliedToExisting = new("Imports.BalanceNotAppliedToExisting", ImportIssueSeverity.Info,
@@ -135,13 +133,23 @@ public static class ImportRules
     public static readonly ImportRule BalanceDateIgnored = new("Imports.BalanceDateIgnored", ImportIssueSeverity.Warning,
         "Bakiye tarihi okunamadı veya gelecekte; devir açıklamasına yazılmayacak.");
 
+    // Fatura kimliği ve durum (E-vet yedeği ile; IMPORT_API_CONTRACT.md §13)
+    public static readonly ImportRule TaxIdInvalid = new("Imports.TaxIdInvalid", ImportIssueSeverity.Warning,
+        "Kimlik / vergi numarası geçersiz (11 haneli T.C. kimlik no veya 10 haneli vergi no olmalı); fatura bilgisi boş aktarılacak.");
+    public static readonly ImportRule StatusUnrecognized = new("Imports.StatusUnrecognized", ImportIssueSeverity.Warning,
+        "Durum tanınmadı (müşteride Aktif / Pasif, hastada Aktif / Vefat); aktif aktarılacak.");
+    public static readonly ImportRule InactiveClient = new("Imports.InactiveClient", ImportIssueSeverity.Info,
+        "Eski programda pasif müşteri; aktarılır ve hatırlatma istemiyor olarak işaretlenir.");
+    public static readonly ImportRule DeceasedDateIgnored = new("Imports.DeceasedDateIgnored", ImportIssueSeverity.Warning,
+        "Vefat tarihi okunamadı, gelecekte ya da doğum tarihinden önce; hasta tarihsiz vefat olarak aktarılacak.");
+
     // Klinik geçmiş (ADR-048 T1)
     public static readonly ImportRule DateInFuture = new("Imports.DateInFuture", ImportIssueSeverity.Error,
         "Tarih gelecekte olamaz.");
     public static readonly ImportRule RecordBeforeBirth = new("Imports.RecordBeforeBirth", ImportIssueSeverity.Warning,
         "Kayıt tarihi hastanın doğum tarihinden önce.");
     public static readonly ImportRule ClinicalRecordEmpty = new("Imports.ClinicalRecordEmpty", ImportIssueSeverity.Error,
-        "Klinik kaydın içeriği boş: şikâyet, anamnez, bulgular, tanı, tedavi, reçete, lab sonucu veya nottan en az biri dolu olmalı.");
+        "Klinik kaydın içeriği boş: şikâyet, anamnez, bulgular, tanı, tedavi, reçete, lab sonucu, not, kilo veya ateşten en az biri dolu olmalı.");
     public static readonly ImportRule TemperatureInvalid = new("Imports.TemperatureInvalid", ImportIssueSeverity.Warning,
         "Ateş geçersiz (25-45 °C arasında bir sayı olmalı); boş aktarılacak.");
     public static readonly ImportRule DuplicateClinicalRecord = new("Imports.DuplicateClinicalRecord", ImportIssueSeverity.Info,
@@ -176,6 +184,10 @@ public static class ImportRules
         "Ürün türü tanınmadı (Hizmet, İlaç, Aşı, Diğer); Diğer olarak aktarılacak.");
     public static readonly ImportRule CategoryUnmapped = new("Imports.CategoryUnmapped", ImportIssueSeverity.Info,
         "Kategori tanımlı kategorilerde yok; ürün kategorisiz aktarılacak.");
+    public static readonly ImportRule VatRateInvalid = new("Imports.VatRateInvalid", ImportIssueSeverity.Warning,
+        "KDV oranı okunamadı (0-100 arası, en çok 2 ondalık; örnek: 20 veya %20); ürün klinik varsayılan KDV'siyle aktarılacak.");
+    public static readonly ImportRule PurchasePriceInvalid = new("Imports.PurchasePriceInvalid", ImportIssueSeverity.Warning,
+        "Alış fiyatı okunamadı (örnek: 1.250,50); alış fiyatı boş aktarılacak.");
 
     // Uygulama (B4; satır sonucu yazılırken sorun listesine eklenir, doğrulama durumu değişmez)
     public static readonly ImportRule OwnerUnitFailed = new("Imports.OwnerUnitFailed", ImportIssueSeverity.Error,

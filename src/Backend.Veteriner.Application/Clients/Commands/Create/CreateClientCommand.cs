@@ -11,6 +11,7 @@ namespace Backend.Veteriner.Application.Clients.Commands.Create;
 /// <param name="PreferredContactChannel">Verilmezse tercihsiz (<see cref="ContactChannel.None"/>).</param>
 /// <param name="RemindersOptedOut">Verilmezse false (hatırlatma gönderilir).</param>
 /// <param name="InvoicingIdentity">Fatura kimliği (ADR-036); verilmezse boş. Denetim kaydında TCKN/VKN maskelenir.</param>
+/// <param name="Notes">Müşteri iç notu (en çok <see cref="Client.MaxNotesLength"/>); denetim kaydında metin yerine <c>***</c>.</param>
 public sealed record CreateClientCommand(
     string FullName,
     string? Email = null,
@@ -18,7 +19,8 @@ public sealed record CreateClientCommand(
     string? Address = null,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] ContactChannel? PreferredContactChannel = null,
     bool? RemindersOptedOut = null,
-    ClientInvoicingIdentityDto? InvoicingIdentity = null)
+    ClientInvoicingIdentityDto? InvoicingIdentity = null,
+    string? Notes = null)
     : IRequest<Result<ClientCreatedDto>>, IAuditableRequest, IActivationSignalRequest
 {
     public ActivationSignalKind ActivationSignal => ActivationSignalKind.ClientCreated;

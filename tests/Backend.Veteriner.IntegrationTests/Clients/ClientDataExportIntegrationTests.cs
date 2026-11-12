@@ -71,6 +71,7 @@ public sealed class ClientDataExportIntegrationTests : IClassFixture<CustomWebAp
         client.GetProperty("address").GetString().Should().Be("Izmir Konak");
         client.GetProperty("preferredContactChannel").GetString().Should().Be("Phone");
         client.GetProperty("remindersOptedOut").GetBoolean().Should().BeTrue();
+        client.GetProperty("notes").GetString().Should().Be("Veri kopyası notu");
 
         var kvkk = json.GetProperty("kvkkConsent");
         kvkk.GetProperty("status").GetString().Should().Be("Accepted");
@@ -128,8 +129,10 @@ public sealed class ClientDataExportIntegrationTests : IClassFixture<CustomWebAp
         foreach (var section in new[] { "pets", "appointments", "examinations", "vaccinations", "treatments", "prescriptions", "charges", "payments" })
             json.GetProperty(section).GetProperty("isTruncated").GetBoolean().Should().BeFalse(section);
 
-        // İç alanlar ve iç notlar yok; başka müşterinin, atanmamış kliniğin kaydı yok.
-        PropertyNames(json).Where(ForbiddenPropertyNames.Contains).Should().BeEmpty();
+        // İç alanlar ve iç notlar yok (tek istisna müşteri kartının notu, PET_STATUS_CLIENT_CONTACT_API_CONTRACT.md §2.1);
+        // başka müşterinin, atanmamış kliniğin kaydı yok.
+        PropertyNames(json.GetProperty("client")).Where(ForbiddenPropertyNames.Contains).Should().Equal("notes");
+        PropertyNames(json).Where(ForbiddenPropertyNames.Contains).Should().Equal("notes");
         body.Should().NotContain(Secret);
         body.Should().NotContain(ctx.UserId.ToString());
         body.Should().NotContain(seeded.OtherClientPetName);
@@ -249,6 +252,7 @@ public sealed class ClientDataExportIntegrationTests : IClassFixture<CustomWebAp
             var clientName = $"Veri Sahibi {Guid.NewGuid():N}"[..20];
             var client = new Client(tenant.Id, clientName, DateTime.UtcNow, "905551110071", $"veri-{Guid.NewGuid():N}@example.com", "Izmir Konak");
             client.ApplyContactPreferences(ContactChannel.Phone, true);
+            client.ApplyNotes("Veri kopyası notu");
             client.RecordKvkkConsent(KvkkConsentStatus.Accepted, new DateOnly(2026, 1, 2), DateOnly.FromDateTime(DateTime.UtcNow), user.Id, 1, new string('a', 64), DateTime.UtcNow);
             db.Clients.Add(client);
             await db.SaveChangesAsync();

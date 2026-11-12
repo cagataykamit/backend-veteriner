@@ -23,5 +23,7 @@ internal static class ProductMappings
             p.PharmacologicalForm,
             p.PresentationForm,
             p.Packaging,
-            p.Manufacturer);
+            p.Manufacturer,
+            p.VatRate,
+            p.PurchasePrice);
 }

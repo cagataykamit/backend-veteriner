@@ -124,7 +124,7 @@ dosyanın sütun açıklamaları. CRLF, UTF-8 BOM'lu.
 |---|---|---|
 | `klinikler.csv` | Klinikler: ad, il/ilçe, iletişim, adres, etkin | — |
 | `kullanicilar.csv` | Kurum kullanıcıları: kimlik, görünen ad, katılma zamanı | E-posta, parola özeti, kilit/deneme sayacı, roller |
-| `musteriler.csv` | Müşteriler: ad, iletişim, adres, tercih kanalı, hatırlatma tercihi, KVKK rıza durumu/tarihi/sürümü, fatura kimliği (TCKN, VKN, vergi dairesi, unvan, fatura adresi) | Normalize telefon, rıza formu özeti (hash) |
+| `musteriler.csv` | Müşteriler: ad, iletişim, adres, tercih kanalı, hatırlatma tercihi, KVKK rıza durumu/tarihi/sürümü, fatura kimliği (TCKN, VKN, vergi dairesi, unvan, fatura adresi), müşteri notu (`Not`, 2026-11-12) | Normalize telefon, rıza formu özeti (hash) |
 | `hastalar.csv` | Hastalar: sahip, ad, tür, ırk, renk, cinsiyet, doğum tarihi, kilo, kısırlık, çip/pasaport/protokol/HBS no, uyarılar ve notu, not, durum, vefat | — |
 | `randevu_nedenleri.csv` | Randevu nedenleri | Hekim eşleşmeleri |
 | `randevular.csv` | Randevular: hasta, zaman, süre, tür, durum, neden, hekim, not, sahip onayı | Değişiklik sayacı |
@@ -146,13 +146,13 @@ dosyanın sütun açıklamaları. CRLF, UTF-8 BOM'lu.
 | `eski-program-hareketleri.csv` | Eski program hesap hareketleri (içe aktarılmış, salt okunur; bakiyeyi etkilemez, ADR-048): tarih, borç/tahsilat, tutar, açıklama, ödeme şekli, belge no, hasta adı | İçe aktarma partisi kimliği |
 | `odemeler.csv` | Ödemeler: tutar, yöntem, nakdin kasası (`KasaId`; nakitte boşsa Ana kasa), zaman, dağıtılan ve krediye kalan, not, iptal | İstek anahtarı ve özeti, değişiklik sayacı |
 | `odeme_dagitimlari.csv` | Ödemenin ücretlere dağıtımı | — |
-| `krediler.csv` | Müşteri kredileri ve **iadeleri** (iade zamanı, tutarı, yöntemi, nakit iadede kasası, gerekçesi, iade eden) | Değişiklik sayacı |
+| `krediler.csv` | Müşteri kredileri ve **iadeleri** (iade zamanı, tutarı, yöntemi, nakit iadede kasası, gerekçesi, iade eden); devir alacağında kaynak ödeme boş, içe aktarma partisi dolu (`IceAktarmaPartisiId`, ADR-048 T3) | Değişiklik sayacı |
 | `kredi_kullanimlari.csv` | Kredinin ücretlere uygulanması | İstek anahtarı |
 | `kasalar.csv` | Kasalar (TIER-008): klinik, kod, ad, Ana kasa mı, etkin | — |
 | `kasa_hareket_turleri.csv` | Kasa giriş/çıkışının gelir/gider türleri | — |
 | `kasa_hareketleri.csv` | Kasa giriş/çıkışları ve kasalar arası aktarım bacakları: kasa, tür, gün, tutar, gelir/gider türü, açıklama, aktarım bağı ve karşı kasa, kaydeden, iptal | Değişiklik sayacı |
 | `kasa_sayimlari.csv` | Günlük kasa sayımları: kasa, gün, açılış, beklenen, sayılan, fark, açıklama, düzeltme bağı, kaydeden, iptal | Değişiklik sayacı |
-| `urunler.csv` | Ürünler: ad, kategori, tür, SKU, barkod, birim, fiyat, kontrollü madde sınıfı, form, üretici | — |
+| `urunler.csv` | Ürünler: ad, kategori, tür, SKU, barkod, birim, fiyat, kontrollü madde sınıfı, form, üretici, KDV oranı (`KdvOrani`) ve alış fiyatı (`AlisFiyati`) (2026-11-12) | — |
 | `stok_durumu.csv` | Klinik bazında eldeki miktar ve asgari stok | — |
 | `stok_partileri.csv` | Stok partileri: seri, son kullanma, miktarlar, tedarikçi, fatura, teslim/sevk, taşıma, soğuk zincir | — |
 | `stok_hareketleri.csv` | Stok hareketleri: tür, miktar, maliyet, neden, kaynak kayıt, ters hareket, parti | İstek anahtarı |

@@ -22,8 +22,11 @@ public sealed record ImportRollbackVaccinationFact(Guid PetId, bool LinkedToExam
 /// <summary>Partinin oluşturduğu randevunun kendi bağları: durum/saat değişti mi, geliş ya da muayene bağlı mı.</summary>
 public sealed record ImportRollbackAppointmentFact(Guid PetId, bool Changed, bool HasVisits, bool HasExaminations);
 
-/// <summary>Partinin müşteriye açtığı devir ücreti; tahsilat bağlandıysa veya iptal edildiyse <see cref="Changed"/>.</summary>
-public sealed record ImportRollbackOpeningBalanceFact(Guid ChargeId, bool Changed);
+/// <summary>
+/// Partinin müşteriye açtığı devir ücreti ya da devir alacağı (<see cref="IsCredit"/>; ADR-048 T3). Ücrete tahsilat bağlandıysa
+/// veya iptal edildiyse; alacaktan mahsup yapıldıysa (geri alınmış olsa da), iade ya da iptal edildiyse <see cref="Changed"/>.
+/// </summary>
+public sealed record ImportRollbackOpeningBalanceFact(Guid Id, bool Changed, bool IsCredit = false);
 
 /// <summary>
 /// Bağımlılık okuması (IMPORT_API_CONTRACT.md §9). Yalnız <b>var olan</b> hedef kayıtlar sözlüklerde bulunur; olmayan
@@ -54,7 +57,7 @@ public sealed record ImportRollbackFacts(
     /// <summary>Var olan hedef randevular.</summary>
     public IReadOnlyDictionary<Guid, ImportRollbackAppointmentFact> Appointments { get; init; } = new Dictionary<Guid, ImportRollbackAppointmentFact>();
 
-    /// <summary>Hedef müşterilere partinin açtığı devir ücretleri (müşteri → ücret).</summary>
+    /// <summary>Hedef müşterilere partinin açtığı devir ücreti ya da alacağı (müşteri → kayıt; müşteride en çok biri).</summary>
     public IReadOnlyDictionary<Guid, ImportRollbackOpeningBalanceFact> OpeningBalances { get; init; } = new Dictionary<Guid, ImportRollbackOpeningBalanceFact>();
 
     /// <summary>Var olan hedef ürünler → bağ neden kodları (boş küme: silinebilir).</summary>
