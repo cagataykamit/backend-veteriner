@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json.Nodes;
+using Backend.Veteriner.Application.EDocuments.Automation;
 using Backend.Veteriner.Application.EDocuments.Providers;
 using Backend.Veteriner.Domain.EDocuments;
 using Backend.Veteriner.Infrastructure.EDocuments.Nilvera;
@@ -203,16 +204,46 @@ public sealed class NilveraEDocumentProviderTests
         _server.Requests.Should().NotContain(r => r.Method == "POST");
     }
 
-    [Fact]
-    public async Task Insufficient_Credits_Should_Be_Account_Error()
+    [Theory]
+    [InlineData(2000)]
+    [InlineData(2002)]
+    [InlineData(2075)]
+    [InlineData(2076)]
+    [InlineData(2077)]
+    [InlineData(2078)]
+    public async Task Credit_Or_Package_Errors_Should_Be_Account_Error_That_Pauses_Automation(int code)
     {
         SeriesExist("earchive");
         _server.On("POST", "/earchive/Send/Model", HttpStatusCode.UnprocessableEntity,
-            """{"Message":"HATALI ISTEK","Errors":[{"Code":2000,"Description":"Yetersiz kontör."}]}""");
+            $$"""{"Message":"HATALI ISTEK","Errors":[{"Code":{{code}},"Description":"Kontör paketi."}]}""");
 
         var result = await Provider().IssueAsync(Account(), Request(EDocumentType.EArchive), CancellationToken.None);
 
         result.Error!.Kind.Should().Be(EDocumentErrorKind.AccountSuspended);
+        EDocumentAutoIssueGuard.IsAccountWide(result.Error.Kind).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Key_Without_Scope_Should_Be_Authorization_Error()
+    {
+        SeriesExist("earchive");
+        _server.On("POST", "/earchive/Send/Model", HttpStatusCode.Forbidden, null);
+
+        var result = await Provider().IssueAsync(Account(), Request(EDocumentType.EArchive), CancellationToken.None);
+
+        result.Error!.Kind.Should().Be(EDocumentErrorKind.Authorization);
+    }
+
+    [Fact]
+    public async Task Per_Document_Rejection_Should_Not_Pause_Automation()
+    {
+        SeriesExist("earchive");
+        _server.On("POST", "/earchive/Send/Model", HttpStatusCode.UnprocessableEntity,
+            """{"Errors":[{"Code":2015,"Description":"Şema hatası."}]}""");
+
+        var result = await Provider().IssueAsync(Account(), Request(EDocumentType.EArchive), CancellationToken.None);
+
+        EDocumentAutoIssueGuard.IsAccountWide(result.Error!.Kind).Should().BeFalse();
     }
 
     [Theory]
@@ -280,6 +311,14 @@ public sealed class NilveraEDocumentProviderTests
 
         archive.Value!.State.Should().Be(ProviderCancelState.Cancelled);
         voucher.Value!.State.Should().Be(ProviderCancelState.Pending);
+    }
+
+    [Fact]
+    public void CanCancel_Should_Exclude_EInvoice()
+    {
+        Provider().CanCancel(EDocumentType.EInvoice).Should().BeFalse();
+        Provider().CanCancel(EDocumentType.EArchive).Should().BeTrue();
+        Provider().CanCancel(EDocumentType.ESmm).Should().BeTrue();
     }
 
     [Fact]

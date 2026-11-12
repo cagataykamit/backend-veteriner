@@ -86,12 +86,13 @@ public sealed class NilveraClient
         {
             HttpStatusCode.Unauthorized => new ProviderError(
                 EDocumentErrorKind.Authorization, "Nilvera API anahtarı geçersiz veya süresi dolmuş; yeni anahtar girin.", code),
+            // Yetkisiz anahtar hesabın tamamını etkiler: bağlantı "yeniden bağlan" olur, otomatik kesme durur.
             HttpStatusCode.Forbidden => new ProviderError(
-                EDocumentErrorKind.ProviderRejected, $"Nilvera API anahtarının {action} yetkisi yok; anahtarı gerekli yetkilerle yeniden üretin.{Suffix(detail)}", code),
+                EDocumentErrorKind.Authorization, $"Nilvera API anahtarının {action} yetkisi yok; anahtarı gerekli yetkilerle yeniden üretin.{Suffix(detail)}", code),
             HttpStatusCode.NotFound => new ProviderError(EDocumentErrorKind.ProviderRejected, $"Nilvera kaydı bulunamadı ({action}).{Suffix(detail)}", code),
             HttpStatusCode.TooManyRequests => new ProviderError(EDocumentErrorKind.Transient, "Nilvera istek sınırına ulaşıldı; otomatik yeniden denenecek.", code),
-            HttpStatusCode.UnprocessableEntity when response.ErrorCodes.Contains(InsufficientCredits)
-                => new ProviderError(EDocumentErrorKind.AccountSuspended, $"Nilvera kontörü yetersiz; Nilvera hesabınıza kontör yükleyin.{Suffix(detail)}", code),
+            HttpStatusCode.UnprocessableEntity when response.ErrorCodes.Any(PackageCodes.Contains)
+                => new ProviderError(EDocumentErrorKind.AccountSuspended, $"Nilvera kontörü / paketi yetersiz veya süresi dolmuş; Nilvera hesabınıza kontör yükleyin.{Suffix(detail)}", code),
             HttpStatusCode.UnprocessableEntity or HttpStatusCode.BadRequest or HttpStatusCode.Conflict
                 => new ProviderError(EDocumentErrorKind.InvalidData, $"Nilvera {action} isteğini kabul etmedi.{Suffix(detail)}", code),
             >= HttpStatusCode.InternalServerError => new ProviderError(EDocumentErrorKind.Transient, "Nilvera geçici olarak yanıt vermiyor; otomatik yeniden denenecek.", code),
@@ -101,6 +102,13 @@ public sealed class NilveraClient
 
     /// <summary>422 / 2000: kontör yetersiz (developer.nilvera.com hata kodları).</summary>
     internal const int InsufficientCredits = 2000;
+
+    /// <summary>
+    /// Hesabın kontör / paket sorunu (developer.nilvera.com/hata-kodlari, 422): 2000 kontör yetersiz, 2002 saklama alanı yetersiz,
+    /// 2075 kontör paketinin tarihi bitti, 2076 saklama paketinin tarihi bitti, 2077 yeterli paket yok, 2078 paketin kontörü
+    /// yetersiz. Belgeye değil hesaba aittir; otomatik kesmeyi durdurur.
+    /// </summary>
+    internal static readonly IReadOnlySet<int> PackageCodes = new HashSet<int> { InsufficientCredits, 2002, 2075, 2076, 2077, 2078 };
 
     /// <summary><c>{"Message":…, "Errors":[{"Code","Description","Detail"}]}</c> → tek satır ayrıntı.</summary>
     internal static string? ErrorDetail(JsonNode? body)
