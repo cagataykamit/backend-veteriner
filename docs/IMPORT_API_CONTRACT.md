@@ -19,6 +19,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 | E-vet yedeği | `sourceProfile = EVet` ile Genel > Yedek Al dosyası + raporlar (`evetPatientReportFile`, `evetVaccineReportFile`, `productsFile`); fatura kimliği, müşteri/hasta durumu, alerji alanları; türsüz hasta bağlantısı; ölçümlü klinik kayıt (bölüm 13) | **Uygulandı** (migration yok) |
 | Devir alacağı (ADR-048 T3 eki) | `AcikBakiye < 0` yeni müşteriye devir alacağı açar (müşteri kredisi, kaynak `OpeningBalance`); `Imports.CreditBalanceNotImported` kalktı; geri alma alacağı da siler (bölüm 12.3, 12.5, 12.7, 12.9; `CLIENT_CREDIT_API_CONTRACT.md` §13) | **Uygulandı** (migration `AddImportedClientCredits`) |
 | E-vet geçmiş görevleri (ADR-048 eki, 2026-11-12) | Randevu Listesi'nde geçmişte kalan aşı dışı görev (tamamlanmış ya da gelinmemiş) klinik geçmiş satırına çevrilir; bu satırların `rowNumber` değeri `1.000.000 + Excel satırı` (bölüm 13.2) | **Uygulandı** (migration yok) |
+| Eksik alanlar (2026-11-12) | Müşteri `Not`; ürün `KdvOrani`, `AlisFiyati`; E-vet müşteri açıklaması/meslek/doğum tarihi/ikinci telefon/kayıt tarihi, hasta kayıt tarihi ve işaretleri, aşı SKT'si, ürün KDV'si ve alış fiyatı (bölüm 4.3, 13.2) | **Uygulandı** (migration `AddProductTaxAndClientNotes`) |
 
 **Frontend için değişenler (B1):**
 - Yeni izinler `Imports.Read`, `Imports.Manage`, `Imports.Commit` yalnız yönetici düzeyine (Admin, Owner, ClinicAdmin) bağlanır. Seed çalışıp kullanıcı çıkış-giriş yapana kadar bu uçlar `403` döner; menü öğesi izinle gizlenmelidir.
@@ -98,6 +99,12 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 - E-vet yedeğinde geçmişte kalan aşı dışı görevler (kontrol, kısırlaştırma, operasyon, taburcu, dikiş alma, tetkik…) artık atlanmaz; **klinik geçmiş** tablosuna satır olarak eklenir. `KayitTuru` görev tipidir; `Not` ilk satırı `E-vet görevi: Tamamlandı` ya da `E-vet görevi: Gelmedi`, ardından `; ` ile görevin bilgi ve açıklama metni.
 - Bu satırlar klinik geçmiş tablosunda muayene satırlarıyla birlikte durur. Satır numarası çakışmasın diye `rowNumber = 1.000.000 + Randevu Listesi Excel satırı` olur (ör. `1000245` → Randevu Listesi satır 245). Hata listesinde 1.000.000 üstü numara görülürse ekran "Randevu Listesi satır N" diye gösterebilir; göstermezse de bilgi kaybı yoktur.
 - Yükleme uyarısı (`Imports.EVetConversion`) geçmiş görevden oluşan klinik kayıt sayısını (tamamlanmış / gelinmemiş) ayrıca verir. Yeni alan, kod, izin ve migration yoktur.
+
+**Frontend için değişenler (eksik alanlar, 2026-11-12; geriye uyumlu):**
+- Yeni kanonik alanlar (her profilde, şablonda da): müşteri **`Not`** (en çok 2000 karakter, yeni müşterinin notu olur); ürün **`KdvOrani`** (0–100, `%` işareti ve ondalık virgül kabul edilir) ve **`AlisFiyati`** (TL, satış fiyatıyla aynı biçim). Sihirbaz alan etiketleri ve ipuçları eklenmeli.
+- Yeni satır kodları (uyarı, satır aktarılır): `Imports.VatRateInvalid` (oran okunamadı; ürün klinik varsayılan KDV'siyle aktarılır), `Imports.PurchasePriceInvalid` (alış fiyatı okunamadı; boş aktarılır). `Not` sınır aşımı mevcut `Imports.FieldTooLong` (hata).
+- Eşleşen (mevcut) müşteri ve ürünün notu, KDV'si ve alış fiyatı **değiştirilmez** (eşleşen kayda yazılmaz kuralı, bölüm 1).
+- Ürün ve müşteri ekranlarındaki yeni alanlar: `BATCH_STOCK_API_CONTRACT.md` §2.1, `PET_STATUS_CLIENT_CONTACT_API_CONTRACT.md` §2.1.
 
 ## 1) Kapsam ve sınırlar
 
@@ -202,6 +209,7 @@ Taslak = `Uploaded`, `Mapped`, `Validating`, `Validated`, `ValidationFailed` (a�
 | `KimlikNo` | Hayır | Fatura kimliği (ADR-036; boşluklar atılır). 11 hane geçerli TCKN → bireysel (`NationalId`); 10 hane geçerli VKN → kurumsal (`TaxNumber`, unvan = `AdSoyad`, vergi dairesi `VergiDairesi`). Geçersiz → **uyarı** `Imports.TaxIdInvalid`, müşteri kimliksiz aktarılır. Kural `TurkishTaxIdentity` / `Client.ApplyInvoicingIdentity`. Yalnız oluşturulan müşteriye yazılır (eşleşen mevcut müşteri ezilmez, K4). |
 | `VergiDairesi` | Hayır | ≤ 100; yalnız `KimlikNo` geçerli VKN ise kullanılır. |
 | `Durum` | Hayır | `Aktif`/boş → aktif; `Pasif` → müşteri aktarılır ve **hatırlatma istemiyor** (`RemindersOptedOut`) işaretlenir, bilgi `Imports.InactiveClient` (Vetinity'de pasif müşteri durumu yok; eski programda pasif müşteriye hatırlatma gitmesin). Tanınmayan → uyarı `Imports.StatusUnrecognized`, aktif. |
+| `Not` | Hayır | Müşteri notu (2026-11-12): ≤ 2000 karakter (`Client.MaxNotesLength`); fazlası `Imports.FieldTooLong` (hata). Yalnız **yeni** müşteriye yazılır. |
 
 **Hasta tablosu (`pets`)**
 
@@ -807,6 +815,8 @@ Silinmeyen kayıt `Kept` ve nedeni (kodlar aşağıdaki B5 tablosunda; taslaktak
 | `StokKodu` | Hayır | ≤ 100 (`Sku`). |
 | `Uretici` | Hayır | ≤ 200. |
 | `Aciklama` | Hayır | ≤ 4000. |
+| `KdvOrani` | Hayır | Ürün KDV oranı (2026-11-12): `20`, `%20`, `18,5` gibi; `TaxRatePercent` kuralı (0–100, en çok 2 ondalık). Boş → klinik varsayılanı (`null`); okunamayan ya da kural dışı → uyarı `Imports.VatRateInvalid`, boş. |
+| `AlisFiyati` | Hayır | Birim alış fiyatı (2026-11-12), bölüm 12.4 biçimi; ≥ 0. Boş ya da 0 → boş; geçersiz → uyarı `Imports.PurchasePriceInvalid`, boş. Bilgi amaçlıdır (stok değeri değildir). |
 
 - Eşleşme (K4 ilkesi): `Barkod` doluysa kiracıda aynı barkodlu ürün → `Match` (bilgi `Imports.MatchedExisting`); yoksa aynı katlanmış ad + aynı tür → `Match`. Mevcut ürünün alanları (fiyat dahil) **güncellenmez**. Dosyada aynı barkod ya da aynı ad + tür ikinci kez → `Imports.DuplicateInFile` (uyarı, `Skip`).
 - Stok miktarı, parti/SKT ve narkotik sınıfı alınmaz (`ControlledClass = None`); açılış stoku mal kabulle girilir (ADR-048 T7).
@@ -901,9 +911,9 @@ Pilot klinik E-vet SMART'tan geliyor. E-vet'in en zengin dışa aktarması **Gen
 
 ### 13.2 Dönüştürme
 
-**Müşteri** (`Müşteri Listesi`): `Protokol No` → `MusteriNo`; `Müşteriler` → `AdSoyad`; `Gsm`, yoksa `Tel1` → `Telefon`; `Email` → `Eposta`; `Adres, Köy - Mahalle, İlçe / Şehir` → `Adres`; `Bakiye` 2 ondalığa yuvarlanır (kayan nokta artığı `0,0000001` sıfırdır) → `AcikBakiye` (artı borç devir ücreti, eksi alacak devir alacağı olur; bölüm 12.5); `Vergi No`, yoksa `Kimlik No` (yalnız rakam) → `KimlikNo`; `Vergi Dairesi`; `Durum`. Müşteri `Açıklama`, `Meslek`, `Doğum Tarihi`, `Tel2` alanlarının Vetinity'de karşılığı yoktur; aktarılmaz.
+**Müşteri** (`Müşteri Listesi`): `Protokol No` → `MusteriNo`; `Müşteriler` → `AdSoyad`; `Gsm`, yoksa `Tel1` → `Telefon`; `Email` → `Eposta`; `Adres, Köy - Mahalle, İlçe / Şehir` → `Adres`; `Bakiye` 2 ondalığa yuvarlanır (kayan nokta artığı `0,0000001` sıfırdır) → `AcikBakiye` (artı borç devir ücreti, eksi alacak devir alacağı olur; bölüm 12.5); `Vergi No`, yoksa `Kimlik No` (yalnız rakam) → `KimlikNo`; `Vergi Dairesi`; `Durum`. Müşteri notu (`Not`, satır satır): `Açıklama`, `Bilgi`, `Meslek: …`, `Doğum tarihi: gg.aa.yyyy`, `İkinci telefon: …` (`Tel2`; `Tel1` telefon olarak kullanılmadıysa o da), `Eski programa kayıt: gg.aa.yyyy` (`Kayıt Tarihi`). Yalnız dolu olanlar yazılır.
 
-**Hasta** (`Hasta Listesi`): `Protokol No` → `HayvanNo`. Sahip: Hasta Listesi raporundaki protokol eşlemesi (müşteri yedekte varsa), yoksa yedekteki sahip adıyla **tek** müşteri (`MusteriNo`); ikisi de yoksa `MusteriNo` boş kalır ve doğrulama ad kuralını uygular (aynı adlı müşteriler varsa `OwnerNotFound`). `Cinsiyet` hücresi ayrıştırılır: `Kısırlaştırılmış Dişi/Erkek` → cinsiyet + `Kisir = Evet`; `Kısır` → yalnız kısır; `Bilinmiyor` → boş. `Hasta Türü` → `Tur`, `Irk`, `Doğum Tarihi`, `Çip No` → `Mikrocip`, `Kart No` (küpe) → `KarneNo`, `Renk`, `Ağırlık` (0 = ölçülmedi, boş), `Alerjik Durumu` → `Alerji`. Not: `Bilgi`, `Açıklama`, `Kalıtsal hastalık: …`, `Kan grubu: …`, `Besin tipi: …`.
+**Hasta** (`Hasta Listesi`): `Protokol No` → `HayvanNo`. Sahip: Hasta Listesi raporundaki protokol eşlemesi (müşteri yedekte varsa), yoksa yedekteki sahip adıyla **tek** müşteri (`MusteriNo`); ikisi de yoksa `MusteriNo` boş kalır ve doğrulama ad kuralını uygular (aynı adlı müşteriler varsa `OwnerNotFound`). `Cinsiyet` hücresi ayrıştırılır: `Kısırlaştırılmış Dişi/Erkek` → cinsiyet + `Kisir = Evet`; `Kısır` → yalnız kısır; `Bilinmiyor` → boş. `Hasta Türü` → `Tur`, `Irk`, `Doğum Tarihi`, `Çip No` → `Mikrocip`, `Kart No` (küpe) → `KarneNo`, `Renk`, `Ağırlık` (0 = ölçülmedi, boş), `Alerjik Durumu` → `Alerji`. Not: `Bilgi`, `Açıklama`, `Kalıtsal hastalık: …`, `Kan grubu: …`, `Besin tipi: …`, `Eski programa kayıt: gg.aa.yyyy` (`Kayıt Tarihi`), işaretliyse `Eski programda çiftleştirilecek olarak işaretli`, `Eski programda sahiplendirilecek olarak işaretli`.
 - **Mikroçip:** rakam dışı karakter içeren veya yedekte başka (sahip + ad olarak farklı) hastada da kayıtlı çip, hastanın notuna `Mikroçip (eski program): …` olarak yazılır, çip alanı boş kalır (ilk görülen hasta çipi tutar). Böylece hasta ve geçmişi düşmez, çip çakışması (K10) yayılmaz.
 - **Durum:** `Ölü` → `Durum = Vefat`, `Ölüm Zamanı` → `VefatTarihi`, `Pasif Nedeni` nota (`Eski program vefat notu: …`). `Pasif` → Vetinity'de karşılığı yok: hasta **aktif** aktarılır, notuna `Eski programda pasif. <neden>` yazılır; bu hastalara sonraki aşı tarihi ve gelecek randevu yazılmaz (vefat edenlere de).
 - **Aynı sahipte aynı ad + tür (2026-11-11):** Vetinity bir müşteride aynı ad + türde iki hasta açmaz (`Pets.DuplicatePet`); E-vet açar (gerçek yedekte 44 çift, çoğu ölmüş eski hayvan + yeni hayvan). Doğum tarihi, cinsiyet, renk ve durumu aynı ve en çok 7 gün arayla açılmış kayıt aynı hayvanın tekrarıdır: ilk kayıtla birleşir (`DuplicateInFile`). Aksi halde ayrı hayvandır: aktif olan, sonra en yeni kayıtlı adını korur; diğerlerinin adına E-vet protokolü eklenir (`Pamuk (E-vet 1234)`). Önceden ikinci hayvan birincisiyle birleşiyor ve geçmişi ona yazılıyordu.
@@ -922,9 +932,9 @@ Pilot klinik E-vet SMART'tan geliyor. E-vet'in en zengin dışa aktarması **Gen
 
 Görev → hasta bağlantısı muayeneyle aynıdır (`Müşteriler`, `Hastalar` çifti).
 
-**Aşı Bilgi raporu** (seri no): satır, aynı sahip + hasta + gündeki tamamlanmış aşıya bağlanır: o gün yedekte tek aşı ve raporda tek satır varsa doğrudan; birden çoksa raporun ürün adı aşı serisini içeriyorsa (`Rabisin ( Kuduz )` ↔ `KUDUZ`, `Felocell Cvr (Kedi Karma)` ↔ `KEDİ KARMA 1`) ve eşleşme tekse. Eşleşen aşıya `Seri` ve not `Ürün: …` eklenir. `Doğrudan Satış` satırları (hastaya yapılmamış satış) atlanır.
+**Aşı Bilgi raporu** (seri no): satır, aynı sahip + hasta + gündeki tamamlanmış aşıya bağlanır: o gün yedekte tek aşı ve raporda tek satır varsa doğrudan; birden çoksa raporun ürün adı aşı serisini içeriyorsa (`Rabisin ( Kuduz )` ↔ `KUDUZ`, `Felocell Cvr (Kedi Karma)` ↔ `KEDİ KARMA 1`) ve eşleşme tekse. Eşleşen aşıya `Seri` ve not `Ürün: …; SKT: gg.aa.yyyy` eklenir (S.K.T dolu ve okunabiliyorsa). Rapordaki fiyat/toplam aktarılmaz (ücret geçmişi değildir, bölüm 13.4). `Doğrudan Satış` satırları (hastaya yapılmamış satış) atlanır.
 
-**Ürün Listesi raporu:** tür başlığı (yalnız ilk hücre dolu, ardından boş satır) → `Kategori` ve `UrunTuru` (`Aşı` → Aşı, `İlaç` → İlaç, `Hizmet` ve `Laboratuvar` → Hizmet, diğerleri → Diğer); alt grup/üretici başlığı (ardından boş satır yok) ve `Barkod-2` → `Aciklama` (`Grup: …; Barkod 2: …`); `Ürün` → `Ad`, `Barkod-1` → `Barkod`, `Satış Fiyatı` (`₺1.250,50`) → `SatisFiyati`. Pasif ürün (`[-]`) aktarılmaz. Alış fiyatı ve KDV aktarılmaz (kanonik alan yok).
+**Ürün Listesi raporu:** tür başlığı (yalnız ilk hücre dolu, ardından boş satır) → `Kategori` ve `UrunTuru` (`Aşı` → Aşı, `İlaç` → İlaç, `Hizmet` ve `Laboratuvar` → Hizmet, diğerleri → Diğer); alt grup/üretici başlığı (ardından boş satır yok) ve `Barkod-2` → `Aciklama` (`Grup: …; Barkod 2: …`); `Ürün` → `Ad`, `Barkod-1` → `Barkod`, `Satış Fiyatı` (`₺1.250,50`) → `SatisFiyati`, `Satış KDV` → `KdvOrani`, `Alış Fiyatı` → `AlisFiyati` (`₺0,00` boş sayılır). `Alış KDV`, alış fiyatı doluysa ve satış KDV'sinden farklıysa `Aciklama`'ya eklenir (`Alış KDV: %10`). Pasif ürün (`[-]`) aktarılmaz.
 
 ### 13.3 Aşı serisi ve katalog eşlemesi
 
@@ -933,5 +943,5 @@ Aşı serisi anahtarı (tek yer `ImportValueResolver.VaccineSeriesKey`): katlanm
 ### 13.4 Bilinen sınırlar
 
 - Yedekte hesap hareketi yok; bakiye müşteri listesindeki `Bakiye` sütunundan gelir (ADR-048 T3). Rapor > Bakiyesi Olan Müşteriler yalnız karşılaştırma içindir, yüklenmez.
-- Müşteri açıklaması, meslek, doğum tarihi, ikinci telefon, hasta yaş grubu, çiftleştir/sahiplendir işaretleri aktarılmaz (karşılık yok).
+- Hasta yaş grubu aktarılmaz (doğum tarihinden türer); müşterinin "sahiplenmek ister" işareti ve görevin `Bölüm` alanı aktarılmaz. Ücret ve ödeme geçmişi yedekte yoktur (yalnız müşterinin net bakiyesi); Aşı Bilgi raporundaki aşı fiyatı tek başına ücret geçmişi sayılmadığı için aktarılmaz.
 - Seri numarası yalnız Aşı Bilgi raporundaki aşılar için gelir (rapor ticari aşıları içerir; parazit ilaçlarını içermez).
