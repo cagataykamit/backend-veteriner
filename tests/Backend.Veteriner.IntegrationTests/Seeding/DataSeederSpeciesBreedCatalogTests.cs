@@ -63,7 +63,7 @@ public sealed class DataSeederSpeciesBreedCatalogTests
 
         await DataSeeder.SeedAsync(db, new StubBcryptPasswordHasher());
 
-        (await db.Breeds.CountAsync()).Should().Be(209);
+        (await db.Breeds.CountAsync()).Should().Be(227);
 
         var dogId = await db.Species.AsNoTracking().Where(s => s.Code == "DOG").Select(s => s.Id).SingleAsync();
         var golden = await db.Breeds.AsNoTracking().SingleAsync(b =>
@@ -100,7 +100,7 @@ public sealed class DataSeederSpeciesBreedCatalogTests
         await DataSeeder.SeedAsync(db, hasher);
 
         (await db.Species.CountAsync()).Should().Be(27);
-        (await db.Breeds.CountAsync()).Should().Be(209);
+        (await db.Breeds.CountAsync()).Should().Be(227);
     }
 
     [Fact]

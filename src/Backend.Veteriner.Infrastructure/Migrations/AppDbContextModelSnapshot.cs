@@ -1430,6 +1430,70 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         },
                         new
                         {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020026"),
+                            Code = "BLACK_YELLOW",
+                            DisplayOrder = 28,
+                            IsActive = true,
+                            Name = "Siyah-Sarı"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020027"),
+                            Code = "GRAY_BLACK",
+                            DisplayOrder = 29,
+                            IsActive = true,
+                            Name = "Gri-Siyah"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020028"),
+                            Code = "BROWN_CREAM",
+                            DisplayOrder = 30,
+                            IsActive = true,
+                            Name = "Kahverengi-Krem"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020029"),
+                            Code = "BEIGE_WHITE",
+                            DisplayOrder = 31,
+                            IsActive = true,
+                            Name = "Bej-Beyaz"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020030"),
+                            Code = "BROWN_BRINDLE",
+                            DisplayOrder = 32,
+                            IsActive = true,
+                            Name = "Kahverengi-Kırçıllı"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020031"),
+                            Code = "CHAMPAGNE",
+                            DisplayOrder = 33,
+                            IsActive = true,
+                            Name = "Şampanya"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020032"),
+                            Code = "CHOCOLATE",
+                            DisplayOrder = 34,
+                            IsActive = true,
+                            Name = "Çikolata"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020033"),
+                            Code = "ORANGE_WHITE",
+                            DisplayOrder = 35,
+                            IsActive = true,
+                            Name = "Turuncu-Beyaz"
+                        },
+                        new
+                        {
                             Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020016"),
                             Code = "OTHER",
                             DisplayOrder = 98,

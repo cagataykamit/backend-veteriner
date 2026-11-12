@@ -32,4 +32,12 @@ public static class PetColorSeedConstants
     public static readonly Guid Dun = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020023");
     public static readonly Guid Beige = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020024");
     public static readonly Guid Blue = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020025");
+    public static readonly Guid BlackYellow = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020026");
+    public static readonly Guid GrayBlack = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020027");
+    public static readonly Guid BrownCream = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020028");
+    public static readonly Guid BeigeWhite = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020029");
+    public static readonly Guid BrownBrindle = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020030");
+    public static readonly Guid Champagne = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020031");
+    public static readonly Guid Chocolate = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020032");
+    public static readonly Guid OrangeWhite = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020033");
 }
