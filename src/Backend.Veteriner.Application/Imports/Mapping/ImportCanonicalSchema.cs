@@ -66,7 +66,7 @@ public static class ImportCanonicalSchema
             "Vergi Dairesi"),
         new("Durum", "Hayır", "Aktif veya Pasif. Pasif müşteri aktarılır ve hatırlatma istemiyor olarak işaretlenir.", "Aktif", false,
             "Müşteri Durumu"),
-        new("Not", "Hayır", "Müşteri notu (en çok 2000 karakter); yalnız yeni müşteriye yazılır.", "Akşamları aranmak istiyor", false,
+        new("Not", "Hayır", "Müşteri notu (en çok 4000 karakter); yalnız yeni müşteriye yazılır.", "Akşamları aranmak istiyor", false,
             "Notlar", "Açıklama", "Müşteri Notu", "Müşteri Açıklaması", "Özel Not"),
     ];
 

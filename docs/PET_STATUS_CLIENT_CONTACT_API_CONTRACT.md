@@ -89,13 +89,13 @@ Müşteriye serbest metin **iç not** alanı eklenir (meslek, tercih, uyarı gib
 
 | Alan | Tip | Kural |
 |---|---|---|
-| `notes` | string? | En çok 2000 karakter (`Client.MaxNotesLength`); kenar boşluğu kırpılır, boş metin `null`. Aşım `Clients.Validation` (400). |
+| `notes` | string? | En çok 4000 karakter (`Client.MaxNotesLength`; muayene ve klinik geçmiş notuyla aynı); kenar boşluğu kırpılır, boş metin `null`. Aşım `Clients.Validation` (400). |
 
 - `POST /clients`: opsiyonel `notes`. `PUT /clients/{id}`: `notes` **`null` = dokunma**, `""` = temizle (eski istemci silmez).
 - Okuma: müşteri detayı (`GET /clients/{id}`) `notes` döner. Liste, arama ve hızlı kayıt yanıtları taşımaz.
 - Sahip portalına **açılmaz** (kliniğin iç notudur). Müşterinin KVKK veri kopyası (`CLIENT_DATA_EXPORT_API_CONTRACT.md`) ve klinik veri kopyası `musteriler.csv` (`Not` sütunu) taşır: kişiyle ilgili kayıttır.
 - Denetim kaydı not metnini yazmaz (serbest metin kişisel veri taşıyabilir); yalnız alanın dolu olduğu `"***"` olarak görünür.
-- Migration `AddProductTaxAndClientNotes` (`Clients.Notes nvarchar(2000) NULL`); yeni izin yok.
+- Migration `AddProductTaxAndClientNotes` (`Clients.Notes nvarchar(4000) NULL`); yeni izin yok.
 
 ## 3) Müşteri bazlı ücret bekleyen kalemler
 

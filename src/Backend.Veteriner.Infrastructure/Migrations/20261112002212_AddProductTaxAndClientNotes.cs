@@ -29,8 +29,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
             migrationBuilder.AddColumn<string>(
                 name: "Notes",
                 table: "Clients",
-                type: "nvarchar(2000)",
-                maxLength: 2000,
+                type: "nvarchar(4000)",
+                maxLength: 4000,
                 nullable: true);
         }
 

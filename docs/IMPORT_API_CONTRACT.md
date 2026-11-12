@@ -101,7 +101,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 - Yükleme uyarısı (`Imports.EVetConversion`) geçmiş görevden oluşan klinik kayıt sayısını (tamamlanmış / gelinmemiş) ayrıca verir. Yeni alan, kod, izin ve migration yoktur.
 
 **Frontend için değişenler (eksik alanlar, 2026-11-12; geriye uyumlu):**
-- Yeni kanonik alanlar (her profilde, şablonda da): müşteri **`Not`** (en çok 2000 karakter, yeni müşterinin notu olur); ürün **`KdvOrani`** (0–100, `%` işareti ve ondalık virgül kabul edilir) ve **`AlisFiyati`** (TL, satış fiyatıyla aynı biçim). Sihirbaz alan etiketleri ve ipuçları eklenmeli.
+- Yeni kanonik alanlar (her profilde, şablonda da): müşteri **`Not`** (en çok 4000 karakter, yeni müşterinin notu olur); ürün **`KdvOrani`** (0–100, `%` işareti ve ondalık virgül kabul edilir) ve **`AlisFiyati`** (TL, satış fiyatıyla aynı biçim). Sihirbaz alan etiketleri ve ipuçları eklenmeli.
 - Yeni satır kodları (uyarı, satır aktarılır): `Imports.VatRateInvalid` (oran okunamadı; ürün klinik varsayılan KDV'siyle aktarılır), `Imports.PurchasePriceInvalid` (alış fiyatı okunamadı; boş aktarılır). `Not` sınır aşımı mevcut `Imports.FieldTooLong` (hata).
 - Eşleşen (mevcut) müşteri ve ürünün notu, KDV'si ve alış fiyatı **değiştirilmez** (eşleşen kayda yazılmaz kuralı, bölüm 1).
 - Ürün ve müşteri ekranlarındaki yeni alanlar: `BATCH_STOCK_API_CONTRACT.md` §2.1, `PET_STATUS_CLIENT_CONTACT_API_CONTRACT.md` §2.1.
@@ -209,7 +209,7 @@ Taslak = `Uploaded`, `Mapped`, `Validating`, `Validated`, `ValidationFailed` (a�
 | `KimlikNo` | Hayır | Fatura kimliği (ADR-036; boşluklar atılır). 11 hane geçerli TCKN → bireysel (`NationalId`); 10 hane geçerli VKN → kurumsal (`TaxNumber`, unvan = `AdSoyad`, vergi dairesi `VergiDairesi`). Geçersiz → **uyarı** `Imports.TaxIdInvalid`, müşteri kimliksiz aktarılır. Kural `TurkishTaxIdentity` / `Client.ApplyInvoicingIdentity`. Yalnız oluşturulan müşteriye yazılır (eşleşen mevcut müşteri ezilmez, K4). |
 | `VergiDairesi` | Hayır | ≤ 100; yalnız `KimlikNo` geçerli VKN ise kullanılır. |
 | `Durum` | Hayır | `Aktif`/boş → aktif; `Pasif` → müşteri aktarılır ve **hatırlatma istemiyor** (`RemindersOptedOut`) işaretlenir, bilgi `Imports.InactiveClient` (Vetinity'de pasif müşteri durumu yok; eski programda pasif müşteriye hatırlatma gitmesin). Tanınmayan → uyarı `Imports.StatusUnrecognized`, aktif. |
-| `Not` | Hayır | Müşteri notu (2026-11-12): ≤ 2000 karakter (`Client.MaxNotesLength`); fazlası `Imports.FieldTooLong` (hata). Yalnız **yeni** müşteriye yazılır. |
+| `Not` | Hayır | Müşteri notu (2026-11-12): ≤ 4000 karakter (`Client.MaxNotesLength`); fazlası `Imports.FieldTooLong` (hata). Yalnız **yeni** müşteriye yazılır. |
 
 **Hasta tablosu (`pets`)**
 

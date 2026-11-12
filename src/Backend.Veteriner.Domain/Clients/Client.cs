@@ -68,7 +68,7 @@ public sealed class Client : AggregateRoot, ITenantOwned, IChangeTracked
     public const int MaxBillingProvinceLength = 80;
     public const int MaxBillingDistrictLength = 80;
     public const int MaxBillingAddressLineLength = 500;
-    public const int MaxNotesLength = 2000;
+    public const int MaxNotesLength = 4000;
 
     /// <summary>Kliniğin iç notu (meslek, tercih, uyarı; eski programlardaki "açıklama"); sahip portalına açılmaz. Yalnız <see cref="ApplyNotes"/> ile değişir.</summary>
     public string? Notes { get; private set; }

@@ -1951,8 +1951,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("varchar(11)");
 
                     b.Property<string>("Notes")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
 
                     b.Property<int?>("PersonType")
                         .HasColumnType("int");
