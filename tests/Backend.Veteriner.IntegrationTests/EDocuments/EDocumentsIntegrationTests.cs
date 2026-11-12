@@ -193,6 +193,26 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
     }
 
     [Fact]
+    public async Task EInvoice_Of_Provider_Without_EInvoice_Cancel_Should_Not_Offer_Or_Start_Cancel()
+    {
+        var ctx = await SeedAsync();
+        _provider.CancelsEInvoice = false;
+        var corporate = await ctx.CreateClientAsync(new { personType = "Corporate", taxNumber = EInvoiceVkn, taxOffice = "Kadıköy", legalName = "Örnek Ltd." });
+        var charge = await ctx.ChargeAsync(corporate, 500m, "Product");
+        var issued = await ctx.PostAsync("/api/v1/e-documents", new { requestId = Guid.NewGuid(), clinicId = ctx.ClinicId, chargeIds = new[] { charge } });
+        var documentId = issued.GetProperty("id").GetGuid();
+        var detail = await ctx.PostAsync($"/api/v1/e-documents/{documentId}/refresh", new { });
+        detail.GetProperty("status").GetString().Should().Be("Issued");
+        detail.GetProperty("canCancel").GetBoolean().Should().BeFalse("entegratör e-Fatura iptalini API'den desteklemiyor");
+
+        var cancel = await ctx.Http.PostAsJsonAsync($"/api/v1/e-documents/{documentId}/cancel", new { reason = "Yanlış kesildi" });
+        cancel.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(cancel)).Should().Be("EDocuments.CancelUnsupported");
+        (await ctx.GetAsync($"/api/v1/e-documents/{documentId}")).GetProperty("status").GetString()
+            .Should().Be("Issued", "belge iptal reddedildi durumuna düşürülmez");
+    }
+
+    [Fact]
     public async Task Without_Connection_Issue_Should_Be_Rejected_And_Disconnect_Should_Clear()
     {
         var ctx = await SeedAsync();
@@ -591,6 +611,8 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
         public Task<ProviderResult<ProviderIssueOutcome>> CheckAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct)
             => throw new NotSupportedException();
 
+        public bool CanCancel(EDocumentType type) => true;
+
         public Task<ProviderResult<ProviderCancelOutcome>> CancelAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct)
             => throw new NotSupportedException();
 
@@ -609,6 +631,11 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
 
         public int IssueCount => _issueCount;
         public string? LastRecipient { get; private set; }
+
+        /// <summary>Paraşüt e-Fatura iptal edebilir; Nilvera gibi edemeyen entegratörü taklit etmek için kapatılır.</summary>
+        public bool CancelsEInvoice { get; set; } = true;
+
+        public bool CanCancel(EDocumentType type) => type != EDocumentType.EInvoice || CancelsEInvoice;
 
         public string ProviderCode => Code;
         public string DisplayName => "Sahte Sağlayıcı";

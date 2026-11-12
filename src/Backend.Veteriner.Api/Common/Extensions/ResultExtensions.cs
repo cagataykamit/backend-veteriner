@@ -113,7 +113,8 @@ public static class ResultExtensions
         if (normalized is "edocuments.notconnected" or "edocuments.invalidstate" or "edocuments.chargealreadydocumented"
             or "edocuments.chargevoided" or "edocuments.importedcharge" or "edocuments.requestidconflict"
             or "edocuments.concurrencyconflict" or "edocuments.providermismatch"
-            or "edocuments.cancelwindowexpired" or "edocuments.pdfnotready" or "charges.edocumentattached")
+            or "edocuments.cancelwindowexpired" or "edocuments.cancelunsupported" or "edocuments.pdfnotready"
+            or "charges.edocumentattached")
         {
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }

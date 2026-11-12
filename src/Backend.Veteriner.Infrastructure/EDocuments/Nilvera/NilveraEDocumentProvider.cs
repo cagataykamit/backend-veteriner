@@ -33,6 +33,13 @@ public sealed class NilveraEDocumentProvider : IEDocumentProvider, IEDocumentCre
     public bool IsConfigured => _client.Options.IsConfigured;
     public EDocumentEnvironment Environment => _client.Options.Environment;
 
+    /// <summary>Nilvera API'sinde yalnız e-Arşiv ve e-SMM iptal ucu var; e-Fatura iptali yok.</summary>
+    public bool CanCancel(EDocumentType type) => type != EDocumentType.EInvoice;
+
+    /// <summary>Kullanıcıya gösterilen e-Fatura iptal yönlendirmesi (iptal ucu ve adaptör aynı metni kullanır).</summary>
+    public const string EInvoiceCancelUnsupportedMessage =
+        "e-Fatura Nilvera API'si üzerinden iptal edilemiyor; alıcıyla iade faturası veya GİB portalı üzerinden işlem yapın.";
+
     public Task<ProviderResult<ProviderAccountInfo>> IdentifyAsync(string credentials, CancellationToken ct)
         => RunAsync(async () =>
         {
@@ -108,7 +115,7 @@ public sealed class NilveraEDocumentProvider : IEDocumentProvider, IEDocumentCre
             {
                 throw new NilveraException(new ProviderError(
                     EDocumentErrorKind.ProviderRejected,
-                    "e-Fatura Nilvera API'si üzerinden iptal edilemiyor; alıcıyla iade faturası veya GİB portalı üzerinden işlem yapın.",
+                    EInvoiceCancelUnsupportedMessage,
                     "einvoice-cancel-unsupported"));
             }
 

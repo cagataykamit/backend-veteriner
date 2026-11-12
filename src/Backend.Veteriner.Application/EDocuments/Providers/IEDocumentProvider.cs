@@ -28,6 +28,9 @@ public interface IEDocumentProvider
     /// <summary>Asenkron sonucu sorar (iş bitti mi, belge oluştu mu).</summary>
     Task<ProviderResult<ProviderIssueOutcome>> CheckAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct);
 
+    /// <summary>Bu belge türü entegratörün API'sinden iptal edilebilir mi (Nilvera'da e-Fatura iptali yok).</summary>
+    bool CanCancel(EDocumentType type);
+
     Task<ProviderResult<ProviderCancelOutcome>> CancelAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct);
 
     /// <summary>Belgesi oluşmamış taslak kaydı sağlayıcıda geri alır (vazgeçme); kayıt yoksa başarı.</summary>

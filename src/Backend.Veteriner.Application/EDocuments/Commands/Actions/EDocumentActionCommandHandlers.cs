@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.EDocuments.Contracts;
+using Backend.Veteriner.Application.EDocuments.Providers;
 using Backend.Veteriner.Domain.EDocuments;
 using Backend.Veteriner.Domain.Shared;
 using Mediator;
@@ -66,12 +67,15 @@ public sealed class CancelEDocumentCommandHandler : IRequestHandler<CancelEDocum
 {
     private readonly EDocumentActionRunner _runner;
     private readonly EDocumentSender _sender;
+    private readonly IEDocumentProviderResolver _providers;
     private readonly TimeProvider _timeProvider;
 
-    public CancelEDocumentCommandHandler(EDocumentActionRunner runner, EDocumentSender sender, TimeProvider timeProvider)
+    public CancelEDocumentCommandHandler(
+        EDocumentActionRunner runner, EDocumentSender sender, IEDocumentProviderResolver providers, TimeProvider timeProvider)
     {
         _runner = runner;
         _sender = sender;
+        _providers = providers;
         _timeProvider = timeProvider;
     }
 
@@ -80,6 +84,14 @@ public sealed class CancelEDocumentCommandHandler : IRequestHandler<CancelEDocum
         {
             if (connection is null || !connection.IsUsable)
                 return Result.Failure(EDocumentProviderGateway.NotConnected(connection));
+
+            // Entegratör bu türü API'den iptal edemiyorsa belge "iptal reddedildi"ye düşürülmez; istek baştan reddedilir.
+            if (_providers.Find(document.ProviderCode) is { } provider && !provider.CanCancel(document.Type))
+            {
+                return Result.Failure(
+                    "EDocuments.CancelUnsupported",
+                    $"{provider.DisplayName} bu belge türünü API üzerinden iptal edemiyor; alıcıyla iade faturası veya GİB portalı üzerinden işlem yapın.");
+            }
 
             var requested = document.RequestCancel(caller.UserId, request.Reason, _timeProvider.GetUtcNow().UtcDateTime);
             if (!requested.IsSuccess)
