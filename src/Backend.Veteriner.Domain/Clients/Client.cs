@@ -68,6 +68,10 @@ public sealed class Client : AggregateRoot, ITenantOwned, IChangeTracked
     public const int MaxBillingProvinceLength = 80;
     public const int MaxBillingDistrictLength = 80;
     public const int MaxBillingAddressLineLength = 500;
+    public const int MaxNotesLength = 2000;
+
+    /// <summary>Kliniğin iç notu (meslek, tercih, uyarı; eski programlardaki "açıklama"); sahip portalına açılmaz. Yalnız <see cref="ApplyNotes"/> ile değişir.</summary>
+    public string? Notes { get; private set; }
 
     /// <summary>Fatura alıcısı türü (ADR-036); <c>null</c> = belirtilmemiş. Fatura kimliği alanları yalnız <see cref="ApplyInvoicingIdentity"/> ile değişir.</summary>
     public ClientPersonType? PersonType { get; private set; }
@@ -141,6 +145,23 @@ public sealed class Client : AggregateRoot, ITenantOwned, IChangeTracked
             PreferredContactChannel = newChannel;
         if (remindersOptedOut is { } optedOut)
             RemindersOptedOut = optedOut;
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Müşteri notunu yazar: <c>null</c> mevcut nota dokunmaz (alanı bilmeyen eski istemci notu silmez); kenar boşluğu kırpılır,
+    /// boş metin notu temizler; en çok <see cref="MaxNotesLength"/> karakter. Kural yalnızca burada yaşar.
+    /// </summary>
+    public Result ApplyNotes(string? notes)
+    {
+        if (notes is null)
+            return Result.Success();
+
+        var text = NormalizeOptional(notes);
+        if (text is { Length: > MaxNotesLength })
+            return Result.Failure("Clients.Validation", $"Müşteri notu en fazla {MaxNotesLength} karakter olabilir.");
+
+        Notes = text;
         return Result.Success();
     }
 

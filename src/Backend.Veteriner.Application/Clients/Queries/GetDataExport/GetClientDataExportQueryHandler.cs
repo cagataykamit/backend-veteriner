@@ -153,7 +153,8 @@ public sealed class GetClientDataExportQueryHandler
                 client.CreatedAtUtc,
                 client.PreferredContactChannel,
                 client.RemindersOptedOut,
-                ClientInvoicingSummaryDto.From(client)),
+                ClientInvoicingSummaryDto.From(client),
+                client.Notes),
             new ClientDataExportKvkkConsentDto(
                 client.KvkkConsentStatus,
                 client.KvkkConsentRecordedOn,

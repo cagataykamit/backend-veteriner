@@ -17,6 +17,7 @@ using Backend.Veteriner.Domain.Notifications;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Prescriptions;
+using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
 using Backend.Veteriner.Infrastructure.DataExports;
@@ -85,6 +86,11 @@ public sealed class DataExportIntegrationTests : IClassFixture<CustomWebApplicat
 
         var clients = Text(files, "musteriler.csv");
         clients.Should().Contain(data.ClientId.ToString("D")).And.Contain(ValidNationalId).And.Contain(data.ClientName);
+        clients.Split("\r\n")[0].Split(';').Should().Contain("Not");
+        clients.Should().Contain("Müşteri notu metni");
+        var products = Text(files, "urunler.csv");
+        products.Split("\r\n")[0].Split(';').Should().Contain(["KdvOrani", "AlisFiyati"]);
+        products.Should().Contain(";10.00;62.50;");
         Text(files, "klinikler.csv").Should().Contain(ctx.ClinicId.ToString("D"));
         Text(files, "hastalar.csv").Should().Contain("Allergy, Aggressive").And.Contain("Penisilin alerjisi").And.Contain(data.ClientId.ToString("D"));
         var exams = Text(files, "muayeneler.csv");
@@ -312,7 +318,9 @@ public sealed class DataExportIntegrationTests : IClassFixture<CustomWebApplicat
 
         var client = new Client(ctx.TenantId, name, now, "905551110088", $"musteri-{Guid.NewGuid():N}@example.com");
         client.ApplyInvoicingIdentity(ClientPersonType.Individual, ValidNationalId, null, null, null, null, null, null, now).IsSuccess.Should().BeTrue();
+        client.ApplyNotes("Müşteri notu metni").IsSuccess.Should().BeTrue();
         db.Clients.Add(client);
+        db.Products.Add(new Product(ctx.TenantId, $"DX Ürün {Guid.NewGuid():N}"[..16], "Adet", 100m, "TRY", now, vatRate: 10m, purchasePrice: 62.5m));
         var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
         var pet = new Pet(ctx.TenantId, client.Id, "Pamuk", speciesId);
         pet.ApplyAlerts(["Allergy", "Aggressive"], "Penisilin alerjisi").IsSuccess.Should().BeTrue();

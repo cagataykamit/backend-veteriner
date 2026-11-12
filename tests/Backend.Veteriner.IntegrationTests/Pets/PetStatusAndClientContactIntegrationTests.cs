@@ -184,6 +184,49 @@ public sealed class PetStatusAndClientContactIntegrationTests : IClassFixture<Cu
         invalid.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    [Fact]
+    public async Task Client_Notes_Should_Roundtrip_Survive_Put_Without_Field_And_Be_Masked_In_Audit()
+    {
+        const string note = "Deneme notu: akşam aranmak istiyor";
+        var ctx = await SeedAsync();
+
+        var tooLong = await ctx.Http.PostAsJsonAsync("/api/v1/clients", new
+        {
+            fullName = $"Not-{Guid.NewGuid():N}"[..12], notes = new string('n', Client.MaxNotesLength + 1),
+        });
+        tooLong.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(tooLong)).Should().Be("Clients.Validation");
+
+        var create = await ctx.Http.PostAsJsonAsync("/api/v1/clients", new { fullName = $"Not-{Guid.NewGuid():N}"[..12], notes = $" {note} " });
+        create.StatusCode.Should().Be(HttpStatusCode.Created, await create.Content.ReadAsStringAsync());
+        var clientId = (await create.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var detail = await ctx.Http.GetFromJsonAsync<JsonElement>($"/api/v1/clients/{clientId}");
+        detail.GetProperty("notes").GetString().Should().Be(note);
+        var fullName = detail.GetProperty("fullName").GetString();
+
+        // Alanı bilmeyen eski istemci notu silmez; "" temizler.
+        (await ctx.Http.PutAsJsonAsync($"/api/v1/clients/{clientId}", new { fullName })).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await ctx.Http.GetFromJsonAsync<JsonElement>($"/api/v1/clients/{clientId}")).GetProperty("notes").GetString().Should().Be(note);
+
+        (await ctx.Http.PutAsJsonAsync($"/api/v1/clients/{clientId}", new { fullName, notes = "" })).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await ctx.Http.GetFromJsonAsync<JsonElement>($"/api/v1/clients/{clientId}")).GetProperty("notes").ValueKind
+            .Should().Be(JsonValueKind.Null);
+
+        // Liste notu taşımaz.
+        var list = await ctx.Http.GetFromJsonAsync<JsonElement>($"/api/v1/clients?page=1&pageSize=5&search={Uri.EscapeDataString(fullName!)}");
+        list.GetProperty("items").EnumerateArray().Any(i => i.TryGetProperty("notes", out _)).Should().BeFalse();
+
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var payloads = await db.AuditLogs.AsNoTracking()
+            .Where(a => (a.Action == "Client.Create" || a.Action == "Client.Update") && a.RequestPayload!.Contains(fullName!))
+            .Select(a => a.RequestPayload!)
+            .ToListAsync();
+        payloads.Should().NotBeEmpty();
+        payloads.Should().Contain(p => p.Contains("\"notes\":\"***\"")).And.OnlyContain(p => !p.Contains("aranmak"));
+    }
+
     // ---- Kurulum ----
 
     private async Task<StatusTestContext> SeedAsync(string[]? permissions = null)

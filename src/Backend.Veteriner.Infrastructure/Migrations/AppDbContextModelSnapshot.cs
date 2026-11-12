@@ -1947,6 +1947,10 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .IsUnicode(false)
                         .HasColumnType("varchar(11)");
 
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
                     b.Property<int?>("PersonType")
                         .HasColumnType("int");
 
@@ -5365,6 +5369,10 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid?>("ProductCategoryId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<decimal?>("PurchasePrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("Sku")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -5383,6 +5391,10 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("VatRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
 
                     b.HasKey("Id");
 

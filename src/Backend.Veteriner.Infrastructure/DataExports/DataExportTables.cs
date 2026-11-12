@@ -148,6 +148,7 @@ public static class DataExportTables
                 DataExportColumn<Client>.Text("FaturaIl", "Fatura ili.", x => x.BillingProvince),
                 DataExportColumn<Client>.Text("FaturaIlce", "Fatura ilçesi.", x => x.BillingDistrict),
                 DataExportColumn<Client>.Text("FaturaAdres", "Fatura adresi.", x => x.BillingAddressLine),
+                DataExportColumn<Client>.Text("Not", "Müşteri notu (kliniğin iç notu).", x => x.Notes),
                 DataExportColumn<Client>.Instant("Olusturma", "Kayıt zamanı.", x => x.CreatedAtUtc),
                 DataExportColumn<Client>.Instant("Guncelleme", "Son güncelleme zamanı.", x => x.UpdatedAtUtc),
             ]),

@@ -11,7 +11,8 @@ namespace Backend.Veteriner.Application.Clients.Contracts.Dtos;
 
 /// <summary>
 /// GET /clients/{id}/data-export (ADR-032 madde 2): müşterinin KVKK bilgi talebi için salt okunur veri kopyası.
-/// İç alanlar (RowVersion, TenantId, kullanıcı kimlikleri, denetim alanları) ve serbest metin iç notlar taşınmaz.
+/// İç alanlar (RowVersion, TenantId, kullanıcı kimlikleri, denetim alanları) ve serbest metin iç notlar taşınmaz; istisna müşteri
+/// kartının notudur (kişiyle ilgili kayıt, PET_STATUS_CLIENT_CONTACT_API_CONTRACT.md §2.1).
 /// Her bölüm en fazla <see cref="MaxRowsPerSection"/> kayıt taşır; fazlası kesilir ve <c>isTruncated</c> true olur.
 /// </summary>
 public sealed record ClientDataExportDto(
@@ -65,7 +66,8 @@ public sealed record ClientDataExportClientDto(
     DateTime CreatedAtUtc,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] ContactChannel PreferredContactChannel,
     bool RemindersOptedOut,
-    ClientInvoicingSummaryDto Invoicing);
+    ClientInvoicingSummaryDto Invoicing,
+    string? Notes);
 
 public sealed record ClientDataExportKvkkConsentDto(
     [property: JsonConverter(typeof(JsonStringEnumConverter))] KvkkConsentStatus Status,

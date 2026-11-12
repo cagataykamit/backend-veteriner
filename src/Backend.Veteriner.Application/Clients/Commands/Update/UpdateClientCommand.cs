@@ -13,6 +13,7 @@ namespace Backend.Veteriner.Application.Clients.Commands.Update;
 /// Fatura kimliği (ADR-036): <c>null</c> = dokunma; verilirse nesnenin tamamı yazılır (tam değiştirme).
 /// Denetim kaydında TCKN/VKN maskelenir.
 /// </param>
+/// <param name="Notes">Müşteri iç notu: <c>null</c> = dokunma, <c>""</c> = temizle; denetim kaydında metin yerine <c>***</c>.</param>
 public sealed record UpdateClientCommand(
     Guid Id,
     string FullName,
@@ -21,7 +22,8 @@ public sealed record UpdateClientCommand(
     string? Address = null,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] ContactChannel? PreferredContactChannel = null,
     bool? RemindersOptedOut = null,
-    ClientInvoicingIdentityDto? InvoicingIdentity = null)
+    ClientInvoicingIdentityDto? InvoicingIdentity = null,
+    string? Notes = null)
     : IRequest<Result>, IAuditableRequest
 {
     public string AuditAction => "Client.Update";

@@ -109,6 +109,10 @@ public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCom
                 return Result<ClientCreatedDto>.Failure(applied.Error);
         }
 
+        var notes = client.ApplyNotes(request.Notes);
+        if (!notes.IsSuccess)
+            return Result<ClientCreatedDto>.Failure(notes.Error);
+
         await _clientsWrite.AddAsync(client, ct);
 
         // Outbox emission aynı SaveChanges/transaction sınırında kalıcı olur (buffer interceptor ile drain edilir).
