@@ -61,6 +61,8 @@ public sealed class ImportValueResolverTests
     private static readonly Guid Husky = Guid.NewGuid();
     private static readonly Guid Dobermann = Guid.NewGuid();
     private static readonly Guid Vizsla = Guid.NewGuid();
+    private static readonly Guid Brittany = Guid.NewGuid();
+    private static readonly Guid Ppr = Guid.NewGuid();
     private static readonly Guid Ferret = Guid.NewGuid();
     private static readonly Guid BrownWhite = Guid.NewGuid();
     private static readonly Guid YellowWhite = Guid.NewGuid();
@@ -72,7 +74,7 @@ public sealed class ImportValueResolverTests
 
     private static readonly ImportValueResolver Extended = new(new ImportCatalogs(
         Species: [new(Dog, "Köpek", "DOG", null), new(Cat, "Kedi", "CAT", null), new(GuineaPig, "Kobay (Gine Domuzu)", "GUINEA_PIG", null), new(Exotic, "Egzotik", "EXOTIC", null), new(Ferret, "Ferret (Gelincik)", "FERRET", null), new(Other, "Diğer", "OTHER", null)],
-        Breeds: [new(ScottishFold, "Scottish Fold", null, Cat), new(BritishShorthair, "British Shorthair", null, Cat), new(Setter, "İngiliz Setter", null, Dog), new(Malinois, "Belçika Malinois", null, Dog), new(Maltese, "Maltese", null, Dog), new(Husky, "Sibirya Kurdu (Siberian Husky)", null, Dog), new(Dobermann, "Dobermann", null, Dog), new(Vizsla, "Vizsla (Macar Kısa Tüylü Pointer)", null, Dog)],
+        Breeds: [new(ScottishFold, "Scottish Fold", null, Cat), new(BritishShorthair, "British Shorthair", null, Cat), new(Setter, "İngiliz Setter", null, Dog), new(Malinois, "Belçika Malinois", null, Dog), new(Maltese, "Maltese", null, Dog), new(Husky, "Sibirya Kurdu (Siberian Husky)", null, Dog), new(Dobermann, "Dobermann", null, Dog), new(Vizsla, "Vizsla (Macar Kısa Tüylü Pointer)", null, Dog), new(Brittany, "Epagneul Breton (Brittany)", null, Dog)],
         Colors:
         [
             new(Piebald, "Alacalı", "PIEBALD", null),
@@ -96,6 +98,7 @@ public sealed class ImportValueResolverTests
             new(Tetanus, "Tetanoz", "TETANUS", null),
             new(Mastitis, "Mastitis", "MASTITIS", null),
             new(Enterotoxemia, "Enterotoksemi", "ENTEROTOXEMIA", null),
+            new(Ppr, "Koyun ve Keçi Vebası (PPR)", "PPR", null),
         ]), []);
 
     public static TheoryData<string, string> EVetVaccineNames => new()
@@ -119,6 +122,9 @@ public sealed class ImportValueResolverTests
         { "TETANOZ 1", nameof(Tetanus) },
         { "Mastitis Aşısı", nameof(Mastitis) },
         { "Mera Aşısı", nameof(Enterotoxemia) },
+        { "Küçük Ruminant Vebası", nameof(Ppr) },
+        { "Küçük Ruminantların Vebası (PPR)", nameof(Ppr) },
+        { "Koyun Vebası", nameof(Ppr) },
     };
 
     [Theory]
@@ -138,6 +144,7 @@ public sealed class ImportValueResolverTests
         [nameof(Tetanus)] = Tetanus,
         [nameof(Mastitis)] = Mastitis,
         [nameof(Enterotoxemia)] = Enterotoxemia,
+        [nameof(Ppr)] = Ppr,
     };
 
     [Theory]
@@ -177,6 +184,8 @@ public sealed class ImportValueResolverTests
         Extended.Resolve(ImportValueKind.Breed, "Husky", Dog).TargetId.Should().Be(Husky);
         Extended.Resolve(ImportValueKind.Breed, "Sibirya Kurdu", Dog).TargetId.Should().Be(Husky);
         Extended.Resolve(ImportValueKind.Breed, "Doberman", Dog).TargetId.Should().Be(Dobermann);
+        Extended.Resolve(ImportValueKind.Breed, "Epanyol Breton", Dog).TargetId.Should().Be(Brittany);
+        Extended.Resolve(ImportValueKind.Breed, "Brittany", Dog).TargetId.Should().Be(Brittany);
         Extended.Resolve(ImportValueKind.Breed, "Macar Tazısı (Vizsla)", Dog).TargetId.Should().Be(Vizsla);
         // Macar tazısı (Magyar agár) Vizsla değildir; kullanıcı eşler.
         Extended.Resolve(ImportValueKind.Breed, "Macar Tazısı", Dog).Kind.Should().Be(ImportValueResolutionKind.Unmapped);

@@ -44,7 +44,7 @@ public static class VaccineDefinitionSeeder
         ("ANTHRAX", "Şarbon"),
         ("BLACKLEG", "Yanıkara"),
         ("LUMPY_SKIN", "Sığırların Nodüler Ekzantemi (LSD)"),
-        ("PPR", "Küçük Ruminantların Vebası (PPR)"),
+        ("PPR", "Koyun ve Keçi Vebası (PPR)"),
     ];
 
     /// <summary>
@@ -63,6 +63,7 @@ public static class VaccineDefinitionSeeder
         ("SHEEP_GOAT_POX", "Koyun-Keçi Çiçeği"),
         ("LUMPY_SKIN", "Nodüler Ekzantem (LSD)"),
         ("PPR", "Küçük Ruminant Vebası (PPR)"),
+        ("PPR", "Küçük Ruminantların Vebası (PPR)"),
     ];
 
     public static async Task SeedAsync(AppDbContext db, ILogger? logger = null, CancellationToken ct = default)

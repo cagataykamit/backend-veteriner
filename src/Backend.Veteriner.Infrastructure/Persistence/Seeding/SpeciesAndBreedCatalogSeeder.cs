@@ -63,7 +63,8 @@ public static class SpeciesAndBreedCatalogSeeder
 
     /// <summary>
     /// FCI/FIFe adına göre düzeltilen ırklar (2026-11-12): Maltese terrier değil bişon (FCI 65), Vizsla tazı değil pointer
-    /// (FCI 57), Siberian Husky (FCI 270), Dobermann (FCI 143), Drahthaar (FCI 98), Lohmann Brown (Lohmann Tierzucht).
+    /// (FCI 57), Siberian Husky (FCI 270), Dobermann (FCI 143), Drahthaar (FCI 98), Epagneul Breton (FCI 95), Lohmann Brown
+    /// (Lohmann Tierzucht).
     /// </summary>
     private static readonly (string SpeciesCode, string OldName, string NewName)[] BreedRenames =
     [
@@ -74,6 +75,7 @@ public static class SpeciesAndBreedCatalogSeeder
         ("DOG", "Drahthaar", "Alman Tel Tüylü Pointer (Drahthaar)"),
         ("CAT", "Norwegian Forest", "Norwegian Forest Cat"),
         ("CHICKEN", "Lohman Brown", "Lohmann Brown"),
+        ("DOG", "Epanyol Breton", "Epagneul Breton (Brittany)"),
     ];
 
     private static readonly (string SpeciesCode, string Name)[] BreedCatalog =
@@ -259,7 +261,7 @@ public static class SpeciesAndBreedCatalogSeeder
                 "Cavalier King Charles Spaniel",
                 "King Charles Spaniel",
                 "Amerikan Cocker Spaniel",
-                "Epanyol Breton",
+                "Epagneul Breton (Brittany)",
                 "Polonya Av Köpeği",
                 "Rus Siyah Terrier",
                 "Border Terrier",
