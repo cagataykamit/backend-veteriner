@@ -227,6 +227,22 @@ public sealed class ImportValueResolver
     /// </summary>
     public static string VaccineSeriesKey(string? vaccineName) => ReduceVaccineKey(ImportTextFolding.Fold(vaccineName));
 
+    /// <summary>
+    /// Eski programın aşı paketinde aşı olmayan uygulama (tedavi, bağışıklık destek ürünü): adında <c>tedavi</c> geçer ya da bilinen
+    /// tedavi ürünüdür. Aşı geçmişine değil klinik geçmişe yazılır; aşı kataloğuna eklenmez.
+    /// </summary>
+    public static bool IsTreatment(string? vaccineName)
+    {
+        var key = ImportTextFolding.Fold(vaccineName);
+        return key.Contains("tedavi", StringComparison.Ordinal) || TreatmentProducts.Contains(VaccineSeriesKey(vaccineName));
+    }
+
+    /// <summary>Aşı paketine yazılan, aşı olmayan ürünler (katlanmış seri anahtarı): bağışıklık destek ve homeopatik ürünler.</summary>
+    private static readonly HashSet<string> TreatmentProducts = new(StringComparer.Ordinal)
+    {
+        "zylexis", "theranekron", "theranekrond", "baypamun",
+    };
+
     private static string ReduceVaccineKey(string key)
     {
         var reduced = VaccineYearly.Replace(key, string.Empty);
