@@ -37,4 +37,9 @@ public static class SpeciesSeedConstants
 
     /// <summary>Türü belirtilmemiş egzotik hayvan (eski programlarda yaygın genel tür; E-vet geçişi 2026-11-12).</summary>
     public static readonly Guid Exotic = Guid.Parse("2c1c8f3a-6b0b-4d1e-9f2a-111111010217");
+
+    /// <summary>Manda (Anadolu Mandası tescilli yerli ırk; Tebliğ 2004/39) ve küçük kemirgenler (2026-11-13).</summary>
+    public static readonly Guid WaterBuffalo = Guid.Parse("2c1c8f3a-6b0b-4d1e-9f2a-111111010218");
+
+    public static readonly Guid SmallRodent = Guid.Parse("2c1c8f3a-6b0b-4d1e-9f2a-111111010219");
 }

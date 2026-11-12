@@ -121,7 +121,7 @@ Takvim silinmez ve okunur; yazma, öneri ve onay 403 olur. Plandan oluşmuş pla
 
 1. Takvim kiracı başınadır (aşı kataloğu gibi); şubeye göre ayrı takvim yok.
 2. İzinler mevcut olanlardır: takvim yönetimi `VaccineDefinitions.Update` (Admin, Owner, ClinicAdmin), öneri `Vaccinations.Read`, onay `Vaccinations.Create`. Yeni izin yok.
-3. Başlangıç şablonu (kedi ve köpek; iç parazit, karma, corona, bronşin, dış parazit, kuduz, lösemi) yaygın uygulamadan derlenmiş genel bir başlangıçtır, tıbbi tavsiye değildir; değerler `VaccinationScheduleStarterTemplate`'te. Hekim gözden geçirir.
+3. Başlangıç şablonu (kedi ve köpek; iç parazit, türe göre karma, bronşin, dış parazit, kuduz, lösemi) WSAVA 2024, Kuduz Yönetmeliği ve ESCCAP ile uyumlu genel bir başlangıçtır (2026-11-13: karma 8., 12., 16. hafta; WSAVA önermediği için köpek koronavirüs çıkarıldı), tıbbi tavsiye değildir; değerler `VaccinationScheduleStarterTemplate`'te. Hekim gözden geçirir.
 4. Tekrar dozu temel seriden sonra yalnız bir tane önerilir; sonrakini o doz uygulanınca yeni öneri ya da kaydın "sonraki uygulama" tarihi verir.
 5. Uygulanmış dozun "sonraki uygulama" tarihi ileri bir tarihse o aşı önerilmez (`NextDueSet`), aynı tarihe iki hatırlatma gitmesin diye.
 6. En erken gün yarındır; geç kalan ilk doz yarına alınır.

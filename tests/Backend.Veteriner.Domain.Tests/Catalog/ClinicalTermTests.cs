@@ -108,4 +108,20 @@ public sealed class ClinicalTermTests
         term.Name.Should().Be("Kusma");
         term.IsActive.Should().BeTrue();
     }
+
+    [Fact]
+    public void ReviseSystemTerm_Should_Rename_Or_Deactivate_Only_System_Rows()
+    {
+        var system = ClinicalTerm.CreateSystem(ClinicalTermKind.Complaint, "Kaşıntı", Now);
+        system.ReviseSystemTerm("Kaşıntı (deri)", isActive: true, Now);
+        system.Name.Should().Be("Kaşıntı (deri)");
+        system.NormalizedName.Should().Be(TurkishTextKey.Normalize("Kaşıntı (deri)"));
+
+        system.ReviseSystemTerm(system.Name, isActive: false, Now);
+        system.IsActive.Should().BeFalse();
+
+        var tenant = ClinicalTerm.CreateForTenant(TenantId, ClinicalTermKind.Complaint, "Kaşıntı", Now);
+        var act = () => tenant.ReviseSystemTerm("X", isActive: true, Now);
+        act.Should().Throw<InvalidOperationException>();
+    }
 }

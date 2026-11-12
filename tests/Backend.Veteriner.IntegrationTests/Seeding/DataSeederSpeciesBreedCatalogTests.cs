@@ -1,5 +1,9 @@
 using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Domain.Catalog;
+using Backend.Veteriner.Domain.Clients;
+using Backend.Veteriner.Domain.Pets;
+using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Backend.Veteriner.Infrastructure.Persistence.Seeding;
 using AwesomeAssertions;
@@ -52,7 +56,7 @@ public sealed class DataSeederSpeciesBreedCatalogTests
         speciesCodes.Should().Contain("CATTLE");
 
         // Migration: 9 (REPTILE dahil) + katalog: 18 yeni (EXOTIC dahil) = 27
-        (await db.Species.CountAsync()).Should().Be(27);
+        (await db.Species.CountAsync()).Should().Be(29);
     }
 
     [Fact]
@@ -63,7 +67,7 @@ public sealed class DataSeederSpeciesBreedCatalogTests
 
         await DataSeeder.SeedAsync(db, new StubBcryptPasswordHasher());
 
-        (await db.Breeds.CountAsync()).Should().Be(227);
+        (await db.Breeds.CountAsync()).Should().Be(315);
 
         var dogId = await db.Species.AsNoTracking().Where(s => s.Code == "DOG").Select(s => s.Id).SingleAsync();
         var golden = await db.Breeds.AsNoTracking().SingleAsync(b =>
@@ -74,7 +78,7 @@ public sealed class DataSeederSpeciesBreedCatalogTests
             .Where(s => s.Code == "GUINEA_PIG")
             .Select(s => s.Id)
             .SingleAsync();
-        (await db.Breeds.CountAsync(b => b.SpeciesId == guineaId)).Should().Be(5);
+        (await db.Breeds.CountAsync(b => b.SpeciesId == guineaId)).Should().Be(10);
 
         var reptileId = await db.Species.AsNoTracking()
             .Where(s => s.Code == "REPTILE")
@@ -86,7 +90,8 @@ public sealed class DataSeederSpeciesBreedCatalogTests
             .Select(b => b.Name)
             .OrderBy(n => n)
             .ToListAsync();
-        reptileBreedNames.Should().BeEquivalentTo(["Bilinmeyen", "Diğer", "Kaplumbağa", "Kertenkele", "Yılan"]);
+        // Kaplumbağa, kertenkele ve yılan ayrı türlerdir; Sürüngen yalnız türü belirtilmemiş eski kayıtlar içindir.
+        reptileBreedNames.Should().BeEquivalentTo(["Bilinmeyen", "Diğer"]);
     }
 
     [Fact]
@@ -99,8 +104,8 @@ public sealed class DataSeederSpeciesBreedCatalogTests
         await DataSeeder.SeedAsync(db, hasher);
         await DataSeeder.SeedAsync(db, hasher);
 
-        (await db.Species.CountAsync()).Should().Be(27);
-        (await db.Breeds.CountAsync()).Should().Be(227);
+        (await db.Species.CountAsync()).Should().Be(29);
+        (await db.Breeds.CountAsync()).Should().Be(315);
     }
 
     [Fact]
@@ -163,8 +168,51 @@ public sealed class DataSeederSpeciesBreedCatalogTests
         await DataSeeder.SeedAsync(db, hasher);
 
         (await db.Breeds.AsNoTracking().SingleAsync(b => b.Id == maltese.Id)).Name.Should().Be("Maltese");
-        (await db.Breeds.CountAsync()).Should().Be(227);
-        (await db.VaccineDefinitions.AsNoTracking().SingleAsync(v => v.Id == corona.Id)).Name.Should().Be("Koronavirüs");
+        (await db.Breeds.CountAsync()).Should().Be(315);
+        (await db.VaccineDefinitions.AsNoTracking().SingleAsync(v => v.Id == corona.Id)).Name.Should().Be("Köpek Koronavirüs Enteriti (CCoV)");
         (await db.Species.AsNoTracking().SingleAsync(s => s.Code == "FERRET")).Name.Should().Be("Ferret (Gelincik)");
+    }
+
+    [Fact]
+    public async Task SeedAsync_Should_Apply_Source_Review_To_An_Older_Catalog()
+    {
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
+        await ResetDatabaseAsync(db);
+        var hasher = new StubBcryptPasswordHasher();
+        await DataSeeder.SeedAsync(db, hasher);
+
+        // 2026-11-13 öncesi katalog: "Tekir" kedi ırkı, genel karma ve FIP aşısı, sınıfsız kuduz.
+        var tekir = new Breed(SpeciesSeedConstants.Cat, "Tekir");
+        db.Breeds.Add(tekir);
+        db.VaccineDefinitions.Add(VaccineDefinition.CreateGlobal("MIXED", "Karma", DateTime.UtcNow));
+        db.VaccineDefinitions.Add(VaccineDefinition.CreateGlobal("FIP", "FIP", DateTime.UtcNow));
+        var rabies = await db.VaccineDefinitions.SingleAsync(v => v.TenantId == null && v.Code == "RABIES");
+        rabies.SetCategory(null, DateTime.UtcNow);
+        var tenant = new Tenant($"Kat-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
+        var client = new Client(tenant.Id, "Sahip", DateTime.UtcNow, "905551112288", null);
+        var pet = new Pet(tenant.Id, client.Id, "Pamuk", SpeciesSeedConstants.Cat, "Tekir", breedId: tekir.Id);
+        db.AddRange(tenant, client, pet);
+        await db.SaveChangesAsync();
+
+        await DataSeeder.SeedAsync(db, hasher);
+
+        var cat = await db.Pets.AsNoTracking().SingleAsync(p => p.Id == pet.Id);
+        cat.Breed.Should().Be("Ev Kedisi (Kısa Tüylü)");
+        cat.PatternId.Should().Be(PetColorSeedConstants.Tabby);
+        cat.ColorId.Should().BeNull();
+        (await db.Breeds.AsNoTracking().SingleAsync(b => b.Id == tekir.Id)).IsActive.Should().BeFalse();
+
+        var vaccines = await db.VaccineDefinitions.AsNoTracking().Where(v => v.TenantId == null).ToDictionaryAsync(v => v.Code);
+        vaccines["MIXED"].IsActive.Should().BeFalse();
+        vaccines["FIP"].IsActive.Should().BeFalse();
+        vaccines["MIXED_CAT"].SpeciesId.Should().Be(SpeciesSeedConstants.Cat);
+        vaccines["RABIES"].Category.Should().Be(VaccineCategory.Core);
+        vaccines["RABIES"].DefaultNextDueDays.Should().Be(365);
+        vaccines["INTERNAL_PARASITE"].Category.Should().Be(VaccineCategory.ParasiteControl);
+
+        var kinds = await db.PetColors.AsNoTracking().ToDictionaryAsync(c => c.Code, c => c.Kind);
+        kinds["TABBY"].Should().Be(PetColorKind.Pattern);
+        kinds["BRINDLE"].Should().Be(PetColorKind.Pattern);
+        kinds["BLACK"].Should().Be(PetColorKind.Color);
     }
 }

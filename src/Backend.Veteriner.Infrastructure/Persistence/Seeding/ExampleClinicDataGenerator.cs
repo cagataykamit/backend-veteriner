@@ -160,13 +160,13 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
     /// <summary>(müşteri sırası, ad, tür kodu, ırk, cinsiyet, yaş ay, kilo kg, kısır, çip var mı, not)</summary>
     private static readonly (int Owner, string Name, string Species, string Breed, PetGender Gender, int AgeMonths, decimal Weight, bool Neutered, bool Chip, string? Note)[] PetSeeds =
     [
-        (0, "Pamuk", "CAT", "Tekir", PetGender.Female, 38, 4.2m, true, true, null),
+        (0, "Pamuk", "CAT", "Ev Kedisi (Kısa Tüylü)", PetGender.Female, 38, 4.2m, true, true, null),
         (0, "Karamel", "DOG", "Golden Retriever", PetGender.Male, 52, 31.5m, false, true, "Tüy dökümü mevsimsel; sahibi omega-3 takviyesi veriyor."),
         (1, "Zeytin", "CAT", "British Shorthair", PetGender.Male, 26, 5.1m, true, true, null),
         (2, "Max", "DOG", "Labrador Retriever", PetGender.Male, 70, 33.8m, true, true, "Eklem hassasiyeti; kilo takibi önerildi."),
         (2, "Cıvıl", "BIRD", "Muhabbet Kuşu", PetGender.Male, 18, 0.04m, false, false, null),
         (3, "Duman", "CAT", "Scottish Fold", PetGender.Male, 14, 3.9m, false, true, null),
-        (4, "Çomar", "DOG", "Kangal", PetGender.Male, 44, 48.0m, false, true, "Bahçede yaşıyor; dış parazit koruması düzenli."),
+        (4, "Çomar", "DOG", "Kangal Çoban Köpeği (Kangal)", PetGender.Male, 44, 48.0m, false, true, "Bahçede yaşıyor; dış parazit koruması düzenli."),
         (4, "Boncuk", "CAT", "Van Kedisi", PetGender.Female, 61, 4.6m, true, false, null),
         (5, "Luna", "DOG", "Melez", PetGender.Female, 30, 18.2m, true, true, "Barınaktan sahiplenildi (2025)."),
         (6, "Şila", "CAT", "Siyam", PetGender.Female, 22, 3.6m, true, true, null),
@@ -174,10 +174,10 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
         (7, "Rocky", "DOG", "Beagle", PetGender.Male, 36, 12.4m, false, true, null),
         (8, "Mia", "CAT", "Melez", PetGender.Female, 8, 2.8m, false, false, "Yavru; aşı takvimi devam ediyor."),
         (8, "Fındık", "DOG", "Poodle", PetGender.Female, 48, 7.1m, true, true, null),
-        (9, "Tarçın", "CAT", "Tekir", PetGender.Male, 95, 5.4m, true, true, "Yaşlı hasta; yıllık kan tahlili önerilir."),
+        (9, "Tarçın", "CAT", "Ev Kedisi (Kısa Tüylü)", PetGender.Male, 95, 5.4m, true, true, "Yaşlı hasta; yıllık kan tahlili önerilir."),
         (10, "Badem", "DOG", "Cocker Spaniel", PetGender.Female, 27, 13.0m, false, true, "Tekrarlayan kulak enfeksiyonu."),
         (10, "Maviş", "BIRD", "Sultan Papağanı", PetGender.Female, 30, 0.09m, false, false, null),
-        (11, "Zeus", "DOG", "Alman Kurdu", PetGender.Male, 40, 36.2m, false, true, null),
+        (11, "Zeus", "DOG", "Alman Çoban Köpeği (Alman Kurdu)", PetGender.Male, 40, 36.2m, false, true, null),
         (11, "Lokum", "CAT", "Persian", PetGender.Female, 33, 4.0m, true, true, "Uzun tüy; düzenli tarama önerildi."),
         (1, "Toffee", "DOG", "Maltese", PetGender.Male, 20, 4.3m, false, true, null),
     ];
@@ -481,8 +481,8 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
     private void WriteAppliedVaccination(Context ctx, Clinical result, ExaminationRecord exam)
     {
         var code = exam.Pet.SpeciesCode == "CAT"
-            ? (ctx.Random.Next(3) == 0 ? "LEUKEMIA" : ctx.Random.Next(2) == 0 ? "MIXED" : "RABIES")
-            : ctx.Random.Next(2) == 0 ? "MIXED" : "RABIES";
+            ? (ctx.Random.Next(3) == 0 ? "LEUKEMIA" : ctx.Random.Next(2) == 0 ? "MIXED_CAT" : "RABIES")
+            : ctx.Random.Next(2) == 0 ? "MIXED_DOG" : "RABIES";
         if (!ctx.Catalog.Vaccines.TryGetValue(code, out var definition))
             return;
 
@@ -497,15 +497,19 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
     /// <summary>Planlı aşılar: önümüzdeki günlerde dört hatırlatma ve bir gecikmiş rapel (hatırlatma listesi için).</summary>
     private void WriteScheduledVaccinations(Context ctx, Clinical result, People people)
     {
-        if (!ctx.Catalog.Vaccines.TryGetValue("RABIES", out var rabies) || !ctx.Catalog.Vaccines.TryGetValue("MIXED", out var mixed))
+        if (!ctx.Catalog.Vaccines.TryGetValue("RABIES", out var rabies)
+            || !ctx.Catalog.Vaccines.TryGetValue("MIXED_DOG", out var mixedDog)
+            || !ctx.Catalog.Vaccines.TryGetValue("MIXED_CAT", out var mixedCat))
             return;
 
-        var candidates = people.Pets.Where(p => p.SpeciesCode != "BIRD").ToList();
+        // Karma aşı türe özgüdür (köpek DHPPi±L, kedi FVRCP).
+        VaccineDefinition MixedFor(PetRecord p) => p.SpeciesCode == "CAT" ? mixedCat : mixedDog;
+        var candidates = people.Pets.Where(p => p.SpeciesCode is "CAT" or "DOG").ToList();
         var dueOffsets = new[] { 2, 5, 9, 21 };
         foreach (var offset in dueOffsets)
         {
             var pet = PickPet(ctx.Random, candidates, []);
-            var definition = offset % 2 == 0 ? rabies : mixed;
+            var definition = offset % 2 == 0 ? rabies : MixedFor(pet);
             var due = OperationDayBounds.NoonUtcForLocalDate(ctx.Today.AddDays(offset));
             var vaccination = new Vaccination(
                 ctx.TenantId, pet.Pet.Id, ctx.ClinicId, null, definition.Id, definition.Name,
@@ -515,13 +519,14 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
         }
 
         var overduePet = PickPet(ctx.Random, candidates, []);
+        var overdueMixed = MixedFor(overduePet);
         var overdue = new Vaccination(
-            ctx.TenantId, overduePet.Pet.Id, ctx.ClinicId, null, mixed.Id, mixed.Name,
+            ctx.TenantId, overduePet.Pet.Id, ctx.ClinicId, null, overdueMixed.Id, overdueMixed.Name,
             VaccinationStatus.Scheduled, null, OperationDayBounds.NoonUtcForLocalDate(ctx.Today.AddDays(-6)),
             Tag("Gecikmiş rapel; sahibine ulaşılamadı."),
             ctx.NowUtc);
         _db.Vaccinations.Add(overdue);
-        result.Vaccinations.Add(new VaccinationRecord(overdue, null, mixed.Code));
+        result.Vaccinations.Add(new VaccinationRecord(overdue, null, overdueMixed.Code));
     }
 
     /// <summary>Lab: dört sonuçlanmış (biri yorum bekliyor) ve bir istenmiş/bekleyen kayıt.</summary>
@@ -631,12 +636,7 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
         // Çıkışlar: uygulanan aşılar ve tedavide kullanılan ilaçlar; iki de tezgâh satışı (mama).
         foreach (var vaccination in clinical.Vaccinations.Where(v => v.Examination is not null))
         {
-            var key = vaccination.VaccineCode switch
-            {
-                "MIXED" => vaccination.Examination!.Pet.SpeciesCode == "CAT" ? "MIXED_CAT" : "MIXED_DOG",
-                var other => other,
-            };
-            if (products.TryGetValue(key, out var product))
+            if (products.TryGetValue(vaccination.VaccineCode, out var product))
                 movements += WriteOut(ctx, product, 1m, vaccination.Vaccination.AppliedAtUtc!.Value, "Vaccination", vaccination.Vaccination.Id, "Aşı uygulaması");
         }
 
@@ -815,7 +815,7 @@ public sealed class ExampleClinicDataGenerator : IExampleClinicLoader
                 .Where(v => v.TenantId == null && v.IsActive)
                 .ToListAsync(ct);
             var colors = await db.PetColors.AsNoTracking()
-                .Where(c => c.IsActive && c.Id != PetColorSeedConstants.Unknown && c.Id != PetColorSeedConstants.Other)
+                .Where(c => c.IsActive && c.Kind == PetColorKind.Color && c.Id != PetColorSeedConstants.Unknown && c.Id != PetColorSeedConstants.Other)
                 .OrderBy(c => c.Code)
                 .ToListAsync(ct);
 

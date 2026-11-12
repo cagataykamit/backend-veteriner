@@ -70,6 +70,23 @@ public sealed class ClinicalTerm : AggregateRoot
         return Result.Success();
     }
 
+    /// <summary>
+    /// Sistem sözlüğü bakımı (yalnız seed): adı düzeltir ya da satırı pasifleştirir. Kiracı satırında kullanılamaz.
+    /// </summary>
+    public void ReviseSystemTerm(string name, bool isActive, DateTime utcNow)
+    {
+        if (!IsSystem)
+            throw new InvalidOperationException("Yalnız sistem sözlük kaydı düzeltilebilir.");
+
+        var check = ValidateName(name);
+        if (!check.IsSuccess)
+            throw new ArgumentException(check.Error.Message, nameof(name));
+
+        ApplyName(name);
+        IsActive = isActive;
+        UpdatedAtUtc = utcNow;
+    }
+
     public Result Activate(DateTime utcNow)
     {
         if (IsSystem)

@@ -210,4 +210,18 @@ public sealed class ExaminationTemplateTests
         template.SelectLinesForApply([new ExaminationTemplateLineDraft(a, 1m), new ExaminationTemplateLineDraft(a, 2m)]).Error.Code
             .Should().Be(ExaminationTemplate.ValidationCode);
     }
+
+    [Fact]
+    public void ReviseSystemTemplate_Should_Update_System_Text_Only()
+    {
+        var system = ExaminationTemplate.CreateSystem("Aşı muayenesi", "Aşı", "Genel durum: ", null, Now);
+        system.ReviseSystemTemplate("Sağlık kontrolü ve aşı", "Aşı", "Genel durum: \nVKS (1–9): ", "Sonraki doz: ", isActive: true, Now);
+
+        system.Name.Should().Be("Sağlık kontrolü ve aşı");
+        system.Findings.Should().Be("Genel durum: \nVKS (1–9):");
+        system.Plan.Should().Be("Sonraki doz:");
+
+        var act = () => Tenant().ReviseSystemTemplate("X", null, null, null, isActive: true, Now);
+        act.Should().Throw<InvalidOperationException>();
+    }
 }

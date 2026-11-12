@@ -114,6 +114,22 @@ public sealed class ExaminationTemplate : AggregateRoot
         return Result.Success();
     }
 
+    /// <summary>
+    /// Sistem şablonu bakımı (yalnız seed): metni düzeltir ya da şablonu pasifleştirir. Kiracı şablonunda kullanılamaz.
+    /// </summary>
+    public void ReviseSystemTemplate(string name, string? visitReason, string? findings, string? plan, bool isActive, DateTime utcNow)
+    {
+        if (!IsSystem)
+            throw new InvalidOperationException("Yalnız sistem şablonu düzeltilebilir.");
+
+        var applied = Apply(name, visitReason, findings, plan, [], packagePrice: null);
+        if (!applied.IsSuccess)
+            throw new ArgumentException(applied.Error.Message, nameof(name));
+
+        IsActive = isActive;
+        UpdatedAtUtc = utcNow;
+    }
+
     public Result Activate(DateTime utcNow)
     {
         if (IsSystem)

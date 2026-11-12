@@ -693,7 +693,7 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
         var pet = new Pet(tenant.Id, client.Id, "Pet3", speciesId);
 
         var defs = await db.VaccineDefinitions.AsNoTracking()
-            .Where(v => v.TenantId == null && (v.Code == "RABIES" || v.Code == "MIXED" || v.Code == "LYME"))
+            .Where(v => v.TenantId == null && (v.Code == "RABIES" || v.Code == "MIXED_CAT" || v.Code == "LYME"))
             .ToDictionaryAsync(v => v.Code, v => new { v.Id, v.Name });
 
         var appliedInside = new Vaccination(
@@ -714,8 +714,8 @@ public sealed class ReportsEndpointTests : IClassFixture<CustomWebApplicationFac
             pet.Id,
             clinic.Id,
             null,
-            defs["MIXED"].Id,
-            defs["MIXED"].Name,
+            defs["MIXED_CAT"].Id,
+            defs["MIXED_CAT"].Name,
             VaccinationStatus.Scheduled,
             null,
             new DateTime(2026, 5, 12, 9, 0, 0, DateTimeKind.Utc),
