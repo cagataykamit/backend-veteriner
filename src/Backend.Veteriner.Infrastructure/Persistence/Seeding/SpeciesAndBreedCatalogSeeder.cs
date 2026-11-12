@@ -17,7 +17,7 @@ public static class SpeciesAndBreedCatalogSeeder
         ("DOG", "Köpek", 20, SpeciesSeedConstants.Dog),
         ("BIRD", "Kuş", 30, SpeciesSeedConstants.Bird),
         ("RABBIT", "Tavşan", 40, SpeciesSeedConstants.Rabbit),
-        ("GUINEA_PIG", "Gine Domuzu", 41, SpeciesSeedConstants.GuineaPig),
+        ("GUINEA_PIG", "Kobay (Gine Domuzu)", 41, SpeciesSeedConstants.GuineaPig),
         ("FERRET", "Gelincik", 42, SpeciesSeedConstants.Ferret),
         ("CHINCHILLA", "Çinçilla", 43, SpeciesSeedConstants.Chinchilla),
         ("HEDGEHOG", "Kirpi", 44, SpeciesSeedConstants.Hedgehog),
@@ -38,7 +38,14 @@ public static class SpeciesAndBreedCatalogSeeder
         ("DUCK", "Ördek", 79, SpeciesSeedConstants.Duck),
         ("GOOSE", "Kaz", 80, SpeciesSeedConstants.Goose),
         ("TURKEY", "Hindi", 81, SpeciesSeedConstants.Turkey),
+        ("EXOTIC", "Egzotik", 90, SpeciesSeedConstants.Exotic),
         ("OTHER", "Diğer", 999, SpeciesSeedConstants.Other),
+    ];
+
+    /// <summary>Klinikte yaygın adı öne alınan türler (2026-11-12: kobay).</summary>
+    private static readonly (string Code, string OldName, string NewName)[] SpeciesRenames =
+    [
+        ("GUINEA_PIG", "Gine Domuzu", "Kobay (Gine Domuzu)"),
     ];
 
     private static readonly (string SpeciesCode, string Name)[] BreedCatalog =
@@ -65,6 +72,24 @@ public static class SpeciesAndBreedCatalogSeeder
             logger?.LogInformation(
                 "SpeciesAndBreedCatalogSeeder: {Count} species row(s) added.",
                 speciesAdded);
+        }
+
+        // Katalog adı değişen türler: yalnız eski sistem adı duruyorsa yeni ada geçer (yöneticinin elle verdiği ad korunur).
+        var renamed = 0;
+        foreach (var (code, oldName, newName) in SpeciesRenames)
+        {
+            var row = await db.Species.FirstOrDefaultAsync(s => s.Code == code && s.Name == oldName, ct);
+            if (row is null)
+                continue;
+
+            row.Update(row.Code, newName, row.DisplayOrder, row.IsActive);
+            renamed++;
+        }
+
+        if (renamed > 0)
+        {
+            await db.SaveChangesAsync(ct);
+            logger?.LogInformation("SpeciesAndBreedCatalogSeeder: {Count} species row(s) renamed.", renamed);
         }
 
         var catalogCodes = SpeciesCatalog.Select(x => x.Code.Trim().ToUpperInvariant()).ToArray();
@@ -144,6 +169,34 @@ public static class SpeciesAndBreedCatalogSeeder
                 "Cane Corso",
                 "Pitbull Tipi",
                 "Samoyed",
+                // Türkiye'de yaygın, eski programlardan gelen kayıtlarda görülen ırklar (E-vet geçişi 2026-11-12)
+                "İngiliz Setter",
+                "Pointer",
+                "Alman Kısa Tüylü Pointer",
+                "Drahthaar",
+                "Macar Tazısı (Vizsla)",
+                "Zağar",
+                "Afgan Tazısı",
+                "Pinscher",
+                "Minyatür Pinscher",
+                "Pekingese",
+                "Pug",
+                "Maltipoo",
+                "Spitz",
+                "Chow Chow",
+                "Akita",
+                "Dogo Argentino",
+                "Belçika Malinois",
+                "Kafkas Çoban Köpeği",
+                "Avustralya Çoban Köpeği",
+                "Boxer",
+                "Dalmaçyalı",
+                "Saint Bernard",
+                "Mastiff",
+                "Amerikan Staffordshire Terrier",
+                "Bull Terrier",
+                "Airedale Terrier",
+                "Cavalier King Charles Spaniel",
                 "Melez",
                 "Diğer"),
             ..B("CAT",
@@ -163,6 +216,15 @@ public static class SpeciesAndBreedCatalogSeeder
                 "Ragdoll",
                 "Exotic Shorthair",
                 "Norwegian Forest",
+                // Sarman ve Smokin Türkiye'de tüy deseni olarak ırk yerine kullanılır (Tekir gibi).
+                "Sarman",
+                "Smokin",
+                "Bombay",
+                "Habeş (Abyssinian)",
+                "American Shorthair",
+                "American Curl",
+                "Oriental",
+                "Khao Manee",
                 "Melez",
                 "Diğer"),
             ..B("RABBIT",
@@ -276,6 +338,7 @@ public static class SpeciesAndBreedCatalogSeeder
                 "Dağlıç",
                 "Morkaraman",
                 "Akkaraman",
+                "Dorper",
                 "Diğer"),
             ..B("GOAT",
                 "Saanen",
@@ -310,6 +373,9 @@ public static class SpeciesAndBreedCatalogSeeder
             ..B("TURKEY",
                 "Bronz Hindi",
                 "Beyaz Hindi",
+                "Diğer"),
+            ..B("EXOTIC",
+                "Bilinmeyen",
                 "Diğer"),
             ..B("OTHER",
                 "Bilinmeyen",

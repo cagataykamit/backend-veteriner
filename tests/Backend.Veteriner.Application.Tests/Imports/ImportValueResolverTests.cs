@@ -39,6 +39,136 @@ public sealed class ImportValueResolverTests
 
     private static ImportValueResolver Resolver(params ImportValueMapping[] userMappings) => new(Catalogs, userMappings);
 
+    // E-vet geçişinde görülen adlar için genişletilmiş katalog (sistem kataloğunun 2026-11-12 eklemeleri).
+    private static readonly Guid Other = Guid.NewGuid();
+    private static readonly Guid Exotic = Guid.NewGuid();
+    private static readonly Guid GuineaPig = Guid.NewGuid();
+    private static readonly Guid ScottishFold = Guid.NewGuid();
+    private static readonly Guid InternalExternal = Guid.NewGuid();
+    private static readonly Guid External = Guid.NewGuid();
+    private static readonly Guid Internal = Guid.NewGuid();
+    private static readonly Guid Fungal = Guid.NewGuid();
+    private static readonly Guid MixedRabies = Guid.NewGuid();
+    private static readonly Guid DistemperParvo = Guid.NewGuid();
+    private static readonly Guid Tetanus = Guid.NewGuid();
+    private static readonly Guid Mastitis = Guid.NewGuid();
+    private static readonly Guid Enterotoxemia = Guid.NewGuid();
+    private static readonly Guid Setter = Guid.NewGuid();
+    private static readonly Guid Malinois = Guid.NewGuid();
+    private static readonly Guid Calico = Guid.NewGuid();
+    private static readonly Guid BrownWhite = Guid.NewGuid();
+    private static readonly Guid YellowWhite = Guid.NewGuid();
+    private static readonly Guid LightBrown = Guid.NewGuid();
+
+    private static readonly ImportValueResolver Extended = new(new ImportCatalogs(
+        Species: [new(Dog, "Köpek", "DOG", null), new(Cat, "Kedi", "CAT", null), new(GuineaPig, "Kobay (Gine Domuzu)", "GUINEA_PIG", null), new(Exotic, "Egzotik", "EXOTIC", null), new(Other, "Diğer", "OTHER", null)],
+        Breeds: [new(ScottishFold, "Scottish Fold", null, Cat), new(Setter, "İngiliz Setter", null, Dog), new(Malinois, "Belçika Malinois", null, Dog)],
+        Colors:
+        [
+            new(Calico, "Alacalı", "CALICO", null),
+            new(BrownWhite, "Kahverengi-Beyaz", "BROWN_WHITE", null),
+            new(YellowWhite, "Sarı-Beyaz", "YELLOW_WHITE", null),
+            new(LightBrown, "Açık Kahverengi", "LIGHT_BROWN", null),
+        ],
+        Vaccines:
+        [
+            new(Mixed, "Karma", "MIXED", null),
+            new(InternalExternal, "İç-Dış Parazit", "INTERNAL_EXTERNAL_PARASITE", null),
+            new(External, "Dış Parazit", "EXTERNAL_PARASITE", null),
+            new(Internal, "İç Parazit", "INTERNAL_PARASITE", null),
+            new(Fungal, "Mantar", "DERMATOPHYTOSIS", null),
+            new(MixedRabies, "Karma + Kuduz", "MIXED_RABIES", null),
+            new(DistemperParvo, "DP (Distemper-Parvo)", "DISTEMPER_PARVO", null),
+            new(Tetanus, "Tetanoz", "TETANUS", null),
+            new(Mastitis, "Mastitis", "MASTITIS", null),
+            new(Enterotoxemia, "Enterotoksemi", "ENTEROTOXEMIA", null),
+        ]), []);
+
+    public static TheoryData<string, string> EVetVaccineNames => new()
+    {
+        { "İÇ+DIŞ PARAZİT", nameof(InternalExternal) },
+        { "İç-Dış Parazit 3 Aylık", nameof(InternalExternal) },
+        { "Nexgard Spectra", nameof(InternalExternal) },
+        { "Nexgard Combo", nameof(InternalExternal) },
+        { "BRAVECTO", nameof(External) },
+        { "Seresto", nameof(External) },
+        { "SCALİBOR", nameof(External) },
+        { "Nexgard", nameof(External) },
+        { "Drontal", nameof(Internal) },
+        { "MANTAR", nameof(Fungal) },
+        { "MANTAR 2", nameof(Fungal) },
+        { "Kedi Karma + Kuduz", nameof(MixedRabies) },
+        { "Köpek Karma +Kuduz", nameof(MixedRabies) },
+        { "PUPPY DP", nameof(DistemperParvo) },
+        { "TETANOZ YILLIK", nameof(Tetanus) },
+        { "TETANOZ 1", nameof(Tetanus) },
+        { "Mastitis Aşısı", nameof(Mastitis) },
+        { "Mera Aşısı", nameof(Enterotoxemia) },
+    };
+
+    [Theory]
+    [MemberData(nameof(EVetVaccineNames))]
+    public void EVet_Vaccine_And_Brand_Names_Should_Resolve_To_The_System_Catalog(string source, string expected)
+        => Extended.Resolve(ImportValueKind.Vaccine, source, Dog).Should().Be(ImportValueResolution.Resolved(ExtendedVaccines[expected]));
+
+    /// <summary>Kimlikler çalıştırmada üretilir; teori verisi adla taşır (keşif ve çalıştırma ayrı değer görür).</summary>
+    private static readonly Dictionary<string, Guid> ExtendedVaccines = new()
+    {
+        [nameof(InternalExternal)] = InternalExternal,
+        [nameof(External)] = External,
+        [nameof(Internal)] = Internal,
+        [nameof(Fungal)] = Fungal,
+        [nameof(MixedRabies)] = MixedRabies,
+        [nameof(DistemperParvo)] = DistemperParvo,
+        [nameof(Tetanus)] = Tetanus,
+        [nameof(Mastitis)] = Mastitis,
+        [nameof(Enterotoxemia)] = Enterotoxemia,
+    };
+
+    [Theory]
+    [InlineData("UYUZ TEDAVİSİ")]
+    [InlineData("ZYLEXİS")]
+    public void Treatments_Should_Stay_Unmapped(string source)
+        => Extended.Resolve(ImportValueKind.Vaccine, source, Dog).Kind.Should().Be(ImportValueResolutionKind.Unmapped);
+
+    [Fact]
+    public void Exotic_And_Common_Species_Words_Should_Resolve()
+    {
+        Extended.Resolve(ImportValueKind.Species, "Egzotik").TargetId.Should().Be(Exotic);
+        Extended.Resolve(ImportValueKind.Species, "Exotic").TargetId.Should().Be(Exotic);
+        Extended.Resolve(ImportValueKind.Species, "Kobay").TargetId.Should().Be(GuineaPig);
+        Extended.Resolve(ImportValueKind.Species, "Gine Domuzu").TargetId.Should().Be(GuineaPig);
+        Extended.Resolve(ImportValueKind.Species, "Guinea Pig").TargetId.Should().Be(GuineaPig);
+        Extended.Resolve(ImportValueKind.Species, "ARABA").Kind.Should().Be(ImportValueResolutionKind.Unmapped);
+    }
+
+    [Fact]
+    public void Breed_Misspellings_Should_Resolve_Within_Species()
+    {
+        Extended.Resolve(ImportValueKind.Breed, "Scottisch Fold", Cat).TargetId.Should().Be(ScottishFold);
+        Extended.Resolve(ImportValueKind.Breed, "Scottisch Fold", Dog).Kind.Should().Be(ImportValueResolutionKind.Unmapped);
+        Extended.Resolve(ImportValueKind.Breed, "Setter", Dog).TargetId.Should().Be(Setter);
+        Extended.Resolve(ImportValueKind.Breed, "Belçika Kurdu", Dog).TargetId.Should().Be(Malinois);
+        Extended.Resolve(ImportValueKind.Breed, "Terrier", Dog).Kind.Should().Be(ImportValueResolutionKind.Unmapped);
+    }
+
+    [Theory]
+    [InlineData("Üç Renkli", "CALICO")]
+    [InlineData("Kahve Beyaz", "BROWN_WHITE")]
+    [InlineData("Beyaz - Sarı", "YELLOW_WHITE")]
+    [InlineData("Sarı Beyaz", "YELLOW_WHITE")]
+    [InlineData("Açık Kahve", "LIGHT_BROWN")]
+    public void EVet_Color_Spellings_Should_Resolve(string source, string code)
+        => Extended.Resolve(ImportValueKind.Color, source).TargetId.Should().Be(ExtendedColors[code]);
+
+    private static readonly Dictionary<string, Guid> ExtendedColors = new()
+    {
+        ["CALICO"] = Calico,
+        ["BROWN_WHITE"] = BrownWhite,
+        ["YELLOW_WHITE"] = YellowWhite,
+        ["LIGHT_BROWN"] = LightBrown,
+    };
+
     [Theory]
     [InlineData("YILLIK KEDİ KARMA", "karma")]
     [InlineData("KÖPEK KARMA 3", "karma")]

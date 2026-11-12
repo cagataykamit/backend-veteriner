@@ -46,8 +46,17 @@ public sealed class PetColorConfiguration : IEntityTypeConfiguration<PetColor>
             Seed(PetColorSeedConstants.Striped, "STRIPED", "Çizgili", 13),
             Seed(PetColorSeedConstants.Calico, "CALICO", "Alacalı", 14),
             Seed(PetColorSeedConstants.MultiColor, "MULTI_COLOR", "Çok Renkli", 15),
-            Seed(PetColorSeedConstants.Other, "OTHER", "Diğer", 16),
-            Seed(PetColorSeedConstants.Unknown, "UNKNOWN", "Bilinmiyor", 17));
+            Seed(PetColorSeedConstants.Brindle, "BRINDLE", "Kırçıllı", 20),
+            Seed(PetColorSeedConstants.BrindleWhite, "BRINDLE_WHITE", "Kırçıllı-Beyaz", 21),
+            Seed(PetColorSeedConstants.YellowWhite, "YELLOW_WHITE", "Sarı-Beyaz", 22),
+            Seed(PetColorSeedConstants.BrownBlack, "BROWN_BLACK", "Kahverengi-Siyah", 23),
+            Seed(PetColorSeedConstants.LightBrown, "LIGHT_BROWN", "Açık Kahverengi", 24),
+            Seed(PetColorSeedConstants.Dun, "DUN", "Boz", 25),
+            Seed(PetColorSeedConstants.Beige, "BEIGE", "Bej", 26),
+            Seed(PetColorSeedConstants.Blue, "BLUE", "Mavi", 27),
+            // Diğer ve Bilinmiyor listenin sonunda kalır.
+            Seed(PetColorSeedConstants.Other, "OTHER", "Diğer", 98),
+            Seed(PetColorSeedConstants.Unknown, "UNKNOWN", "Bilinmiyor", 99));
     }
 
     private static PetColor Seed(Guid id, string code, string name, int displayOrder)

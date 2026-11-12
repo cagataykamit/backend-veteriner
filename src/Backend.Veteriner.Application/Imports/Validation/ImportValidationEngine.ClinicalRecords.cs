@@ -53,13 +53,19 @@ public sealed partial class ImportValidationEngine
         var recordContent = new ImportedClinicalRecord.Content(
             recordType, content[0], content[1], content[2], content[3], content[4], content[5], content[6], content[7],
             veterinarian, weight, temperature);
-        if (!recordContent.HasContent())
-            issues.Add(ImportRules.ClinicalRecordEmpty.At());
-
         var normalized = new ImportNormalizedClinicalRecord(
             pet?.Key, pet?.Owner.Key, recordedOn, recordType,
             content[0], content[1], content[2], content[3], content[4], content[5], content[6], content[7],
             veterinarian, weight, temperature);
+
+        // Boş kayıt taşınacak bilgi içermez: hata değil, atlanır (eski programda doldurulmamış muayene). Diğer sorunları
+        // (hasta bulunamadı, tarih) bilgi taşımayan satırda anlamsızdır; kliniği hata listesiyle uğraştırmamak için düşülür.
+        if (!recordContent.HasContent())
+        {
+            issues.Clear();
+            issues.Add(ImportRules.ClinicalRecordEmpty.At());
+            return Finish(ImportTable.ClinicalRecords, reader.RowNumber, issues, normalized, ImportRowAction.Skip);
+        }
 
         if (HasError(issues))
             return Finish(ImportTable.ClinicalRecords, reader.RowNumber, issues, normalized);

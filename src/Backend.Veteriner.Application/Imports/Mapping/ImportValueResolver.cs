@@ -62,15 +62,113 @@ public sealed class ImportValueResolver
             ["cat"] = "kedi",
             ["bird"] = "kus",
             ["rabbit"] = "tavsan",
+            ["exotic"] = "egzotik",
+            ["kobay"] = "kobayginedomuzu",
+            ["ginedomuzu"] = "kobayginedomuzu",
+            ["papagan"] = "kus",
+            ["muhabbetkusu"] = "kus",
+            ["kanarya"] = "kus",
+        },
+        // Yazım farkları ve İngilizce adlar; hedef, hastanın türündeki katalog ırkıdır.
+        [ImportValueKind.Breed] = new()
+        {
+            ["scottischfold"] = "scottishfold",
+            ["scottishshorthair"] = "scottishstraight",
+            ["pomerian"] = "pomeranian",
+            ["siamessesiyamkedisi"] = "siyam",
+            ["siamese"] = "siyam",
+            ["irankedisi"] = "persian",
+            ["iran"] = "persian",
+            ["almancobankopegi"] = "almankurdu",
+            ["germanshepherd"] = "almankurdu",
+            ["maltese"] = "malteseterrier",
+            ["fransizbulldog"] = "frenchbulldog",
+            ["ingilizbulldog"] = "englishbulldog",
+            ["bulldog"] = "englishbulldog",
+            ["pitbull"] = "pitbulltipi",
+            ["labrador"] = "labradorretriever",
+            ["golden"] = "goldenretriever",
+            ["sibiryakurduhusky"] = "husky",
+            ["sibiryakurdu"] = "husky",
+            ["cocker"] = "cockerspaniel",
+            ["ingilizcocker"] = "cockerspaniel",
+            ["egzoticshorthair"] = "exoticshorthair",
+            ["norwegianforestcat"] = "norwegianforest",
+            ["setter"] = "ingilizsetter",
+            ["kurzhaar"] = "almankisatuylupointer",
+            ["macartazisi"] = "macartazisivizsla",
+            ["vizsla"] = "macartazisivizsla",
+            ["belcikakurdu"] = "belcikamalinois",
+            ["belgianmalinois"] = "belcikamalinois",
+            ["malinois"] = "belcikamalinois",
+            ["pekinez"] = "pekingese",
+            ["americanstaffordshireterrier"] = "amerikanstaffordshireterrier",
+            ["zagarkopegi"] = "zagar",
+            ["abyssinian"] = "habesabyssinian",
+            ["habes"] = "habesabyssinian",
+            ["orientallonghair"] = "oriental",
+            ["orientalshorthair"] = "oriental",
+            ["turkishangora"] = "ankarakedisi",
+            ["ankara"] = "ankarakedisi",
+            ["turkishvan"] = "vankedisi",
+            ["bilinmiyor"] = "diger",
+            ["mix"] = "melez",
+            ["kirma"] = "melez",
+        },
+        // Renk yazım farkları (sıra ve kısaltma); hedef katalog rengidir.
+        [ImportValueKind.Color] = new()
+        {
+            ["ucrenkli"] = "alacali",
+            ["tricolor"] = "alacali",
+            ["calico"] = "alacali",
+            ["kahve"] = "kahverengi",
+            ["kahvebeyaz"] = "kahverengibeyaz",
+            ["beyazkahve"] = "kahverengibeyaz",
+            ["kahvesiyah"] = "kahverengisiyah",
+            ["siyahkahve"] = "kahverengisiyah",
+            ["beyazsari"] = "saribeyaz",
+            ["beyazsiyah"] = "siyahbeyaz",
+            ["beyazgri"] = "gribeyaz",
+            ["beyazkircilli"] = "kircillibeyaz",
+            ["acikkahve"] = "acikkahverengi",
+            ["karisik"] = "cokrenkli",
+            ["mix"] = "cokrenkli",
         },
         [ImportValueKind.Vaccine] = new()
         {
             ["rabies"] = "kuduz",
-            ["kuduzasisi"] = "kuduz",
             ["mixed"] = "karma",
-            ["karmaasisi"] = "karma",
             ["bronchine"] = "bronsin",
+            ["kennelcough"] = "bronsin",
             ["leukemia"] = "losemi",
+            ["felv"] = "losemi",
+            ["icdis"] = "icdisparazit",
+            ["icvedisparazit"] = "icdisparazit",
+            ["mera"] = "enterotoksemi",
+            ["puppydp"] = "dpdistemperparvo",
+            ["dp"] = "dpdistemperparvo",
+            ["leptospira"] = "leptospiroz",
+            ["lepto"] = "leptospiroz",
+            ["dermatofit"] = "mantar",
+            // Ticari ürün adları (kombine iç-dış / yalnız dış / yalnız iç parazit)
+            ["nexgardspectra"] = "icdisparazit",
+            ["nexgardcombo"] = "icdisparazit",
+            ["simparicatrio"] = "icdisparazit",
+            ["broadline"] = "icdisparazit",
+            ["advocate"] = "icdisparazit",
+            ["stronghold"] = "icdisparazit",
+            ["strongholdplus"] = "icdisparazit",
+            ["revolution"] = "icdisparazit",
+            ["nexgard"] = "disparazit",
+            ["bravecto"] = "disparazit",
+            ["seresto"] = "disparazit",
+            ["scalibor"] = "disparazit",
+            ["frontline"] = "disparazit",
+            ["simparica"] = "disparazit",
+            ["credelio"] = "disparazit",
+            ["advantix"] = "disparazit",
+            ["milbemax"] = "icparazit",
+            ["drontal"] = "icparazit",
         },
     };
 
@@ -122,8 +220,9 @@ public sealed class ImportValueResolver
     }
 
     /// <summary>
-    /// Aşı serisi anahtarı: katlanmış addan baştaki/sondaki <c>yıllık</c>, sondaki doz numarası ve <c>N aylık</c>, baştaki
-    /// <c>kedi</c>/<c>köpek</c> atılır (<c>YILLIK KEDİ KARMA</c> = <c>KEDİ KARMA 2</c> = <c>karma</c>). Sonraki aşı tarihini serinin
+    /// Aşı serisi anahtarı: katlanmış addan baştaki/sondaki <c>yıllık</c>, sondaki doz numarası ve <c>N aylık</c>, sondaki
+    /// <c>aşı</c>/<c>aşısı</c>, baştaki <c>kedi</c>/<c>köpek</c> atılır (<c>YILLIK KEDİ KARMA</c> = <c>KEDİ KARMA 2</c> = <c>Karma Aşısı</c> =
+    /// <c>karma</c>). Sonraki aşı tarihini serinin
     /// son uygulamasına bağlamak (E-vet dönüştürücüsü) ve katalog eşlemesi aynı kuralı kullanır.
     /// </summary>
     public static string VaccineSeriesKey(string? vaccineName) => ReduceVaccineKey(ImportTextFolding.Fold(vaccineName));
@@ -132,6 +231,7 @@ public sealed class ImportValueResolver
     {
         var reduced = VaccineYearly.Replace(key, string.Empty);
         reduced = VaccineDoseSuffix.Replace(reduced, string.Empty);
+        reduced = VaccineWordSuffix.Replace(reduced, string.Empty);
         reduced = VaccineSpeciesPrefix.Replace(reduced, string.Empty);
         return reduced.Length == 0 ? key : reduced;
     }
@@ -139,6 +239,7 @@ public sealed class ImportValueResolver
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(100);
     private static readonly Regex VaccineYearly = new("^yillik|yillik$", RegexOptions.Compiled, RegexTimeout);
     private static readonly Regex VaccineDoseSuffix = new(@"\d*aylik$|\d+$", RegexOptions.Compiled, RegexTimeout);
+    private static readonly Regex VaccineWordSuffix = new("(?<=.{3})(asisi|asi)$", RegexOptions.Compiled, RegexTimeout);
     private static readonly Regex VaccineSpeciesPrefix = new("^(kedi|kopek)(?=.)", RegexOptions.Compiled, RegexTimeout);
 
     private bool TryCatalogOrAlias(ImportValueKind kind, string key, Guid? parentId, out ImportValueResolution resolved)

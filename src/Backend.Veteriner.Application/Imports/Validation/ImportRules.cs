@@ -148,8 +148,8 @@ public static class ImportRules
         "Tarih gelecekte olamaz.");
     public static readonly ImportRule RecordBeforeBirth = new("Imports.RecordBeforeBirth", ImportIssueSeverity.Warning,
         "Kayıt tarihi hastanın doğum tarihinden önce.");
-    public static readonly ImportRule ClinicalRecordEmpty = new("Imports.ClinicalRecordEmpty", ImportIssueSeverity.Error,
-        "Klinik kaydın içeriği boş: şikâyet, anamnez, bulgular, tanı, tedavi, reçete, lab sonucu, not, kilo veya ateşten en az biri dolu olmalı.");
+    public static readonly ImportRule ClinicalRecordEmpty = new("Imports.ClinicalRecordEmpty", ImportIssueSeverity.Info,
+        "Klinik kaydın içeriği boş (şikâyet, anamnez, bulgular, tanı, tedavi, reçete, lab sonucu, not, kilo ve ateş yok); aktarılacak bilgi olmadığı için satır atlanacak.");
     public static readonly ImportRule TemperatureInvalid = new("Imports.TemperatureInvalid", ImportIssueSeverity.Warning,
         "Ateş geçersiz (25-45 °C arasında bir sayı olmalı); boş aktarılacak.");
     public static readonly ImportRule DuplicateClinicalRecord = new("Imports.DuplicateClinicalRecord", ImportIssueSeverity.Info,
