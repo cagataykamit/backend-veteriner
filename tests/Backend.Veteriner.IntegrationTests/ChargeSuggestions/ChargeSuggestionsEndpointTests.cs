@@ -101,6 +101,26 @@ public sealed class ChargeSuggestionsEndpointTests : IClassFixture<CustomWebAppl
         (await ChargeCountAsync(ctx)).Should().Be(1);
     }
 
+    [Theory]
+    [InlineData(10d)]
+    [InlineData(null)]
+    public async Task Convert_Should_Take_Vat_Rate_From_Product(double? productVatRate)
+    {
+        var ctx = await SeedAsync(vatRate: (decimal?)productVatRate);
+        var client = await ClientAsync(ctx, ReceptionPermissions);
+        await AdministerAsync(client, ctx, 1m);
+        var id = Id((await PendingAsync(client, ctx)).Single());
+
+        var response = await client.PostAsJsonAsync($"/api/v1/charge-suggestions/{id}/convert", new { });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var vatRate = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("charge").GetProperty("vatRate");
+        if (productVatRate is { } rate)
+            vatRate.GetDecimal().Should().Be((decimal)rate);
+        else
+            vatRate.ValueKind.Should().Be(JsonValueKind.Null, "ürün oranı boşsa klinik varsayılanı");
+    }
+
     [Fact]
     public async Task Convert_Should_Use_Edited_Values()
     {
@@ -418,7 +438,7 @@ public sealed class ChargeSuggestionsEndpointTests : IClassFixture<CustomWebAppl
         return client;
     }
 
-    private async Task<SeedCtx> SeedAsync(decimal price = Price, ProductKind kind = ProductKind.Other, decimal? stock = 20m)
+    private async Task<SeedCtx> SeedAsync(decimal price = Price, ProductKind kind = ProductKind.Other, decimal? stock = 20m, decimal? vatRate = null)
     {
         await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -428,7 +448,7 @@ public sealed class ChargeSuggestionsEndpointTests : IClassFixture<CustomWebAppl
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
         var clinic = new Clinic(tenant.Id, $"Cs-{Guid.NewGuid():N}"[..14], "Istanbul");
         db.Clinics.Add(clinic);
-        var product = new Product(tenant.Id, $"cp-{Guid.NewGuid():N}"[..14], "Doz", price, "TRY", DateTime.UtcNow, sku: $"CSK-{Guid.NewGuid():N}"[..14], kind: kind);
+        var product = new Product(tenant.Id, $"cp-{Guid.NewGuid():N}"[..14], "Doz", price, "TRY", DateTime.UtcNow, sku: $"CSK-{Guid.NewGuid():N}"[..14], kind: kind, vatRate: vatRate);
         db.Products.Add(product);
         var owner = new Client(tenant.Id, $"CsClient-{Guid.NewGuid():N}"[..14], DateTime.UtcNow, "905551110077");
         db.Clients.Add(owner);

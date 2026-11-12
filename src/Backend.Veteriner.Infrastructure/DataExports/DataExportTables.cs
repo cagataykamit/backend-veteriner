@@ -648,6 +648,8 @@ public static class DataExportTables
                 DataExportColumn<Product>.Text("Ambalaj", "Ambalaj.", x => x.Packaging),
                 DataExportColumn<Product>.Text("Uretici", "Üretici.", x => x.Manufacturer),
                 DataExportColumn<Product>.Text("Aciklama", "Açıklama.", x => x.Description),
+                DataExportColumn<Product>.Number("KdvOrani", "KDV oranı (%); boş = klinik varsayılanı.", x => x.VatRate),
+                DataExportColumn<Product>.Number("AlisFiyati", "Birim alış fiyatı (bilgi amaçlı).", x => x.PurchasePrice),
                 DataExportColumn<Product>.Boolean("Etkin", "Etkin mi.", x => x.IsActive),
             ]),
 

@@ -7,6 +7,8 @@ public sealed class Product : AggregateRoot, ITenantOwned
 {
     public const int ManufacturerMaxLength = 200;
     public const int BarcodeMaxLength = 100;
+    public const int PurchasePriceDecimals = 2;
+    public const string ValidationCode = "Products.Validation";
 
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
@@ -49,6 +51,12 @@ public sealed class Product : AggregateRoot, ITenantOwned
     /// <summary>Üretici firma (RECORD-005); tedarikçiden (parti girişindeki firma) ayrıdır.</summary>
     public string? Manufacturer { get; private set; }
 
+    /// <summary>Ürünün KDV oranı (%); <c>null</c> = klinik varsayılanı. Üründen oluşan ücrete aynen geçer; sonraki değişiklik oluşmuş ücreti değiştirmez.</summary>
+    public decimal? VatRate { get; private set; }
+
+    /// <summary>Birim alış fiyatı (TL), yalnız bilgi: stok değeri, maliyet raporu ve ücret hesabı bu alanı okumaz.</summary>
+    public decimal? PurchasePrice { get; private set; }
+
     /// <summary>Hizmet dışındaki ürünler stok takiplidir; stok düşen/giren her yüzey bu kuralı kullanır.</summary>
     public bool IsStockTracked => Kind != ProductKind.Service;
 
@@ -81,7 +89,9 @@ public sealed class Product : AggregateRoot, ITenantOwned
         string? pharmacologicalForm = null,
         string? presentationForm = null,
         string? packaging = null,
-        string? manufacturer = null)
+        string? manufacturer = null,
+        decimal? vatRate = null,
+        decimal? purchasePrice = null)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -96,6 +106,7 @@ public sealed class Product : AggregateRoot, ITenantOwned
 
         if (kind == ProductKind.Service && controlledClass != ControlledSubstanceClass.None)
             throw new ArgumentException("Hizmet kontrollü sınıfta olamaz.", nameof(controlledClass));
+        EnsureValid(ValidateTaxAndPurchasePrice(vatRate, purchasePrice));
 
         TenantId = tenantId;
         ProductCategoryId = productCategoryId == Guid.Empty ? null : productCategoryId;
@@ -112,6 +123,8 @@ public sealed class Product : AggregateRoot, ITenantOwned
         PresentationForm = NormalizeOptional(presentationForm);
         Packaging = NormalizeOptional(packaging);
         Manufacturer = NormalizeOptional(manufacturer);
+        VatRate = vatRate;
+        PurchasePrice = purchasePrice;
         IsActive = true;
         CreatedAtUtc = utcNow;
         UpdatedAtUtc = null;
@@ -119,6 +132,25 @@ public sealed class Product : AggregateRoot, ITenantOwned
 
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>
+    /// KDV oranı <see cref="TaxRatePercent"/> kuralına uyar; alış fiyatı ≥ 0 ve en çok <see cref="PurchasePriceDecimals"/> ondalıklıdır
+    /// (BATCH_STOCK_API_CONTRACT.md §2.1). Kural yalnızca burada yaşar; kurucu ve <see cref="Update"/> ihlalde istisna atar.
+    /// </summary>
+    public static Result ValidateTaxAndPurchasePrice(decimal? vatRate, decimal? purchasePrice)
+    {
+        if (!TaxRatePercent.IsValidOptional(vatRate))
+            return Result.Failure(ValidationCode, $"KDV oranı geçersiz. {TaxRatePercent.InvalidMessage}");
+        if (purchasePrice is { } price && (price < 0 || decimal.Round(price, PurchasePriceDecimals) != price))
+            return Result.Failure(ValidationCode, "Alış fiyatı negatif olamaz ve en çok 2 ondalıklı olmalıdır.");
+        return Result.Success();
+    }
+
+    private static void EnsureValid(Result result)
+    {
+        if (!result.IsSuccess)
+            throw new ArgumentException(result.Error.Message);
+    }
 
     /// <summary>Kayıt, benzersizlik denetimi ve barkodla arama aynı biçimi kullanır: kenar boşlukları atılır, boş değer yok sayılır.</summary>
     public static string? NormalizeBarcode(string? value) => NormalizeOptional(value);
@@ -138,7 +170,9 @@ public sealed class Product : AggregateRoot, ITenantOwned
         string? pharmacologicalForm = null,
         string? presentationForm = null,
         string? packaging = null,
-        string? manufacturer = null)
+        string? manufacturer = null,
+        decimal? vatRate = null,
+        decimal? purchasePrice = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Ürün adı boş olamaz.", nameof(name));
@@ -150,6 +184,7 @@ public sealed class Product : AggregateRoot, ITenantOwned
             throw new ArgumentException("Para birimi boş olamaz.", nameof(currency));
         if (kind == ProductKind.Service && controlledClass != ControlledSubstanceClass.None)
             throw new ArgumentException("Hizmet kontrollü sınıfta olamaz.", nameof(controlledClass));
+        EnsureValid(ValidateTaxAndPurchasePrice(vatRate, purchasePrice));
 
         ProductCategoryId = productCategoryId == Guid.Empty ? null : productCategoryId;
         Name = name.Trim();
@@ -165,6 +200,8 @@ public sealed class Product : AggregateRoot, ITenantOwned
         PresentationForm = NormalizeOptional(presentationForm);
         Packaging = NormalizeOptional(packaging);
         Manufacturer = NormalizeOptional(manufacturer);
+        VatRate = vatRate;
+        PurchasePrice = purchasePrice;
         UpdatedAtUtc = utcNow;
     }
 

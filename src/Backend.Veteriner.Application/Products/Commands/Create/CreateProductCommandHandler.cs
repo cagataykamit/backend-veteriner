@@ -38,6 +38,10 @@ public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductC
                 "Tenants.ContextMissing",
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
 
+        var pricing = Product.ValidateTaxAndPurchasePrice(request.VatRate, request.PurchasePrice);
+        if (!pricing.IsSuccess)
+            return Result<ProductDto>.Failure(pricing.Error);
+
         ProductCategory? category = null;
         if (request.ProductCategoryId.HasValue)
         {
@@ -84,7 +88,9 @@ public sealed class CreateProductCommandHandler : IRequestHandler<CreateProductC
             request.PharmacologicalForm,
             request.PresentationForm,
             request.Packaging,
-            request.Manufacturer);
+            request.Manufacturer,
+            request.VatRate,
+            request.PurchasePrice);
 
         try
         {
