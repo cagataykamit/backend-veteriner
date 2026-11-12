@@ -25,7 +25,7 @@ public static class SpeciesAndBreedCatalogSeeder
         ("TURTLE", "Kaplumbağa", 60, SpeciesSeedConstants.Turtle),
         ("LIZARD", "Kertenkele", 61, SpeciesSeedConstants.Lizard),
         ("SNAKE", "Yılan", 62, SpeciesSeedConstants.Snake),
-        ("REPTILE", "Sürüngen", 80, SpeciesSeedConstants.Reptile),
+        ("REPTILE", "Sürüngen", 63, SpeciesSeedConstants.Reptile),
         ("FISH", "Balık", 70, SpeciesSeedConstants.Fish),
         ("HORSE", "At", 71, SpeciesSeedConstants.Horse),
         ("DONKEY", "Eşek", 72, SpeciesSeedConstants.Donkey),
@@ -50,6 +50,15 @@ public static class SpeciesAndBreedCatalogSeeder
     [
         ("GUINEA_PIG", "Gine Domuzu", "Kobay (Gine Domuzu)"),
         ("FERRET", "Gelincik", "Ferret (Gelincik)"),
+    ];
+
+    /// <summary>
+    /// Sırası düzeltilen türler (2026-11-12: Sürüngen, Kaz ile aynı sırada, 80, idi; sürüngenlerin yanına alınır).
+    /// Yalnız sistemin verdiği eski sıra duruyorsa uygulanır; yöneticinin elle verdiği sıra korunur.
+    /// </summary>
+    private static readonly (string Code, int OldOrder, int NewOrder)[] SpeciesReorders =
+    [
+        ("REPTILE", 80, 63),
     ];
 
     /// <summary>
@@ -93,7 +102,7 @@ public static class SpeciesAndBreedCatalogSeeder
                 speciesAdded);
         }
 
-        // Katalog adı değişen türler: yalnız eski sistem adı duruyorsa yeni ada geçer (yöneticinin elle verdiği ad korunur).
+        // Katalog adı/sırası değişen türler: yalnız eski sistem değeri duruyorsa yeniye geçer (yöneticinin elle verdiği değer korunur).
         var renamed = 0;
         foreach (var (code, oldName, newName) in SpeciesRenames)
         {
@@ -105,10 +114,20 @@ public static class SpeciesAndBreedCatalogSeeder
             renamed++;
         }
 
+        foreach (var (code, oldOrder, newOrder) in SpeciesReorders)
+        {
+            var row = await db.Species.FirstOrDefaultAsync(s => s.Code == code && s.DisplayOrder == oldOrder, ct);
+            if (row is null)
+                continue;
+
+            row.Update(row.Code, row.Name, newOrder, row.IsActive);
+            renamed++;
+        }
+
         if (renamed > 0)
         {
             await db.SaveChangesAsync(ct);
-            logger?.LogInformation("SpeciesAndBreedCatalogSeeder: {Count} species row(s) renamed.", renamed);
+            logger?.LogInformation("SpeciesAndBreedCatalogSeeder: {Count} species row(s) renamed or reordered.", renamed);
         }
 
         var catalogCodes = SpeciesCatalog.Select(x => x.Code.Trim().ToUpperInvariant()).ToArray();

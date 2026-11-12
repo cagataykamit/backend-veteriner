@@ -127,6 +127,25 @@ public sealed class DataSeederSpeciesBreedCatalogTests
     }
 
     [Fact]
+    public async Task SeedAsync_Should_Move_Reptile_Off_Goose_Order_But_Keep_Admin_Order()
+    {
+        await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
+        await ResetDatabaseAsync(db);
+        var hasher = new StubBcryptPasswordHasher();
+
+        // Migration Sürüngen'i 80 (Kaz ile aynı) sırayla ekler; seed sürüngenlerin yanına alır.
+        await DataSeeder.SeedAsync(db, hasher);
+        (await db.Species.AsNoTracking().SingleAsync(s => s.Code == "REPTILE")).DisplayOrder.Should().Be(63);
+        (await db.Species.AsNoTracking().SingleAsync(s => s.Code == "GOOSE")).DisplayOrder.Should().Be(80);
+
+        var reptile = await db.Species.SingleAsync(s => s.Code == "REPTILE");
+        reptile.Update(reptile.Code, reptile.Name, 95, reptile.IsActive);
+        await db.SaveChangesAsync();
+        await DataSeeder.SeedAsync(db, hasher);
+        (await db.Species.AsNoTracking().SingleAsync(s => s.Code == "REPTILE")).DisplayOrder.Should().Be(95);
+    }
+
+    [Fact]
     public async Task SeedAsync_Should_Rename_Old_Breed_And_Vaccine_Names_To_Literature_Names_Keeping_Ids()
     {
         await using var db = IntegrationTestDbContexts.CreateSystem(CreateOptions());
