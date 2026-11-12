@@ -826,7 +826,7 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
 
         json.GetProperty("status").GetString().Should().Be("Validated");
         Counts(json, "customers").Should().Equal(2, 2, 0, 0, 2, 0, 0); // alacak bakiyesi devir alacağı olur, satır kodu yok
-        Counts(json, "clinicalRecords").Should().Equal(3, 2, 0, 1, 1, 0, 1); // mükerrer atlanır, içeriksiz hata
+        Counts(json, "clinicalRecords").Should().Equal(3, 3, 0, 0, 1, 0, 2); // mükerrer ve içeriksiz satır atlanır (hata değil)
         Counts(json, "accountEntries").Should().Equal(2, 1, 0, 1, 1, 0, 0);
         Counts(json, "appointments").Should().Equal(2, 2, 0, 0, 1, 0, 1); // geçmiş randevu atlanır
         Counts(json, "products").Should().Equal(2, 1, 1, 0, 1, 0, 1);
