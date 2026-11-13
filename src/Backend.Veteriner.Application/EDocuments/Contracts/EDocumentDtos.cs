@@ -93,7 +93,10 @@ public sealed record EDocumentListItemDto(
     DateTime? IssuedAtUtc,
     bool IsTest,
     string? LastErrorMessage,
-    [property: JsonConverter(typeof(JsonStringEnumConverter))] EDocumentOrigin Origin);
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] EDocumentOrigin Origin,
+    bool CanCancel = false,
+    DateTime? BuyerAnswerDueUtc = null,
+    string? BuyerRejectionReason = null);
 
 public sealed record EDocumentPreviewConnectionDto(
     [property: JsonConverter(typeof(JsonStringEnumConverter))] EDocumentConnectionStatus Status,

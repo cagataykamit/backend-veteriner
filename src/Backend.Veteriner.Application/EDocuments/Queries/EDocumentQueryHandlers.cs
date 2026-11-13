@@ -62,12 +62,21 @@ public sealed class GetEDocumentsListQueryHandler : IRequestHandler<GetEDocument
     private readonly EDocumentAccess _access;
     private readonly IReadRepository<EDocument> _documents;
     private readonly IReadRepository<Client> _clients;
+    private readonly IEDocumentProviderResolver _providers;
+    private readonly TimeProvider _timeProvider;
 
-    public GetEDocumentsListQueryHandler(EDocumentAccess access, IReadRepository<EDocument> documents, IReadRepository<Client> clients)
+    public GetEDocumentsListQueryHandler(
+        EDocumentAccess access,
+        IReadRepository<EDocument> documents,
+        IReadRepository<Client> clients,
+        IEDocumentProviderResolver providers,
+        TimeProvider timeProvider)
     {
         _access = access;
         _documents = documents;
         _clients = clients;
+        _providers = providers;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<PagedResult<EDocumentListItemDto>>> Handle(GetEDocumentsListQuery request, CancellationToken ct)
@@ -85,7 +94,8 @@ public sealed class GetEDocumentsListQueryHandler : IRequestHandler<GetEDocument
                 request.Page, request.PageSize), ct);
 
         var names = await ClientNamesAsync(_clients, caller.TenantId, rows.Select(r => r.ClientId), ct);
-        var items = rows.Select(r => r.ToListItem(names.GetValueOrDefault(r.ClientId, string.Empty))).ToList();
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var items = rows.Select(r => r.ToListItem(names.GetValueOrDefault(r.ClientId, string.Empty), _providers, now)).ToList();
         return Result<PagedResult<EDocumentListItemDto>>.Success(
             PagedResult<EDocumentListItemDto>.Create(items, total, request.Page, request.PageSize));
     }
