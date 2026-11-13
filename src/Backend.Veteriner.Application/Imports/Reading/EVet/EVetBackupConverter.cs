@@ -26,6 +26,9 @@ internal static class EVetBackupConverter
     private const string TaskSheet = "randevulistesi";
     private const string ExaminationSheet = "muayenelistesi";
 
+    /// <summary>Aynı hayvan sayılacak mikroçipin en az hane sayısı (kısa, yer tutucu numaralar birleştirmez).</summary>
+    private const int MinChipDigits = 9;
+
     /// <summary>Klinik geçmişe dönüşen görevin satır numarası: bu değer + Randevu Listesi Excel satırı (IMPORT_API_CONTRACT.md §13.2).</summary>
     public const int TaskClinicalRowOffset = 1_000_000;
 
@@ -223,7 +226,7 @@ internal static class EVetBackupConverter
             entries.Add(new PetEntry(row, protocol, owner, sheet));
         }
 
-        var (formerByProtocol, formerByChip) = MergeOwnerChanges(entries);
+        var (formerByProtocol, formerByChip, formerByCopy) = MergeSameAnimals(entries);
         var (renamed, merged) = SeparateSameNamedPets(entries.Where(e => e.MergedInto is null).ToList());
         foreach (var entry in entries)
         {
@@ -232,9 +235,9 @@ internal static class EVetBackupConverter
                 state.InactivePets.Add(entry.Key);
         }
 
-        var formersByTarget = entries.Where(e => e.MergedInto is not null).ToLookup(e => e.MergedInto!);
+        var formersByTarget = entries.Where(e => e.MergedInto is not null).ToLookup(e => e.Root);
 
-        // 2. geçiş: satırlar (sahibi değişen hayvanın eski kaydı aktarılmaz; bilgisi yeni kaydın notuna yazılır).
+        // 2. geçiş: satırlar (aynı hayvanın birleşen kaydı aktarılmaz; bilgisi hedef kaydın notuna yazılır).
         foreach (var entry in entries)
         {
             if (entry.MergedInto is not null)
@@ -246,6 +249,12 @@ internal static class EVetBackupConverter
             var ownerName = sheet[row, "Müşteriler"];
             var pair = entry.Pair;
             var status = entry.Status;
+            var formers = formersByTarget[entry].OrderBy(f => f.Registered ?? DateTime.MinValue).ToList();
+
+            // Aktif kaydı olmayan grubun hedefi (son kayıt) ölüm tarihsiz ölüyse vefat değil sahip değişimidir: vefat gelmez.
+            var ownerChangedAway = formers.Count > 0 && status == "olu" && entry.Died is null;
+            if (ownerChangedAway)
+                status = "pasif";
 
             var (gender, neutered) = SplitGender(sheet[row, "Cinsiyet"]);
             var notes = new List<string?>
@@ -259,14 +268,21 @@ internal static class EVetBackupConverter
                 EVetCells.IsChecked(sheet[row, "Çiftleştir"]) ? "Eski programda çiftleştirilecek olarak işaretli" : null,
                 EVetCells.IsChecked(sheet[row, "Sahiplendir"]) ? "Eski programda sahiplendirilecek olarak işaretli" : null,
             };
-            foreach (var former in formersByTarget[entry])
+            foreach (var former in formers)
             {
-                notes.Add(Labeled("Önceki sahip (eski program)", EVetCells.Join(", ",
-                    sheet[former.Row, "Müşteriler"],
-                    former.Protocol is null ? null : $"E-vet {former.Protocol}",
-                    Labeled("kayıt", EVetCells.NoteDate(sheet[former.Row, "Kayıt Tarihi"])))));
+                // Önceki sahip müşteri numarasıyla (bağlanamadıysa adıyla) yazılır; ekranda kişisel veri az kalsın.
+                var formerOwner = former.Identity.Owner == entry.Identity.Owner ? null
+                    : former.Owner is { } customerNo ? $"müşteri no {customerNo.Split('#')[0]}"
+                    : sheet[former.Row, "Müşteriler"];
+                notes.Add(EVetCells.Join(", ",
+                    formerOwner is null ? "E-vet'te aynı hayvanın eski kaydı" : $"E-vet'te önceki sahip kaydı: {formerOwner}",
+                    former.Protocol is null ? null : $"hasta no {former.Protocol}",
+                    Labeled("kayıt", EVetCells.NoteDate(sheet[former.Row, "Kayıt Tarihi"]))));
                 notes.Add(Labeled("Önceki kayıttaki not", EVetCells.Join("; ", sheet[former.Row, "Bilgi"], sheet[former.Row, "Açıklama"])));
             }
+
+            if (ownerChangedAway)
+                notes.Add("Eski programda son kaydı ölü görünüyor ama vefat tarihi yok (sahibi değişmiş); vefat olarak aktarılmadı.");
 
             // Rakam dışı ya da başka hastada da kayıtlı çip (E-vet'te benzersizlik yok) nota taşınır: hasta düşmesin, çip
             // çakışması (K10) yayılmasın. Aynı sahip + adın tekrarı (aynı hasta) çakışma sayılmaz.
@@ -289,7 +305,9 @@ internal static class EVetBackupConverter
             }
 
             var deceased = status == "olu";
-            if (status == "pasif")
+            if (ownerChangedAway)
+                notes.Add(Labeled("Eski program pasif nedeni", sheet[row, "Pasif Nedeni"]));
+            else if (status == "pasif")
                 notes.Add(EVetCells.Join(" ", "Eski programda pasif.", sheet[row, "Pasif Nedeni"]));
             else if (deceased)
                 notes.Add(Labeled("Eski program vefat notu", sheet[row, "Pasif Nedeni"]));
@@ -328,12 +346,12 @@ internal static class EVetBackupConverter
                 $"{movedChips} hastanın mikroçipi rakam dışı karakter içeriyor ya da başka hastada da kayıtlı; numara hastanın notuna yazılacak."));
         }
 
-        if (formerByProtocol + formerByChip > 0)
+        if (formerByProtocol + formerByChip + formerByCopy > 0)
         {
             warnings.Add(new ImportReadWarning(WarningCode, ImportTable.Pets,
-                $"Sahibi değişen hastaların eski sahipteki {formerByProtocol + formerByChip} kaydı (E-vet'te ölü görünür) yeni sahipteki "
-                + $"kayıtla birleşecek ({formerByProtocol} aynı protokol numarasıyla, {formerByChip} aynı mikroçiple): hasta vefat olarak "
-                + "gelmez, eski kaydın aşı ve muayene geçmişi yeni kayda yazılır, önceki sahip hastanın notunda kalır."));
+                $"Aynı hayvanın {formerByProtocol + formerByChip + formerByCopy} ek kaydı tek hastada birleşecek (sahibi değişen hastanın eski "
+                + $"sahipteki kaydı: {formerByProtocol} aynı protokolle, {formerByChip} aynı mikroçiple; aynı sahipte {formerByCopy} kopya kayıt): "
+                + "birleşen kayıt vefat olarak gelmez, aşı ve muayene geçmişi hastaya yazılır, önceki sahip ve kopya hastanın notunda kalır."));
         }
 
         if (renamed > 0 || merged > 0)
@@ -383,25 +401,37 @@ internal static class EVetBackupConverter
     }
 
     /// <summary>
-    /// E-vet'te sahibi değişen hayvan: E-vet eski sahibin kartındaki kaydı ölü (ölüm tarihi boş) bırakır, yeni sahipte aynı protokol
-    /// numarasıyla yeni kayıt açar; dışa aktarmada "sahibi değişti" işareti yoktur. Aynı hayvan sayılan eski kayıt aktif kayda
-    /// birleşir (geçmişi ona yazılır, kendisi aktarılmaz). Aynı hayvan: aynı protokol numarası ya da aynı mikroçip taşıyan, aynı
-    /// türdeki grupta tek aktif kayıt; diğerleri ölüm tarihsiz ölü/pasif. Döner: protokolle ve mikroçiple birleşen eski kayıt sayısı.
+    /// Aynı hayvanın E-vet'teki birden çok kaydını tek hastada toplar (IMPORT_API_CONTRACT.md §13.2):
+    /// (1) <b>sahip değişimi:</b> E-vet eski sahipteki kaydı ölü (ölüm tarihi boş) bırakır, yeni sahipte aynı protokolle kayıt açar;
+    /// dışa aktarmada "sahibi değişti" işareti yoktur. Aynı protokol + tür, eski kayıt ölüm tarihsiz ölü/pasif.
+    /// (2) <b>mikroçip:</b> aynı mikroçip + tür tek hayvandır (zincir ve geri dönüş dahil: A → B → A).
+    /// (3) <b>kopya:</b> aynı sahipte aynı ad + tür + doğum tarihi (yanlışlıkla açılıp vefat girilmiş kopya).
+    /// Hedef grubun tek aktif kaydıdır; aktif yoksa en son açılan kayıt; iki aktif varsa birleştirilmez. Birleşen kayıt aktarılmaz,
+    /// geçmişi hedefe bağlanır (<see cref="PetEntry.Root"/>). Döner: kurala göre birleşen kayıt sayısı.
     /// </summary>
-    private static (int ByProtocol, int ByChip) MergeOwnerChanges(List<PetEntry> entries)
+    private static (int ByProtocol, int ByChip, int ByCopy) MergeSameAnimals(List<PetEntry> entries)
     {
-        static int Merge(IEnumerable<IGrouping<string, PetEntry>> groups)
+        static int Merge(IEnumerable<IEnumerable<PetEntry>> groups, Func<PetEntry, bool> canBeFormer)
         {
             var count = 0;
-            foreach (var group in groups.Where(g => g.Count() > 1))
+            foreach (var group in groups)
             {
-                var members = group.Where(e => e.MergedInto is null).ToList();
-                var active = members.Where(e => e.Status == "aktif").ToList();
-                if (active is not [var target] || members.Select(e => e.Identity.Species).Distinct().Count() != 1)
+                var roots = group.Select(e => e.Root).Distinct().ToList();
+                if (roots.Count < 2 || roots.Select(e => e.Identity.Species).Distinct().Count() != 1)
                     continue;
 
-                var formers = members.Where(e => e != target).ToList();
-                if (formers.Count == 0 || !formers.All(e => e.Status is "olu" or "pasif" && e.Died is null))
+                var active = roots.Where(e => e.Status == "aktif").ToList();
+                var target = active.Count switch
+                {
+                    1 => active[0],
+                    0 => roots.OrderBy(e => e.Registered ?? DateTime.MinValue).ThenBy(e => e.Row.RowNumber).Last(),
+                    _ => null,
+                };
+                if (target is null)
+                    continue;
+
+                var formers = roots.Where(e => e != target).ToList();
+                if (!formers.All(e => e.Status is "olu" or "pasif" && canBeFormer(e)))
                     continue;
 
                 foreach (var former in formers)
@@ -412,9 +442,16 @@ internal static class EVetBackupConverter
             return count;
         }
 
-        var byProtocol = Merge(entries.Where(e => e.Protocol is not null).GroupBy(e => e.Protocol!, StringComparer.Ordinal));
-        var byChip = Merge(entries.Where(e => e.Chip is not null && e.MergedInto is null).GroupBy(e => e.Chip!, StringComparer.Ordinal));
-        return (byProtocol, byChip);
+        var byProtocol = Merge(
+            entries.Where(e => e.Protocol is not null).GroupBy(e => e.Protocol!, StringComparer.Ordinal).Where(g => g.Count() > 1),
+            e => e.Died is null);
+        var byChip = Merge(
+            entries.Where(e => e.Chip is { Length: >= MinChipDigits }).GroupBy(e => e.Chip!, StringComparer.Ordinal).Where(g => g.Count() > 1),
+            _ => true);
+        var byCopy = Merge(
+            entries.Where(e => e.Name is not null && e.Birth is not null).GroupBy(e => (e.Identity, e.Birth!.Value.Date)).Where(g => g.Count() > 1),
+            _ => true);
+        return (byProtocol, byChip, byCopy);
     }
 
     /// <summary>E-vet cinsiyet hücresi kısırlığı da taşır (<c>Kısırlaştırılmış Dişi</c>, <c>Kısır</c>, <c>Bilinmiyor</c>).</summary>
@@ -823,6 +860,7 @@ internal static class EVetBackupConverter
             Registered = EVetCells.ParseDateTime(sheet[row, "Kayıt Tarihi"]);
             Died = EVetCells.ParseDateTime(sheet[row, "Ölüm Zamanı"]);
             Chip = ChipKey(sheet[row, "Çip No"]);
+            Birth = EVetCells.ParseDateTime(sheet[row, "Doğum Tarihi"]);
             Traits =string.Join('|', EVetCells.Date(sheet[row, "Doğum Tarihi"]), sheet[row, "Cinsiyet"], sheet[row, "Renk"], Status);
         }
 
@@ -848,6 +886,8 @@ internal static class EVetBackupConverter
         /// <summary>Mikroçip karşılaştırma anahtarı (<see cref="ChipKey"/>).</summary>
         public string? Chip { get; }
 
+        public DateTime? Birth { get; }
+
         /// <summary>Aynı hayvanın tekrar kaydıysa ilk kaydın anahtarı (doğrulamada ilk satırla birleşir).</summary>
         public string? DuplicateOf { get; set; }
 
@@ -855,7 +895,10 @@ internal static class EVetBackupConverter
         public PetEntry? MergedInto { get; set; }
 
         /// <summary>Muayene ve görevlerin bağlanacağı hasta anahtarı.</summary>
-        public string? TargetKey => MergedInto is { } target ? target.DuplicateOf ?? target.Key : DuplicateOf ?? Key;
+        /// <summary>Birleşme zincirinin sonundaki (aktarılan) kayıt; birleşmediyse kendisi.</summary>
+        public PetEntry Root => MergedInto?.Root ?? this;
+
+        public string? TargetKey => MergedInto is not null ? Root.DuplicateOf ?? Root.Key : DuplicateOf ?? Key;
     }
 
     /// <summary>Sahip + hasta adı çiftinin adayı (yaşam bilgisiyle).</summary>
