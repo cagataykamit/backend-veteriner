@@ -450,6 +450,30 @@ public sealed class EVetBackupConverterTests
     }
 
     [Fact]
+    public void Task_Completed_Before_Its_Future_Date_Should_Be_Imported_On_Import_Day_With_Planned_Date_Note()
+    {
+        var workbook = ImportTestFiles.Xlsx(
+            ("Müşteri Listesi", [CustomerHeader, [Registered, "Ayşe Yılmaz", 0d, 101, null, null, null, null, null, null, null, null, null, null, "Aktif"]]),
+            ("Hasta Listesi", [PetHeader, ["Ayşe Yılmaz", "Tarçın", 201, null, null, null, "Kedi", null, "Dişi", null, null, null, null, null, "Aktif"]]),
+            ("Randevu Listesi",
+            [
+                TaskHeader,
+                ["Ayşe Yılmaz", "Tarçın", "Kontrol Muayenesi", new DateTime(2026, 10, 20, 14, 0, 0), null, "Dr. B", "Kilo 4,2", null, "Tamamlandı"],
+                ["Ayşe Yılmaz", "Tarçın", "Aşılama", new DateTime(2026, 10, 25, 10, 0, 0), "KUDUZ", "Dr. A", null, null, "Tamamlandı"],
+            ]));
+
+        var result = Read(new ImportFileSet(ImportTestFiles.XlsxFile(workbook), null, null, null));
+
+        var record = Rows(result, ImportTable.ClinicalRecords).Single();
+        record["Tarih"].Should().Be("2026-10-14");
+        record["Not"].Should().Be("E-vet görevi: Tamamlandı; E-vet'te planlanan tarih: 20.10.2026; erken tamamlanmış; Kilo 4,2");
+        var vaccination = Rows(result, ImportTable.Vaccinations).Single();
+        vaccination["UygulamaTarihi"].Should().Be("2026-10-14");
+        vaccination["Not"].Should().Be("E-vet'te planlanan tarih: 25.10.2026; erken tamamlanmış");
+        result.Warnings.Should().Contain(w => w.Message.Contains("2 görev planlanan tarihinden önce tamamlanmış"));
+    }
+
+    [Fact]
     public void Owner_Changed_Pet_Should_Not_Merge_When_Ambiguous()
     {
         object?[] header = ["Kayıt Tarihi", "Müşteriler", "Hastalar", "Protokol No", "Hasta Türü", "Ölüm Zamanı", "Durum"];

@@ -502,6 +502,7 @@ internal static class EVetBackupConverter
         var records = new List<ImportSourceRow>();
         var missed = 0;
         var treatments = 0;
+        var early = 0;
         var skipped = new SkipCounter();
 
         foreach (var row in sheet.Rows)
@@ -522,12 +523,22 @@ internal static class EVetBackupConverter
             if (NonPatientTaskTypes.Contains(type)) { skipped.Add("hasta işi olmayan türde (maaş, borç/ödeme hatırlatması, bilgi)"); continue; }
             if (start is null) { skipped.Add("tarihi okunamayan"); continue; }
 
+            // Planlanandan erken yapılan işte E-vet görev tarihini değiştirmez (gelecekte kalır): aktarma günüyle yazılır,
+            // planlanan tarih notta kalır.
+            string? earlyNote = null;
+            if (status == "tamamlandi" && start.Value > state.NowLocal)
+            {
+                earlyNote = $"E-vet'te planlanan tarih: {start.Value.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)}; erken tamamlanmış";
+                start = state.NowLocal;
+                early++;
+            }
+
             var petProtocol = state.PetsByPair.Resolve(EVetCells.PairKey(ownerName, petName), start.Value);
             var petKey = petProtocol ?? EVetCells.PairKey(ownerName, petName);
 
             if (vaccine is not null && status == "tamamlandi")
             {
-                applied.Add(new AppliedVaccine(row, petKey, petProtocol, ownerName, petName, vaccine, start.Value, sheet));
+                applied.Add(new AppliedVaccine(row, petKey, petProtocol, ownerName, petName, vaccine, start.Value, sheet, earlyNote));
                 continue;
             }
 
@@ -541,7 +552,7 @@ internal static class EVetBackupConverter
             if (status == "tamamlandi" || (status == "yapilacak" && start.Value <= state.NowLocal))
             {
                 var completed = status == "tamamlandi";
-                records.Add(TaskRecord(sheet, row, petProtocol, ownerName, petName, start.Value, completed, treatment));
+                records.Add(TaskRecord(sheet, row, petProtocol, ownerName, petName, start.Value, completed, treatment, earlyNote));
                 missed += completed ? 0 : 1;
                 treatments += treatment is null ? 0 : 1;
                 continue;
@@ -606,6 +617,13 @@ internal static class EVetBackupConverter
                 + (treatments > 0 ? $" Aşı paketine yazılmış {treatments} tedavi (ör. uyuz tedavisi) aşı değil, tedavi olarak bunlara dahildir." : "")));
         }
 
+        if (early > 0)
+        {
+            warnings.Add(new ImportReadWarning(WarningCode, ImportTable.ClinicalRecords,
+                $"Randevu Listesi: {early} görev planlanan tarihinden önce tamamlanmış (E-vet'te tarihi gelecekte kalmış); aktarma gününün "
+                + "tarihiyle yazılacak, planlanan tarih notta kalacak."));
+        }
+
         if (skipped.Total > 0)
         {
             warnings.Add(new ImportReadWarning(WarningCode, ImportTable.Appointments,
@@ -627,11 +645,11 @@ internal static class EVetBackupConverter
 
     /// <summary>
     /// Geçmiş görev → klinik geçmiş satırı: kayıt türü görev tipi, notun ilk satırı görevin sonucu (tamamlandı / gelmedi),
-    /// ardından bilgi ve açıklama.
+    /// ardından (planlanandan erken yapıldıysa) planlanan tarih, bilgi ve açıklama.
     /// </summary>
     private static ImportSourceRow TaskRecord(
         EVetSheet sheet, ImportSourceRow row, string? petProtocol, string? ownerName, string? petName, DateTime start, bool completed,
-        string? treatment)
+        string? treatment, string? earlyNote)
         => new(TaskClinicalRowOffset + row.RowNumber,
         [
             petProtocol,
@@ -647,7 +665,7 @@ internal static class EVetBackupConverter
             null,
             null,
             treatment,
-            EVetCells.Join("; ", completed ? "E-vet görevi: Tamamlandı" : "E-vet görevi: Gelmedi", sheet[row, "Bilgi"], sheet[row, "Açıklama"]),
+            EVetCells.Join("; ", completed ? "E-vet görevi: Tamamlandı" : "E-vet görevi: Gelmedi", earlyNote, sheet[row, "Bilgi"], sheet[row, "Açıklama"]),
         ]);
 
     /// <summary>
@@ -725,7 +743,7 @@ internal static class EVetBackupConverter
 
     /// <summary>Tamamlanmış aşı görevi; sonraki aşı tarihi yapılacak görevlerden sonra atanır.</summary>
     private sealed class AppliedVaccine(
-        ImportSourceRow row, string petKey, string? petProtocol, string? ownerName, string? petName, string vaccine, DateTime start, EVetSheet sheet)
+        ImportSourceRow row, string petKey, string? petProtocol, string? ownerName, string? petName, string vaccine, DateTime start, EVetSheet sheet, string? earlyNote)
     {
         public string PetKey { get; } = petKey;
         public string Vaccine { get; } = vaccine;
@@ -750,6 +768,7 @@ internal static class EVetBackupConverter
                     "; ",
                     Report?.Product is { } product ? $"Ürün: {product}" : null,
                     Report?.ExpiresOn is { } expiry ? $"SKT: {expiry}" : null,
+                    earlyNote,
                     sheet[row, "Bilgi"],
                     sheet[row, "Açıklama"]),
             ]);
