@@ -40,10 +40,10 @@ public sealed class CreateImportBatchForm
     public IFormFile? AppointmentsFile { get; init; }
     public IFormFile? ProductsFile { get; init; }
 
-    /// <summary>E-vet Rapor &gt; Hasta Listesi (CSV); yalnız E-vet profilinde, yedekle (<see cref="File"/>) birlikte.</summary>
+    /// <summary>E-vet Rapor &gt; Genel &gt; Hasta Listesi (CSV); yalnız E-vet profilinde, yedekle (<see cref="File"/>) birlikte.</summary>
     public IFormFile? EVetPatientReportFile { get; init; }
 
-    /// <summary>E-vet Rapor &gt; Resmi &gt; Aşı Bilgi (CSV); yalnız E-vet profilinde, yedekle (<see cref="File"/>) birlikte.</summary>
+    /// <summary>E-vet Rapor &gt; Resmi &gt; Aşı Bilgisi (CSV); yalnız E-vet profilinde, yedekle (<see cref="File"/>) birlikte.</summary>
     public IFormFile? EVetVaccineReportFile { get; init; }
 
     public string? Encoding { get; init; }

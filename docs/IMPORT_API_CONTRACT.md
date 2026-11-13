@@ -83,7 +83,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 
 **Frontend için değişenler (E-vet yedeği, 2026-11-11; geriye uyumlu ekleme, bölüm 13):**
 - `sourceProfile = EVet` iken `file` E-vet'in **Genel > Yedek Al** Excel dosyası olabilir; sunucu onu eşleme adımından önce kanonik tablolara çevirir (müşteri, hasta, aşı, klinik geçmiş, randevu). Sütunlar kanonik adlarla gelir (`confidence = Exact`); kullanıcı eşleme yapmaz, yalnız değer eşlemesi (tür, aşı adı) gerekebilir.
-- Yedekle birlikte üç isteğe bağlı CSV alanı: `productsFile` (E-vet Rapor > Depo > Ürün Listesi; gruplu biçim çözülür), **`evetPatientReportFile`** (Rapor > Hasta Listesi; hasta → müşteri protokolü), **`evetVaccineReportFile`** (Rapor > Resmi > Aşı Bilgi; seri no ve ürün adı). Yeni alanlar yalnız `EVet` profilinde ve yedekle birlikte kabul edilir; aksi `400 Imports.UnsupportedFile`. `EVet` dışında `file` ile CSV birlikte gönderilemez (değişmedi).
+- Yedekle birlikte üç isteğe bağlı CSV alanı: `productsFile` (E-vet Rapor > Depo > Ürün Listesi; gruplu biçim çözülür), **`evetPatientReportFile`** (Rapor > Genel > Hasta Listesi; hasta → müşteri protokolü), **`evetVaccineReportFile`** (Rapor > Resmi > Aşı Bilgisi; seri no ve ürün adı). Yeni alanlar yalnız `EVet` profilinde ve yedekle birlikte kabul edilir; aksi `400 Imports.UnsupportedFile`. `EVet` dışında `file` ile CSV birlikte gönderilemez (değişmedi).
 - Yükleme yanıtının `warnings[]` dizisinde `code = "Imports.EVetConversion"` öğeleri dönüştürmenin özetini verir (bağlantı kaynağı, atlanan görevler ve nedenleri, sonraki aşı tarihi sayısı, seri eşleşmesi, pasif ürün). Ekran bunları bilgi olarak göstermelidir.
 - `GET /imports/source-profiles`: E-vet profilinin notu ve eşlemeleri gerçek dosyaya göre güncellendi, `verified = true`.
 - Yeni kanonik alanlar (her profilde, şablonda da): müşteri `KimlikNo`, `VergiDairesi`, `Durum`; hasta `Alerji`, `Durum`, `VefatTarihi` (bölüm 4.3). Yeni satır kodları: `Imports.TaxIdInvalid`, `Imports.StatusUnrecognized`, `Imports.InactiveClient`, `Imports.DeceasedDateIgnored` (bölüm 6.4).
@@ -913,8 +913,8 @@ Pilot klinik E-vet SMART'tan geliyor. E-vet'in en zengin dışa aktarması **Gen
 | Form alanı | Dosya | Zorunlu | Kullanım |
 |---|---|---|---|
 | `file` | Genel > Yedek Al (`.xlsx`): **Müşteri, Hasta, Randevular, Muayene** işaretli; **Giriş Bilgileri işaretsiz** (kullanıcı bilgisi gerekmez) | Evet (E-vet yolu) | Sayfalar katlanmış adla tanınır: `Müşteri Listesi`, `Hasta Listesi`, `Randevu Listesi`, `Muayene Listesi`. Bunlardan hiçbiri yoksa çalışma kitabı genel okuyucuya gider (Vetinity şablonu E-vet profiliyle de yüklenebilir). |
-| `evetPatientReportFile` | Rapor > Hasta Listesi (`.csv`, `;`) | Hayır (önerilir) | İç içe rapordan hasta protokolü → müşteri protokolü. Tanınmazsa `400 Imports.UnsupportedFile`. |
-| `evetVaccineReportFile` | Rapor > Resmi > Aşı Bilgi (`.csv`; tarih aralığı E-vet'in kullanılmaya başlandığı tarihten bugüne) | Hayır | Aşı seri numarası ve ticari ürün adı. Tanınmazsa `400 Imports.UnsupportedFile`. |
+| `evetPatientReportFile` | Rapor > Genel > Hasta Listesi (`.csv`, `;`) | Hayır (önerilir) | İç içe rapordan hasta protokolü → müşteri protokolü. Tanınmazsa `400 Imports.UnsupportedFile`. |
+| `evetVaccineReportFile` | Rapor > Resmi > Aşı Bilgisi (`.csv`; tarih aralığı E-vet'in kullanılmaya başlandığı tarihten bugüne) | Hayır | Aşı seri numarası ve ticari ürün adı. Tanınmazsa `400 Imports.UnsupportedFile`. |
 | `productsFile` | Rapor > Depo > Ürün Listesi (`.csv`) | Hayır | Başlık satırı (`Ürün`, `Barkod-1`, `Satış Fiyatı`) tanınırsa gruplu rapor çözülür; tanınmazsa genel CSV okuyucusu (yedeksiz yüklemede de). |
 
 - Raporlar yalnız `EVet` profilinde ve yedekle birlikte kabul edilir (bölüm 4.1). Tarihler yedekte tarih hücresi ya da Excel seri sayısı, raporlarda `gg.aa.yyyy[ SS:dd]` olarak okunur.
@@ -956,7 +956,7 @@ Görev → hasta bağlantısı muayeneyle aynıdır (`Müşteriler`, `Hastalar` 
 
 **Planlanandan erken tamamlanan görev (2026-11-14):** E-vet görevi erken yapılınca tarihini değiştirmez; `Durum = Tamamlandı` olduğu hâlde başlangıcı gelecekte kalır (gerçek yedekte 6 aşı ve 1 kontrol). Böyle görev, aşı ya da klinik geçmiş olarak **yükleme anının tarihiyle** yazılır (önceden gelecek tarih yüzünden `Vaccinations.AppliedAtMustNotBeFuture` / `Imports.DateInFuture` hatası alıyordu). Nota `E-vet'te planlanan tarih: gg.aa.yyyy; erken tamamlanmış` eklenir: klinik geçmişte görev sonucundan sonra, aşıda ürün ve SKT'den sonra. Sayısı yükleme uyarısında (`Imports.EVetConversion`) ayrıca verilir.
 
-**Aşı Bilgi raporu** (seri no): satır, aynı sahip + hasta + gündeki tamamlanmış aşıya bağlanır: o gün yedekte tek aşı ve raporda tek satır varsa doğrudan; birden çoksa raporun ürün adı aşı serisini içeriyorsa (`Rabisin ( Kuduz )` ↔ `KUDUZ`, `Felocell Cvr (Kedi Karma)` ↔ `KEDİ KARMA 1`) ve eşleşme tekse. Eşleşen aşıya `Seri` ve not `Ürün: …; SKT: gg.aa.yyyy` eklenir (S.K.T dolu ve okunabiliyorsa). Rapordaki fiyat/toplam aktarılmaz (ücret geçmişi değildir, bölüm 13.4). `Doğrudan Satış` satırları (hastaya yapılmamış satış) atlanır.
+**Aşı Bilgisi raporu** (seri no): satır, aynı sahip + hasta + gündeki tamamlanmış aşıya bağlanır: o gün yedekte tek aşı ve raporda tek satır varsa doğrudan; birden çoksa raporun ürün adı aşı serisini içeriyorsa (`Rabisin ( Kuduz )` ↔ `KUDUZ`, `Felocell Cvr (Kedi Karma)` ↔ `KEDİ KARMA 1`) ve eşleşme tekse. Eşleşen aşıya `Seri` ve not `Ürün: …; SKT: gg.aa.yyyy` eklenir (S.K.T dolu ve okunabiliyorsa). Rapordaki fiyat/toplam aktarılmaz (ücret geçmişi değildir, bölüm 13.4). `Doğrudan Satış` satırları (hastaya yapılmamış satış) atlanır.
 
 **Ürün Listesi raporu:** tür başlığı (yalnız ilk hücre dolu, ardından boş satır) → `Kategori` ve `UrunTuru` (`Aşı` → Aşı, `İlaç` → İlaç, `Hizmet` ve `Laboratuvar` → Hizmet, diğerleri → Diğer); alt grup/üretici başlığı (ardından boş satır yok) ve `Barkod-2` → `Aciklama` (`Grup: …; Barkod 2: …`); `Ürün` → `Ad`, `Barkod-1` → `Barkod`, `Satış Fiyatı` (`₺1.250,50`) → `SatisFiyati`, `Satış KDV` → `KdvOrani`, `Alış Fiyatı` → `AlisFiyati` (`₺0,00` boş sayılır). `Alış KDV`, alış fiyatı doluysa ve satış KDV'sinden farklıysa `Aciklama`'ya eklenir (`Alış KDV: %10`). Pasif ürün (`[-]`) aktarılmaz.
 
@@ -967,5 +967,5 @@ Aşı serisi anahtarı (tek yer `ImportValueResolver.VaccineSeriesKey`): katlanm
 ### 13.4 Bilinen sınırlar
 
 - Yedekte hesap hareketi yok; bakiye müşteri listesindeki `Bakiye` sütunundan gelir (ADR-048 T3). Rapor > Bakiyesi Olan Müşteriler yalnız karşılaştırma içindir, yüklenmez.
-- Hasta yaş grubu aktarılmaz (doğum tarihinden türer); müşterinin "sahiplenmek ister" işareti ve görevin `Bölüm` alanı aktarılmaz. Ücret ve ödeme geçmişi yedekte yoktur (yalnız müşterinin net bakiyesi); Aşı Bilgi raporundaki aşı fiyatı tek başına ücret geçmişi sayılmadığı için aktarılmaz.
-- Seri numarası yalnız Aşı Bilgi raporundaki aşılar için gelir (rapor ticari aşıları içerir; parazit ilaçlarını içermez).
+- Hasta yaş grubu aktarılmaz (doğum tarihinden türer); müşterinin "sahiplenmek ister" işareti ve görevin `Bölüm` alanı aktarılmaz. Ücret ve ödeme geçmişi yedekte yoktur (yalnız müşterinin net bakiyesi); Aşı Bilgisi raporundaki aşı fiyatı tek başına ücret geçmişi sayılmadığı için aktarılmaz.
+- Seri numarası yalnız Aşı Bilgisi raporundaki aşılar için gelir (rapor ticari aşıları içerir; parazit ilaçlarını içermez).
