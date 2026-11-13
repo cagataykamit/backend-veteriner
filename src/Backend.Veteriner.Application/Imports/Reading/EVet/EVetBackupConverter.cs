@@ -230,7 +230,7 @@ internal static class EVetBackupConverter
         var (renamed, merged) = SeparateSameNamedPets(entries.Where(e => e.MergedInto is null).ToList());
         foreach (var entry in entries)
         {
-            state.PetsByPair.Append(entry.Pair, new PetCandidate(entry.TargetKey, entry.Registered, entry.Died));
+            state.PetsByPair.Append(entry.Pair, new PetCandidate(entry.TargetKey, entry.Root.Status == "aktif", entry.Registered, entry.Died));
             if (entry.MergedInto is null && entry.Key is not null && entry.Status is "olu" or "pasif")
                 state.InactivePets.Add(entry.Key);
         }
@@ -901,12 +901,15 @@ internal static class EVetBackupConverter
         public string? TargetKey => MergedInto is not null ? Root.DuplicateOf ?? Root.Key : DuplicateOf ?? Key;
     }
 
-    /// <summary>Sahip + hasta adı çiftinin adayı (yaşam bilgisiyle).</summary>
-    private sealed record PetCandidate(string? Key, DateTime? Registered, DateTime? Died);
+    /// <summary>Sahip + hasta adı çiftinin adayı (yaşam bilgisiyle; <paramref name="Active"/>: aktarılan kaydı E-vet'te aktif).</summary>
+    private sealed record PetCandidate(string? Key, bool Active, DateTime? Registered, DateTime? Died);
 
     /// <summary>
-    /// Sahip + hasta adı → hasta anahtarı. Tek aday varsa o; birden çoksa kaydın tarihinde kayıtlı ve hayatta olan tek aday.
-    /// Ayırt edilemezse "Belirsiz: …" anahtarı döner: doğrulama satırı hasta bulunamadı hatasıyla raporlar, yanlış hastaya yazmaz.
+    /// Sahip + hasta adı → hasta anahtarı (aynı hayvanın kayıtları önce birleşir, <see cref="MergeSameAnimals"/>; adaylar birleşen
+    /// kökün anahtarını taşır). Tek aday varsa o; birden çoksa (1) kaydın tarihinde kayıtlı ve hayatta olan tek aday; (2) o tarihte
+    /// hayatta olanlardan (kimse yoksa hepsinden) yalnız biri aktifse o: yanlışlıkla açılıp vefat girilmiş kopyanın kaydı aktif hastaya
+    /// bağlanır. Yaşam aralığı önce gelir: ölmüş eski hayvanın kendi dönemindeki kaydı yeni hayvana yazılmasın. Ayırt edilemezse
+    /// "Belirsiz: …" anahtarı döner: doğrulama satırı hasta bulunamadı hatasıyla raporlar, yanlış hastaya yazmaz.
     /// </summary>
     private sealed class PetIndex
     {
@@ -929,16 +932,14 @@ internal static class EVetBackupConverter
             if (keys.Count == 1)
                 return keys[0];
 
-            if (on is { } date)
-            {
-                var alive = list
-                    .Where(c => (c.Registered is null || c.Registered.Value.Date <= date.Date) && (c.Died is null || c.Died.Value.Date >= date.Date))
-                    .Select(c => c.Key)
-                    .Distinct()
-                    .ToList();
-                if (alive.Count == 1)
-                    return alive[0];
-            }
+            var alive = on is { } date
+                ? list.Where(c => (c.Registered is null || c.Registered.Value.Date <= date.Date) && (c.Died is null || c.Died.Value.Date >= date.Date)).ToList()
+                : [];
+            if (alive.Select(c => c.Key).Distinct().ToList() is [var onlyAlive])
+                return onlyAlive;
+
+            if ((alive.Count > 0 ? alive : list).Where(c => c.Active).Select(c => c.Key).Distinct().ToList() is [var onlyActive])
+                return onlyActive;
 
             return $"Belirsiz: {string.Join(" / ", keys.Select(k => k ?? "?"))}";
         }

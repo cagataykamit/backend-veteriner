@@ -538,6 +538,33 @@ public sealed class EVetBackupConverterTests
     }
 
     [Fact]
+    public void Ambiguous_Same_Named_Pets_Should_Resolve_By_Life_Span_Then_To_The_Only_Active_One()
+    {
+        object?[] header = ["Kayıt Tarihi", "Müşteriler", "Hastalar", "Protokol No", "Hasta Türü", "Doğum Tarihi", "Ölüm Zamanı", "Durum"];
+        var workbook = ImportTestFiles.Xlsx(
+            ("Müşteri Listesi", [CustomerHeader, [Registered, "Ayşe Yılmaz", 0d, 101, null, null, null, null, null, null, null, null, null, null, "Aktif"]]),
+            ("Hasta Listesi",
+            [
+                header,
+                // Ölmüş eski kedi (kendi dönemi) ve yeni kedi; doğum tarihleri farklı, birleşmez.
+                [new DateTime(2015, 1, 1), "Ayşe Yılmaz", "Pamuk", 801, "Kedi", new DateTime(2014, 3, 3), new DateTime(2020, 1, 1), "Ölü"],
+                [new DateTime(2021, 1, 1), "Ayşe Yılmaz", "Pamuk", 802, "Kedi", new DateTime(2020, 7, 7), null, "Aktif"],
+                // Yanlışlıkla açılıp vefat girilmiş kopya (doğum tarihi yok): o tarihte ikisi de kayıtlı → aktif olana.
+                [new DateTime(2022, 1, 1), "Ayşe Yılmaz", "Pamuk", 803, "Kedi", null, null, "Ölü"],
+            ]),
+            ("Randevu Listesi",
+            [
+                TaskHeader,
+                ["Ayşe Yılmaz", "Pamuk", "Aşılama", new DateTime(2018, 5, 1, 10, 0, 0), "KUDUZ", "Dr. A", null, null, "Tamamlandı"],
+                ["Ayşe Yılmaz", "Pamuk", "Aşılama", new DateTime(2024, 5, 1, 10, 0, 0), "KUDUZ", "Dr. A", null, null, "Tamamlandı"],
+            ]));
+
+        var result = Read(new ImportFileSet(ImportTestFiles.XlsxFile(workbook), null, null, null));
+
+        Rows(result, ImportTable.Vaccinations).Select(v => v["HayvanNo"]).Should().Equal("801", "802");
+    }
+
+    [Fact]
     public void Group_Without_Active_Record_Should_Merge_Into_Latest_And_Same_Owner_Copy_Into_Active()
     {
         object?[] header = ["Kayıt Tarihi", "Müşteriler", "Hastalar", "Protokol No", "Çip No", "Hasta Türü", "Doğum Tarihi", "Ölüm Zamanı", "Durum"];
