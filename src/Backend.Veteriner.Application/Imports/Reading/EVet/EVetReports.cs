@@ -3,12 +3,12 @@ using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Application.Imports.Reading.EVet;
 
-/// <summary>Aşı Bilgi raporunun bir uygulaması: ticari ürün adı, seri numarası ve son kullanma tarihi (<c>gg.aa.yyyy</c>; okunamazsa null).</summary>
+/// <summary>Aşı Bilgisi raporunun bir uygulaması: ticari ürün adı, seri numarası ve son kullanma tarihi (<c>gg.aa.yyyy</c>; okunamazsa null).</summary>
 internal sealed record EVetVaccineReportRow(string? Product, string? Serial, string? ExpiresOn = null);
 
 /// <summary>
-/// Yedeği tamamlayan iki E-vet raporu (CSV, <c>;</c>). Hasta Listesi (Rapor &gt; Hasta Listesi) hasta protokolünü müşteri
-/// protokolüne bağlar: yedeğin hasta sayfasında yalnız sahip adı vardır. Aşı Bilgi (Rapor &gt; Resmi &gt; Aşı Bilgi) seri
+/// Yedeği tamamlayan iki E-vet raporu (CSV, <c>;</c>). Hasta Listesi (Rapor &gt; Genel &gt; Hasta Listesi) hasta protokolünü müşteri
+/// protokolüne bağlar: yedeğin hasta sayfasında yalnız sahip adı vardır. Aşı Bilgisi (Rapor &gt; Resmi &gt; Aşı Bilgisi) seri
 /// numarasını verir: yedeğin randevu sayfasında yoktur. İkisi de isteğe bağlıdır.
 /// </summary>
 internal sealed class EVetReports
@@ -39,7 +39,7 @@ internal sealed class EVetReports
             {
                 return Result<EVetReports>.Failure(
                     "Imports.UnsupportedFile",
-                    "Hasta Listesi raporu tanınmadı; E-vet'te Rapor > Hasta Listesi ekranından Csv olarak indirin.");
+                    "Hasta Listesi raporu tanınmadı; E-vet'te Rapor > Genel > Hasta Listesi ekranından Csv olarak indirin.");
             }
         }
 
@@ -51,7 +51,7 @@ internal sealed class EVetReports
             {
                 return Result<EVetReports>.Failure(
                     "Imports.UnsupportedFile",
-                    "Aşı Bilgi raporu tanınmadı; E-vet'te Rapor > Resmi > Aşı Bilgi ekranından Csv olarak indirin.");
+                    "Aşı Bilgisi raporu tanınmadı; E-vet'te Rapor > Resmi > Aşı Bilgisi ekranından Csv olarak indirin.");
             }
         }
 

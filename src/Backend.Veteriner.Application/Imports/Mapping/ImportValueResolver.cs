@@ -328,9 +328,6 @@ public sealed class ImportValueResolver
         if (key.Length == 0)
             return ImportValueResolution.Empty;
 
-        if (_userMappings.TryGetValue((kind, key), out var target))
-            return target is { } id ? ImportValueResolution.Resolved(id) : ImportValueResolution.Skipped;
-
         if (TryCatalogOrAlias(kind, key, parentId, out var resolved))
             return resolved;
 
@@ -340,6 +337,11 @@ public sealed class ImportValueResolver
         {
             return resolved;
         }
+
+        // Kullanıcı eşlemesi yalnız kendiliğinden eşlenemeyen satırlara uygulanır (2026-11-14): ekran değeri yalnız bu satırların
+        // sayısıyla gösterir; "atla" ya da seçilen karşılık, aynı yazımın hastanın türüne göre eşlenmiş öbür satırlarını bozmaz.
+        if (_userMappings.TryGetValue((kind, key), out var target))
+            return target is { } id ? ImportValueResolution.Resolved(id) : ImportValueResolution.Skipped;
 
         return ImportValueResolution.Unmapped;
     }

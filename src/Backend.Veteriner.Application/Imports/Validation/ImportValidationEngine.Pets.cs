@@ -1,3 +1,4 @@
+using System.Globalization;
 using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Pets;
@@ -27,6 +28,9 @@ public sealed partial class ImportValidationEngine
 
         /// <summary>Tür bilinçli atlandı (<c>targetId = null</c>); bağlı aşılar da atlanır.</summary>
         public bool SkippedByUser { get; set; }
+
+        /// <summary>Satır hatalıysa ilk hatanın mesajı (bağlı satırlarda asıl neden olarak gösterilir).</summary>
+        public string? Reason { get; set; }
     }
 
     private readonly Dictionary<string, PetNode> _petByRef = new(StringComparer.OrdinalIgnoreCase);
@@ -84,40 +88,53 @@ public sealed partial class ImportValidationEngine
             var breed = speciesId is null
                 ? ImportValueResolution.Unmapped
                 : _resolver.Resolve(ImportValueKind.Breed, rawBreed, speciesId);
-            if (breed.Kind == ImportValueResolutionKind.Resolved)
+            if (breed.Kind == ImportValueResolutionKind.Resolved
+                && _breedsById.TryGetValue(breed.TargetId!.Value, out var entry) && entry.ParentId == speciesId)
             {
-                if (_breedsById.TryGetValue(breed.TargetId!.Value, out var entry) && entry.ParentId == speciesId)
-                    breedId = breed.TargetId;
-                else
-                    issues.Add(ImportRules.BreedSpeciesMismatch.At("Irk", value: rawBreed));
+                breedId = breed.TargetId;
             }
             else
             {
+                // Eşlenemeyen ya da türe uymayan ırk hastayı düşürmez: metin olarak aktarılır.
                 breedText = rawBreed;
-                issues.Add(ImportRules.BreedFreeText.At("Irk", value: rawBreed));
+                issues.Add(breed.Kind == ImportValueResolutionKind.Resolved
+                    ? ImportRules.BreedSpeciesMismatch.At("Irk", value: rawBreed)
+                    : ImportRules.BreedFreeText.At("Irk", value: rawBreed));
                 if (breedText.Length > MaxBreedTextLength)
                     issues.Add(ImportRules.FieldTooLong.At("Irk", $"Irk en fazla {MaxBreedTextLength} karakter olabilir."));
             }
         }
 
         // Cinsiyet, kısır
+        // Alınmayan alan değeri kaybolmaz: hastanın notuna "Dosyadaki …: değer (neden, alınmadı)" satırı yazılır.
+        var dropped = new List<string>();
+
         var rawGender = reader.Raw("Cinsiyet");
         var (gender, genderRecognized) = ImportValueParsers.ParseGender(rawGender);
         if (!genderRecognized)
-            issues.Add(ImportRules.GenderUnrecognized.At("Cinsiyet", value: rawGender));
+            issues.Add(Dropped(ImportRules.GenderUnrecognized, "Cinsiyet", "cinsiyet", rawGender, "tanınmadı", dropped));
 
         var rawNeutered = reader.Raw("Kisir");
         var (neutered, neuteredRecognized) = ImportValueParsers.ParseNeutered(rawNeutered);
         if (!neuteredRecognized)
-            issues.Add(ImportRules.NeuteredUnrecognized.At("Kisir", value: rawNeutered));
+            issues.Add(Dropped(ImportRules.NeuteredUnrecognized, "Kisir", "kısırlık", rawNeutered, "tanınmadı", dropped));
 
-        // Doğum tarihi
-        var (birthDate, _) = ReadDate(reader, "DogumTarihi", issues);
+        // Doğum tarihi: okunamayan tarih hastayı düşürmez (bağlı geçmişi de düşerdi); hasta doğum tarihsiz aktarılır.
+        var birthIssues = new List<ImportIssue>();
+        var (birthDate, _) = ReadDate(reader, "DogumTarihi", birthIssues);
+        foreach (var issue in birthIssues)
+        {
+            issues.Add(issue.Severity == ImportIssueSeverity.Error
+                ? Dropped(ImportRules.BirthDateIgnored, "DogumTarihi", "doğum tarihi", issue.Value, "okunamadı", dropped, $"{issue.Message} Hasta doğum tarihsiz aktarılacak")
+                : issue);
+        }
+
         if (birthDate is { } birth)
         {
             if (birth > _today)
             {
-                issues.Add(ImportRules.BirthDateInFuture.At("DogumTarihi", value: reader.Raw("DogumTarihi")));
+                issues.Add(Dropped(ImportRules.BirthDateInFuture, "DogumTarihi", "doğum tarihi",
+                    birth.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture), "gelecek tarih", dropped));
                 birthDate = null;
             }
             else if (birth < _today.AddYears(-MaxBirthDateAgeYears))
@@ -126,16 +143,16 @@ public sealed partial class ImportValidationEngine
             }
         }
 
-        // Mikroçip biçimi (çakışma kimlik çözüldükten sonra)
+        // Mikroçip biçimi (çakışma kimlik çözüldükten sonra); okunamayan numara hastayı düşürmez, notuna yazılır.
         var rawChip = reader.Raw("Mikrocip");
         var chip = ImportValueParsers.ParseMicrochip(rawChip);
         switch (chip.Problem)
         {
             case ImportMicrochipProblem.ScientificNotation:
-                issues.Add(ImportRules.MicrochipScientificNotation.At("Mikrocip", value: rawChip));
+                issues.Add(Dropped(ImportRules.MicrochipScientificNotation, "Mikrocip", "mikroçip", rawChip, "bilimsel gösterim", dropped));
                 break;
             case ImportMicrochipProblem.Invalid:
-                issues.Add(ImportRules.MicrochipInvalid.At("Mikrocip", value: rawChip));
+                issues.Add(Dropped(ImportRules.MicrochipInvalid, "Mikrocip", "mikroçip", rawChip, "okunamadı", dropped));
                 break;
             default:
                 if (chip.Value is { Length: not ImportValueParsers.StandardMicrochipLength })
@@ -169,7 +186,7 @@ public sealed partial class ImportValidationEngine
         var rawWeight = reader.Raw("Agirlik");
         var (weight, weightValid) = ImportValueParsers.ParseWeight(rawWeight);
         if (!weightValid)
-            issues.Add(ImportRules.WeightInvalid.At("Agirlik", value: rawWeight));
+            issues.Add(Dropped(ImportRules.WeightInvalid, "Agirlik", "ağırlık", rawWeight, "geçersiz", dropped));
 
         var passport = reader.Raw("KarneNo");
         if (passport is { Length: > MaxPassportLength })
@@ -184,9 +201,9 @@ public sealed partial class ImportValidationEngine
             allergyNote = allergy.Length <= Pet.MaxAlertNoteLength ? null : $"Alerji: {allergy}";
         }
 
-        var (deceased, deceasedOn) = ReadPetStatus(reader, birthDate, issues);
+        var (deceased, deceasedOn) = ReadPetStatus(reader, birthDate, issues, dropped);
 
-        var notes = string.Join('\n', new[] { colorNote, allergyNote, reader.Raw("Not") }.Where(s => s is not null));
+        var notes = string.Join('\n', new[] { colorNote }.Concat(dropped).Concat([allergyNote, reader.Raw("Not")]).Where(s => s is not null));
         if (notes.Length > MaxPetNotesLength)
             issues.Add(ImportRules.FieldTooLong.At("Not", $"Not (renk satırıyla birlikte) en fazla {MaxPetNotesLength} karakter olabilir."));
 
@@ -207,6 +224,18 @@ public sealed partial class ImportValidationEngine
         var normalized = new ImportNormalizedPet(
             owner?.Key, reference, name, speciesId, breedId, breedText, gender, birthDate, neutered,
             chip.Value, colorId, weight, passport, notes.Length == 0 ? null : notes, alertNote, deceased, deceasedOn, patternId);
+
+        // Sahipsiz hasta: eski programda müşteri kartı silinmiş (sahip adı boş ya da "."). Bağlı aşı / klinik geçmiş / randevusu yoksa
+        // aktarılacak bilgi yoktur: hata değil, bilerek atlanır. Geçmişi varsa sahip hatası kalır (kayıt kaybı görünür kalsın).
+        if (owner is null && IsOwnerless(reader) && (reference is null || !HasLinkedRecords(reference)))
+        {
+            issues.RemoveAll(i => i.Code == ImportRules.OwnerNotFound.Code || i.Code == ImportRules.OwnerRowInvalid.Code);
+            if (!HasError(issues))
+            {
+                issues.Add(ImportRules.OwnerlessPetSkipped.At());
+                return Complete(node, Finish(ImportTable.Pets, reader.RowNumber, issues, normalized, ImportRowAction.Skip));
+            }
+        }
 
         if (HasError(issues) || owner is null)
             return Complete(node, Finish(ImportTable.Pets, reader.RowNumber, issues, normalized));
@@ -269,7 +298,8 @@ public sealed partial class ImportValidationEngine
     /// Durum: boş/Aktif → aktif; Vefat/Ölü → vefat (tarih isteğe bağlı, gelecekte veya doğumdan önce olamaz: uyarı, tarihsiz);
     /// tanınmayan → uyarı, aktif. Vefat kuralı <c>Pet.SetStatus</c>'tadır; uygulama onu çağırır.
     /// </summary>
-    private (bool Deceased, DateOnly? DeceasedOn) ReadPetStatus(ImportRowReader reader, DateOnly? birthDate, List<ImportIssue> issues)
+    private (bool Deceased, DateOnly? DeceasedOn) ReadPetStatus(
+        ImportRowReader reader, DateOnly? birthDate, List<ImportIssue> issues, List<string> dropped)
     {
         var raw = reader.Raw("Durum");
         switch (ImportTextFolding.Fold(raw))
@@ -279,7 +309,7 @@ public sealed partial class ImportValidationEngine
             case "vefat" or "olu" or "oldu" or "deceased" or "exitus":
                 break;
             default:
-                issues.Add(ImportRules.StatusUnrecognized.At("Durum", value: raw));
+                issues.Add(Dropped(ImportRules.StatusUnrecognized, "Durum", "durum", raw, "tanınmadı", dropped));
                 return (false, null);
         }
 
@@ -291,15 +321,49 @@ public sealed partial class ImportValidationEngine
         if (date is { } value && value <= _today && (birthDate is null || value >= birthDate))
             return (true, value);
 
-        issues.Add(ImportRules.DeceasedDateIgnored.At("VefatTarihi", value: rawDate));
+        issues.Add(Dropped(ImportRules.DeceasedDateIgnored, "VefatTarihi", "vefat tarihi", rawDate, "geçersiz", dropped));
         return (true, null);
+    }
+
+    /// <summary>
+    /// Alınmayan alan değeri (B3, 2026-11-14): sorun mesajı değeri söyler, hastanın (klinik geçmişte kaydın) notuna <c>Dosyadaki &lt;alan&gt;: &lt;değer&gt;
+    /// (&lt;neden&gt;, alınmadı)</c> satırı eklenir; eski programdaki bilgi kaybolmaz.
+    /// </summary>
+    private static ImportIssue Dropped(
+        ImportRule rule, string field, string label, string? value, string reason, List<string> dropped, string? message = null,
+        string noteOf = "hastanın")
+    {
+        dropped.Add($"Dosyadaki {label}: {value} ({reason}, alınmadı)");
+        return rule.At(field, $"{(message ?? rule.Message).TrimEnd('.')}. Dosyadaki değer ({value}) {noteOf} notuna yazılacak.", value);
+    }
+
+    /// <summary>Satırın sahip adı harf/rakam taşımıyor ya da tek karakter (E-vet'te silinmiş müşteri kartı: ".").</summary>
+    private static bool IsOwnerless(ImportRowReader reader)
+        => reader.Raw("SahipAdSoyad") is { } ownerName && ImportTextFolding.Fold(ownerName).Length < 2;
+
+    private HashSet<string>? _petRefsWithRecords;
+
+    /// <summary>Aşı, klinik geçmiş ya da randevu satırı bu hasta numarasına bağlanıyor mu.</summary>
+    private bool HasLinkedRecords(string reference)
+    {
+        _petRefsWithRecords ??= new[] { ImportTable.Vaccinations, ImportTable.ClinicalRecords, ImportTable.Appointments }
+            .Where(_input.Tables.ContainsKey)
+            .SelectMany(t => _input.Tables[t].Select(row => new ImportRowReader(_input.Mapping.ColumnsOf(t), row).Raw("HayvanNo")))
+            .Select(ImportValueParsers.NormalizeText)
+            .OfType<string>()
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return _petRefsWithRecords.Contains(reference);
     }
 
     private static ImportRowResult Complete(PetNode node, ImportRowResult result)
     {
         node.Status = result.Status;
         if (result.Status == ImportRowValidationStatus.Error)
+        {
             node.Ref = null;
+            node.Reason = FirstError(result);
+        }
+
         return result;
     }
 
@@ -332,7 +396,7 @@ public sealed partial class ImportValidationEngine
 
             if (node.Owner is null)
             {
-                issues.Add(ImportRules.OwnerRowInvalid.At("MusteriNo", $"Müşteri satırı ({node.Row}) hatalı.", reference));
+                issues.Add(ImportRules.OwnerRowInvalid.At("MusteriNo", $"Müşteri aktarılmadı: {node.Reason} (Müşteriler satır {node.Row})", reference));
                 return null;
             }
 

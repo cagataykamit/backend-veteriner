@@ -205,6 +205,7 @@ public sealed class ImportFullMigrationValidationTests
         row.Status.Should().Be(ImportRowValidationStatus.Warning);
         Codes(row).Should().Contain(ImportRules.RecordBeforeBirth.Code).And.Contain(ImportRules.TemperatureInvalid.Code);
         ((ImportNormalizedClinicalRecord)row.Normalized).TemperatureC.Should().BeNull();
+        ((ImportNormalizedClinicalRecord)row.Normalized).Notes.Should().Be("Dosyadaki ateş: 60 (geçersiz, alınmadı)");
     }
 
     [Fact]

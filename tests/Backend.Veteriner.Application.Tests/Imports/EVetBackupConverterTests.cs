@@ -398,6 +398,209 @@ public sealed class EVetBackupConverterTests
         result.Warnings.Should().Contain(w => w.Message.Contains("bilgileri farklı 2 hasta") && w.Message.Contains("bilgileri aynı 1 tekrar"));
     }
 
+    [Fact]
+    public void Owner_Changed_Pet_Should_Merge_Former_Record_Into_New_Owner_By_Protocol_Or_Chip()
+    {
+        // E-vet sahip değişiminde eski sahipteki kaydı ölü (ölüm tarihi boş) bırakır, yeni sahipte aynı protokolle kayıt açar.
+        object?[] header = ["Kayıt Tarihi", "Müşteriler", "Hastalar", "Protokol No", "Çip No", "Hasta Türü", "Bilgi", "Ölüm Zamanı", "Durum"];
+        var workbook = ImportTestFiles.Xlsx(
+            ("Müşteri Listesi",
+            [
+                CustomerHeader,
+                [Registered, "Ayşe Yılmaz", 0d, 101, null, null, null, null, null, null, null, null, null, null, "Aktif"],
+                [Registered, "Can Demir", 0d, 102, null, null, null, null, null, null, null, null, null, null, "Aktif"],
+            ]),
+            ("Hasta Listesi",
+            [
+                header,
+                [new DateTime(2022, 1, 1), "Ayşe Yılmaz", "Duman", 301, null, "Kedi", "Sakin", null, "Ölü"],
+                [new DateTime(2025, 1, 1), "Can Demir", "Duman", 301, null, "Kedi", null, null, "Aktif"],
+                [new DateTime(2022, 1, 1), "Ayşe Yılmaz", "Mia", 302, "985000000000009", "Kedi", null, null, "Ölü"],
+                [new DateTime(2025, 1, 1), "Can Demir", "Minnoş", 303, "985000000000009", "Kedi", null, null, "Aktif"],
+                // Ölüm tarihi olan gerçek vefat: aynı protokol olsa da birleşmez.
+                [new DateTime(2022, 1, 1), "Ayşe Yılmaz", "Kont", 304, null, "Köpek", null, new DateTime(2024, 3, 1), "Ölü"],
+                [new DateTime(2025, 1, 1), "Can Demir", "Kont", 304, null, "Köpek", null, null, "Aktif"],
+            ]),
+            ("Randevu Listesi",
+            [
+                TaskHeader,
+                ["Ayşe Yılmaz", "Duman", "Aşılama", new DateTime(2023, 4, 1, 10, 0, 0), "KUDUZ", "Dr. A", null, null, "Tamamlandı"],
+            ]),
+            ("Muayene Listesi",
+            [
+                ExaminationHeader,
+                [new DateTime(2023, 6, 1), "Ayşe Yılmaz", "Mia", "Dr. A", 4d, null, "Kusma", null, null, null, null, null],
+            ]));
+
+        var result = Read(new ImportFileSet(ImportTestFiles.XlsxFile(workbook), null, null, null));
+
+        var pets = Rows(result, ImportTable.Pets);
+        pets.Select(p => (p["HayvanNo"], p["HayvanAdi"], p["Durum"])).Should().Equal(
+            ("301#3", "Duman", null), ("303", "Minnoş", null), ("304#6", "Kont", "Vefat"), ("304#7", "Kont", null));
+        pets[0]["MusteriNo"].Should().Be("102");
+        pets[0]["Not"].Should().Contain("E-vet'te önceki sahip kaydı: müşteri no 101, hasta no 301, kayıt: 01.01.2022")
+            .And.Contain("Önceki kayıttaki not: Sakin");
+        pets[1]["Mikrocip"].Should().Be("985000000000009");
+        pets[1]["Not"].Should().Contain("E-vet'te önceki sahip kaydı: müşteri no 101, hasta no 302");
+
+        // Eski sahip dönemindeki aşı ve muayene yeni sahipteki hastaya bağlanır.
+        Rows(result, ImportTable.Vaccinations).Single()["HayvanNo"].Should().Be("301#3");
+        Rows(result, ImportTable.ClinicalRecords).Single()["HayvanNo"].Should().Be("303");
+        result.Warnings.Should().Contain(w => w.Message.Contains("Aynı hayvanın 2 ek kaydı") && w.Message.Contains("1 aynı protokolle, 1 aynı mikroçiple; aynı sahipte 0 kopya"));
+    }
+
+    [Fact]
+    public void Task_Completed_Before_Its_Future_Date_Should_Be_Imported_On_Import_Day_With_Planned_Date_Note()
+    {
+        var workbook = ImportTestFiles.Xlsx(
+            ("Müşteri Listesi", [CustomerHeader, [Registered, "Ayşe Yılmaz", 0d, 101, null, null, null, null, null, null, null, null, null, null, "Aktif"]]),
+            ("Hasta Listesi", [PetHeader, ["Ayşe Yılmaz", "Tarçın", 201, null, null, null, "Kedi", null, "Dişi", null, null, null, null, null, "Aktif"]]),
+            ("Randevu Listesi",
+            [
+                TaskHeader,
+                ["Ayşe Yılmaz", "Tarçın", "Kontrol Muayenesi", new DateTime(2026, 10, 20, 14, 0, 0), null, "Dr. B", "Kilo 4,2", null, "Tamamlandı"],
+                ["Ayşe Yılmaz", "Tarçın", "Aşılama", new DateTime(2026, 10, 25, 10, 0, 0), "KUDUZ", "Dr. A", null, null, "Tamamlandı"],
+            ]));
+
+        var result = Read(new ImportFileSet(ImportTestFiles.XlsxFile(workbook), null, null, null));
+
+        var record = Rows(result, ImportTable.ClinicalRecords).Single();
+        record["Tarih"].Should().Be("2026-10-14");
+        record["Not"].Should().Be("E-vet görevi: Tamamlandı; E-vet'te planlanan tarih: 20.10.2026; erken tamamlanmış; Kilo 4,2");
+        var vaccination = Rows(result, ImportTable.Vaccinations).Single();
+        vaccination["UygulamaTarihi"].Should().Be("2026-10-14");
+        vaccination["Not"].Should().Be("E-vet'te planlanan tarih: 25.10.2026; erken tamamlanmış");
+        result.Warnings.Should().Contain(w => w.Message.Contains("2 görev planlanan tarihinden önce tamamlanmış"));
+    }
+
+    [Fact]
+    public void Owner_Changed_Pet_Should_Not_Merge_When_Ambiguous()
+    {
+        object?[] header = ["Kayıt Tarihi", "Müşteriler", "Hastalar", "Protokol No", "Hasta Türü", "Ölüm Zamanı", "Durum"];
+        var workbook = ImportTestFiles.Xlsx(
+            ("Müşteri Listesi", [CustomerHeader, [Registered, "Ayşe Yılmaz", 0d, 101, null, null, null, null, null, null, null, null, null, null, "Aktif"]]),
+            ("Hasta Listesi",
+            [
+                header,
+                // İki aktif kayıt: hangisinin yeni kayıt olduğu bilinmez.
+                [new DateTime(2022, 1, 1), "Ayşe Yılmaz", "Pamuk", 401, "Kedi", null, "Ölü"],
+                [new DateTime(2025, 1, 1), "Ayşe Yılmaz", "Pamuk 2", 401, "Kedi", null, "Aktif"],
+                [new DateTime(2025, 2, 1), "Ayşe Yılmaz", "Pamuk 3", 401, "Kedi", null, "Aktif"],
+                // Farklı tür: aynı hayvan değil.
+                [new DateTime(2022, 1, 1), "Ayşe Yılmaz", "Zeytin", 402, "Kedi", null, "Ölü"],
+                [new DateTime(2025, 1, 1), "Ayşe Yılmaz", "Zeytin", 402, "Köpek", null, "Aktif"],
+            ]));
+
+        var result = Read(new ImportFileSet(ImportTestFiles.XlsxFile(workbook), null, null, null));
+
+        Rows(result, ImportTable.Pets).Should().HaveCount(5);
+        result.Warnings.Should().NotContain(w => w.Message.Contains("Aynı hayvanın"));
+    }
+
+    [Fact]
+    public void Same_Chip_Chain_Should_Become_One_Pet_And_Old_Owner_Records_Should_Not_Be_Ambiguous()
+    {
+        // A → B → A: Ayşe'de eski kayıt + aktif kayıt, Can'da iki eski kayıt (biri vefat girilmiş); hepsi aynı mikroçip.
+        object?[] header = ["Kayıt Tarihi", "Müşteriler", "Hastalar", "Protokol No", "Çip No", "Hasta Türü", "Ölüm Zamanı", "Durum"];
+        const string chip = "985000000000077";
+        var workbook = ImportTestFiles.Xlsx(
+            ("Müşteri Listesi",
+            [
+                CustomerHeader,
+                [Registered, "Ayşe Yılmaz", 0d, 101, null, null, null, null, null, null, null, null, null, null, "Aktif"],
+                [Registered, "Can Demir", 0d, 102, null, null, null, null, null, null, null, null, null, null, "Aktif"],
+            ]),
+            ("Hasta Listesi",
+            [
+                header,
+                [new DateTime(2020, 1, 1), "Ayşe Yılmaz", "Boncuk", 501, chip, "Kedi", null, "Ölü"],
+                [new DateTime(2021, 1, 1), "Can Demir", "Boncuk", 502, chip, "Kedi", null, "Ölü"],
+                [new DateTime(2022, 1, 1), "Can Demir", "Boncuk", 503, chip, "Kedi", new DateTime(2022, 6, 1), "Ölü"],
+                [new DateTime(2023, 1, 1), "Ayşe Yılmaz", "Boncuk", 504, chip, "Kedi", null, "Aktif"],
+            ]),
+            ("Randevu Listesi",
+            [
+                TaskHeader,
+                // Eski sahip adıyla yazılmış aşılar: Ayşe'deki iki kayıt da o tarihte hayatta (önceden "Belirsiz").
+                ["Ayşe Yılmaz", "Boncuk", "Aşılama", new DateTime(2024, 3, 1, 10, 0, 0), "KUDUZ", "Dr. A", null, null, "Tamamlandı"],
+                ["Can Demir", "Boncuk", "Aşılama", new DateTime(2021, 6, 1, 10, 0, 0), "KUDUZ", "Dr. A", null, null, "Tamamlandı"],
+            ]));
+
+        var result = Read(new ImportFileSet(ImportTestFiles.XlsxFile(workbook), null, null, null));
+
+        var pet = Rows(result, ImportTable.Pets).Single();
+        (pet["HayvanNo"], pet["HayvanAdi"], pet["Durum"], pet["MusteriNo"], pet["Mikrocip"]).Should().Be(("504", "Boncuk", null, "101", chip));
+        pet["Not"].Should().Contain("E-vet'te aynı hayvanın eski kaydı, hasta no 501, kayıt: 01.01.2020")
+            .And.Contain("E-vet'te önceki sahip kaydı: müşteri no 102, hasta no 502")
+            .And.Contain("E-vet'te önceki sahip kaydı: müşteri no 102, hasta no 503");
+        Rows(result, ImportTable.Vaccinations).Select(v => v["HayvanNo"]).Should().Equal("504", "504");
+        result.Warnings.Should().Contain(w => w.Message.Contains("Aynı hayvanın 3 ek kaydı") && w.Message.Contains("3 aynı mikroçiple"));
+    }
+
+    [Fact]
+    public void Ambiguous_Same_Named_Pets_Should_Resolve_By_Life_Span_Then_To_The_Only_Active_One()
+    {
+        object?[] header = ["Kayıt Tarihi", "Müşteriler", "Hastalar", "Protokol No", "Hasta Türü", "Doğum Tarihi", "Ölüm Zamanı", "Durum"];
+        var workbook = ImportTestFiles.Xlsx(
+            ("Müşteri Listesi", [CustomerHeader, [Registered, "Ayşe Yılmaz", 0d, 101, null, null, null, null, null, null, null, null, null, null, "Aktif"]]),
+            ("Hasta Listesi",
+            [
+                header,
+                // Ölmüş eski kedi (kendi dönemi) ve yeni kedi; doğum tarihleri farklı, birleşmez.
+                [new DateTime(2015, 1, 1), "Ayşe Yılmaz", "Pamuk", 801, "Kedi", new DateTime(2014, 3, 3), new DateTime(2020, 1, 1), "Ölü"],
+                [new DateTime(2021, 1, 1), "Ayşe Yılmaz", "Pamuk", 802, "Kedi", new DateTime(2020, 7, 7), null, "Aktif"],
+                // Yanlışlıkla açılıp vefat girilmiş kopya (doğum tarihi yok): o tarihte ikisi de kayıtlı → aktif olana.
+                [new DateTime(2022, 1, 1), "Ayşe Yılmaz", "Pamuk", 803, "Kedi", null, null, "Ölü"],
+            ]),
+            ("Randevu Listesi",
+            [
+                TaskHeader,
+                ["Ayşe Yılmaz", "Pamuk", "Aşılama", new DateTime(2018, 5, 1, 10, 0, 0), "KUDUZ", "Dr. A", null, null, "Tamamlandı"],
+                ["Ayşe Yılmaz", "Pamuk", "Aşılama", new DateTime(2024, 5, 1, 10, 0, 0), "KUDUZ", "Dr. A", null, null, "Tamamlandı"],
+            ]));
+
+        var result = Read(new ImportFileSet(ImportTestFiles.XlsxFile(workbook), null, null, null));
+
+        Rows(result, ImportTable.Vaccinations).Select(v => v["HayvanNo"]).Should().Equal("801", "802");
+    }
+
+    [Fact]
+    public void Group_Without_Active_Record_Should_Merge_Into_Latest_And_Same_Owner_Copy_Into_Active()
+    {
+        object?[] header = ["Kayıt Tarihi", "Müşteriler", "Hastalar", "Protokol No", "Çip No", "Hasta Türü", "Doğum Tarihi", "Ölüm Zamanı", "Durum"];
+        var workbook = ImportTestFiles.Xlsx(
+            ("Müşteri Listesi",
+            [
+                CustomerHeader,
+                [Registered, "Ayşe Yılmaz", 0d, 101, null, null, null, null, null, null, null, null, null, null, "Aktif"],
+                [Registered, "Can Demir", 0d, 102, null, null, null, null, null, null, null, null, null, null, "Aktif"],
+            ]),
+            ("Hasta Listesi",
+            [
+                header,
+                // Aktif kaydı olmayan hayvan: son kayıt hedef, vefat tarihi yok → vefat gelmez.
+                [new DateTime(2020, 1, 1), "Ayşe Yılmaz", "Fıstık", 601, "985000000000088", "Köpek", null, null, "Ölü"],
+                [new DateTime(2023, 1, 1), "Can Demir", "Fıstık", 602, "985000000000088", "Köpek", null, null, "Ölü"],
+                // Aynı sahipte yanlışlıkla açılıp vefat girilmiş kopya (aynı tür + doğum tarihi).
+                [new DateTime(2023, 1, 1), "Ayşe Yılmaz", "Pamuk", 701, null, "Kedi", new DateTime(2019, 5, 5), null, "Aktif"],
+                [new DateTime(2023, 1, 15), "Ayşe Yılmaz", "Pamuk", 702, null, "Kedi", new DateTime(2019, 5, 5), new DateTime(2023, 2, 1), "Ölü"],
+            ]),
+            ("Randevu Listesi",
+            [
+                TaskHeader,
+                ["Ayşe Yılmaz", "Pamuk", "Aşılama", new DateTime(2023, 1, 20, 10, 0, 0), "KUDUZ", "Dr. A", null, null, "Tamamlandı"],
+            ]));
+
+        var result = Read(new ImportFileSet(ImportTestFiles.XlsxFile(workbook), null, null, null));
+
+        var pets = Rows(result, ImportTable.Pets);
+        pets.Select(p => (p["HayvanNo"], p["HayvanAdi"], p["Durum"])).Should().Equal(("602", "Fıstık", null), ("701", "Pamuk", null));
+        pets[0]["Not"].Should().Contain("vefat olarak aktarılmadı").And.Contain("E-vet'te önceki sahip kaydı: müşteri no 101, hasta no 601");
+        pets[1]["Not"].Should().Contain("E-vet'te aynı hayvanın eski kaydı, hasta no 702");
+        Rows(result, ImportTable.Vaccinations).Single()["HayvanNo"].Should().Be("701");
+        result.Warnings.Should().Contain(w => w.Message.Contains("1 aynı mikroçiple; aynı sahipte 1 kopya"));
+    }
+
     // ================================================================ Randevu → aşı / randevu
 
     [Fact]

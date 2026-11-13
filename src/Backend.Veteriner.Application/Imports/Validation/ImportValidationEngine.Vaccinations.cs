@@ -163,7 +163,9 @@ public sealed partial class ImportValidationEngine
         {
             if (!_petByRef.TryGetValue(reference, out var node))
             {
-                issues.Add(ImportRules.PetNotFound.At("HayvanNo", $"'{reference}' numaralı hasta dosyada bulunamadı.", reference));
+                issues.Add(ImportRules.PetNotFound.At("HayvanNo", reference.StartsWith(ImportRules.AmbiguousPetReferencePrefix, StringComparison.Ordinal)
+                    ? $"Aynı sahipte aynı adlı birden çok hasta var (E-vet {reference[ImportRules.AmbiguousPetReferencePrefix.Length..]}); kaydın hangisine ait olduğu ayırt edilemedi."
+                    : $"'{reference}' numaralı hasta dosyada bulunamadı.", reference));
                 return (null, false);
             }
 
@@ -172,7 +174,7 @@ public sealed partial class ImportValidationEngine
 
             if (node.Ref is null)
             {
-                issues.Add(ImportRules.PetRowInvalid.At("HayvanNo", $"Hasta satırı ({node.Row}) hatalı.", reference));
+                issues.Add(ImportRules.PetRowInvalid.At("HayvanNo", $"Hasta aktarılmadı: {node.Reason} (Hastalar satır {node.Row})", reference));
                 return (null, false);
             }
 

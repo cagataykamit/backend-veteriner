@@ -8,6 +8,20 @@ using Backend.Veteriner.Domain.Vaccinations;
 
 namespace Backend.Veteriner.Application.Imports.Specs;
 
+/// <summary>Önizleme toplulaştırması için sorunu olan satır: tablo, doğrulama durumu ve sorunları.</summary>
+public sealed record ImportIssueRow(ImportTable Table, ImportRowValidationStatus Status, string? IssuesJson);
+
+/// <summary>Sorunu olan satırların tablo, durum ve <c>IssuesJson</c> değerleri (önizleme sorun sayıları ve aktarılmayacak nedenleri).</summary>
+public sealed class ImportIssueRowsSpec : Specification<ImportBatchRow, ImportIssueRow>
+{
+    public ImportIssueRowsSpec(Guid batchId)
+    {
+        Query.AsNoTracking();
+        Query.Where(r => r.BatchId == batchId && r.IssuesJson != null);
+        Query.Select(r => new ImportIssueRow(r.Table, r.ValidationStatus, r.IssuesJson));
+    }
+}
+
 /// <summary>Önizleme toplulaştırması için: sorunu olan satırların <c>IssuesJson</c> değerleri (yalnız tek sütun).</summary>
 public sealed class ImportIssuesJsonSpec : Specification<ImportBatchRow, string?>
 {

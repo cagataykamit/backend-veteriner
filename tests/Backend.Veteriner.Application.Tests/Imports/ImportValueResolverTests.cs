@@ -75,7 +75,7 @@ public sealed class ImportValueResolverTests
     private static readonly Guid OrangeWhite = Guid.NewGuid();
     private static readonly Guid BritishShorthair = Guid.NewGuid();
 
-    private static readonly ImportValueResolver Extended = new(new ImportCatalogs(
+    private static readonly ImportCatalogs ExtendedCatalogs = new(
         Species: [new(Dog, "Köpek", "DOG", null), new(Cat, "Kedi", "CAT", null), new(GuineaPig, "Kobay (Gine Domuzu)", "GUINEA_PIG", null), new(Exotic, "Egzotik", "EXOTIC", null), new(Ferret, "Ferret (Gelincik)", "FERRET", null), new(Other, "Diğer", "OTHER", null)],
         Breeds: [new(ScottishFold, "Scottish Fold", null, Cat), new(BritishShorthair, "British Shorthair", null, Cat), new(Setter, "İngiliz Setter", null, Dog), new(Malinois, "Belçika Çoban Köpeği (Malinois)", null, Dog), new(Maltese, "Maltese", null, Dog), new(Husky, "Sibirya Kurdu (Siberian Husky)", null, Dog), new(Dobermann, "Dobermann", null, Dog), new(Vizsla, "Vizsla (Macar Kısa Tüylü Pointer)", null, Dog), new(Brittany, "Epagneul Breton (Brittany)", null, Dog)],
         Colors:
@@ -104,7 +104,9 @@ public sealed class ImportValueResolverTests
             new(Mastitis, "Mastitis", "MASTITIS", null),
             new(Enterotoxemia, "Enterotoksemi", "ENTEROTOXEMIA", null),
             new(Ppr, "Koyun ve Keçi Vebası (PPR)", "PPR", null),
-        ]), []);
+        ]);
+
+    private static readonly ImportValueResolver Extended = new(ExtendedCatalogs, []);
 
     public static TheoryData<string, string> EVetVaccineNames => new()
     {
@@ -325,11 +327,16 @@ public sealed class ImportValueResolverTests
         => Resolver().Resolve(ImportValueKind.Species, source).Should().Be(ImportValueResolution.Empty);
 
     [Fact]
-    public void User_Mapping_Should_Win_Over_Catalog_And_Aliases()
+    public void User_Mapping_Should_Apply_Only_Where_Automatic_Matching_Fails()
     {
-        var resolver = Resolver(new ImportValueMapping("species", "KOPEK", Bird));
+        Resolver(new ImportValueMapping("species", "KOPEK", Bird)).Resolve(ImportValueKind.Species, "Köpek").TargetId.Should().Be(Dog);
 
-        resolver.Resolve(ImportValueKind.Species, "Köpek").TargetId.Should().Be(Bird);
+        // Ekranda "KÖPEK KARMA 1 — 1 satırda" (türü Diğer olan hasta) için "atla": köpekte ve kedide türüne göre eşlenmeye devam eder.
+        var skipOne = new ImportValueResolver(ExtendedCatalogs, [new ImportValueMapping("vaccine", "KÖPEK KARMA 1", null)]);
+        skipOne.Resolve(ImportValueKind.Vaccine, "KÖPEK KARMA 1", Dog).TargetId.Should().Be(MixedDog);
+        skipOne.Resolve(ImportValueKind.Vaccine, "KÖPEK KARMA 1", Cat).TargetId.Should().Be(MixedCat);
+        skipOne.Resolve(ImportValueKind.Vaccine, "KÖPEK KARMA 1", Other).Should().Be(ImportValueResolution.Skipped);
+        Extended.Resolve(ImportValueKind.Vaccine, "KÖPEK KARMA 1", Other).Kind.Should().Be(ImportValueResolutionKind.Unmapped);
     }
 
     [Fact]
