@@ -7,6 +7,7 @@ using Backend.IntegrationTests.Infrastructure;
 using Backend.IntegrationTests.OnlineAppointments;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Application.Waitlist;
 using Backend.Veteriner.Domain.Appointments;
@@ -340,17 +341,22 @@ public sealed class WaitlistIntegrationTests : IClassFixture<CustomWebApplicatio
     /// <summary>İki gün sonrası çarşamba 10:00 (İstanbul); varsayılan çalışma saatleri içinde, teklif penceresi dolmaz.</summary>
     private static DateTime Slot() => OnlineAppointmentTestContext.NextIstanbul(DayOfWeek.Wednesday, 10);
 
-    private static object EntryBody(Guid clinicId, Guid clientId, Guid petId) => new
+    /// <summary>Tarih aralığı İstanbul gününe göre (uygulama "bugün"ü böyle hesaplar; UTC günüyle gece 21:00–24:00 UTC arası test düşerdi).</summary>
+    private static object EntryBody(Guid clinicId, Guid clientId, Guid petId)
     {
-        clinicId,
-        clientId,
-        petId,
-        appointmentType = (int)AppointmentType.Checkup,
-        earliestDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd"),
-        latestDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(20)).ToString("yyyy-MM-dd"),
-        preferredDays = "None",
-        note = "Erken gelmek istiyor",
-    };
+        var today = OperationDayBounds.ToLocalDate(DateTime.UtcNow);
+        return new
+        {
+            clinicId,
+            clientId,
+            petId,
+            appointmentType = (int)AppointmentType.Checkup,
+            earliestDate = today.ToString("yyyy-MM-dd"),
+            latestDate = today.AddDays(20).ToString("yyyy-MM-dd"),
+            preferredDays = "None",
+            note = "Erken gelmek istiyor",
+        };
+    }
 
     private async Task RunProcessorAsync()
     {
