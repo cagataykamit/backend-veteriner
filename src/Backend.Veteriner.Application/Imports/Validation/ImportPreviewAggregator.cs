@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Imports.Contracts.Dtos;
 using Backend.Veteriner.Application.Imports.Mapping;
+using Backend.Veteriner.Domain.Imports;
 
 namespace Backend.Veteriner.Application.Imports.Validation;
 
@@ -69,6 +70,39 @@ public static class ImportPreviewAggregator
             .ToList();
 
         return (unmappedDtos, countDtos);
+    }
+
+    /// <summary>
+    /// Tablo başına aktarılmayacak satırların nedenleri: hatalı satırda ilk hata kodu (<c>Error</c>), hatasız satırda ilk
+    /// atlama kuralı (<see cref="ImportRules.SkipReasons"/>, <c>Skipped</c>). Satır başına bir neden: toplamlar tablo sayacının
+    /// <c>error</c> ve <c>willSkip</c> değerlerine eşittir. Sıra: tablo, tür (atlanan önce), satır sayısı azalan.
+    /// </summary>
+    public static IReadOnlyList<ImportNotImportedReasonDto> NotImportedReasons(
+        IEnumerable<(ImportTable Table, ImportRowValidationStatus Status, string? IssuesJson)> rows)
+    {
+        var skipCodes = ImportRules.SkipReasons.Select(r => r.Code).ToList();
+        var counts = new Dictionary<(ImportTable Table, bool Error, string Code), int>();
+        foreach (var (table, status, json) in rows)
+        {
+            var issues = ImportIssueJson.Parse(json);
+            var error = status == ImportRowValidationStatus.Error;
+            var code = error
+                ? issues.FirstOrDefault(i => i.Severity == ImportIssueSeverity.Error)?.Code
+                : skipCodes.FirstOrDefault(c => issues.Any(i => i.Code == c));
+            if (code is null)
+                continue;
+
+            counts[(table, error, code)] = counts.GetValueOrDefault((table, error, code)) + 1;
+        }
+
+        return counts
+            .OrderBy(kv => kv.Key.Table)
+            .ThenBy(kv => kv.Key.Error)
+            .ThenByDescending(kv => kv.Value)
+            .ThenBy(kv => kv.Key.Code, StringComparer.Ordinal)
+            .Select(kv => new ImportNotImportedReasonDto(
+                ImportCanonicalNames.Key(kv.Key.Table), kv.Key.Error ? "Error" : "Skipped", kv.Key.Code, kv.Value))
+            .ToList();
     }
 
     /// <summary>

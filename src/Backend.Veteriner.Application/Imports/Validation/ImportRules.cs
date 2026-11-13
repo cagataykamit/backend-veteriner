@@ -117,6 +117,9 @@ public static class ImportRules
     public static readonly ImportRule DuplicateVaccination = new("Imports.DuplicateVaccination", ImportIssueSeverity.Info,
         "Aynı hasta, aynı aşı ve aynı uygulama günü için kayıt zaten var; bu satır atlanacak.");
 
+    /// <summary>E-vet dönüştürücüsünün ayırt edemediği hasta bağlantısı (<c>HayvanNo</c>): bu önek + aday protokoller.</summary>
+    public const string AmbiguousPetReferencePrefix = "Belirsiz: ";
+
     // Bağlantılar
     public static readonly ImportRule OwnerlessPetSkipped = new("Imports.OwnerlessPetSkipped", ImportIssueSeverity.Info,
         "Hastanın sahibi yok (eski programda müşteri kartı silinmiş) ve bağlı aşı, muayene ya da randevusu yok; atlanacak.");
@@ -224,6 +227,16 @@ public static class ImportRules
 
     public static ImportRule? Find(string? code)
         => All.FirstOrDefault(r => string.Equals(r.Code, code, StringComparison.Ordinal));
+
+    /// <summary>
+    /// Hatasız satırı bilerek atlatan kurallar (satır <c>Skip</c> eylemi alır): önizlemede "atlanacak" nedeni olarak sayılır
+    /// (IMPORT_API_CONTRACT.md §7.6 <c>notImportedReasons</c>). Sıra öncelik sırasıdır: satırda birden çoğu varsa ilki neden sayılır.
+    /// </summary>
+    public static IReadOnlyList<ImportRule> SkipReasons { get; } =
+    [
+        ValueSkipped, ParentSkipped, OwnerlessPetSkipped, ClinicalRecordEmpty, DuplicateInFile, DuplicateVaccination,
+        DuplicateClinicalRecord, DuplicateAccountEntry, DuplicateAppointment, PastAppointmentSkipped,
+    ];
 }
 
 /// <summary>Satır sorunları listesinin (<c>IssuesJson</c>) serileştirilmesi; tek yer.</summary>

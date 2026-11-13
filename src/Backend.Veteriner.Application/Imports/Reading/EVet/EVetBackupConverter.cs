@@ -941,7 +941,7 @@ internal static class EVetBackupConverter
             if ((alive.Count > 0 ? alive : list).Where(c => c.Active).Select(c => c.Key).Distinct().ToList() is [var onlyActive])
                 return onlyActive;
 
-            return $"Belirsiz: {string.Join(" / ", keys.Select(k => k ?? "?"))}";
+            return ImportRules.AmbiguousPetReferencePrefix + string.Join(" / ", keys.Select(k => k ?? "?"));
         }
     }
 

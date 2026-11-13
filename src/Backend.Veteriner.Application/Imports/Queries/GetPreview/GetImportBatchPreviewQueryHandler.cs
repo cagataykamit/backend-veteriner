@@ -74,15 +74,17 @@ public sealed class GetImportBatchPreviewQueryHandler : IRequestHandler<GetImpor
         {
             return Result<ImportPreviewDto>.Success(new ImportPreviewDto(
                 batch.ValidationId, batch.Status, summary, [], impact,
-                [], false, ImportCommitGate.FileBlockers(batch), PayloadPurged: true));
+                [], false, ImportCommitGate.FileBlockers(batch), PayloadPurged: true, NotImportedReasons: []));
         }
 
-        var issuesJson = await _rows.ListAsync(new ImportIssuesJsonSpec(batch.Id), ct);
-        var (unmapped, issueCounts) = ImportPreviewAggregator.AggregateIssues(issuesJson);
+        var issueRows = await _rows.ListAsync(new ImportIssueRowsSpec(batch.Id), ct);
+        var (unmapped, issueCounts) = ImportPreviewAggregator.AggregateIssues(issueRows.Select(r => r.IssuesJson));
+        var reasons = ImportPreviewAggregator.NotImportedReasons(issueRows.Select(r => (r.Table, r.Status, r.IssuesJson)));
         var blockers = ImportCommitGate.Blockers(batch, unmapped);
         var canCommit = ImportCommitGate.CanCommit(batch, blockers);
 
         return Result<ImportPreviewDto>.Success(new ImportPreviewDto(
-            batch.ValidationId, batch.Status, summary, unmapped, impact, issueCounts, canCommit, blockers, PayloadPurged: false));
+            batch.ValidationId, batch.Status, summary, unmapped, impact, issueCounts, canCommit, blockers, PayloadPurged: false,
+            NotImportedReasons: reasons));
     }
 }

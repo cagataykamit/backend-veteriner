@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Imports.Validation;
+using Backend.Veteriner.Domain.Imports;
 using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Imports;
@@ -32,6 +33,28 @@ public sealed class ImportPreviewAggregatorTests
             ("breed", "Sokak", 1, false),
             ("vaccine", "Süper Aşı", 1, true),
             ("color", "Sarı", 1, false));
+    }
+
+    [Fact]
+    public void Not_Imported_Reasons_Should_Count_One_Reason_Per_Row_By_Table_And_Kind()
+    {
+        const ImportRowValidationStatus valid = ImportRowValidationStatus.Valid;
+        const ImportRowValidationStatus error = ImportRowValidationStatus.Error;
+        var reasons = ImportPreviewAggregator.NotImportedReasons(
+        [
+            (ImportTable.ClinicalRecords, valid, Issues(ImportRules.ClinicalRecordEmpty.At())),
+            (ImportTable.ClinicalRecords, valid, Issues(ImportRules.ClinicalRecordEmpty.At())),
+            (ImportTable.ClinicalRecords, valid, Issues(ImportRules.RecordBeforeBirth.At(), ImportRules.DuplicateClinicalRecord.At())),
+            (ImportTable.ClinicalRecords, error, Issues(ImportRules.RecordBeforeBirth.At(), ImportRules.PetNotFound.At(), ImportRules.DateInFuture.At())),
+            (ImportTable.ClinicalRecords, valid, Issues(ImportRules.RecordBeforeBirth.At())),
+            (ImportTable.Pets, valid, Issues(ImportRules.ValueSkipped.At(), ImportRules.BreedFreeText.At())),
+        ]);
+
+        reasons.Select(r => (r.Table, r.Kind, r.Code, r.RowCount)).Should().Equal(
+            ("pets", "Skipped", "Imports.ValueSkipped", 1),
+            ("clinicalRecords", "Skipped", "Imports.ClinicalRecordEmpty", 2),
+            ("clinicalRecords", "Skipped", "Imports.DuplicateClinicalRecord", 1),
+            ("clinicalRecords", "Error", "Imports.PetNotFound", 1));
     }
 
     [Fact]

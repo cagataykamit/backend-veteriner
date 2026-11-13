@@ -17,7 +17,14 @@ public sealed record ImportPreviewDto(
     IReadOnlyList<ImportIssueCountDto> IssueCounts,
     bool CanCommit,
     IReadOnlyList<string> Blockers,
-    bool PayloadPurged);
+    bool PayloadPurged,
+    IReadOnlyList<ImportNotImportedReasonDto> NotImportedReasons);
+
+/// <summary>
+/// Tablo başına aktarılmayacak satırların nedeni (2026-11-14): <see cref="Kind"/> <c>Skipped</c> (bilerek atlanan: boş, tekrar,
+/// kullanıcının atladığı değer) ya da <c>Error</c>; satır başına bir neden sayılır (atlamada ilk atlama kuralı, hatada ilk hata).
+/// </summary>
+public sealed record ImportNotImportedReasonDto(string Table, string Kind, string Code, int RowCount);
 
 /// <summary>Eşlenemeyen benzersiz kaynak değer; <see cref="Blocking"/> tür/aşı için true (ırk/renk serbest metne düşer).</summary>
 public sealed record ImportUnmappedValueDto(string Kind, string Source, int RowCount, bool Blocking);
