@@ -35,7 +35,7 @@ internal static class EDocumentMappings
             d.CreatedByUserId,
             d.IssuedAtUtc,
             d.CancellableUntilUtc,
-            CanCancel(d, utcNow) && (providers.Find(d.ProviderCode)?.CanCancel(d.Type) ?? true),
+            CanCancelAt(d, providers, utcNow),
             d.Status == EDocumentStatus.Failed,
             d.Status == EDocumentStatus.Failed && !d.HasProviderDocument,
             CanDownloadPdf(d),
@@ -44,9 +44,12 @@ internal static class EDocumentMappings
             d.CancelledAtUtc,
             d.DiscardReason,
             d.LastErrorKind is { } kind ? new EDocumentErrorDto(kind, d.LastErrorMessage ?? string.Empty, d.LastProviderErrorCode) : null,
-            d.AttemptCount);
+            d.AttemptCount,
+            d.BuyerAnswerDueUtc,
+            d.BuyerRejectedAtUtc,
+            d.BuyerRejectionReason);
 
-    public static EDocumentListItemDto ToListItem(this EDocument d, string clientName)
+    public static EDocumentListItemDto ToListItem(this EDocument d, string clientName, IEDocumentProviderResolver providers, DateTime utcNow)
         => new(
             d.Id,
             d.ClinicId,
@@ -60,7 +63,14 @@ internal static class EDocumentMappings
             d.IssuedAtUtc,
             d.Environment == EDocumentEnvironment.Test,
             d.LastErrorMessage,
-            d.Origin);
+            d.Origin,
+            CanCancelAt(d, providers, utcNow),
+            d.BuyerAnswerDueUtc,
+            d.BuyerRejectionReason);
+
+    /// <summary>İptal edilebilir: durum ve süre uygun, entegratör bu türü API'den iptal edebiliyor (Nilvera'da e-Fatura iptali yok).</summary>
+    private static bool CanCancelAt(EDocument d, IEDocumentProviderResolver providers, DateTime utcNow)
+        => CanCancel(d, utcNow) && (providers.Find(d.ProviderCode)?.CanCancel(d.Type) ?? true);
 
     public static bool CanCancel(EDocument d, DateTime utcNow)
         => d.Status is EDocumentStatus.Issued or EDocumentStatus.CancelRejected
@@ -68,5 +78,6 @@ internal static class EDocumentMappings
 
     public static bool CanDownloadPdf(EDocument d)
         => d.HasProviderDocument
-           && d.Status is EDocumentStatus.Issued or EDocumentStatus.CancelRequested or EDocumentStatus.CancelRejected or EDocumentStatus.Cancelled;
+           && d.Status is EDocumentStatus.Issued or EDocumentStatus.CancelRequested or EDocumentStatus.CancelRejected or EDocumentStatus.Cancelled
+               or EDocumentStatus.RejectedByBuyer;
 }

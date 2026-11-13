@@ -59,6 +59,7 @@ public sealed class EDocumentConfiguration : IEntityTypeConfiguration<EDocument>
         b.Property(x => x.UpdatedAtUtc);
         b.Property(x => x.CancelReason).HasMaxLength(EDocumentRules.MaxReasonLength);
         b.Property(x => x.DiscardReason).HasMaxLength(EDocumentRules.MaxReasonLength);
+        b.Property(x => x.BuyerRejectionReason).HasMaxLength(EDocumentRules.MaxReasonLength);
 
         b.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
 

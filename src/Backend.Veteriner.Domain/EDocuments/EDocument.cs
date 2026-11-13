@@ -91,6 +91,15 @@ public sealed class EDocument : AggregateRoot, IClinicScoped, ITenantOwned
     public DateTime? CancelRequestedAtUtc { get; private set; }
     public DateTime? CancelledAtUtc { get; private set; }
 
+    /// <summary>
+    /// Ticari e-Faturada alıcı yanıtı bu ana kadar beklenir (arka plan işi sorar); <c>null</c> = beklenen yanıt yok
+    /// (temel senaryo, e-Arşiv, e-SMM ya da yanıt geldi / süre doldu).
+    /// </summary>
+    public DateTime? BuyerAnswerDueUtc { get; private set; }
+
+    public DateTime? BuyerRejectedAtUtc { get; private set; }
+    public string? BuyerRejectionReason { get; private set; }
+
     public string? DiscardReason { get; private set; }
     public Guid? DiscardedByUserId { get; private set; }
     public DateTime? DiscardedAtUtc { get; private set; }
@@ -98,7 +107,10 @@ public sealed class EDocument : AggregateRoot, IClinicScoped, ITenantOwned
     public byte[] RowVersion { get; private set; } = default!;
 
     /// <summary>Belge ücretleri tutuyor mu: iptal edilen ve vazgeçilen belge ücretleri serbest bırakır.</summary>
-    public bool HoldsCharges => Status is not (EDocumentStatus.Discarded or EDocumentStatus.Cancelled);
+    public bool HoldsCharges => Status is not (EDocumentStatus.Discarded or EDocumentStatus.Cancelled or EDocumentStatus.RejectedByBuyer);
+
+    /// <summary>Kesilmiş belge alıcının kabul / red yanıtını bekliyor mu.</summary>
+    public bool AwaitsBuyerAnswer => Status == EDocumentStatus.Issued && BuyerAnswerDueUtc is not null;
 
     public DateTime? CancellableUntilUtc => IssuedAtUtc?.AddDays(EDocumentRules.CancelWindowDays);
 
@@ -324,6 +336,56 @@ public sealed class EDocument : AggregateRoot, IClinicScoped, ITenantOwned
         CancelledAtUtc = utcNow;
         NextCheckAtUtc = null;
         ClearError();
+        UpdatedAtUtc = utcNow;
+        return Result.Success();
+    }
+
+    /// <summary>Kesilen ticari e-Fatura alıcı yanıtını bekler; arka plan işi <paramref name="nextCheckAtUtc"/> zamanında sorar.</summary>
+    public Result AwaitBuyerAnswer(DateTime dueUtc, DateTime nextCheckAtUtc, DateTime utcNow)
+    {
+        if (Status != EDocumentStatus.Issued)
+            return InvalidState("Yalnız kesilmiş belge alıcı yanıtı bekleyebilir.");
+
+        BuyerAnswerDueUtc = dueUtc;
+        NextCheckAtUtc = nextCheckAtUtc;
+        UpdatedAtUtc = utcNow;
+        return Result.Success();
+    }
+
+    /// <summary>Yanıt henüz yok (veya sorulamadı): bir sonraki soruş zamanı.</summary>
+    public Result PostponeBuyerAnswerCheck(DateTime nextCheckAtUtc, DateTime utcNow)
+    {
+        if (!AwaitsBuyerAnswer)
+            return InvalidState("Belge alıcı yanıtı beklemiyor.");
+
+        NextCheckAtUtc = nextCheckAtUtc;
+        UpdatedAtUtc = utcNow;
+        return Result.Success();
+    }
+
+    /// <summary>Alıcı kabul etti ya da yanıt süresi doldu: belge kesilmiş kalır, beklenen yanıt yok.</summary>
+    public Result CloseBuyerAnswer(DateTime utcNow)
+    {
+        if (!AwaitsBuyerAnswer)
+            return InvalidState("Belge alıcı yanıtı beklemiyor.");
+
+        BuyerAnswerDueUtc = null;
+        NextCheckAtUtc = null;
+        UpdatedAtUtc = utcNow;
+        return Result.Success();
+    }
+
+    /// <summary>Alıcı ticari e-Faturayı reddetti: belge geçersiz, ücretler serbest kalır (çağıran bağı çözer).</summary>
+    public Result MarkRejectedByBuyer(string? reason, DateTime utcNow)
+    {
+        if (!AwaitsBuyerAnswer)
+            return InvalidState("Yalnız alıcı yanıtı bekleyen belge reddedilmiş olarak işaretlenebilir.");
+
+        Status = EDocumentStatus.RejectedByBuyer;
+        BuyerRejectedAtUtc = utcNow;
+        BuyerRejectionReason = TrimOptional(reason, EDocumentRules.MaxReasonLength);
+        BuyerAnswerDueUtc = null;
+        NextCheckAtUtc = null;
         UpdatedAtUtc = utcNow;
         return Result.Success();
     }

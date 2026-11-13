@@ -54,6 +54,7 @@ Draft → Sending → Issued
             ↘ Failed → (discard) → Discarded
 Issued → CancelRequested → Cancelled
                          ↘ CancelRejected → (cancel tekrar) → CancelRequested
+Issued (ticari e-Fatura, alıcı yanıtı bekleniyor) → RejectedByBuyer   (yalnız alıcı reddederse)
 ```
 
 | Durum | Anlamı | Ücretler bağlı mı |
@@ -66,6 +67,9 @@ Issued → CancelRequested → Cancelled
 | `CancelRequested` | İptal sağlayıcıya iletiliyor | Evet |
 | `Cancelled` | İptal edildi | **Hayır** |
 | `CancelRejected` | Sağlayıcı iptali reddetti; belge kesilmiş kalır | Evet |
+| `RejectedByBuyer` | Ticari e-Fatura alıcı tarafından reddedildi; belge geçersiz, düzeltilip yeni belge kesilir | **Hayır** (ücretler serbest) |
+
+**Ticari e-Fatura alıcı yanıtı:** e-Fatura ticari senaryoyla (`TICARIFATURA`, Nilvera) kesilince belge `Issued` olur ve `buyerAnswerDueUtc` (kesim + `EDocumentRules.BuyerAnswerWindowDays` = 8 gün; kaynaklar 7 / 8 diyor, DOĞRULANMADI) dolar; arka plan işi alıcı yanıtını saatte bir sorar. Kabul (ya da süre + 1 gün dolunca yanıt yok) → `buyerAnswerDueUtc` boşalır, belge kesilmiş kalır. Red → `RejectedByBuyer`, `buyerRejectedAtUtc`, `buyerRejectionReason` (alıcının notu), ücretler serbest kalır ve yeniden belgelenebilir, `EDocuments.Issue` iznine bildirim (§4.11). Temel senaryo, e-Arşiv ve e-SMM'de yanıt beklenmez.
 
 - Kesilmiş belge değiştirilmez; düzeltme = iptal + yeni belge (iptal süresi içinde).
 - Belgeye bağlı ücret **düzeltilemez ve iptal edilemez** (`Charges.EDocumentAttached`, 409): önce belge iptal edilir (ADR-036 "belge iptali önerilir").
@@ -212,7 +216,7 @@ Yanıt:
 
 ### 4.3 Liste — `GET /e-documents`
 
-Sorgu: `clinicId`, `clientId`, `status`, `documentType`, `fromUtc`, `toUtc`, `page` (1), `pageSize` (20, en çok 100). Yanıt standart sayfalı zarf `{ items: EDocumentListItemDto[], page, pageSize, totalItems, totalPages }`; sıralama oluşturma zamanı azalan. Liste öğesi: `id, clinicId, clientId, clientName, documentType, status, documentNumber, totalAmount, createdAtUtc, issuedAtUtc, isTest, lastErrorMessage`.
+Sorgu: `clinicId`, `clientId`, `status`, `documentType`, `fromUtc`, `toUtc`, `page` (1), `pageSize` (20, en çok 100). Yanıt standart sayfalı zarf `{ items: EDocumentListItemDto[], page, pageSize, totalItems, totalPages }`; sıralama oluşturma zamanı azalan. Liste öğesi: `id, clinicId, clientId, clientName, documentType, status, documentNumber, totalAmount, createdAtUtc, issuedAtUtc, isTest, lastErrorMessage, canCancel, buyerAnswerDueUtc, buyerRejectionReason` (`canCancel` detaydaki kuralla aynı; panel iptal düğmesini buna göre gösterir).
 
 ### 4.4 Detay — `GET /e-documents/{id}`
 
@@ -285,6 +289,7 @@ Bağlı her klinikte `endOfDayTime`'da (ayar yoksa 23:00, otomatik kapalı olsa 
 |---|---|---|---|
 | `EDocumentsAutoIssuePaused` (9) | Kliniğe erişen, `Clinics.Update` izni olanlar (sürdürebilenler) | `targetType: "EDocumentSettings"`, `targetId` = klinik | Otomatik kesme kalıcı sorunla durdu (§6); durma başına bir kez |
 | `EDocumentPaymentVoided` (10) | Kliniğe erişen, `EDocuments.Cancel` izni olanlar | `targetType: "EDocument"`, `targetId` = belge | Belgeli ücretin ödemesi iptal edildi; belge **kendiliğinden iptal edilmez** ("Tahsilat gerçekten geri verildiyse belgeyi iptal edin") |
+| `EDocumentRejectedByBuyer` (11) | Kliniğe erişen, `EDocuments.Issue` izni olanlar | `targetType: "EDocument"`, `targetId` = belge | Ticari e-Fatura alıcı tarafından reddedildi (gerekçeyle); ücretler yeniden belgelenebilir |
 
 Ödeme iptali (`POST /payments/{id}/void`) bildirimi ödeme iptaliyle aynı kayıtta yazar; `Failed` / `Discarded` / `Cancelled` belge için bildirim yok.
 
@@ -295,7 +300,7 @@ Bağlı her klinikte `endOfDayTime`'da (ayar yoksa 23:00, otomatik kapalı olsa 
 - Paraşüt akışı: alıcı cari (`contacts`, vergi no ile aranır, yoksa oluşturulur) → satır ürünü (`products`; Paraşüt satırda ürün/hizmet ister; satır açıklamasından türetilen sabit kodla `VTN-…` aranır, yoksa oluşturulur) → satış faturası (`sales_invoices`, `external_reference_key` = belgenin dış referansı; tekrarında mevcut fatura kullanılır) → e-SMM (`e_smms`, eşzamanlı) / e-Arşiv (`e_archives`) / e-Fatura (`e_invoices`, `scenario: basic`, `to` = gelen kutusu adresi) → iş takibi (`trackable_jobs`) → `active_e_document`. İptal `DELETE sales_invoices/{id}/cancel`. PDF `…/{id}/pdf` (adres süreli, saklanmaz).
 - Nilvera akışı (V1, `developer.nilvera.com`; şemalar `apitest.nilvera.com/{servis}/swagger/v1/swagger.json`, 2026-11-12 okundu). Kimlik `Authorization: Bearer {API anahtarı}`; servisler `earchive`, `einvoice`, `evoucher` (e-SMM; `esmm` değil), `general`.
   - Seri: `GET /{servis}/Series`; varsayılan ve etkin seri, yoksa ilk etkin seri (e-Arşiv'de seri zorunlu). Etkin seri yoksa `InvalidData` ("Nilvera portalında seri tanımlayın").
-  - Gönderim: `POST /{servis}/Send/Model`; gövde e-Arşiv `{ArchiveInvoice:{InvoiceInfo, CustomerInfo, InvoiceLines, Notes}}`, e-Fatura `{EInvoice:{…}, CustomerAlias}` (`InvoiceProfile: TEMELFATURA`), e-SMM `{Voucher:{VoucherInfo, CustomerInfo, VoucherLines, Notes}}`. **ETTN (`UUID`) = belgenin dış referansı**; satıcı (`CompanyInfo`) gönderilmez, Nilvera aktif firmayı doldurur. Satırlar KDV hariç birim fiyat, birim kodu UN/ECE (`C62` adet…); belge toplamları (`LineExtensionAmount`, `KdvTotal`, `GeneralKDV{oran}Total`, `PayableAmount`) gönderilir. e-SMM satırında miktar yok: `GrossWage` = satır tutarı, gelir vergisi stopajı `GVWithholdingPercent` / `GVWithholdingTotal`.
+  - Gönderim: `POST /{servis}/Send/Model`; gövde e-Arşiv `{ArchiveInvoice:{InvoiceInfo, CustomerInfo, InvoiceLines, Notes}}`, e-Fatura `{EInvoice:{…}, CustomerAlias}` (`InvoiceProfile: TICARIFATURA` — ticari senaryo, 2026-11-13; alıcı yanıtı `GET /einvoice/Sale/{ETTN}/Status` → `Answer.AnswerCode`: `approved` / `documentAnsweredAutomatically` kabul, `rejected` red (`AnswerNote`), `waitingForApproval` / `unknown` / boş bekliyor; yanıtta `InvoiceProfile` temelse yanıt beklenmez), e-SMM `{Voucher:{VoucherInfo, CustomerInfo, VoucherLines, Notes}}`. **ETTN (`UUID`) = belgenin dış referansı**; satıcı (`CompanyInfo`) gönderilmez, Nilvera aktif firmayı doldurur. Satırlar KDV hariç birim fiyat, birim kodu UN/ECE (`C62` adet…); belge toplamları (`LineExtensionAmount`, `KdvTotal`, `GeneralKDV{oran}Total`, `PayableAmount`) gönderilir. e-SMM satırında miktar yok: `GrossWage` = satır tutarı, gelir vergisi stopajı `GVWithholdingPercent` / `GVWithholdingTotal`.
   - Tekrar koruması: aynı ETTN ikinci kez `409` döner → durum sorgulanır; belge varsa oradan devam edilir, yoksa (başka bir 409, ör. VKN uyuşmazlığı) hata gösterilir. **Test ortamında doğrulandı (2026-11-12):** kesilmiş belgenin yanıtı kaybolmuş gibi bırakılıp aynı ETTN yeniden gönderildi → `409 {Errors:[{Code:1001,"ETTN Numarası Sistemde Kayıtlıdır."}]}` → belge aynı numarayla eşlendi; Nilvera'da o ETTN'den tek belge var.
   - Durum: `GET /earchive/Invoices/{ETTN}/Status`, `/evoucher/Vouchers/{ETTN}/Status` (`StatusCode: unknown|waiting|succeed|error`), `/einvoice/Sale/{ETTN}/Status` (`InvoiceStatus.Code`, `Answer.AnswerCode: rejected` → hata). e-Arşiv / e-SMM'de bu durum belgenin değil **GİB raporunun** durumudur: kesilen belge rapor oluşana dek `unknown` / "Rapor Oluşturulmadı" kalır (test ortamında görüldü, 2026-11-12). Bu yüzden e-Arşiv / e-SMM'de durum `error` değilse `…/Details` okunur; numara (`InvoiceNumber` / `VoucherNumber`) varsa belge `Issued` (tutar `InvoiceAmount` / `VoucherAmount`). e-Fatura'da `succeed` beklenir. Bildirim yok; durum arka plan işiyle sorgulanır (§2).
   - İptal: `PUT /earchive/Invoices/{ETTN}/Cancel`, `PUT /evoucher/Vouchers/{ETTN}/Cancel`; 422 2026/2034 (zaten iptal) başarı, 2028/2029/2036/2037 (kuyrukta / sonra dene) yeniden denenir. **e-Fatura iptali Nilvera API'sinde yok:** sağlayıcı yeteneği `CanCancel(EInvoice) = false` → belge `canCancel: false`, iptal ucu `EDocuments.CancelUnsupported` (409) ile baştan reddeder, belge kesilmiş kalır (kullanıcı alıcıyla iade faturası veya GİB portalı üzerinden işlem yapar).
@@ -343,6 +348,7 @@ Veritabanı (canlıda `__EFMigrationsHistory` kontrol edilip eksikler sırayla u
 | `20261111002331_AddEDocumentAutomation` | klinik e-Belge ayarı, belge kaynağı (main'de; canlıda uygulanmadıysa) |
 | `20261112112342_AddEDocumentAutoIssuePause` | ayarda durdurma anı ve nedeni (bu dal) |
 | `20261112120019_AddChargeFullyPaidAt` | `Charges.FullyPaidAtUtc` + mevcut kapalı ücretleri doldurma + koşullu indeks (bu dal; `Charges` tablosunu bir kez günceller) |
+| `20261113150526_AddEDocumentBuyerAnswer` | `EDocuments.BuyerAnswerDueUtc`, `BuyerRejectedAtUtc`, `BuyerRejectionReason` (ticari e-Fatura alıcı yanıtı; bu dal) |
 
 **Entegratör:** canlıya yalnız Nilvera ile çıkılır (kullanıcı kararı 2026-11-13). Paraşüt kodu durur, `EDocuments:Parasut:Enabled = false` (appsettings.json) ile kapalıdır: `availableProviders` listesinde görünmez, bağlanılamaz. Açmak için `Enabled: true` ve canlı Paraşüt uygulama kimliği gerekir. Yapılandırılmamış / kapalı entegratör listede hiç gösterilmez (§3.1).
 

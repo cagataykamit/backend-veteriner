@@ -32,7 +32,9 @@ public sealed class EDocumentsDueForCheckSpec : Specification<EDocument, EDocume
     public EDocumentsDueForCheckSpec(DateTime utcNow, int take)
     {
         Query.AsNoTracking();
-        Query.Where(d => (d.Status == EDocumentStatus.Sending || d.Status == EDocumentStatus.CancelRequested)
+        // Gönderilen / iptali istenen belgeler ve alıcı yanıtı beklenen kesilmiş ticari e-Faturalar.
+        Query.Where(d => (d.Status == EDocumentStatus.Sending || d.Status == EDocumentStatus.CancelRequested
+                          || (d.Status == EDocumentStatus.Issued && d.BuyerAnswerDueUtc != null))
                          && d.NextCheckAtUtc != null && d.NextCheckAtUtc <= utcNow);
         Query.OrderBy(d => d.NextCheckAtUtc).Take(take);
         Query.Select(d => new EDocumentDueItem(d.Id, d.TenantId));

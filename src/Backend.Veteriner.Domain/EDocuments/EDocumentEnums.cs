@@ -18,7 +18,10 @@ public enum EDocumentStatus
     Discarded = 4,
     CancelRequested = 5,
     Cancelled = 6,
-    CancelRejected = 7
+    CancelRejected = 7,
+
+    /// <summary>Ticari e-Fatura alıcı tarafından reddedildi; belge geçersiz, ücretler serbest (yeniden belgelenebilir).</summary>
+    RejectedByBuyer = 8
 }
 
 /// <summary>Sağlayıcı hatasının sınıfı; adaptör çevirir, kullanıcıya Türkçe metinle döner.</summary>

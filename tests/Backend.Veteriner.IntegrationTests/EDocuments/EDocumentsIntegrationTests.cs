@@ -196,6 +196,45 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
     }
 
     [Fact]
+    public async Task Commercial_EInvoice_Rejected_By_Buyer_Should_Free_Charges_And_Notify()
+    {
+        var ctx = await SeedAsync();
+        _provider.CommercialEInvoice = true;
+        var corporate = await ctx.CreateClientAsync(new { personType = "Corporate", taxNumber = EInvoiceVkn, taxOffice = "Kadıköy", legalName = "Örnek Ltd." });
+        var rejectedCharge = await ctx.ChargeAsync(corporate, 500m, "Product");
+        var acceptedCharge = await ctx.ChargeAsync(corporate, 200m, "Product");
+
+        var first = await ctx.PostAsync("/api/v1/e-documents", new { requestId = Guid.NewGuid(), clinicId = ctx.ClinicId, chargeIds = new[] { rejectedCharge } });
+        var firstId = first.GetProperty("id").GetGuid();
+        var issued = await ctx.PostAsync($"/api/v1/e-documents/{firstId}/refresh", new { });
+        issued.GetProperty("status").GetString().Should().Be("Issued");
+        issued.GetProperty("buyerAnswerDueUtc").ValueKind.Should().Be(JsonValueKind.String, "ticari e-Faturada alıcı yanıtı beklenir");
+
+        _provider.BuyerAnswer = new ProviderBuyerAnswer(ProviderBuyerAnswerState.Rejected, "Fiyat hatalı");
+        var rejected = await ctx.PostAsync($"/api/v1/e-documents/{firstId}/refresh", new { });
+        rejected.GetProperty("status").GetString().Should().Be("RejectedByBuyer");
+        rejected.GetProperty("buyerRejectionReason").GetString().Should().Be("Fiyat hatalı");
+        rejected.GetProperty("canCancel").GetBoolean().Should().BeFalse();
+        (await ctx.GetAsync($"/api/v1/charges/{rejectedCharge}")).GetProperty("eDocumentId").ValueKind
+            .Should().Be(JsonValueKind.Null, "reddedilen faturanın ücreti yeniden belgelenebilir");
+
+        _provider.BuyerAnswer = ProviderBuyerAnswer.Accepted;
+        var second = await ctx.PostAsync("/api/v1/e-documents", new { requestId = Guid.NewGuid(), clinicId = ctx.ClinicId, chargeIds = new[] { acceptedCharge } });
+        var secondId = second.GetProperty("id").GetGuid();
+        await ctx.PostAsync($"/api/v1/e-documents/{secondId}/refresh", new { });
+        var accepted = await ctx.PostAsync($"/api/v1/e-documents/{secondId}/refresh", new { });
+        accepted.GetProperty("status").GetString().Should().Be("Issued");
+        accepted.GetProperty("buyerAnswerDueUtc").ValueKind.Should().Be(JsonValueKind.Null, "kabul edildi, yanıt beklenmiyor");
+
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var notice = await db.UserNotifications.AsNoTracking().SingleAsync(n =>
+            n.UserId == ctx.UserId && n.Type == Backend.Veteriner.Domain.Notifications.UserNotificationType.EDocumentRejectedByBuyer);
+        notice.TargetId.Should().Be(firstId);
+        notice.Body.Should().Contain("Fiyat hatalı");
+    }
+
+    [Fact]
     public async Task EInvoice_Of_Provider_Without_EInvoice_Cancel_Should_Not_Offer_Or_Start_Cancel()
     {
         var ctx = await SeedAsync();
@@ -616,6 +655,9 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
 
         public bool CanCancel(EDocumentType type) => true;
 
+        public Task<ProviderResult<ProviderBuyerAnswer>> GetBuyerAnswerAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct)
+            => throw new NotSupportedException();
+
         public Task<ProviderResult<ProviderCancelOutcome>> CancelAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct)
             => throw new NotSupportedException();
 
@@ -636,6 +678,9 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
         public bool IsConfigured => false;
         public EDocumentEnvironment Environment => EDocumentEnvironment.Test;
         public bool CanCancel(EDocumentType type) => true;
+
+        public Task<ProviderResult<ProviderBuyerAnswer>> GetBuyerAnswerAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct)
+            => throw new NotSupportedException();
 
         public Task<ProviderResult<ProviderAccountCheck>> VerifyAsync(EDocumentProviderAccount account, CancellationToken ct) => throw new NotSupportedException();
         public Task<ProviderResult<string?>> FindEInvoiceRecipientAsync(EDocumentProviderAccount account, string taxNumber, CancellationToken ct) => throw new NotSupportedException();
@@ -659,6 +704,15 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
         public bool CancelsEInvoice { get; set; } = true;
 
         public bool CanCancel(EDocumentType type) => type != EDocumentType.EInvoice || CancelsEInvoice;
+
+        /// <summary>Ticari e-Fatura yanıtı: testler ayarlar (varsayılan bekliyor).</summary>
+        public ProviderBuyerAnswer BuyerAnswer { get; set; } = ProviderBuyerAnswer.Pending;
+
+        /// <summary>e-Fatura kesimi ticari senaryo gibi alıcı yanıtı beklesin mi.</summary>
+        public bool CommercialEInvoice { get; set; }
+
+        public Task<ProviderResult<ProviderBuyerAnswer>> GetBuyerAnswerAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct)
+            => Task.FromResult(ProviderResult<ProviderBuyerAnswer>.Ok(BuyerAnswer));
 
         public string ProviderCode => Code;
         public string DisplayName => "Sahte Sağlayıcı";
@@ -688,7 +742,9 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
 
         public Task<ProviderResult<ProviderIssueOutcome>> CheckAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct)
             => Task.FromResult(ProviderResult<ProviderIssueOutcome>.Ok(
-                new ProviderIssueOutcome(ProviderIssueState.Issued, refs.ProviderInvoiceId, "arc-1", null, "ARC-1", "uuid-2", 300m)));
+                new ProviderIssueOutcome(
+                    ProviderIssueState.Issued, refs.ProviderInvoiceId, "arc-1", null, "ARC-1", "uuid-2", 300m,
+                    CommercialEInvoice && refs.Type == EDocumentType.EInvoice)));
 
         public Task<ProviderResult<ProviderCancelOutcome>> CancelAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct)
             => Task.FromResult(ProviderResult<ProviderCancelOutcome>.Ok(new ProviderCancelOutcome(ProviderCancelState.Cancelled)));
