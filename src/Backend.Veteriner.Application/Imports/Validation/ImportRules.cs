@@ -50,8 +50,10 @@ public static class ImportRules
         "Tarih biçimi belirsiz (iki haneli yıl, yalnız ay/yıl veya ay adı kabul edilmez). Beklenen biçim: gg.aa.yyyy.");
     public static readonly ImportRule DateOutOfRange = new("Imports.DateOutOfRange", ImportIssueSeverity.Error,
         "Tarih 01.01.1990'dan eski olamaz.");
-    public static readonly ImportRule BirthDateInFuture = new("Pets.BirthDateInFuture", ImportIssueSeverity.Error,
-        "Doğum tarihi gelecekte olamaz.");
+    public static readonly ImportRule BirthDateInFuture = new("Pets.BirthDateInFuture", ImportIssueSeverity.Warning,
+        "Doğum tarihi gelecekte; hasta doğum tarihsiz aktarılacak.");
+    public static readonly ImportRule BirthDateIgnored = new("Imports.BirthDateIgnored", ImportIssueSeverity.Warning,
+        "Doğum tarihi okunamadı; hasta doğum tarihsiz aktarılacak.");
     public static readonly ImportRule BirthDateImplausible = new("Imports.BirthDateImplausible", ImportIssueSeverity.Warning,
         "Doğum tarihi 40 yıldan eski; lütfen kontrol edin.");
     public static readonly ImportRule AppliedAtInFuture = new("Vaccinations.AppliedAtMustNotBeFuture", ImportIssueSeverity.Error,
@@ -64,10 +66,10 @@ public static class ImportRules
         "Uygulama tarihi hastanın doğum tarihinden önce.");
 
     // Mikroçip (K10)
-    public static readonly ImportRule MicrochipInvalid = new("Imports.MicrochipInvalid", ImportIssueSeverity.Error,
-        "Mikroçip yalnız rakamlardan oluşmalıdır (en çok 50 hane).");
-    public static readonly ImportRule MicrochipScientificNotation = new("Imports.MicrochipScientificNotation", ImportIssueSeverity.Error,
-        "Mikroçip bilimsel gösterimde (örn. 9,85121E+14); Excel basamakları kaybetmiş olabilir. Hücreyi metin biçimine çevirip yeniden girin.");
+    public static readonly ImportRule MicrochipInvalid = new("Imports.MicrochipInvalid", ImportIssueSeverity.Warning,
+        "Mikroçip yalnız rakamlardan oluşmalıdır (en çok 50 hane); numara hastanın notuna yazılacak.");
+    public static readonly ImportRule MicrochipScientificNotation = new("Imports.MicrochipScientificNotation", ImportIssueSeverity.Warning,
+        "Mikroçip bilimsel gösterimde (örn. 9,85121E+14); Excel basamakları kaybetmiş olabilir. Hasta mikroçipsiz aktarılacak, okunan değer notuna yazılacak; hücreyi metin biçimine çevirip yeniden yükleyebilirsiniz.");
     public static readonly ImportRule MicrochipLength = new("Imports.MicrochipLength", ImportIssueSeverity.Warning,
         "Mikroçip 15 haneli değil (eski çip olabilir).");
     public static readonly ImportRule MicrochipConflict = new("Imports.MicrochipConflict", ImportIssueSeverity.Error,
@@ -86,8 +88,8 @@ public static class ImportRules
         "Irk katalogda bulunamadı; serbest metin olarak aktarılacak.");
     public static readonly ImportRule ColorFreeText = new("Imports.ColorFreeText", ImportIssueSeverity.Info,
         "Renk katalogda bulunamadı; nota eklenecek.");
-    public static readonly ImportRule BreedSpeciesMismatch = new("Pets.BreedSpeciesMismatch", ImportIssueSeverity.Error,
-        "Eşlenen ırk bu hayvan türüne ait değil.");
+    public static readonly ImportRule BreedSpeciesMismatch = new("Pets.BreedSpeciesMismatch", ImportIssueSeverity.Warning,
+        "Eşlenen ırk bu hayvan türüne ait değil; ırk metin olarak aktarılacak.");
     public static readonly ImportRule VaccineInvalidSpecies = new("VaccineDefinitions.InvalidSpecies", ImportIssueSeverity.Error,
         "Eşlenen aşı tanımı hayvan türü ile uyumlu değil.");
 
@@ -119,11 +121,11 @@ public static class ImportRules
     public static readonly ImportRule OwnerNotFound = new("Imports.OwnerNotFound", ImportIssueSeverity.Error,
         "Hastanın sahibi dosyada veya kayıtlı müşterilerde bulunamadı.");
     public static readonly ImportRule OwnerRowInvalid = new("Imports.OwnerRowInvalid", ImportIssueSeverity.Error,
-        "Sahip müşteri satırı hatalı olduğu için bu satır aktarılamaz.");
+        "Sahip müşteri aktarılamadığı için bu satır aktarılamaz.");
     public static readonly ImportRule PetNotFound = new("Imports.PetNotFound", ImportIssueSeverity.Error,
         "Satırın hastası dosyada veya kayıtlı hastalarda bulunamadı.");
     public static readonly ImportRule PetRowInvalid = new("Imports.PetRowInvalid", ImportIssueSeverity.Error,
-        "Hasta satırı hatalı olduğu için bu satır aktarılamaz.");
+        "Hasta aktarılamadığı için bu satır aktarılamaz.");
 
     // Açık bakiye (müşteri; ADR-048 T3)
     public static readonly ImportRule AmountInvalid = new("Imports.AmountInvalid", ImportIssueSeverity.Warning,

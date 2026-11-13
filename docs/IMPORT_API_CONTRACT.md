@@ -328,14 +328,15 @@ Kural kodları, önem dereceleri ve varsayılan mesajlar kodda **tek yerde** tan
 | `Imports.DateInvalid` | Error | Tarih ayrıştırılamadı veya takvimde yok (`31.02.2024`). |
 | `Imports.DateFormatAmbiguous` | Error | Biçim belirsiz ve reddedilen sınıfta: iki haneli yıl, yalnız ay/yıl, ay adı (bölüm 4.4). |
 | `Imports.DateOutOfRange` | Error | Uygulama tarihi 1990-01-01'den eski. |
-| `Pets.BirthDateInFuture` | Error | Doğum tarihi bugünden (İstanbul takvim günü) sonra. |
+| `Pets.BirthDateInFuture` | Warning | Doğum tarihi bugünden (İstanbul takvim günü) sonra; hasta doğum tarihsiz aktarılır (2026-11-14; önce Error: hasta ve bağlı geçmişi düşüyordu). |
 | `Imports.BirthDateImplausible` | Warning | Doğum tarihi 40 yıldan eski (aktarılır). |
+| `Imports.BirthDateIgnored` | Warning | Hasta doğum tarihi okunamadı (geçersiz ya da belirsiz biçim; mesaj tarih kuralının açıklamasını taşır); hasta doğum tarihsiz aktarılır (2026-11-14). |
 | `Vaccinations.AppliedAtMustNotBeFuture` | Error | Uygulama tarihi bugünden sonra. |
 | `Vaccinations.DueAtMustBeAfterAppliedAt` | Error | Sonraki aşı tarihi uygulama tarihinden sonra değil. |
 | `Vaccinations.DueTooFarInFuture` | Error | Sonraki aşı tarihi bugünden 5 yıl ötede (geçmiş sınırı yok). |
 | `Imports.AppliedBeforeBirth` | Warning | Uygulama tarihi hastanın doğum tarihinden önce (dosyadaki veya mevcut hasta). |
-| `Imports.MicrochipInvalid` | Error | Boşluk/`-`/`.` temizlendikten sonra rakam dışı karakter var veya > 50 hane. |
-| `Imports.MicrochipScientificNotation` | Error | Değer bilimsel gösterimde (`9,85121E+14`); hücreyi metin yapın. |
+| `Imports.MicrochipInvalid` | Warning | Boşluk/`-`/`.` temizlendikten sonra rakam dışı karakter var veya > 50 hane; hasta mikroçipsiz aktarılır, değer notuna `Mikroçip (okunamadı): …` olarak yazılır (2026-11-14; önce Error). |
+| `Imports.MicrochipScientificNotation` | Warning | Değer bilimsel gösterimde (`9,85121E+14`); hasta mikroçipsiz aktarılır, değer notuna yazılır; doğru numara için hücreyi metin yapıp yeniden yükleyin (2026-11-14; önce Error). |
 | `Imports.MicrochipLength` | Warning | Çip 15 hane değil (eski çip olabilir). |
 | `Imports.MicrochipConflict` | Error | Aynı çip dosyada önceki başka hayvanda **veya** kiracıda başka bir hayvanda `[K10]`; mesaj çakışan satırı/kaydı belirtir. Aynı hayvanın tekrarı (hasta mükerrer kuralı) çakışma sayılmaz. |
 | `Imports.SpeciesUnmapped` / `Imports.VaccineUnmapped` | Error | Tür/aşı adı katalogda yok ve kullanıcı eşlememiş `[K6]`; `value` kaynak değer. Yeni tanım oluşmaz. |
@@ -343,7 +344,7 @@ Kural kodları, önem dereceleri ve varsayılan mesajlar kodda **tek yerde** tan
 | `Imports.ParentSkipped` | Warning | Bağlı üst satır (hasta) bilinçli atlandığı için satır da atlanır. |
 | `Imports.BreedFreeText` | Info | Irk katalogda yok / atlandı → serbest metin; `value` kaynak. |
 | `Imports.ColorFreeText` | Info | Renk katalogda yok / atlandı → `Notes`'a `Renk: <değer>` eklenir; `value` kaynak. |
-| `Pets.BreedSpeciesMismatch` | Error | Kullanıcının eşlediği ırk, satırın türüne ait değil. |
+| `Pets.BreedSpeciesMismatch` | Warning | Kullanıcının eşlediği ırk, satırın türüne ait değil; ırk metin olarak aktarılır (2026-11-14; önce Error). |
 | `VaccineDefinitions.InvalidSpecies` | Error | Kullanıcının eşlediği aşı tanımı hastanın türüyle uyumsuz. |
 | `Imports.GenderUnrecognized` | Warning | Cinsiyet tanınmadı; boş aktarılır. |
 | `Imports.NeuteredUnrecognized` | Warning | Kısır değeri tanınmadı; `false` aktarılır. |
@@ -355,9 +356,9 @@ Kural kodları, önem dereceleri ve varsayılan mesajlar kodda **tek yerde** tan
 | `Imports.SharedPhone` | Info | Aynı telefon başka adlı müşteride var (dosyada veya kiracıda); yeni müşteri oluşur. |
 | `Imports.PossibleDuplicate` | Warning | Telefon ve e-posta yok ve aynı (katlanmış) ad dosyada/kiracıda zaten var; yeni müşteri oluşur. |
 | `Imports.OwnerNotFound` | Error | Hasta satırının sahibi dosyada veya kiracıda bulunamadı / belirsiz. |
-| `Imports.OwnerRowInvalid` | Error | Sahip müşteri satırı hatalı olduğundan hasta aktarılamaz. |
+| `Imports.OwnerRowInvalid` | Error | Sahip müşteri satırı hatalı olduğundan hasta aktarılamaz. Mesaj asıl nedeni taşır: `Müşteri aktarılmadı: <müşteri satırının ilk hatası> (Müşteriler satır N)` (2026-11-14). |
 | `Imports.PetNotFound` | Error | Aşı satırının hastası dosyada veya kiracıda bulunamadı / belirsiz. |
-| `Imports.PetRowInvalid` | Error | Hasta satırı hatalı olduğundan aşı aktarılamaz. |
+| `Imports.PetRowInvalid` | Error | Hasta satırı hatalı olduğundan aşı / klinik geçmiş / randevu aktarılamaz. Mesaj asıl nedeni taşır: `Hasta aktarılmadı: <hasta satırının ilk hatası> (Hastalar satır N)` (2026-11-14). |
 | `Imports.DuplicateVaccination` | Info | Aynı hasta + aynı aşı tanımı + aynı uygulama günü dosyada önceden var veya kiracıda kayıtlı; eylem `Skip`. |
 | `Imports.TaxIdInvalid` | Warning | `KimlikNo` geçerli 11 haneli TCKN veya 10 haneli VKN değil; fatura bilgisi boş aktarılır (`value` özgün). |
 | `Imports.StatusUnrecognized` | Warning | Müşteri (`Aktif`/`Pasif`) veya hasta (`Aktif`/`Vefat`/`Ölü`) durumu tanınmadı; aktif aktarılır. |

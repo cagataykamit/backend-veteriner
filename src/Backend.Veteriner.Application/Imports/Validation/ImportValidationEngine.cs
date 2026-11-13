@@ -116,6 +116,10 @@ public sealed partial class ImportValidationEngine
 
     private static bool HasError(List<ImportIssue> issues) => issues.Any(i => i.Severity == ImportIssueSeverity.Error);
 
+    /// <summary>Hatalı satırın ilk hata mesajı: ona bağlı satırlarda (hasta → aşı, müşteri → hasta) asıl neden olarak yazılır.</summary>
+    private static string? FirstError(ImportRowResult result)
+        => result.Issues.FirstOrDefault(i => i.Severity == ImportIssueSeverity.Error)?.Message;
+
     private static ImportRowValidationStatus StatusOf(List<ImportIssue> issues)
         => HasError(issues)
             ? ImportRowValidationStatus.Error

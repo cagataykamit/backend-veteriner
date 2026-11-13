@@ -442,7 +442,9 @@ public sealed class ImportValidationEngineTests
             customers: Customers(Customer(no: "M-1", name: null)),
             pets: Pets(Pet(customerNo: "M-1")));
 
-        Codes(Single(output, ImportTable.Pets)).Should().Equal("Imports.OwnerRowInvalid");
+        var pet = Single(output, ImportTable.Pets);
+        Codes(pet).Should().Equal("Imports.OwnerRowInvalid");
+        pet.Issues.Single().Message.Should().Be("Müşteri aktarılmadı: Zorunlu alan boş. (Müşteriler satır 2)");
     }
 
     [Fact]
@@ -557,7 +559,7 @@ public sealed class ImportValidationEngineTests
     }
 
     [Fact]
-    public void Pet_Breed_Mapped_To_Other_Species_Should_Mismatch()
+    public void Pet_Breed_Mapped_To_Other_Species_Should_Warn_And_Keep_Breed_As_Text()
     {
         var mapping = Mapping(CustomerFields, PetFields, null, new ImportValueMapping("breed", "Tekir", Tekir));
         var output = Run(
@@ -566,8 +568,10 @@ public sealed class ImportValidationEngineTests
             mapping: mapping);
 
         var r = Single(output, ImportTable.Pets);
-        r.Status.Should().Be(ImportRowValidationStatus.Error);
+        r.Status.Should().Be(ImportRowValidationStatus.Warning);
         Codes(r).Should().Equal("Pets.BreedSpeciesMismatch");
+        ((ImportNormalizedPet)r.Normalized).Breed.Should().Be("Tekir");
+        ((ImportNormalizedPet)r.Normalized).BreedId.Should().BeNull();
     }
 
     [Fact]
@@ -622,7 +626,7 @@ public sealed class ImportValidationEngineTests
     // ---------------------------------------------------------------- Hasta tarihleri
 
     [Fact]
-    public void Pet_Future_Birth_Date_Should_Be_Error_But_Today_Is_Allowed()
+    public void Pet_Future_Birth_Date_Should_Warn_And_Be_Dropped_But_Today_Is_Allowed()
     {
         var output = Run(
             customers: Customers(Customer(no: "M-1")),
@@ -631,8 +635,9 @@ public sealed class ImportValidationEngineTests
                 Pet(customerNo: "M-1", name: "Bugün", birth: "14.10.2026")));
 
         var future = Single(output, ImportTable.Pets, 2);
-        future.Status.Should().Be(ImportRowValidationStatus.Error);
+        future.Status.Should().Be(ImportRowValidationStatus.Warning);
         Codes(future).Should().Equal("Pets.BirthDateInFuture");
+        ((ImportNormalizedPet)future.Normalized).BirthDate.Should().BeNull();
         Single(output, ImportTable.Pets, 3).Status.Should().Be(ImportRowValidationStatus.Valid);
     }
 
@@ -650,23 +655,25 @@ public sealed class ImportValidationEngineTests
     }
 
     [Theory]
-    [InlineData("3.5.24", "Imports.DateFormatAmbiguous")]
-    [InlineData("31.02.2020", "Imports.DateInvalid")]
-    public void Pet_Bad_Birth_Date_Should_Be_Error(string birth, string code)
+    [InlineData("3.5.24", "Tarih biçimi belirsiz")]
+    [InlineData("31.02.2020", "Tarih okunamadı")]
+    public void Pet_Bad_Birth_Date_Should_Warn_And_Pet_Be_Imported_Without_Birth_Date(string birth, string reason)
     {
         var output = Run(
             customers: Customers(Customer(no: "M-1")),
             pets: Pets(Pet(customerNo: "M-1", birth: birth)));
 
         var r = Single(output, ImportTable.Pets);
-        r.Status.Should().Be(ImportRowValidationStatus.Error);
-        r.Issues.Single().Should().Match<ImportIssue>(i => i.Code == code && i.Value == birth);
+        r.Status.Should().Be(ImportRowValidationStatus.Warning);
+        r.Issues.Single().Should().Match<ImportIssue>(i =>
+            i.Code == "Imports.BirthDateIgnored" && i.Value == birth && i.Message.Contains(reason) && i.Message.EndsWith("Hasta doğum tarihsiz aktarılacak."));
+        ((ImportNormalizedPet)r.Normalized).BirthDate.Should().BeNull();
     }
 
     // ---------------------------------------------------------------- Mikroçip (K10)
 
     [Fact]
-    public void Pet_Microchip_Scientific_Notation_And_Invalid_Should_Be_Distinct_Errors()
+    public void Pet_Microchip_Scientific_Notation_And_Invalid_Should_Warn_And_Move_To_Notes()
     {
         var output = Run(
             customers: Customers(Customer(no: "M-1")),
@@ -674,8 +681,17 @@ public sealed class ImportValidationEngineTests
                 Pet(customerNo: "M-1", name: "A", chip: "9,85121E+14"),
                 Pet(customerNo: "M-1", name: "B", chip: "98511X")));
 
-        Codes(Single(output, ImportTable.Pets, 2)).Should().Equal("Imports.MicrochipScientificNotation");
-        Codes(Single(output, ImportTable.Pets, 3)).Should().Equal("Imports.MicrochipInvalid");
+        var scientific = Single(output, ImportTable.Pets, 2);
+        var invalid = Single(output, ImportTable.Pets, 3);
+        Codes(scientific).Should().Equal("Imports.MicrochipScientificNotation");
+        Codes(invalid).Should().Equal("Imports.MicrochipInvalid");
+        foreach (var r in new[] { scientific, invalid })
+        {
+            r.Status.Should().Be(ImportRowValidationStatus.Warning);
+            ((ImportNormalizedPet)r.Normalized).Microchip.Should().BeNull();
+        }
+
+        ((ImportNormalizedPet)invalid.Normalized).Notes.Should().Be("Mikroçip (okunamadı): 98511X");
     }
 
     [Fact]
@@ -922,7 +938,9 @@ public sealed class ImportValidationEngineTests
             Vaccination(petNo: "H-1"),
             petRow: Pet(customerNo: "M-1", petNo: "H-1", species: "Ejderha"));
 
-        Codes(Single(output, ImportTable.Vaccinations)).Should().Equal("Imports.PetRowInvalid");
+        var vaccination = Single(output, ImportTable.Vaccinations);
+        Codes(vaccination).Should().Equal("Imports.PetRowInvalid");
+        vaccination.Issues.Single().Message.Should().StartWith("Hasta aktarılmadı: ").And.EndWith("(Hastalar satır 2)");
     }
 
     [Fact]

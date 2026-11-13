@@ -23,6 +23,9 @@ public sealed partial class ImportValidationEngine
 
         /// <summary>Hastaların bağlanacağı müşteri; hatalı satırda null.</summary>
         public OwnerRef? Owner { get; set; }
+
+        /// <summary>Satır hatalıysa ilk hatanın mesajı (bağlı satırlarda asıl neden olarak gösterilir).</summary>
+        public string? Reason { get; set; }
     }
 
     private readonly Dictionary<string, CustomerNode> _customerByRef = new(StringComparer.OrdinalIgnoreCase);
@@ -222,7 +225,11 @@ public sealed partial class ImportValidationEngine
     {
         node.Status = result.Status;
         if (result.Status == ImportRowValidationStatus.Error)
+        {
             node.Owner = null;
+            node.Reason = FirstError(result);
+        }
+
         return result;
     }
 

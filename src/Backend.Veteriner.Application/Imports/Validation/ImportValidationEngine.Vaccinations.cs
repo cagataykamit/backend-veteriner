@@ -172,7 +172,7 @@ public sealed partial class ImportValidationEngine
 
             if (node.Ref is null)
             {
-                issues.Add(ImportRules.PetRowInvalid.At("HayvanNo", $"Hasta satırı ({node.Row}) hatalı.", reference));
+                issues.Add(ImportRules.PetRowInvalid.At("HayvanNo", $"Hasta aktarılmadı: {node.Reason} (Hastalar satır {node.Row})", reference));
                 return (null, false);
             }
 

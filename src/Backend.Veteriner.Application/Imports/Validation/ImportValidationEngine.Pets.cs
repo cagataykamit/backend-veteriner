@@ -27,6 +27,9 @@ public sealed partial class ImportValidationEngine
 
         /// <summary>Tür bilinçli atlandı (<c>targetId = null</c>); bağlı aşılar da atlanır.</summary>
         public bool SkippedByUser { get; set; }
+
+        /// <summary>Satır hatalıysa ilk hatanın mesajı (bağlı satırlarda asıl neden olarak gösterilir).</summary>
+        public string? Reason { get; set; }
     }
 
     private readonly Dictionary<string, PetNode> _petByRef = new(StringComparer.OrdinalIgnoreCase);
@@ -84,17 +87,18 @@ public sealed partial class ImportValidationEngine
             var breed = speciesId is null
                 ? ImportValueResolution.Unmapped
                 : _resolver.Resolve(ImportValueKind.Breed, rawBreed, speciesId);
-            if (breed.Kind == ImportValueResolutionKind.Resolved)
+            if (breed.Kind == ImportValueResolutionKind.Resolved
+                && _breedsById.TryGetValue(breed.TargetId!.Value, out var entry) && entry.ParentId == speciesId)
             {
-                if (_breedsById.TryGetValue(breed.TargetId!.Value, out var entry) && entry.ParentId == speciesId)
-                    breedId = breed.TargetId;
-                else
-                    issues.Add(ImportRules.BreedSpeciesMismatch.At("Irk", value: rawBreed));
+                breedId = breed.TargetId;
             }
             else
             {
+                // Eşlenemeyen ya da türe uymayan ırk hastayı düşürmez: metin olarak aktarılır.
                 breedText = rawBreed;
-                issues.Add(ImportRules.BreedFreeText.At("Irk", value: rawBreed));
+                issues.Add(breed.Kind == ImportValueResolutionKind.Resolved
+                    ? ImportRules.BreedSpeciesMismatch.At("Irk", value: rawBreed)
+                    : ImportRules.BreedFreeText.At("Irk", value: rawBreed));
                 if (breedText.Length > MaxBreedTextLength)
                     issues.Add(ImportRules.FieldTooLong.At("Irk", $"Irk en fazla {MaxBreedTextLength} karakter olabilir."));
             }
@@ -111,8 +115,12 @@ public sealed partial class ImportValidationEngine
         if (!neuteredRecognized)
             issues.Add(ImportRules.NeuteredUnrecognized.At("Kisir", value: rawNeutered));
 
-        // Doğum tarihi
-        var (birthDate, _) = ReadDate(reader, "DogumTarihi", issues);
+        // Doğum tarihi: okunamayan tarih hastayı düşürmez (bağlı geçmişi de düşerdi); hasta doğum tarihsiz aktarılır.
+        var birthIssues = new List<ImportIssue>();
+        var (birthDate, _) = ReadDate(reader, "DogumTarihi", birthIssues);
+        issues.AddRange(birthIssues.Select(i => i.Severity == ImportIssueSeverity.Error
+            ? ImportRules.BirthDateIgnored.At("DogumTarihi", $"{i.Message} Hasta doğum tarihsiz aktarılacak.", i.Value)
+            : i));
         if (birthDate is { } birth)
         {
             if (birth > _today)
@@ -126,16 +134,19 @@ public sealed partial class ImportValidationEngine
             }
         }
 
-        // Mikroçip biçimi (çakışma kimlik çözüldükten sonra)
+        // Mikroçip biçimi (çakışma kimlik çözüldükten sonra); okunamayan numara hastayı düşürmez, notuna yazılır.
         var rawChip = reader.Raw("Mikrocip");
         var chip = ImportValueParsers.ParseMicrochip(rawChip);
+        string? chipNote = null;
         switch (chip.Problem)
         {
             case ImportMicrochipProblem.ScientificNotation:
                 issues.Add(ImportRules.MicrochipScientificNotation.At("Mikrocip", value: rawChip));
+                chipNote = $"Mikroçip (okunamadı): {rawChip}";
                 break;
             case ImportMicrochipProblem.Invalid:
                 issues.Add(ImportRules.MicrochipInvalid.At("Mikrocip", value: rawChip));
+                chipNote = $"Mikroçip (okunamadı): {rawChip}";
                 break;
             default:
                 if (chip.Value is { Length: not ImportValueParsers.StandardMicrochipLength })
@@ -186,7 +197,7 @@ public sealed partial class ImportValidationEngine
 
         var (deceased, deceasedOn) = ReadPetStatus(reader, birthDate, issues);
 
-        var notes = string.Join('\n', new[] { colorNote, allergyNote, reader.Raw("Not") }.Where(s => s is not null));
+        var notes = string.Join('\n', new[] { colorNote, chipNote, allergyNote, reader.Raw("Not") }.Where(s => s is not null));
         if (notes.Length > MaxPetNotesLength)
             issues.Add(ImportRules.FieldTooLong.At("Not", $"Not (renk satırıyla birlikte) en fazla {MaxPetNotesLength} karakter olabilir."));
 
@@ -299,7 +310,11 @@ public sealed partial class ImportValidationEngine
     {
         node.Status = result.Status;
         if (result.Status == ImportRowValidationStatus.Error)
+        {
             node.Ref = null;
+            node.Reason = FirstError(result);
+        }
+
         return result;
     }
 
@@ -332,7 +347,7 @@ public sealed partial class ImportValidationEngine
 
             if (node.Owner is null)
             {
-                issues.Add(ImportRules.OwnerRowInvalid.At("MusteriNo", $"Müşteri satırı ({node.Row}) hatalı.", reference));
+                issues.Add(ImportRules.OwnerRowInvalid.At("MusteriNo", $"Müşteri aktarılmadı: {node.Reason} (Müşteriler satır {node.Row})", reference));
                 return null;
             }
 
