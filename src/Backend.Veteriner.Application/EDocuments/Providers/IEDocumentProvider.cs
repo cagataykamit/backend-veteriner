@@ -31,6 +31,12 @@ public interface IEDocumentProvider
     /// <summary>Bu belge türü entegratörün API'sinden iptal edilebilir mi (Nilvera'da e-Fatura iptali yok).</summary>
     bool CanCancel(EDocumentType type);
 
+    /// <summary>
+    /// Kesilmiş ticari e-Faturanın alıcı yanıtı (kabul / red / bekliyor). Yalnız kesim sonucu
+    /// <see cref="ProviderIssueOutcome.AwaitsBuyerAnswer"/> olan belgede sorulur.
+    /// </summary>
+    Task<ProviderResult<ProviderBuyerAnswer>> GetBuyerAnswerAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct);
+
     Task<ProviderResult<ProviderCancelOutcome>> CancelAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct);
 
     /// <summary>Belgesi oluşmamış taslak kaydı sağlayıcıda geri alır (vazgeçme); kayıt yoksa başarı.</summary>
@@ -140,7 +146,8 @@ public sealed record ProviderIssueOutcome(
     string? ProviderJobId,
     string? DocumentNumber,
     string? DocumentUuid,
-    decimal? Total)
+    decimal? Total,
+    bool AwaitsBuyerAnswer = false)
 {
     public static ProviderIssueOutcome Pending(string? invoiceId, string? jobId) => new(ProviderIssueState.Pending, invoiceId, null, jobId, null, null, null);
 }
@@ -152,6 +159,20 @@ public enum ProviderCancelState
 }
 
 public sealed record ProviderCancelOutcome(ProviderCancelState State);
+
+public enum ProviderBuyerAnswerState
+{
+    Pending = 0,
+    Accepted = 1,
+    Rejected = 2
+}
+
+/// <param name="Reason">Alıcının red gerekçesi (varsa).</param>
+public sealed record ProviderBuyerAnswer(ProviderBuyerAnswerState State, string? Reason = null)
+{
+    public static ProviderBuyerAnswer Pending { get; } = new(ProviderBuyerAnswerState.Pending);
+    public static ProviderBuyerAnswer Accepted { get; } = new(ProviderBuyerAnswerState.Accepted);
+}
 
 public sealed record ProviderPdf(byte[]? Content, string FileName)
 {

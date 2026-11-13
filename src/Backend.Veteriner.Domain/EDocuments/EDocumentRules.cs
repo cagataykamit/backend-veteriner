@@ -12,6 +12,15 @@ public static class EDocumentRules
     /// <summary>Kesilmiş belgenin iptal edilebileceği gün sayısı (7/8 gün kaynakları çelişkili; sağlayıcı ayrıca reddedebilir).</summary>
     public const int CancelWindowDays = 8;
 
+    /// <summary>
+    /// Ticari e-Faturada alıcının sistem üzerinden kabul / red yanıtı verebileceği gün sayısı (kaynaklar 7 / 8 gün diyor;
+    /// DOĞRULANMADI). Bu süre (+ <see cref="BuyerAnswerGraceDays"/>) dolup yanıt gelmezse belge kabul edilmiş sayılır.
+    /// </summary>
+    public const int BuyerAnswerWindowDays = 8;
+
+    /// <summary>Yanıt süresinden sonra sağlayıcıya sorulmaya devam edilen gün (geç gelen yanıtı kaçırmamak için).</summary>
+    public const int BuyerAnswerGraceDays = 1;
+
     /// <summary>Kimliğini vermeyen bireysel alıcı için kullanılan TCKN yer tutucusu.</summary>
     public const string UnknownBuyerNationalId = "11111111111";
 

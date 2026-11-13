@@ -37,6 +37,9 @@ public enum UserNotificationType
 
     /// <summary>Belgesi kesilmiş ücretin ödemesi iptal edildi; belge kendiliğinden iptal edilmez (ADR-036; belge iptal yetkisi olanlara).</summary>
     EDocumentPaymentVoided = 10,
+
+    /// <summary>Ticari e-Fatura alıcı tarafından reddedildi; ücretler serbest kaldı (ADR-036; belge kesme izni olanlara).</summary>
+    EDocumentRejectedByBuyer = 11,
 }
 
 /// <summary>

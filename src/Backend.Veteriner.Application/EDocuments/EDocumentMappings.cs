@@ -44,7 +44,10 @@ internal static class EDocumentMappings
             d.CancelledAtUtc,
             d.DiscardReason,
             d.LastErrorKind is { } kind ? new EDocumentErrorDto(kind, d.LastErrorMessage ?? string.Empty, d.LastProviderErrorCode) : null,
-            d.AttemptCount);
+            d.AttemptCount,
+            d.BuyerAnswerDueUtc,
+            d.BuyerRejectedAtUtc,
+            d.BuyerRejectionReason);
 
     public static EDocumentListItemDto ToListItem(this EDocument d, string clientName)
         => new(
@@ -68,5 +71,6 @@ internal static class EDocumentMappings
 
     public static bool CanDownloadPdf(EDocument d)
         => d.HasProviderDocument
-           && d.Status is EDocumentStatus.Issued or EDocumentStatus.CancelRequested or EDocumentStatus.CancelRejected or EDocumentStatus.Cancelled;
+           && d.Status is EDocumentStatus.Issued or EDocumentStatus.CancelRequested or EDocumentStatus.CancelRejected or EDocumentStatus.Cancelled
+               or EDocumentStatus.RejectedByBuyer;
 }

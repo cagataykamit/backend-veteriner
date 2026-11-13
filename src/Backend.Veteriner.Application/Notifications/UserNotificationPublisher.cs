@@ -61,6 +61,9 @@ public interface IUserNotificationPublisher
 
     /// <summary>Belgesi kesilmiş ücretin ödemesi iptal edildi: belge iptal yetkisi olanlara, belge başına bir bildirim.</summary>
     Task EDocumentPaymentVoidedAsync(Guid tenantId, Guid clinicId, Guid documentId, string? documentNumber, CancellationToken ct);
+
+    /// <summary>Ticari e-Fatura alıcı tarafından reddedildi: kliniğe erişen belge kesme izni olanlara.</summary>
+    Task EDocumentRejectedByBuyerAsync(Guid tenantId, Guid clinicId, Guid documentId, string? documentNumber, string? reason, CancellationToken ct);
 }
 
 public sealed class UserNotificationPublisher : IUserNotificationPublisher
@@ -281,6 +284,29 @@ public sealed class UserNotificationPublisher : IUserNotificationPublisher
                 UserNotificationType.EDocumentPaymentVoided,
                 "Ödemesi iptal edilen e-belge",
                 body,
+                EDocumentTarget,
+                documentId,
+                utcNow), ct);
+        }
+    }
+
+    public async Task EDocumentRejectedByBuyerAsync(
+        Guid tenantId, Guid clinicId, Guid documentId, string? documentNumber, string? reason, CancellationToken ct)
+    {
+        var userIds = await _recipients.ListAsync(tenantId, clinicId, PermissionCatalog.EDocuments.Issue, TenantWideClaimNames.All, ct);
+        var label = string.IsNullOrWhiteSpace(documentNumber) ? "e-Fatura" : $"{documentNumber} numaralı e-Fatura";
+        var body = $"{label} alıcı tarafından reddedildi{(string.IsNullOrWhiteSpace(reason) ? "" : $": {reason.Trim()}")}. "
+                   + "Ücretler yeniden belgelenebilir; düzeltip yeni belge kesin.";
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        foreach (var userId in userIds)
+        {
+            await _notifications.AddAsync(UserNotification.Create(
+                tenantId,
+                clinicId,
+                userId,
+                UserNotificationType.EDocumentRejectedByBuyer,
+                "Alıcı e-Faturayı reddetti",
+                body.Length > UserNotification.BodyMaxLength ? body[..UserNotification.BodyMaxLength] : body,
                 EDocumentTarget,
                 documentId,
                 utcNow), ct);

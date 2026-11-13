@@ -2901,6 +2901,16 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<int>("AttemptCount")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("BuyerAnswerDueUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("BuyerRejectedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("BuyerRejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<string>("CancelReason")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");

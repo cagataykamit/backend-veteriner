@@ -136,7 +136,7 @@ public sealed class NilveraEDocumentProviderTests
         result.IsSuccess.Should().BeTrue(result.Error?.Message);
         var body = _server.Body("POST", "/einvoice/Send/Model")!;
         body["CustomerAlias"]!.ToString().Should().Be("urn:mail:defaultpk@nilvera.com");
-        body["EInvoice"]!["InvoiceInfo"]!["InvoiceProfile"]!.ToString().Should().Be("TEMELFATURA");
+        body["EInvoice"]!["InvoiceInfo"]!["InvoiceProfile"]!.ToString().Should().Be("TICARIFATURA");
         body["EInvoice"]!["InvoiceInfo"]!["SendType"].Should().BeNull();
     }
 
@@ -288,14 +288,34 @@ public sealed class NilveraEDocumentProviderTests
     }
 
     [Fact]
-    public async Task Check_EInvoice_Rejected_Answer_Should_Fail()
+    public async Task Delivered_Commercial_EInvoice_Should_Be_Issued_And_Await_Buyer_Answer()
     {
         _server.On("GET", $"/einvoice/Sale/{Reference}/Status", HttpStatusCode.OK,
-            """{"Answer":{"AnswerCode":"rejected","AnswerNote":"Hatalı tutar"},"InvoiceStatus":{"Code":"succeed"}}""");
+            """{"InvoiceProfile":"TICARIFATURA","Answer":null,"InvoiceStatus":{"Code":"succeed","Description":"FATURA ALICIYA İLETİLDİ"}}""");
+        _server.On("GET", $"/einvoice/Sale/{Reference}/Details", HttpStatusCode.OK, """{"InvoiceNumber":"ANS2026000000011","InvoiceAmount":2500.0}""");
 
         var result = await Provider().CheckAsync(Account(), Refs(EDocumentType.EInvoice), CancellationToken.None);
 
-        result.Error!.Message.Should().Contain("reddedildi").And.Contain("Hatalı tutar");
+        result.Value!.State.Should().Be(ProviderIssueState.Issued);
+        result.Value.AwaitsBuyerAnswer.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("TICARIFATURA", "approved", ProviderBuyerAnswerState.Accepted)]
+    [InlineData("TICARIFATURA", "documentAnsweredAutomatically", ProviderBuyerAnswerState.Accepted)]
+    [InlineData("TICARIFATURA", "waitingForApproval", ProviderBuyerAnswerState.Pending)]
+    [InlineData("TICARIFATURA", "rejected", ProviderBuyerAnswerState.Rejected)]
+    [InlineData("TEMELFATURA", "unknown", ProviderBuyerAnswerState.Accepted)]
+    public async Task Buyer_Answer_Should_Map_Nilvera_Answer_Code(string profile, string answer, ProviderBuyerAnswerState expected)
+    {
+        _server.On("GET", $"/einvoice/Sale/{Reference}/Status", HttpStatusCode.OK,
+            $$$"""{"InvoiceProfile":"{{{profile}}}","Answer":{"AnswerCode":"{{{answer}}}","AnswerNote":"Hatalı tutar"},"InvoiceStatus":{"Code":"succeed"}}""");
+
+        var result = await Provider().GetBuyerAnswerAsync(Account(), Refs(EDocumentType.EInvoice), CancellationToken.None);
+
+        result.Value!.State.Should().Be(expected);
+        if (expected == ProviderBuyerAnswerState.Rejected)
+            result.Value.Reason.Should().Be("Hatalı tutar");
     }
 
     [Fact]

@@ -75,7 +75,10 @@ public sealed record EDocumentDto(
     DateTime? CancelledAtUtc,
     string? DiscardReason,
     EDocumentErrorDto? LastError,
-    int AttemptCount);
+    int AttemptCount,
+    DateTime? BuyerAnswerDueUtc = null,
+    DateTime? BuyerRejectedAtUtc = null,
+    string? BuyerRejectionReason = null);
 
 public sealed record EDocumentListItemDto(
     Guid Id,

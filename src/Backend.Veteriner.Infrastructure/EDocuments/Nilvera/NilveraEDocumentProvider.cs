@@ -134,13 +134,38 @@ public sealed class NilveraEDocumentProvider : IEDocumentProvider, IEDocumentCre
             return new ProviderCancelOutcome(ProviderCancelState.Cancelled);
         });
 
+    /// <summary>
+    /// Ticari e-Faturanın alıcı yanıtı (<c>/einvoice/Sale/{ETTN}/Status</c> → <c>Answer.AnswerCode</c>): <c>approved</c> ve
+    /// <c>documentAnsweredAutomatically</c> kabul, <c>rejected</c> red (<c>AnswerNote</c> gerekçe), diğerleri bekliyor.
+    /// Temel senaryoda ve e-Arşiv / e-SMM'de yanıt yoktur (kabul).
+    /// </summary>
+    public Task<ProviderResult<ProviderBuyerAnswer>> GetBuyerAnswerAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct)
+        => RunAsync(async () =>
+        {
+            if (refs.Type != EDocumentType.EInvoice)
+                return ProviderBuyerAnswer.Accepted;
+
+            var status = await StatusAsync(account.Credentials, Service.For(refs.Type), Reference(refs.ExternalReference), ct);
+            if (status is null)
+                return ProviderBuyerAnswer.Pending;
+            if (status.Profile is { } profile && profile != CommercialProfile)
+                return ProviderBuyerAnswer.Accepted;
+
+            return status.AnswerCode switch
+            {
+                "approved" or "documentAnsweredAutomatically" => ProviderBuyerAnswer.Accepted,
+                "rejected" => new ProviderBuyerAnswer(ProviderBuyerAnswerState.Rejected, status.AnswerNote),
+                _ => ProviderBuyerAnswer.Pending,
+            };
+        });
+
     /// <summary>Nilvera'ya taslak yazılmaz (doğrudan gönderim); kesilmiş belge silinemez, yalnız iptal edilir.</summary>
     public Task<ProviderResult<bool>> DiscardDraftAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct)
         => RunAsync(async () =>
         {
             var service = Service.For(refs.Type);
             var status = await StatusAsync(account.Credentials, service, Reference(refs.ExternalReference), ct);
-            if (status is not null && status.Code is not ("error" or "rejected"))
+            if (status is not null && status.Code != "error")
                 throw new NilveraException(new ProviderError(EDocumentErrorKind.ProviderRejected, "Belge Nilvera'da oluşturulmuş; vazgeçilemez, iptal edin."));
             return true;
         });
@@ -183,7 +208,8 @@ public sealed class NilveraEDocumentProvider : IEDocumentProvider, IEDocumentCre
     /// Belgenin Nilvera'daki durumu: kesildiyse numara ve tutarla birlikte; yoksa <c>null</c>, bekliyorsa bekliyor.
     /// e-Arşiv / e-SMM'de durum ucu belgenin değil GİB raporunun durumunu verir (kesilen belge rapor oluşana dek
     /// <c>unknown</c> "Rapor Oluşturulmadı" kalır; test ortamında görüldü). Bu türlerde belge numara almışsa ve durum
-    /// <c>error</c> değilse kesilmiş sayılır. e-Fatura GİB'e iletilince (<c>succeed</c>) kesilmiş sayılır.
+    /// <c>error</c> değilse kesilmiş sayılır. e-Fatura alıcıya iletilince (<c>succeed</c>) kesilmiş sayılır; ticari senaryoda alıcı
+    /// yanıtı ayrıca izlenir (<see cref="GetBuyerAnswerAsync"/>), red kesimden sonra gelir.
     /// </summary>
     private async Task<ProviderIssueOutcome?> ReadOutcomeAsync(string apiKey, EDocumentType type, Guid reference, CancellationToken ct)
     {
@@ -196,7 +222,7 @@ public sealed class NilveraEDocumentProvider : IEDocumentProvider, IEDocumentCre
         switch (status.Code)
         {
             case "succeed":
-            case not ("error" or "rejected") when type != EDocumentType.EInvoice:
+            case not "error" when type != EDocumentType.EInvoice:
                 var details = await _client.SendAsync(
                     apiKey, HttpMethod.Get, $"/{service.Api}/{service.Collection}/{uuid}/Details", null,
                     $"/{service.Api}/{service.Collection}/{{uuid}}/Details", ct);
@@ -205,25 +231,21 @@ public sealed class NilveraEDocumentProvider : IEDocumentProvider, IEDocumentCre
                 if (string.IsNullOrWhiteSpace(number))
                     return ProviderIssueOutcome.Pending(uuid, uuid);
                 var total = Decimal(details.Body?[service.AmountField]);
-                return new ProviderIssueOutcome(ProviderIssueState.Issued, uuid, uuid, null, number, uuid, total);
+                var awaitsAnswer = type == EDocumentType.EInvoice && (status.Profile ?? CommercialProfile) == CommercialProfile;
+                return new ProviderIssueOutcome(ProviderIssueState.Issued, uuid, uuid, null, number, uuid, total, awaitsAnswer);
             case "error":
                 throw new NilveraException(new ProviderError(
                     EDocumentErrorKind.ProviderRejected,
                     string.IsNullOrWhiteSpace(status.Detail) ? "Nilvera belgeyi oluşturamadı." : $"Nilvera belgeyi oluşturamadı: {status.Detail}",
                     "status-error"));
-            case "rejected":
-                throw new NilveraException(new ProviderError(
-                    EDocumentErrorKind.ProviderRejected,
-                    string.IsNullOrWhiteSpace(status.Detail) ? "e-Fatura alıcı tarafından reddedildi." : $"e-Fatura alıcı tarafından reddedildi: {status.Detail}",
-                    "rejected"));
             default:
                 return ProviderIssueOutcome.Pending(uuid, uuid);
         }
     }
 
     /// <summary>
-    /// Durum ucu: e-Arşiv / e-SMM <c>{StatusCode, StatusDetail}</c>; e-Fatura <c>{InvoiceStatus{Code,…}, Answer{AnswerCode,…}}</c>.
-    /// Belge Nilvera'da yoksa <c>null</c>. Kodlar: <c>unknown|waiting|succeed|error</c>; e-Fatura reddi <c>rejected</c> olarak döner.
+    /// Durum ucu: e-Arşiv / e-SMM <c>{StatusCode, StatusDetail}</c>; e-Fatura <c>{InvoiceProfile, InvoiceStatus{Code,…},
+    /// Answer{AnswerCode, AnswerNote,…}}</c>. Belge Nilvera'da yoksa <c>null</c>. Kodlar: <c>unknown|waiting|succeed|error</c>.
     /// </summary>
     private async Task<NilveraStatus?> StatusAsync(string apiKey, Service service, string uuid, CancellationToken ct)
     {
@@ -238,12 +260,14 @@ public sealed class NilveraEDocumentProvider : IEDocumentProvider, IEDocumentCre
         if (service.Type != EDocumentType.EInvoice)
             return new NilveraStatus(body?["StatusCode"]?.ToString() ?? "unknown", body?["StatusDetail"]?.ToString());
 
-        if (body?["Answer"]?["AnswerCode"]?.ToString() == "rejected")
-            return new NilveraStatus("rejected", body["Answer"]?["AnswerNote"]?.ToString() ?? body["Answer"]?["Description"]?.ToString());
         var invoiceStatus = body?["InvoiceStatus"];
+        var answer = body?["Answer"];
         return new NilveraStatus(
             invoiceStatus?["Code"]?.ToString() ?? "unknown",
-            invoiceStatus?["DetailDescription"]?.ToString() ?? invoiceStatus?["Description"]?.ToString());
+            invoiceStatus?["DetailDescription"]?.ToString() ?? invoiceStatus?["Description"]?.ToString(),
+            body?["InvoiceProfile"]?.ToString(),
+            answer?["AnswerCode"]?.ToString(),
+            answer?["AnswerNote"]?.ToString() ?? answer?["Description"]?.ToString());
     }
 
     /// <summary>Hesaptaki seri: varsayılan ve etkin olan, yoksa ilk etkin seri (e-Arşiv'de seri zorunlu, 422 / 2033).</summary>
@@ -374,7 +398,8 @@ public sealed class NilveraEDocumentProvider : IEDocumentProvider, IEDocumentCre
 
         if (request.Type == EDocumentType.EInvoice)
         {
-            info["InvoiceProfile"] = "TEMELFATURA";
+            // Ticari senaryo: alıcı yanlış faturayı sistem üzerinden reddedebilir (ADR-036, 2026-11-13); yanıt izlenir.
+            info["InvoiceProfile"] = CommercialProfile;
             return new JsonObject { ["EInvoice"] = invoice, ["CustomerAlias"] = request.EInvoiceRecipient };
         }
 
@@ -464,7 +489,10 @@ public sealed class NilveraEDocumentProvider : IEDocumentProvider, IEDocumentCre
 
     private sealed record NilveraCompany(string TaxNumber, string Name);
 
-    private sealed record NilveraStatus(string Code, string? Detail);
+    private sealed record NilveraStatus(string Code, string? Detail, string? Profile = null, string? AnswerCode = null, string? AnswerNote = null);
+
+    /// <summary>e-Fatura senaryosu: ticari (alıcı kabul / red yanıtı verebilir).</summary>
+    internal const string CommercialProfile = "TICARIFATURA";
 
     /// <summary>Belge türünün Nilvera servisi: API adı, belge koleksiyonu ve ayrıntı yanıtındaki numara / tutar alanları.</summary>
     private sealed record Service(EDocumentType Type, string Api, string Collection, string Label, string NumberField, string AmountField)

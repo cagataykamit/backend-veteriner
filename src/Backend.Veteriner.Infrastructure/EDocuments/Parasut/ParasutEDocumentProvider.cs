@@ -29,6 +29,10 @@ public sealed class ParasutEDocumentProvider : IEDocumentProvider, IEDocumentOAu
     /// <summary>İptal satış faturası iptaliyle yapılır; üç tür için de geçerli.</summary>
     public bool CanCancel(EDocumentType type) => true;
 
+    /// <summary>e-Fatura temel senaryoyla (<c>basic</c>) gider; alıcı yanıtı beklenmez.</summary>
+    public Task<ProviderResult<ProviderBuyerAnswer>> GetBuyerAnswerAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct)
+        => Task.FromResult(ProviderResult<ProviderBuyerAnswer>.Ok(ProviderBuyerAnswer.Accepted));
+
     public string BuildAuthorizationUrl(string state, string codeChallenge) => _client.AuthorizationUrl(state, codeChallenge);
 
     public async Task<ProviderResult<string>> ExchangeCodeAsync(string code, string codeVerifier, CancellationToken ct)

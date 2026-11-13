@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.EDocuments.Providers;
 using Backend.Veteriner.Application.EDocuments.Specs;
+using Backend.Veteriner.Application.Notifications;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.EDocuments;
 using Microsoft.Extensions.Logging;
@@ -21,22 +22,28 @@ public sealed class EDocumentSender
     /// <summary>Belge, bağlantı başka sağlayıcıya / ortama geçtiği için gönderilmedi (sağlayıcı yanıt kodu yerine).</summary>
     public const string ProviderMismatchCode = "provider-mismatch";
 
+    /// <summary>Ticari e-Faturada alıcı yanıtının sorulma aralığı (yanıt süresi boyunca).</summary>
+    public static readonly TimeSpan BuyerAnswerCheckInterval = TimeSpan.FromHours(1);
+
     private static readonly TimeSpan FirstCheckDelay = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan MaxCheckDelay = TimeSpan.FromMinutes(30);
 
     private readonly EDocumentProviderGateway _gateway;
     private readonly IRepository<Charge> _charges;
+    private readonly IUserNotificationPublisher _notifications;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<EDocumentSender> _logger;
 
     public EDocumentSender(
         EDocumentProviderGateway gateway,
         IRepository<Charge> charges,
+        IUserNotificationPublisher notifications,
         TimeProvider timeProvider,
         ILogger<EDocumentSender> logger)
     {
         _gateway = gateway;
         _charges = charges;
+        _notifications = notifications;
         _timeProvider = timeProvider;
         _logger = logger;
     }
@@ -96,10 +103,17 @@ public sealed class EDocumentSender
 
     /// <summary>
     /// Bekleyen belgeye bakar: gönderiliyorsa sonucu sorar (iş yoksa ve belge oluşmadıysa aynı dış referansla yeniden gönderir),
-    /// iptal isteniyorsa iptali yeniden dener. Deneme üst sınırında kalıcı hataya düşer.
+    /// iptal isteniyorsa iptali yeniden dener. Deneme üst sınırında kalıcı hataya düşer. Ticari e-Fatura kesildiyse alıcı yanıtını
+    /// sorar (<see cref="CheckBuyerAnswerAsync"/>; deneme sınırına sayılmaz).
     /// </summary>
     public async Task CheckAsync(EDocument document, EDocumentConnection? connection, int maxChecks, CancellationToken ct)
     {
+        if (document.AwaitsBuyerAnswer)
+        {
+            await CheckBuyerAnswerAsync(document, connection, ct);
+            return;
+        }
+
         if (document.Status is not (EDocumentStatus.Sending or EDocumentStatus.CancelRequested))
             return;
 
@@ -168,6 +182,53 @@ public sealed class EDocumentSender
         }
 
         ApplyIssueOutcome(document, result.Value!);
+    }
+
+    /// <summary>
+    /// Ticari e-Faturanın alıcı yanıtı: kabulde (veya yanıt süresi + pay dolunca) belge kesilmiş kalır; redde belge "alıcı
+    /// reddetti" olur, ücretler serbest kalır (yeniden belgelenebilir), belge kesme yetkilisine bildirim gider. Yanıt yoksa ya da
+    /// sorulamadıysa (bağlantı, geçici hata) bir sonraki aralıkta yeniden sorulur.
+    /// </summary>
+    public async Task CheckBuyerAnswerAsync(EDocument document, EDocumentConnection? connection, CancellationToken ct)
+    {
+        if (!document.AwaitsBuyerAnswer)
+            return;
+
+        var now = Now();
+        var opened = _gateway.OpenFor(document, connection);
+        if (opened.IsSuccess)
+        {
+            var session = opened.Value!;
+            var result = await session.Provider.GetBuyerAnswerAsync(session.Account, Refs(document), ct);
+            _gateway.Absorb(connection!, result);
+            if (result is { IsSuccess: true, Value: { State: ProviderBuyerAnswerState.Accepted } })
+            {
+                document.CloseBuyerAnswer(now);
+                return;
+            }
+
+            if (result is { IsSuccess: true, Value: { State: ProviderBuyerAnswerState.Rejected } rejected })
+            {
+                document.MarkRejectedByBuyer(rejected.Reason, now);
+                await ReleaseChargesAsync(document, ct);
+                await _notifications.EDocumentRejectedByBuyerAsync(
+                    document.TenantId, document.ClinicId, document.Id, document.DocumentNumber, document.BuyerRejectionReason, ct);
+                return;
+            }
+
+            if (!result.IsSuccess)
+            {
+                _logger.LogWarning(
+                    "e-Fatura alıcı yanıtı alınamadı. EDocumentId={EDocumentId}, Kind={Kind}, ProviderCode={ProviderCode}",
+                    document.Id, result.Error!.Kind, result.Error.ProviderCode);
+            }
+        }
+
+        // Yanıt yok: süre (+ pay) dolduysa kabul edilmiş sayılır, değilse bir sonraki aralıkta yeniden sorulur.
+        if (now > document.BuyerAnswerDueUtc!.Value.AddDays(EDocumentRules.BuyerAnswerGraceDays))
+            document.CloseBuyerAnswer(now);
+        else
+            document.PostponeBuyerAnswerCheck(now.Add(BuyerAnswerCheckInterval), now);
     }
 
     /// <summary><c>CancelRequested</c> belgeyi sağlayıcıda iptal eder; başarıda ücretler serbest kalır.</summary>
@@ -269,7 +330,10 @@ public sealed class EDocumentSender
 
         if (outcome.State == ProviderIssueState.Issued && outcome.ProviderDocumentId is { } documentId)
         {
-            document.MarkIssued(documentId, outcome.DocumentNumber, outcome.DocumentUuid, outcome.Total, Now());
+            var now = Now();
+            document.MarkIssued(documentId, outcome.DocumentNumber, outcome.DocumentUuid, outcome.Total, now);
+            if (outcome.AwaitsBuyerAnswer)
+                document.AwaitBuyerAnswer(now.AddDays(EDocumentRules.BuyerAnswerWindowDays), now.Add(BuyerAnswerCheckInterval), now);
             return;
         }
 

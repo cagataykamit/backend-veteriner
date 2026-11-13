@@ -48,6 +48,51 @@ public sealed class EDocumentTests
     }
 
     [Fact]
+    public void Buyer_Answer_Should_Be_Awaited_Only_When_Issued_And_Rejection_Should_Free_Charges()
+    {
+        var document = NewIssuedForAnswer();
+        var due = new DateTime(2026, 11, 21, 10, 0, 0, DateTimeKind.Utc);
+
+        document.AwaitBuyerAnswer(due, due.AddDays(-8).AddHours(1), due.AddDays(-8)).IsSuccess.Should().BeTrue();
+        document.AwaitsBuyerAnswer.Should().BeTrue();
+        document.HoldsCharges.Should().BeTrue();
+
+        document.MarkRejectedByBuyer("Fiyat hatalı", due.AddDays(-5)).IsSuccess.Should().BeTrue();
+        document.Status.Should().Be(EDocumentStatus.RejectedByBuyer);
+        document.HoldsCharges.Should().BeFalse("reddedilen faturanın ücretleri serbest kalır");
+        document.AwaitsBuyerAnswer.Should().BeFalse();
+        document.NextCheckAtUtc.Should().BeNull();
+        document.RequestCancel(Guid.NewGuid(), "Gerekçe yazıldı", due).IsSuccess.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Closing_Buyer_Answer_Should_Keep_Document_Issued()
+    {
+        var document = NewIssuedForAnswer();
+        var now = new DateTime(2026, 11, 13, 10, 0, 0, DateTimeKind.Utc);
+        document.AwaitBuyerAnswer(now.AddDays(8), now.AddHours(1), now);
+
+        document.CloseBuyerAnswer(now.AddDays(1)).IsSuccess.Should().BeTrue();
+
+        document.Status.Should().Be(EDocumentStatus.Issued);
+        document.AwaitsBuyerAnswer.Should().BeFalse();
+        document.MarkRejectedByBuyer("geç", now.AddDays(2)).IsSuccess.Should().BeFalse("yanıt beklenmeyen belge reddedilmiş sayılmaz");
+    }
+
+    private static EDocument NewIssuedForAnswer()
+    {
+        var buyer = EDocumentBuyer.Corporate("Örnek Ltd.", "1234567890", "Kadıköy", null, null, null, null).Value!;
+        var document = EDocument.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, null, EDocumentType.EInvoice, EDocumentEnvironment.Test, "nilvera",
+            Guid.NewGuid(), "hash", null, buyer,
+            [new EDocumentLineDraft(Guid.NewGuid(), "Mama", 1m, null, 500m, 20m, ChargeLineKind.Product)],
+            null, Guid.NewGuid(), DateTime.UtcNow).Value!;
+        document.BeginSending(DateTime.UtcNow);
+        document.MarkIssued("doc-1", "ANS1", "uuid", 500m, DateTime.UtcNow);
+        return document;
+    }
+
+    [Fact]
     public void Individual_Buyer_Without_NationalId_Should_Use_Unknown_Buyer_Placeholder()
     {
         var buyer = EDocumentBuyer.Individual("Ayşe Yılmaz", null, null, null, null, null).Value!;
