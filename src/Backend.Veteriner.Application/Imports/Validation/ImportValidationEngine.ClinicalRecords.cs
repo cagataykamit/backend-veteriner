@@ -39,15 +39,20 @@ public sealed partial class ImportValidationEngine
 
         var veterinarian = ReadText(reader, "Hekim", ImportedClinicalRecord.MaxVeterinarianNameLength, issues);
 
+        var dropped = new List<string>();
         var rawWeight = reader.Raw("Kilo");
         var (weight, weightValid) = ImportValueParsers.ParseWeight(rawWeight);
         if (!weightValid)
-            issues.Add(ImportRules.WeightInvalid.At("Kilo", value: rawWeight));
+            issues.Add(Dropped(ImportRules.WeightInvalid, "Kilo", "kilo", rawWeight, "geçersiz", dropped, noteOf: "kaydın"));
 
         var rawTemperature = reader.Raw("Ates");
         var (temperature, temperatureValid) = ImportValueParsers.ParseTemperature(rawTemperature);
         if (!temperatureValid)
-            issues.Add(ImportRules.TemperatureInvalid.At("Ates", value: rawTemperature));
+            issues.Add(Dropped(ImportRules.TemperatureInvalid, "Ates", "ateş", rawTemperature, "geçersiz", dropped, noteOf: "kaydın"));
+
+        // Alınmayan ölçüm kaybolmaz: kaydın notuna yazılır (içerik sayılır).
+        if (dropped.Count > 0)
+            content[^1] = string.Join('\n', new[] { content[^1] }.Concat(dropped).Where(s => s is not null));
 
         // Yalnız ölçüm (kilo, ateş) taşıyan kayıt da içeriktir; kural varlıkta (ImportedClinicalRecord.Content.HasContent).
         var recordContent = new ImportedClinicalRecord.Content(

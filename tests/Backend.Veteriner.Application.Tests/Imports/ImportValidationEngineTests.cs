@@ -658,6 +658,9 @@ public sealed class ImportValidationEngineTests
         future.Status.Should().Be(ImportRowValidationStatus.Warning);
         Codes(future).Should().Equal("Pets.BirthDateInFuture");
         ((ImportNormalizedPet)future.Normalized).BirthDate.Should().BeNull();
+        ((ImportNormalizedPet)future.Normalized).Notes.Should().Be("Dosyadaki doğum tarihi: 15.10.2026 (gelecek tarih, alınmadı)");
+        future.Issues.Single().Message.Should().Be(
+            "Doğum tarihi gelecekte; hasta doğum tarihsiz aktarılacak. Dosyadaki değer (15.10.2026) hastanın notuna yazılacak.");
         Single(output, ImportTable.Pets, 3).Status.Should().Be(ImportRowValidationStatus.Valid);
     }
 
@@ -686,7 +689,9 @@ public sealed class ImportValidationEngineTests
         var r = Single(output, ImportTable.Pets);
         r.Status.Should().Be(ImportRowValidationStatus.Warning);
         r.Issues.Single().Should().Match<ImportIssue>(i =>
-            i.Code == "Imports.BirthDateIgnored" && i.Value == birth && i.Message.Contains(reason) && i.Message.EndsWith("Hasta doğum tarihsiz aktarılacak."));
+            i.Code == "Imports.BirthDateIgnored" && i.Value == birth && i.Message.Contains(reason)
+            && i.Message.EndsWith($"Hasta doğum tarihsiz aktarılacak. Dosyadaki değer ({birth}) hastanın notuna yazılacak."));
+        ((ImportNormalizedPet)r.Normalized).Notes.Should().Be($"Dosyadaki doğum tarihi: {birth} (okunamadı, alınmadı)");
         ((ImportNormalizedPet)r.Normalized).BirthDate.Should().BeNull();
     }
 
@@ -711,7 +716,7 @@ public sealed class ImportValidationEngineTests
             ((ImportNormalizedPet)r.Normalized).Microchip.Should().BeNull();
         }
 
-        ((ImportNormalizedPet)invalid.Normalized).Notes.Should().Be("Mikroçip (okunamadı): 98511X");
+        ((ImportNormalizedPet)invalid.Normalized).Notes.Should().Be("Dosyadaki mikroçip: 98511X (okunamadı, alınmadı)");
     }
 
     [Fact]

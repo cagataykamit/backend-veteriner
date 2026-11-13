@@ -1,3 +1,4 @@
+using System.Globalization;
 using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Pets;
@@ -105,27 +106,35 @@ public sealed partial class ImportValidationEngine
         }
 
         // Cinsiyet, kısır
+        // Alınmayan alan değeri kaybolmaz: hastanın notuna "Dosyadaki …: değer (neden, alınmadı)" satırı yazılır.
+        var dropped = new List<string>();
+
         var rawGender = reader.Raw("Cinsiyet");
         var (gender, genderRecognized) = ImportValueParsers.ParseGender(rawGender);
         if (!genderRecognized)
-            issues.Add(ImportRules.GenderUnrecognized.At("Cinsiyet", value: rawGender));
+            issues.Add(Dropped(ImportRules.GenderUnrecognized, "Cinsiyet", "cinsiyet", rawGender, "tanınmadı", dropped));
 
         var rawNeutered = reader.Raw("Kisir");
         var (neutered, neuteredRecognized) = ImportValueParsers.ParseNeutered(rawNeutered);
         if (!neuteredRecognized)
-            issues.Add(ImportRules.NeuteredUnrecognized.At("Kisir", value: rawNeutered));
+            issues.Add(Dropped(ImportRules.NeuteredUnrecognized, "Kisir", "kısırlık", rawNeutered, "tanınmadı", dropped));
 
         // Doğum tarihi: okunamayan tarih hastayı düşürmez (bağlı geçmişi de düşerdi); hasta doğum tarihsiz aktarılır.
         var birthIssues = new List<ImportIssue>();
         var (birthDate, _) = ReadDate(reader, "DogumTarihi", birthIssues);
-        issues.AddRange(birthIssues.Select(i => i.Severity == ImportIssueSeverity.Error
-            ? ImportRules.BirthDateIgnored.At("DogumTarihi", $"{i.Message} Hasta doğum tarihsiz aktarılacak.", i.Value)
-            : i));
+        foreach (var issue in birthIssues)
+        {
+            issues.Add(issue.Severity == ImportIssueSeverity.Error
+                ? Dropped(ImportRules.BirthDateIgnored, "DogumTarihi", "doğum tarihi", issue.Value, "okunamadı", dropped, $"{issue.Message} Hasta doğum tarihsiz aktarılacak")
+                : issue);
+        }
+
         if (birthDate is { } birth)
         {
             if (birth > _today)
             {
-                issues.Add(ImportRules.BirthDateInFuture.At("DogumTarihi", value: reader.Raw("DogumTarihi")));
+                issues.Add(Dropped(ImportRules.BirthDateInFuture, "DogumTarihi", "doğum tarihi",
+                    birth.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture), "gelecek tarih", dropped));
                 birthDate = null;
             }
             else if (birth < _today.AddYears(-MaxBirthDateAgeYears))
@@ -137,16 +146,13 @@ public sealed partial class ImportValidationEngine
         // Mikroçip biçimi (çakışma kimlik çözüldükten sonra); okunamayan numara hastayı düşürmez, notuna yazılır.
         var rawChip = reader.Raw("Mikrocip");
         var chip = ImportValueParsers.ParseMicrochip(rawChip);
-        string? chipNote = null;
         switch (chip.Problem)
         {
             case ImportMicrochipProblem.ScientificNotation:
-                issues.Add(ImportRules.MicrochipScientificNotation.At("Mikrocip", value: rawChip));
-                chipNote = $"Mikroçip (okunamadı): {rawChip}";
+                issues.Add(Dropped(ImportRules.MicrochipScientificNotation, "Mikrocip", "mikroçip", rawChip, "bilimsel gösterim", dropped));
                 break;
             case ImportMicrochipProblem.Invalid:
-                issues.Add(ImportRules.MicrochipInvalid.At("Mikrocip", value: rawChip));
-                chipNote = $"Mikroçip (okunamadı): {rawChip}";
+                issues.Add(Dropped(ImportRules.MicrochipInvalid, "Mikrocip", "mikroçip", rawChip, "okunamadı", dropped));
                 break;
             default:
                 if (chip.Value is { Length: not ImportValueParsers.StandardMicrochipLength })
@@ -180,7 +186,7 @@ public sealed partial class ImportValidationEngine
         var rawWeight = reader.Raw("Agirlik");
         var (weight, weightValid) = ImportValueParsers.ParseWeight(rawWeight);
         if (!weightValid)
-            issues.Add(ImportRules.WeightInvalid.At("Agirlik", value: rawWeight));
+            issues.Add(Dropped(ImportRules.WeightInvalid, "Agirlik", "ağırlık", rawWeight, "geçersiz", dropped));
 
         var passport = reader.Raw("KarneNo");
         if (passport is { Length: > MaxPassportLength })
@@ -195,9 +201,9 @@ public sealed partial class ImportValidationEngine
             allergyNote = allergy.Length <= Pet.MaxAlertNoteLength ? null : $"Alerji: {allergy}";
         }
 
-        var (deceased, deceasedOn) = ReadPetStatus(reader, birthDate, issues);
+        var (deceased, deceasedOn) = ReadPetStatus(reader, birthDate, issues, dropped);
 
-        var notes = string.Join('\n', new[] { colorNote, chipNote, allergyNote, reader.Raw("Not") }.Where(s => s is not null));
+        var notes = string.Join('\n', new[] { colorNote }.Concat(dropped).Concat([allergyNote, reader.Raw("Not")]).Where(s => s is not null));
         if (notes.Length > MaxPetNotesLength)
             issues.Add(ImportRules.FieldTooLong.At("Not", $"Not (renk satırıyla birlikte) en fazla {MaxPetNotesLength} karakter olabilir."));
 
@@ -292,7 +298,8 @@ public sealed partial class ImportValidationEngine
     /// Durum: boş/Aktif → aktif; Vefat/Ölü → vefat (tarih isteğe bağlı, gelecekte veya doğumdan önce olamaz: uyarı, tarihsiz);
     /// tanınmayan → uyarı, aktif. Vefat kuralı <c>Pet.SetStatus</c>'tadır; uygulama onu çağırır.
     /// </summary>
-    private (bool Deceased, DateOnly? DeceasedOn) ReadPetStatus(ImportRowReader reader, DateOnly? birthDate, List<ImportIssue> issues)
+    private (bool Deceased, DateOnly? DeceasedOn) ReadPetStatus(
+        ImportRowReader reader, DateOnly? birthDate, List<ImportIssue> issues, List<string> dropped)
     {
         var raw = reader.Raw("Durum");
         switch (ImportTextFolding.Fold(raw))
@@ -302,7 +309,7 @@ public sealed partial class ImportValidationEngine
             case "vefat" or "olu" or "oldu" or "deceased" or "exitus":
                 break;
             default:
-                issues.Add(ImportRules.StatusUnrecognized.At("Durum", value: raw));
+                issues.Add(Dropped(ImportRules.StatusUnrecognized, "Durum", "durum", raw, "tanınmadı", dropped));
                 return (false, null);
         }
 
@@ -314,8 +321,20 @@ public sealed partial class ImportValidationEngine
         if (date is { } value && value <= _today && (birthDate is null || value >= birthDate))
             return (true, value);
 
-        issues.Add(ImportRules.DeceasedDateIgnored.At("VefatTarihi", value: rawDate));
+        issues.Add(Dropped(ImportRules.DeceasedDateIgnored, "VefatTarihi", "vefat tarihi", rawDate, "geçersiz", dropped));
         return (true, null);
+    }
+
+    /// <summary>
+    /// Alınmayan alan değeri (B3, 2026-11-14): sorun mesajı değeri söyler, hastanın (klinik geçmişte kaydın) notuna <c>Dosyadaki &lt;alan&gt;: &lt;değer&gt;
+    /// (&lt;neden&gt;, alınmadı)</c> satırı eklenir; eski programdaki bilgi kaybolmaz.
+    /// </summary>
+    private static ImportIssue Dropped(
+        ImportRule rule, string field, string label, string? value, string reason, List<string> dropped, string? message = null,
+        string noteOf = "hastanın")
+    {
+        dropped.Add($"Dosyadaki {label}: {value} ({reason}, alınmadı)");
+        return rule.At(field, $"{(message ?? rule.Message).TrimEnd('.')}. Dosyadaki değer ({value}) {noteOf} notuna yazılacak.", value);
     }
 
     /// <summary>Satırın sahip adı harf/rakam taşımıyor ya da tek karakter (E-vet'te silinmiş müşteri kartı: ".").</summary>

@@ -376,6 +376,14 @@ Toplu sorgular (N+1 yok): doğrulama kiracının mevcut verisini sabit sayıda s
 
 **Ad karşılaştırması (ADR-019 K4):** Türkçe duyarlı ve aksan duyarsızdır; `AYŞE YILMAZ`, `Ayşe Yılmaz` ve `AYSE YILMAZ` aynı kişidir, `I/ı/İ/i` birbirine eşittir, baştaki/sondaki/art arda boşluk yok sayılır. Yalnız karşılaştırma anahtarıdır; kayıtlı ad olduğu gibi kalır. Kural tek yerde (`Client.NormalizeFullNameForDuplicateCheck`) yaşar, içe aktarma onu aynen izler. Hayvan adı mükerreri de aynı kuralı izler (`KARAMEL` = `Karamel`; `Pet.NormalizeNameForDuplicateCheck`, müşteri kuralına yönlenir).
 
+**Alınmayan alan değeri (2026-11-14):** Alan düzeyindeki bir sorun yüzünden alınmayan değer kaybolmaz.
+- **Kapsam:**
+  - Hastada: gelecek ya da okunamayan doğum tarihi, tanınmayan cinsiyet / kısırlık / durum, geçersiz ağırlık ve vefat tarihi, okunamayan mikroçip.
+  - Klinik geçmişte: geçersiz kilo ve ateş.
+- **Sorun mesajı** değeri söyler: `… Dosyadaki değer (01.01.2027) hastanın notuna yazılacak.` (klinik geçmişte `kaydın notuna`).
+- **Not satırı:** hastanın notuna (klinik geçmişte kaydın `Not` alanına) `Dosyadaki doğum tarihi: 01.01.2027 (gelecek tarih, alınmadı)` biçiminde bir satır eklenir.
+- Kural tek yerde: `ImportValidationEngine.Dropped`.
+
 ## 7) Uçlar
 
 Hata zarfı için bölüm 8. `{id}` = parti kimliği.
