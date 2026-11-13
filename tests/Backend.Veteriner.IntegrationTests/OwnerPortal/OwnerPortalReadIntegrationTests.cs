@@ -116,7 +116,7 @@ public sealed partial class OwnerPortalIntegrationTests
             => Charge.Create(staff.TenantId, clinicId, portal.ClientId, active.Id, null, null, $"{Secret} kalem", 1, amount, Guid.NewGuid(), now, null).Value!;
 
         var paidCharge = ChargeAt(staff.ClinicId, 1000m);
-        paidCharge.ApplyAllocation(1000m).IsSuccess.Should().BeTrue();
+        paidCharge.ApplyAllocation(1000m, DateTime.UtcNow).IsSuccess.Should().BeTrue();
         var card = new Payment(staff.TenantId, staff.ClinicId, portal.ClientId, active.Id, null, null, 1000m, "TRY", PaymentMethod.Card, now.AddDays(-2), $"{Secret} ödeme notu");
         card.ApplyAllocation(1000m).IsSuccess.Should().BeTrue();
         db.AddRange(

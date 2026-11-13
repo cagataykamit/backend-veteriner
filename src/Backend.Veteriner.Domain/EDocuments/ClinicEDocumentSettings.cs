@@ -23,13 +23,25 @@ public sealed class ClinicEDocumentSettings : ITenantOwned
     public bool IssueOnPaymentByDefault { get; private set; }
 
     /// <summary>
-    /// Otomatik kesmenin açıldığı an: yalnız bu andan sonra yazılan ücretler otomatik belgelenir (ayarı açmak geçmiş ücretlerin
-    /// hepsini birden kesmez). Mod kapatılınca boşalır.
+    /// Otomatik kesmenin açıldığı an: yalnız bu andan sonra ödemesi tamamlanan ücretler otomatik belgelenir (ücretin ne
+    /// zaman yazıldığı fark etmez; açılışta zaten ödenmiş eski ücretler kesilmez). Mod kapatılınca boşalır; durdurma ("Sürdür") değiştirmez.
     /// </summary>
     public DateTime? AutoIssueEnabledAtUtc { get; private set; }
 
     /// <summary>Gün sonu işinin son çalıştığı İstanbul günü (aynı gün ikinci kez çalışmaz).</summary>
     public DateOnly? LastEndOfDayRunDate { get; private set; }
+
+    /// <summary>
+    /// Otomatik kesme kalıcı bir sağlayıcı sorunuyla (yetki / anahtar, kontör, hesap askıda, bağlantı kullanılamıyor) durduruldu:
+    /// her yeni ücret aynı hatayla "kesilemedi" olmasın diye yeni belge kesilmez. Ayar kaydedilince ("Sürdür") yeniden başlar.
+    /// </summary>
+    public DateTime? AutoIssuePausedAtUtc { get; private set; }
+
+    public string? AutoIssuePauseReason { get; private set; }
+
+    public const int MaxPauseReasonLength = 500;
+
+    public bool IsAutoIssuePaused => AutoIssuePausedAtUtc is not null;
 
     public Guid UpdatedByUserId { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
@@ -73,7 +85,22 @@ public sealed class ClinicEDocumentSettings : ITenantOwned
         IssueOnPaymentByDefault = issueOnPaymentByDefault;
         UpdatedByUserId = userId;
         UpdatedAtUtc = utcNow;
+        // Kaydetmek durdurulmuş otomatik kesmeyi sürdürür (sorun giderilmediyse ilk turda yeniden durur).
+        AutoIssuePausedAtUtc = null;
+        AutoIssuePauseReason = null;
         return Result.Success();
+    }
+
+    /// <summary>Otomatik kesmeyi kalıcı hatada durdurur. Kapalıysa veya zaten durmuşsa <c>false</c> (bildirim bir kez gider).</summary>
+    public bool PauseAutoIssue(string reason, DateTime utcNow)
+    {
+        if (AutoIssueMode == EDocumentAutoIssueMode.Off || IsAutoIssuePaused)
+            return false;
+
+        var text = string.IsNullOrWhiteSpace(reason) ? "Entegratör hesabında kalıcı bir sorun var." : reason.Trim();
+        AutoIssuePausedAtUtc = utcNow;
+        AutoIssuePauseReason = text.Length > MaxPauseReasonLength ? text[..MaxPauseReasonLength] : text;
+        return true;
     }
 
     /// <summary>Gün sonu işinin bu gün için çalışması gerekiyor mu (saat geldi ve bugün çalışmadı).</summary>

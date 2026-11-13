@@ -15,7 +15,11 @@ public enum EDocumentKindForLine
     Invoice = 1
 }
 
-/// <summary>Klinik e-Belge ayarı + mükellef türünden çıkan belge türü özeti (kural backend'de, panel yalnız gösterir).</summary>
+/// <summary>
+/// Klinik e-Belge ayarı + mükellef türünden çıkan belge türü özeti (kural backend'de, panel yalnız gösterir).
+/// <c>AutoIssuePausedAtUtc</c> doluysa otomatik kesme kalıcı bir sağlayıcı sorunuyla durdu; nedeni <c>AutoIssuePauseReason</c>,
+/// ayar kaydedilince sürer.
+/// </summary>
 public sealed record ClinicEDocumentSettingsDto(
     Guid ClinicId,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] EDocumentAutoIssueMode AutoIssueMode,
@@ -24,7 +28,9 @@ public sealed record ClinicEDocumentSettingsDto(
     DateTime? AutoIssueEnabledAtUtc,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] ClinicTaxpayerType? TaxpayerType,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] EDocumentKindForLine? ServiceDocument,
-    [property: JsonConverter(typeof(JsonStringEnumConverter))] EDocumentKindForLine? ProductDocument);
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] EDocumentKindForLine? ProductDocument,
+    DateTime? AutoIssuePausedAtUtc,
+    string? AutoIssuePauseReason);
 
 public sealed record EDocumentRemindersDto(bool Connected, int UndocumentedPaidCount, int FailedCount);
 

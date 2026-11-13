@@ -38,6 +38,18 @@ public sealed class ParasutEDocumentProviderTests
         return new ParasutEDocumentProvider(client);
     }
 
+    [Fact]
+    public void Disabled_Option_Should_Make_Provider_Unconfigured()
+    {
+        var off = new ParasutOptions
+        {
+            Enabled = false, ClientId = "test-client", ClientSecret = "test-secret", RedirectUri = "https://localhost:7173/api/e-documents/parasut/callback",
+        };
+
+        off.IsConfigured.Should().BeFalse("canlıda Paraşüt kapalı: listelenmez, bağlanılamaz");
+        Provider().IsConfigured.Should().BeTrue("varsayılan açık");
+    }
+
     private static string Credentials(DateTime expiresAt)
         => JsonSerializer.Serialize(new { AccessToken = "access-1", RefreshToken = "refresh-1", ExpiresAtUtc = expiresAt });
 
@@ -48,7 +60,7 @@ public sealed class ParasutEDocumentProviderTests
         => new(
             type,
             Guid.Parse("3b241101-e2bb-4255-8caf-4136c566a962"),
-            new DateOnly(2026, 11, 11),
+            new DateTime(2026, 11, 11, 9, 5, 0),
             new EDocumentSendBuyer(EDocumentBuyerKind.Individual, "Ayşe Yılmaz", identity, unknown, null, "İstanbul", "Kadıköy", null, null),
             [new EDocumentSendLine("Muayene", 1m, null, 1000m, 20m)],
             null,

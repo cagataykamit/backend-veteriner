@@ -42,6 +42,13 @@ public sealed class Charge : AggregateRoot, IClinicScoped, ITenantOwned
 
     public decimal OutstandingAmount => Amount - AllocatedAmount;
 
+    /// <summary>
+    /// Tahsilatın (ödeme veya kredi) ücreti tamamen kapattığı an; açık tutar doğunca (tahsis geri alma, tutarı artıran düzeltme)
+    /// boşalır. Otomatik e-belge "ayar açıkken ödemesi tamamlanan" ücreti bununla seçer (ADR-036, 2026-11-12). Tutarı tahsis
+    /// edilmiş tutara indiren düzeltmede ücret kapanır ama an yazılmaz (düzeltme tahsilat değildir; belgesi elle kesilir).
+    /// </summary>
+    public DateTime? FullyPaidAtUtc { get; private set; }
+
     /// <summary>Ücretin bağlı olduğu geçerli e-belge (ADR-036 Dilim 3); bir ücret yalnız bir geçerli belgeye bağlanır.</summary>
     public Guid? EDocumentId { get; private set; }
 
@@ -201,6 +208,8 @@ public sealed class Charge : AggregateRoot, IClinicScoped, ITenantOwned
         Amount = newAmount;
         LineKind = newTax.LineKind;
         VatRate = newTax.VatRate;
+        if (OutstandingAmount > 0)
+            FullyPaidAtUtc = null;
         MutationSequence++;
         return Result.Success();
     }
@@ -269,12 +278,13 @@ public sealed class Charge : AggregateRoot, IClinicScoped, ITenantOwned
             return Result.Failure("Charges.Validation", "Geri alınacak tahsis tutarı ücretin tahsis edilmiş tutarını aşıyor.");
 
         AllocatedAmount -= amount;
+        FullyPaidAtUtc = null;
         MutationSequence++;
         return Result.Success();
     }
 
-    /// <summary>Tahsis sayacını artırır; açık tutarı aşamaz.</summary>
-    public Result ApplyAllocation(decimal amount)
+    /// <summary>Tahsis sayacını artırır; açık tutarı aşamaz. Ücreti kapatan tahsis <see cref="FullyPaidAtUtc"/>'yi yazar.</summary>
+    public Result ApplyAllocation(decimal amount, DateTime nowUtc)
     {
         if (IsVoided)
             return Result.Failure("Charges.AlreadyVoided", "İptal edilmiş ücrete tahsis yapılamaz.");
@@ -290,6 +300,8 @@ public sealed class Charge : AggregateRoot, IClinicScoped, ITenantOwned
         }
 
         AllocatedAmount += amount;
+        if (OutstandingAmount == 0)
+            FullyPaidAtUtc = NormalizeUtc(nowUtc);
         MutationSequence++;
         return Result.Success();
     }

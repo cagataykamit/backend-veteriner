@@ -16,7 +16,7 @@ public sealed class ClientBalanceTotalsTests
     {
         var charge = Charge.Create(TenantId, ClinicId, ClientId, null, null, null, "Muayene", 1, amount, Guid.NewGuid(), OwnerPortalTestFixture.Now, null).Value!;
         if (allocated > 0)
-            charge.ApplyAllocation(allocated).IsSuccess.Should().BeTrue();
+            charge.ApplyAllocation(allocated, DateTime.UtcNow).IsSuccess.Should().BeTrue();
         return charge;
     }
 

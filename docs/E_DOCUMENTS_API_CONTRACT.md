@@ -36,13 +36,13 @@ Bir belge tek türdür. Seçilen ücretler iki türe ayrılıyorsa önizleme gru
 Alıcı müşterinin fatura kimliğinden (`INVOICING_IDENTITY_API_CONTRACT.md` §2) belge anında kopyalanır (belgede saklanır, sonradan müşteri değişse de belge değişmez):
 
 - Kurumsal: `legalName` (yoksa `fullName`), `taxNumber` **zorunlu**, `taxOffice` önerilir. Vergi numarası yoksa `EDocuments.BuyerIdentityMissing` (400, `extensions.missingFields`).
-- Bireysel veya kişi türü boş: ad soyad; TCKN yoksa **bilinmeyen alıcı** kimliği `11111111111` kullanılır (DOĞRULANMADI, `EDocumentRules.UnknownBuyerNationalId`).
+- Bireysel veya kişi türü boş: ad soyad; TCKN yoksa **bilinmeyen alıcı** kimliği `11111111111` kullanılır (DOĞRULANMADI, `EDocumentRules.UnknownBuyerNationalId`). Ad verilmişse **ad ve soyad birlikte** olmalı (en az iki sözcük); değilse `EDocuments.BuyerIdentityMissing`, `missingFields: ["fullName"]` (önizlemede `missingBuyerFields`). Nilvera test ortamı tek sözcüklü kişi adını reddetti (2026-11-12); belge alıcıyı kopyaladığı için kesmeden önce yakalanır.
 - Peşin müşteri (ADR-016): bilinmeyen alıcı.
 - Adres: `billingProvince`, `billingDistrict`, `billingAddressLine` (boşsa klinik adresi değil, boş gönderilir).
 
 ### 1.3 Tutar
 
-Ücret tutarı KDV dahildir. Satır KDV oranı `Charge.vatRate ?? ClinicTaxpayerSettings.defaultVatRate` (kayıt yoksa %20). Stopaj yalnız e-SMM'de ve alıcı kurumsalsa `ClinicTaxpayerSettings.withholdingRate` ile uygulanır (DOĞRULANMADI). KDV hariç satır tutarı `brüt / (1 + kdv − stopaj)`, 2 ondalığa yuvarlanır; birim fiyat bu tutarın miktara bölümüdür (en çok 6 ondalık). Sağlayıcının yuvarlaması nedeniyle belge toplamı ücret toplamından en çok birkaç kuruş farklı olabilir; belge toplamı sağlayıcıdan okunup `providerTotal` alanında döner.
+Ücret tutarı KDV dahildir. Satır KDV oranı `Charge.vatRate ?? ClinicTaxpayerSettings.defaultVatRate` (kayıt yoksa %20). Stopaj yalnız e-SMM'de ve alıcı kurumsalsa `ClinicTaxpayerSettings.withholdingRate` ile uygulanır (DOĞRULANMADI). KDV hariç satır tutarı `brüt / (1 + kdv − stopaj)`, 2 ondalığa yuvarlanır; birim fiyat bu tutarın miktara bölümüdür (en çok 6 ondalık). Sağlayıcının yuvarlaması nedeniyle belge toplamı ücret toplamından en çok birkaç kuruş farklı olabilir; belge toplamı sağlayıcıdan okunup `providerTotal` alanında döner. Bu fark kimi tutarda matematiksel olarak kaçınılmazdır: 3 × 33,33 = 99,99 TL (%20 KDV dahil) için KDV hariç 83,33 → belge 100,00; 83,32 → 99,98; 99,99 veren iki ondalıklı tutar yoktur (Nilvera test ortamında görüldü, belge 100,00). Bilinçli karar: en yakına yuvarlanır, fark `providerTotal` ile gösterilir; belge düzeltmesi yapılmaz.
 
 ---
 
@@ -75,7 +75,7 @@ Issued → CancelRequested → Cancelled
 
 ## 3) Sağlayıcı bağlantısı (klinik başına)
 
-Klinik başına tek bağlantı (Tenant + Clinic benzersiz). Kimlik bilgileri (OAuth erişim/yenileme belirteçleri) **ASP.NET Data Protection ile şifreli** saklanır, hiçbir yanıtta dönmez, günlüğe yazılmaz. İzin: okuma `Clinics.Read`, yazma `Clinics.Update` (Admin, Owner, ClinicAdmin). Atanmamış klinik `Clinics.AccessDenied` (403).
+Klinik başına tek bağlantı (Tenant + Clinic benzersiz). Kimlik bilgileri (OAuth erişim/yenileme belirteçleri ya da API anahtarı) **ASP.NET Data Protection ile şifreli** saklanır, hiçbir yanıtta dönmez, günlüğe yazılmaz. İzin: okuma `Clinics.Read`, yazma `Clinics.Update` (Admin, Owner, ClinicAdmin). Atanmamış klinik `Clinics.AccessDenied` (403).
 
 ### 3.1 `GET /clinics/{clinicId}/e-document-connection`
 
@@ -100,8 +100,9 @@ Klinik başına tek bağlantı (Tenant + Clinic benzersiz). Kimlik bilgileri (OA
 - `status`: `NotConnected` (kayıt yok veya koparıldı) | `Connected` | `AccountSelectionRequired` (hesapta birden çok firma var, §3.4) | `ReauthorizationRequired` (yenileme belirteci geçersiz; yeniden bağlanmalı).
 - `environment`: `Test` | `Live` — sunucu ayarından (`EDocuments:Parasut:Environment`); belgeye de yazılır. Test ortamında kesilen belge gerçek değildir.
 - `accountChoices`: yalnız `AccountSelectionRequired` iken `[{ "accountId", "accountName", "taxNumber" }]`.
-- `connectionMethod`: `OAuth` (sağlayıcının ekranında onay, §3.2) | `Credentials` (ileride anahtar/kullanıcı alanlarıyla bağlanan sağlayıcılar). Panel sağlayıcı listesini ve kartı buna göre çizer; belge akışlarında sağlayıcı adı geçmez.
-- `configured: false` = sunucuda uygulama kimliği yok; bağlanma `EDocuments.ProviderNotConfigured` (503) döner.
+- `connectionMethod`: `OAuth` (sağlayıcının ekranında onay, §3.2; Paraşüt) | `Credentials` (klinik sağlayıcı portalında ürettiği API anahtarını girer, §3.8; Nilvera). Panel sağlayıcı listesini ve kartı buna göre çizer; belge akışlarında sağlayıcı adı geçmez.
+- `configured: false` = sunucuda sağlayıcı ayarı eksik (Paraşüt: uygulama kimliği; Nilvera: taban adres); bağlanma `EDocuments.ProviderNotConfigured` (503) döner.
+- `environment` sağlayıcının sunucu ayarından gelir (`EDocuments:{Sağlayıcı}:Environment`).
 
 ### 3.2 `POST /clinics/{clinicId}/e-document-connection/authorize`
 
@@ -129,6 +130,14 @@ Bağlantıyı sınar (belirteç yenilenir, firma erişilebilir mi, e-belge kulla
 
 Bağlantıyı koparır: şifreli kimlik bilgisi silinir, durum `NotConnected`. Kesilmiş belgeler kalır (PDF/iptal için yeniden bağlanmak gerekir). 204. Denetim: `Clinic.EDocumentConnection.Disconnect`.
 
+### 3.8 `POST /clinics/{clinicId}/e-document-connection/credentials`
+
+API anahtarıyla bağlanan sağlayıcı (`connectionMethod: "Credentials"`). Gövde `{ "provider": "nilvera", "apiKey": "…" }`. Anahtar baştan/sondan kırpılır, en çok 500 karakter. Sunucu anahtarla sağlayıcıya bağlanır ve anahtarın ait olduğu hesabı bulur (Nilvera: `GET /general/Company`; `accountId` = firmanın VKN/TCKN'si, `accountName` = unvanı), anahtarı şifreleyip saklar, bağlantıyı sınar. Yanıt §3.1; anahtar hiçbir yanıtta dönmez, günlüğe yazılmaz, denetim kaydında maskelenir (`ApiKey` alanı). Denetim: `Clinic.EDocumentConnection.Connect`.
+
+- Mevcut bağlantı (başka sağlayıcıyla olsa da) bu anahtarla değiştirilir. Anahtarı değiştirmek için aynı uç yeniden çağrılır.
+- Hatalar: anahtar boş / çok uzun, sağlayıcı anahtarla bağlanmıyor (OAuth sağlayıcısı) veya bilinmiyor → `EDocuments.Validation` (400). Sağlayıcı anahtarı reddetti (401) → `EDocuments.Validation` (400, "API anahtarı geçersiz…"); **mevcut bağlantı değişmez**. Sağlayıcı geçici hata → `EDocuments.ProviderUnavailable` (503). Eşzamanlı yazım → `EDocuments.ConcurrencyConflict` (409).
+- Bağlıyken anahtar sağlayıcıda geri alınırsa sonraki çağrı 401 alır ve bağlantı `ReauthorizationRequired` olur (§3.1); klinik yeni anahtar girer.
+
 ---
 
 ### 3.7 Klinik e-Belge ayarı — `GET` / `PUT /clinics/{clinicId}/e-document-settings`
@@ -149,10 +158,11 @@ Okuma `Clinics.Read`, yazma `Clinics.Update`. Bağlantıdan ayrıdır (koparıl�
 ```
 
 - `autoIssueMode`: `Off` | `OnPayment` (tamamen ödenen ücret arka plan işinin bir sonraki turunda, en çok `EDocuments:Processor:AutomationIntervalSeconds` gecikmeyle kesilir) | `EndOfDay` (günde bir kez `endOfDayTime`'da, İstanbul saati).
-- `autoIssueEnabledAtUtc`: otomatik kesmenin açıldığı an; **yalnız bundan sonra yazılan ücretler** otomatik kesilir (açmak geçmişi toplu kesmez). Kapatınca boşalır.
+- `autoIssueEnabledAtUtc`: otomatik kesmenin açıldığı an; **yalnız bundan sonra ödemesi tamamlanan ücretler** otomatik kesilir, ücretin ne zaman yazıldığı fark etmez (açılmadan yazılıp sonra ödenen ücret de kesilir; açılışta zaten ödenmiş eski ücretler geriye dönük kesilmez — kullanıcı kararı 2026-11-12). Kapatınca boşalır; yeniden açmak yeni an yazar (kapalıyken ödenenler kesilmez). Durdurma / sürdürme anı değiştirmez.
 - `issueOnPaymentByDefault`: ödeme ekranındaki "e-Belge kes" seçeneğinin varsayılanı.
 - `serviceDocument` / `productDocument`: mükellef türünden çıkan belge (`ESmm` | `Invoice` = alıcıya göre e-Arşiv / e-Fatura); mükellef türü yoksa null. Kural backend'de (§1.1), panel yalnız gösterir.
-- PUT gövdesi: `{ autoIssueMode, endOfDayTime: "SS:dd", issueOnPaymentByDefault }`. Geçersiz saat `EDocuments.Validation` (400). Denetim: `Clinic.EDocumentSettings.Update`.
+- `autoIssuePausedAtUtc` / `autoIssuePauseReason`: otomatik kesme hesap genelinde kalıcı bir sağlayıcı sorunuyla durduysa an ve neden (§6); değilse null. Panel nedeni ve "Sürdür" düğmesini gösterir.
+- PUT gövdesi: `{ autoIssueMode, endOfDayTime: "SS:dd", issueOnPaymentByDefault }`. Geçersiz saat `EDocuments.Validation` (400). Denetim: `Clinic.EDocumentSettings.Update`. **Kaydetmek durdurulmuş otomatik kesmeyi sürdürür** (sorun giderilmediyse ilk turda yeniden durur ve yeniden bildirir).
 
 ## 4) Belgeler
 
@@ -239,6 +249,8 @@ Detay ve liste öğesi ayrıca `origin`: `Manual` | `Payment` | `Automatic` taş
 
 Geçersiz durum geçişi `EDocuments.InvalidState` (409). Hepsi 200 `EDocumentDto` döner (PDF hariç). Denetim: `EDocument.Retry`, `EDocument.Discard`, `EDocument.Cancel`.
 
+**Belge kendi sağlayıcısında kalır:** belge kesildiği sağlayıcı (`provider`) ve ortamla (`isTest`) işlenir. Klinik o arada başka entegratöre veya test ↔ canlı ortama geçtiyse yenile / yeniden dene / arka plan işi belgeyi yeni sağlayıcıya **göndermez ve sormaz** (çapraz gönderim çift belge üretir): `Sending` belge `Failed` olur, `lastError.providerCode: "provider-mismatch"`, mesaj eski entegratörün adını verir ("…ekranından takip edin; kesilmediyse vazgeçip yeniden kesin"); `CancelRequested` `CancelRejected` olur. PDF isteği `EDocuments.ProviderMismatch` (409).
+
 ### 4.6 Belgesiz ücretler — `GET /e-documents/undocumented-charges`
 
 AK-4 "belgesi kesilmemiş ücretler" listesi. Sorgu: `clinicId`, `clientId`, `visitId`, `fromUtc`, `toUtc`, `page`, `pageSize`. İptal edilmemiş ve belgeye bağlı olmayan ücretler (`Discarded` / `Cancelled` belgeden serbest kalanlar dahil) **ve kesilemeyen (`Failed`) belgeye bağlı ücretler**. Eski programdan devreden bakiye ücreti (`isImported`, ADR-048 T3) bu listeye, hatırlatma sayacına, ödemeden kesmeye ve otomatik kesmeye girmez; kural `EDocumentRules.IsDocumentableCharge`. Öğe: `chargeId, clientId, clientName, petId, petName, visitId, saleId, description, amount, outstandingAmount, createdAtUtc, failedDocumentId, reason`. `reason` (kullanıcı metni): "Belge kesilemedi: …" (sağlayıcı hatası; `failedDocumentId` ile yeniden dene / vazgeç), "Müşterinin vergi numarası eksik.", "Ödeme bekliyor."; hazırsa null. İzin `EDocuments.Read`.
@@ -267,19 +279,71 @@ Gövde `{ "paymentId": "…" }`. `EDocuments.Issue`. Ödeme ekranındaki "e-Belg
 
 Bağlı her klinikte `endOfDayTime`'da (ayar yoksa 23:00, otomatik kapalı olsa da) günde bir kez, kliniğe erişen ve `EDocuments.Issue` izni olan kullanıcılara bildirim (`type: EDocumentsDailySummary`, `targetType: "EDocuments"`, `targetId` = klinik): "N belge otomatik kesildi · M belge kesilemedi · K ödenmiş ücretin belgesi yok". Hepsi sıfırsa bildirim yok.
 
+### 4.11 Diğer e-belge bildirimleri
+
+| `type` | Kime | Hedef | Ne zaman |
+|---|---|---|---|
+| `EDocumentsAutoIssuePaused` (9) | Kliniğe erişen, `Clinics.Update` izni olanlar (sürdürebilenler) | `targetType: "EDocumentSettings"`, `targetId` = klinik | Otomatik kesme kalıcı sorunla durdu (§6); durma başına bir kez |
+| `EDocumentPaymentVoided` (10) | Kliniğe erişen, `EDocuments.Cancel` izni olanlar | `targetType: "EDocument"`, `targetId` = belge | Belgeli ücretin ödemesi iptal edildi; belge **kendiliğinden iptal edilmez** ("Tahsilat gerçekten geri verildiyse belgeyi iptal edin") |
+
+Ödeme iptali (`POST /payments/{id}/void`) bildirimi ödeme iptaliyle aynı kayıtta yazar; `Failed` / `Discarded` / `Cancelled` belge için bildirim yok.
+
 ## 5) Sağlayıcı soyutlaması (uygulama notu)
 
-- `IEDocumentProvider` (Application): mükellef sorgusu, belge gönder, durum sorgula, iptal, PDF, bağlantı sına; `IEDocumentOAuthProvider` OAuth bağlanma adımları. Paraşüt uygulaması `Infrastructure/EDocuments/Parasut`. Domain'de sağlayıcı adı geçmez; bağlantı `providerCode` metniyle sağlayıcıyı seçer. İkinci entegratör yeni bir `IEDocumentProvider` kaydıdır.
-- Hata sınıfları adaptörde çevrilir: geçersiz veri, yetki (bağlantı `ReauthorizationRequired`), hesap askıda (Paraşüt 402), kontör, sağlayıcı reddi, geçici (otomatik yeniden deneme).
+- `IEDocumentProvider` (Application): mükellef sorgusu, belge gönder, durum sorgula, iptal, PDF, bağlantı sına; `IEDocumentOAuthProvider` OAuth bağlanma adımları; `IEDocumentCredentialProvider` API anahtarıyla bağlanma (anahtar → hesap). Uygulamalar `Infrastructure/EDocuments/Parasut` ve `Infrastructure/EDocuments/Nilvera`. Domain'de sağlayıcı adı geçmez; bağlantı `providerCode` metniyle sağlayıcıyı seçer. Yeni entegratör yeni bir `IEDocumentProvider` kaydı (ve bağlanma yöntemine göre OAuth ya da anahtar arayüzü) demektir.
+- Hata sınıfları adaptörde çevrilir: geçersiz veri, yetki (bağlantı `ReauthorizationRequired`), hesap askıda (Paraşüt 402) / kontör yetersiz (Nilvera 422 kod 2000), sağlayıcı reddi, geçici (otomatik yeniden deneme).
 - Paraşüt akışı: alıcı cari (`contacts`, vergi no ile aranır, yoksa oluşturulur) → satır ürünü (`products`; Paraşüt satırda ürün/hizmet ister; satır açıklamasından türetilen sabit kodla `VTN-…` aranır, yoksa oluşturulur) → satış faturası (`sales_invoices`, `external_reference_key` = belgenin dış referansı; tekrarında mevcut fatura kullanılır) → e-SMM (`e_smms`, eşzamanlı) / e-Arşiv (`e_archives`) / e-Fatura (`e_invoices`, `scenario: basic`, `to` = gelen kutusu adresi) → iş takibi (`trackable_jobs`) → `active_e_document`. İptal `DELETE sales_invoices/{id}/cancel`. PDF `…/{id}/pdf` (adres süreli, saklanmaz).
-- Ayarlar (`EDocuments:Parasut`): `ClientId`, `ClientSecret` (user-secrets / ortam değişkeni; repoda yok), `Environment` (`Test`/`Live`), `IdentityBaseUrl`, `ApiBaseUrl`, `RedirectUri`. `EDocuments:Processor`: `Enabled`, `IntervalSeconds`, `BatchSize`, `MaxAttempts`. Data Protection anahtar halkası: `DataProtection:KeysPath` (canlıda kalıcı ve yedekli dizin; boşsa varsayılan konum ve açılışta uyarı).
+- Nilvera akışı (V1, `developer.nilvera.com`; şemalar `apitest.nilvera.com/{servis}/swagger/v1/swagger.json`, 2026-11-12 okundu). Kimlik `Authorization: Bearer {API anahtarı}`; servisler `earchive`, `einvoice`, `evoucher` (e-SMM; `esmm` değil), `general`.
+  - Seri: `GET /{servis}/Series`; varsayılan ve etkin seri, yoksa ilk etkin seri (e-Arşiv'de seri zorunlu). Etkin seri yoksa `InvalidData` ("Nilvera portalında seri tanımlayın").
+  - Gönderim: `POST /{servis}/Send/Model`; gövde e-Arşiv `{ArchiveInvoice:{InvoiceInfo, CustomerInfo, InvoiceLines, Notes}}`, e-Fatura `{EInvoice:{…}, CustomerAlias}` (`InvoiceProfile: TEMELFATURA`), e-SMM `{Voucher:{VoucherInfo, CustomerInfo, VoucherLines, Notes}}`. **ETTN (`UUID`) = belgenin dış referansı**; satıcı (`CompanyInfo`) gönderilmez, Nilvera aktif firmayı doldurur. Satırlar KDV hariç birim fiyat, birim kodu UN/ECE (`C62` adet…); belge toplamları (`LineExtensionAmount`, `KdvTotal`, `GeneralKDV{oran}Total`, `PayableAmount`) gönderilir. e-SMM satırında miktar yok: `GrossWage` = satır tutarı, gelir vergisi stopajı `GVWithholdingPercent` / `GVWithholdingTotal`.
+  - Tekrar koruması: aynı ETTN ikinci kez `409` döner → durum sorgulanır; belge varsa oradan devam edilir, yoksa (başka bir 409, ör. VKN uyuşmazlığı) hata gösterilir. **Test ortamında doğrulandı (2026-11-12):** kesilmiş belgenin yanıtı kaybolmuş gibi bırakılıp aynı ETTN yeniden gönderildi → `409 {Errors:[{Code:1001,"ETTN Numarası Sistemde Kayıtlıdır."}]}` → belge aynı numarayla eşlendi; Nilvera'da o ETTN'den tek belge var.
+  - Durum: `GET /earchive/Invoices/{ETTN}/Status`, `/evoucher/Vouchers/{ETTN}/Status` (`StatusCode: unknown|waiting|succeed|error`), `/einvoice/Sale/{ETTN}/Status` (`InvoiceStatus.Code`, `Answer.AnswerCode: rejected` → hata). e-Arşiv / e-SMM'de bu durum belgenin değil **GİB raporunun** durumudur: kesilen belge rapor oluşana dek `unknown` / "Rapor Oluşturulmadı" kalır (test ortamında görüldü, 2026-11-12). Bu yüzden e-Arşiv / e-SMM'de durum `error` değilse `…/Details` okunur; numara (`InvoiceNumber` / `VoucherNumber`) varsa belge `Issued` (tutar `InvoiceAmount` / `VoucherAmount`). e-Fatura'da `succeed` beklenir. Bildirim yok; durum arka plan işiyle sorgulanır (§2).
+  - İptal: `PUT /earchive/Invoices/{ETTN}/Cancel`, `PUT /evoucher/Vouchers/{ETTN}/Cancel`; 422 2026/2034 (zaten iptal) başarı, 2028/2029/2036/2037 (kuyrukta / sonra dene) yeniden denenir. **e-Fatura iptali Nilvera API'sinde yok:** sağlayıcı yeteneği `CanCancel(EInvoice) = false` → belge `canCancel: false`, iptal ucu `EDocuments.CancelUnsupported` (409) ile baştan reddeder, belge kesilmiş kalır (kullanıcı alıcıyla iade faturası veya GİB portalı üzerinden işlem yapar).
+  - Hesap hataları (developer.nilvera.com/hata-kodlari): 422 / 2000, 2002, 2075, 2076, 2077, 2078 (kontör veya paket yetersiz / süresi dolmuş) → `AccountSuspended`; 401 ve 403 (anahtar geçersiz / yetkisiz) → `Authorization` (bağlantı "yeniden bağlan" olur). İkisi de otomatik kesmeyi durdurur (§6). Diğer 400/409/422 belgeye özgüdür (`InvalidData`), durdurmaz. Kontör bakiyesi `GET /general/Credits` ile okunabilir (şimdilik kullanılmıyor). Test hesabının kontörü bitirilemediği için gerçek kontör yanıtı denenmedi; kodlar belgeden alındı ve adaptör testleriyle güvenceye alındı.
+  - **e-Fatura test ortamında doğrulandı (2026-11-12):** alıcı mükellef sorgusuyla bulundu (test kullanıcısı VKN 1111113181, `urn:mail:defaultpk@…`), elle kesim → durum `waiting` "GİB'e Başarıyla İletildi" → `succeed` "Alıcıya Başarıyla İletildi" (GİB 1300) → belge `Issued` (arka plan işi), numara ve toplam okundu, PDF indirildi (TEMELFATURA, düzenlenme saati doğru); otomatik kesim ("Ödeme alınınca") e-Fatura'yı kendiliğinden kesti. Nilvera test VKN'lerinin çoğu (1234567802 dahil) kontrol hanesinden geçmediği için uygulamada alıcı yapılamaz; kontrol hanesi doğru test mükellefi kullanılmalı.
+  - PDF: `GET …/{ETTN}/pdf`; test ortamında JSON içinde tırnaklı base64 metin döner (`application/json`); ham `application/pdf` da kabul edilir. Vazgeçme: Nilvera'ya taslak yazılmadığı için silinecek kayıt yoktur; belge Nilvera'da oluşmuşsa (durum `error` değil) vazgeçme reddedilir, iptal edilir.
+  - `IssueDate` belgenin oluşturulduğu an, İstanbul saatiyle saniyesine kadar gönderilir (`yyyy-MM-ddTHH:mm:ss`; sağlayıcı isteği `IssuedAtLocal`); PDF'te "Düzenlenme Saati" bu saattir (test ortamında görüldü). Yeniden denemede değişmez.
+  - Kişi alıcı adı ad + soyad olmalı, `District` zorunlu (boşsa il adı gönderilir).
+  - Mükellef sorgusu: `GET /general/GlobalCompany/GetGlobalCustomerInfo/{vkn}?globalUserType=Invoice`; `Aliases[]` içinde `DeletionTime` boş ilk etiket gelen kutusu adresidir; 404 mükellef değil.
+- Ayarlar (`EDocuments:Parasut`): `ClientId`, `ClientSecret` (user-secrets / ortam değişkeni; repoda yok), `Environment` (`Test`/`Live`), `IdentityBaseUrl`, `ApiBaseUrl`, `RedirectUri`. `EDocuments:Nilvera`: `Environment`, `ApiBaseUrl` (canlı `https://api.nilvera.com`, test `https://apitest.nilvera.com`), `TimeoutSeconds`; sunucuda gizli değer yok (anahtar kliniğe ait, bağlantıda şifreli). `EDocuments:Processor`: `Enabled`, `IntervalSeconds`, `BatchSize`, `MaxAttempts`. Data Protection anahtar halkası: `DataProtection:KeysPath` (canlıda kalıcı ve yedekli dizin; boşsa varsayılan konum ve açılışta uyarı).
 
 ## 6) Otomatik kesme (arka plan işi)
 
 - `EDocumentAutomationProcessor` (`EDocuments:Processor:AutomationIntervalSeconds`, varsayılan 60 sn) bağlı klinikleri tarar; her klinik kendi kiracı kapsamında işlenir.
-- Uygun ücret: tamamen ödenmiş (`allocatedAmount = amount`), iptal edilmemiş, belgesiz, `autoIssueEnabledAtUtc`'den sonra yazılmış; bağlantı sağlam; alıcı belge türü için yeterli (kurumsalda vergi no). Uygun olmayan veya hata alan ücret kesilmez, §4.6 listesinde nedeniyle görünür ve §4.9–§4.10 hatırlatmasına girer.
+- Uygun ücret: iptal edilmemiş, belgesiz, **ödemesi `autoIssueEnabledAtUtc`'den sonra tamamlanmış** (`Charge.FullyPaidAtUtc ≥ autoIssueEnabledAtUtc`; "Gün sonunda" modunda da aynı ölçüt, o güne kadar bekleyenler de kesilir); bağlantı sağlam; alıcı belge türü için yeterli (kurumsalda vergi no). Uygun olmayan veya hata alan ücret kesilmez, §4.6 listesinde nedeniyle görünür ve §4.9–§4.10 hatırlatmasına girer.
 - Gruplama müşteri başına, belge türüne göre; tekrar koruması anahtarla türetilen requestId + "bir ücret tek geçerli belge" bağı (otomatik ve elle kesme yarışsa da çift belge yok).
 - Otomatik belgenin `createdByUserId`'si ayarı en son kaydeden kullanıcıdır, `origin: Automatic`. Her otomatik belge denetim kaydına `EDocument.AutoIssue` olarak yazılır (aktör yok, yük `origin: "Automatic"`).
 - Gün sonu işaretlemesi işten önce kaydedilir (`ClinicEDocumentSettings.RowVersion`); iki örnek aynı günü ikinci kez çalıştırmaz.
 - Deneme kiracısında canlı ortamda otomatik kesme yapılmaz.
+- **Kalıcı hesap hatasında durma** (`EDocumentAutoIssueGuard`): yetki / anahtar reddi (bağlantı "yeniden bağlan" durumuna düşer), hesap askıda / kontör bitti (`AccountSuspended`), kota (`QuotaExceeded`) veya kullanılamayan bağlantı çıkınca tur durur, `ClinicEDocumentSettings.AutoIssuePausedAtUtc` / `AutoIssuePauseReason` yazılır, `EDocumentsAutoIssuePaused` bildirimi bir kez gider (§4.11). Durmuşken yeni belge kesilmez; bu sürede ödenen ücretler belgesiz bekler ve sürdürünce (ayarı kaydetmek) kesilir (`autoIssueEnabledAtUtc` değişmez). Sonucu sonradan gelen (asenkron) belgede aynı hata çıkarsa durum işi de durdurur. Belgeye özgü hatalar (alıcı bilgisi, verinin reddi) durdurmaz; geçici hatalar (zaman aşımı, 5xx, 429) artan aralıkla yeniden denenir (10 sn → 30 dk, en çok `MaxAttempts`).
+- **Ayar kapatılınca** yeni belge kesilmez; gönderilmiş (`Sending`) belgelerin sonucu yine alınır (sağlayıcıda oluşmuş olabilirler; yarıda bırakmak çift belge riskidir).
+- **İptal / vazgeçmeden sonra** otomatik kesme aynı ücreti yeniden kesmez (aynı anahtarlı requestId eski belgeyi bulur); yeniden kesim elle yapılır ve **yeni dış referans (UUID)** alır (test ortamında doğrulandı).
+- `Charge.FullyPaidAtUtc`: tahsilatın (ödeme tahsisi veya kredi mahsubu) ücreti kapattığı an; ödeme geri alınınca veya tutarı artıran düzeltmede boşalır, yeniden ödenince yeni an yazılır. Tutarı tahsis edilmiş tutara indiren düzeltmeyle kapanan ücrette an yazılmaz (otomatik kesilmez, elle kesilir). Migration `AddChargeFullyPaidAt` sütunu ekler, mevcut kapalı ücretleri son geçerli tahsilin anıyla doldurur ve `(TenantId, ClinicId, FullyPaidAtUtc)` koşullu indeksini (belgesiz, dolu) kurar; yalnız yerel geliştirme veritabanında uygulandı.
+- Migration: `AddEDocumentAutoIssuePause` (`ClinicEDocumentSettings.AutoIssuePausedAtUtc`, `AutoIssuePauseReason`; iki boş bırakılabilir sütun); yalnız yerel geliştirme veritabanında uygulandı.
+
+## 7) Çift kesim koruması (iki sağlayıcıda ortak)
+
+| Risk | Koruma |
+|---|---|
+| Aynı ücrete iki etkin belge | Ücretin tek `EDocumentId` sütunu (bir ücret aynı anda tek belgeye bağlanabilir; veritabanı düzeyinde yapısal) + `Charge.MutationSequence` eşzamanlılık belirteci; belge iptal / vazgeçmede bağ çözülür. Ayrıca koşullu benzersiz indeks gerekmez: ilişki satırda tek sütun. |
+| İki sekme / iki kullanıcı / elle + otomatik aynı anda | Bağlama aynı kayıtta; kaybeden `EDocuments.ConcurrencyConflict` (409). Aynı `requestId` benzersiz indeks (`TenantId, RequestId`); otomatik ve ödemeden kesmede requestId tetikleyiciden türetilir. |
+| Arka plan işi iki örnekte çalışır | Aynı türetilmiş requestId → ikinci örnek mevcut belgeyi bulur; belge `RowVersion` ile korunur; gün sonu işareti işten önce kaydedilir. |
+| Gönderimde zaman aşımı / süreç düşmesi | Belge ve dış referans (UUID) **gönderimden önce** kaydedilir; sonuç gelmezse arka plan işi **aynı UUID** ile yeniden gönderir; sağlayıcı "zaten var" derse (Nilvera 409/1001, Paraşüt `external_reference_key`) belge eşlenir, hata sayılmaz. |
+| Sağlayıcı / ortam değişimi | Belge kendi sağlayıcısında kalır (§4.5). |
+| İptalden sonra yeniden kesim | Yeni belge, yeni UUID. |
 - Migration: `AddEDocumentAutomation` (`ClinicEDocumentSettings`, `EDocuments.Origin`); yalnız yerel geliştirme veritabanında uygulandı.
+
+## 8) Canlıya çıkış (Nilvera ve otomatik kesme)
+
+Veritabanı (canlıda `__EFMigrationsHistory` kontrol edilip eksikler sırayla uygulanır; uygulama kullanıcı onayıyla):
+
+| Migration | Ne yapar |
+|---|---|
+| `20261110234342_AddEDocuments` | e-belge tabloları (main'de; canlıda uygulanmadıysa) |
+| `20261111002331_AddEDocumentAutomation` | klinik e-Belge ayarı, belge kaynağı (main'de; canlıda uygulanmadıysa) |
+| `20261112112342_AddEDocumentAutoIssuePause` | ayarda durdurma anı ve nedeni (bu dal) |
+| `20261112120019_AddChargeFullyPaidAt` | `Charges.FullyPaidAtUtc` + mevcut kapalı ücretleri doldurma + koşullu indeks (bu dal; `Charges` tablosunu bir kez günceller) |
+
+**Entegratör:** canlıya yalnız Nilvera ile çıkılır (kullanıcı kararı 2026-11-13). Paraşüt kodu durur, `EDocuments:Parasut:Enabled = false` (appsettings.json) ile kapalıdır: `availableProviders` listesinde görünmez, bağlanılamaz. Açmak için `Enabled: true` ve canlı Paraşüt uygulama kimliği gerekir. Yapılandırılmamış / kapalı entegratör listede hiç gösterilmez (§3.1).
+
+Sunucu yapılandırması: Nilvera için sunucuya gizli bilgi girilmez (anahtar klinik başına, panelden girilir ve veritabanında şifreli saklanır). `appsettings.json` varsayılanları canlıdır: `EDocuments:Nilvera:Environment = Live`, `ApiBaseUrl = https://api.nilvera.com`; `EDocuments:Processor:Enabled = true`. **Zorunlu:** `DataProtection:KeysPath` kalıcı ve yedekli bir dizin olmalı (anahtar halkası kaybolursa kayıtlı Nilvera anahtarları çözülemez, klinikler yeniden bağlanır). Klinik tarafı: Nilvera canlı hesabı (portal.nilvera.com), e-Arşiv / e-SMM / e-Fatura modülleri ve serileri tanımlı, kontör yüklü; API Tanımları'ndan anahtar üretilip panelde Ayarlar › e-Belge'ye girilir.

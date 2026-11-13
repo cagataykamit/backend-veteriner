@@ -444,7 +444,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
             await using var scope = Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var charge = await db.Charges.SingleAsync(c => c.Id == chargeId);
-            charge.ApplyAllocation(amount).IsSuccess.Should().BeTrue();
+            charge.ApplyAllocation(amount, DateTime.UtcNow).IsSuccess.Should().BeTrue();
             await db.SaveChangesAsync();
         }
 

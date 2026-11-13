@@ -26,6 +26,13 @@ public sealed class ParasutOptions
 
     public int TimeoutSeconds { get; init; } = 30;
 
+    /// <summary>
+    /// Kliniklere sunulsun mu. Kapalıyken entegratör listesinde görünmez, bağlanılamaz, belge gönderilmez; kod durur, ayarla
+    /// yeniden açılır. Canlıda kapalı (ADR-036, 2026-11-13: ilk entegratör Nilvera; Paraşüt desteği yanıt vermedi).
+    /// </summary>
+    public bool Enabled { get; init; } = true;
+
     public bool IsConfigured =>
-        !string.IsNullOrWhiteSpace(ClientId) && !string.IsNullOrWhiteSpace(ClientSecret) && !string.IsNullOrWhiteSpace(RedirectUri);
+        Enabled
+        && !string.IsNullOrWhiteSpace(ClientId) && !string.IsNullOrWhiteSpace(ClientSecret) && !string.IsNullOrWhiteSpace(RedirectUri);
 }

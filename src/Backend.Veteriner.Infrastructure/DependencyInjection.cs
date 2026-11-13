@@ -1,5 +1,6 @@
 // src/Backend.Veteriner.Infrastructure/DependencyInjection.cs
 using Microsoft.AspNetCore.DataProtection;
+using Backend.Veteriner.Infrastructure.EDocuments.Nilvera;
 using Backend.Veteriner.Infrastructure.EDocuments.Parasut;
 using Backend.Veteriner.Infrastructure.EDocuments;
 using Backend.Veteriner.Application.EDocuments.Providers;
@@ -399,6 +400,15 @@ public static class DependencyInjection
         services.AddScoped<ParasutEDocumentProvider>();
         services.AddScoped<IEDocumentProvider>(sp => sp.GetRequiredService<ParasutEDocumentProvider>());
         services.AddScoped<IEDocumentOAuthProvider>(sp => sp.GetRequiredService<ParasutEDocumentProvider>());
+        services.Configure<NilveraOptions>(configuration.GetSection(NilveraOptions.SectionName));
+        // API anahtarı başlıkta, vergi kimliği adreste: varsayılan HttpClient günlükleri kapalı (NilveraClient kendi şablonunu yazar).
+        services.AddHttpClient(NilveraClient.HttpClientName, (sp, client) =>
+                client.Timeout = TimeSpan.FromSeconds(Math.Max(5, sp.GetRequiredService<IOptions<NilveraOptions>>().Value.TimeoutSeconds)))
+            .RemoveAllLoggers();
+        services.AddScoped<NilveraClient>();
+        services.AddScoped<NilveraEDocumentProvider>();
+        services.AddScoped<IEDocumentProvider>(sp => sp.GetRequiredService<NilveraEDocumentProvider>());
+        services.AddScoped<IEDocumentCredentialProvider>(sp => sp.GetRequiredService<NilveraEDocumentProvider>());
         services.Configure<EDocumentProcessorOptions>(configuration.GetSection(EDocumentProcessorOptions.SectionName));
         services.AddSingleton<EDocumentStatusProcessor>();
         services.AddHostedService<EDocumentStatusHostedService>();

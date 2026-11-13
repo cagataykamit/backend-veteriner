@@ -40,10 +40,11 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
         PermissionCatalog.Clinics.Read, PermissionCatalog.Clinics.Update,
         PermissionCatalog.Charges.Read, PermissionCatalog.Charges.Create, PermissionCatalog.Charges.Correct,
         PermissionCatalog.EDocuments.Read, PermissionCatalog.EDocuments.Issue, PermissionCatalog.EDocuments.Cancel,
-        PermissionCatalog.Payments.Read, PermissionCatalog.Payments.Create,
+        PermissionCatalog.Payments.Read, PermissionCatalog.Payments.Create, PermissionCatalog.Payments.Correct,
     ];
 
     private readonly FakeProvider _provider = new();
+    private readonly KeyProvider _keyProvider = new();
     private readonly WebApplicationFactory<global::Program> _factory;
 
     public EDocumentsIntegrationTests(CustomWebApplicationFactory factory)
@@ -51,8 +52,56 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
         _factory = factory.WithWebHostBuilder(b => b.ConfigureTestServices(services =>
         {
             services.RemoveAll<IEDocumentProvider>();
+            services.RemoveAll<IEDocumentCredentialProvider>();
             services.AddSingleton<IEDocumentProvider>(_provider);
+            services.AddSingleton<IEDocumentProvider>(_keyProvider);
+            services.AddSingleton<IEDocumentCredentialProvider>(_keyProvider);
+            services.AddSingleton<IEDocumentProvider>(new ClosedProvider());
         }));
+    }
+
+    [Fact]
+    public async Task Api_Key_Connection_Should_Verify_Key_Store_It_Encrypted_And_Never_Return_It()
+    {
+        var ctx = await SeedAsync();
+        var url = $"/api/v1/clinics/{ctx.ClinicId}/e-document-connection";
+
+        var options = await ctx.GetAsync(url);
+        options.GetProperty("availableProviders").EnumerateArray()
+            .Single(p => p.GetProperty("provider").GetString() == KeyProvider.Code)
+            .GetProperty("connectionMethod").GetString().Should().Be("Credentials");
+        options.GetProperty("availableProviders").EnumerateArray()
+            .Should().NotContain(p => p.GetProperty("provider").GetString() == ClosedProvider.Code, "kapalı entegratör kliniklere sunulmaz");
+
+        var wrong = await ctx.Http.PostAsJsonAsync($"{url}/credentials", new { provider = KeyProvider.Code, apiKey = "yanlis-anahtar" });
+        wrong.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await wrong.Content.ReadAsStringAsync()).Should().Contain("API anahtarı geçersiz").And.NotContain("yanlis-anahtar");
+        (await ctx.GetAsync(url)).GetProperty("provider").GetString().Should().Be(FakeProvider.Code, "geçersiz anahtar mevcut bağlantıyı bozmaz");
+
+        var oauthOnly = await ctx.Http.PostAsJsonAsync($"{url}/credentials", new { provider = FakeProvider.Code, apiKey = KeyProvider.ValidKey });
+        oauthOnly.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var connected = await ctx.Http.PostAsJsonAsync($"{url}/credentials", new { provider = KeyProvider.Code, apiKey = $"  {KeyProvider.ValidKey}  " });
+        var text = await connected.Content.ReadAsStringAsync();
+        connected.StatusCode.Should().Be(HttpStatusCode.OK, text);
+        text.Should().NotContain(KeyProvider.ValidKey);
+        var dto = JsonDocument.Parse(text).RootElement;
+        dto.GetProperty("status").GetString().Should().Be("Connected");
+        dto.GetProperty("provider").GetString().Should().Be(KeyProvider.Code);
+        dto.GetProperty("accountId").GetString().Should().Be("1234567801");
+        dto.GetProperty("lastVerificationOk").GetBoolean().Should().BeTrue();
+
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var stored = await db.Set<EDocumentConnection>().AsNoTracking().SingleAsync(c => c.ClinicId == ctx.ClinicId);
+        stored.ProtectedCredentials.Should().NotBeNullOrEmpty().And.NotContain(KeyProvider.ValidKey);
+        scope.ServiceProvider.GetRequiredService<ISecretProtector>()
+            .Unprotect(EDocumentProviderGateway.CredentialsPurpose, stored.ProtectedCredentials!).Should().Be(KeyProvider.ValidKey);
+        var payloads = await db.AuditLogs.AsNoTracking()
+            .Where(a => a.ActorUserId == ctx.UserId && a.Action == "Clinic.EDocumentConnection.Connect")
+            .Select(a => a.RequestPayload)
+            .ToListAsync();
+        payloads.Should().NotBeEmpty().And.AllSatisfy(p => p.Should().NotContain(KeyProvider.ValidKey).And.NotContain("yanlis-anahtar"));
     }
 
     [Fact]
@@ -144,6 +193,26 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
         var rejectedBody = await rejected.Content.ReadAsStringAsync();
         rejected.StatusCode.Should().Be(HttpStatusCode.BadRequest, rejectedBody);
         JsonDocument.Parse(rejectedBody).RootElement.GetProperty("missingFields")[0].GetString().Should().Be("taxNumber");
+    }
+
+    [Fact]
+    public async Task EInvoice_Of_Provider_Without_EInvoice_Cancel_Should_Not_Offer_Or_Start_Cancel()
+    {
+        var ctx = await SeedAsync();
+        _provider.CancelsEInvoice = false;
+        var corporate = await ctx.CreateClientAsync(new { personType = "Corporate", taxNumber = EInvoiceVkn, taxOffice = "Kadıköy", legalName = "Örnek Ltd." });
+        var charge = await ctx.ChargeAsync(corporate, 500m, "Product");
+        var issued = await ctx.PostAsync("/api/v1/e-documents", new { requestId = Guid.NewGuid(), clinicId = ctx.ClinicId, chargeIds = new[] { charge } });
+        var documentId = issued.GetProperty("id").GetGuid();
+        var detail = await ctx.PostAsync($"/api/v1/e-documents/{documentId}/refresh", new { });
+        detail.GetProperty("status").GetString().Should().Be("Issued");
+        detail.GetProperty("canCancel").GetBoolean().Should().BeFalse("entegratör e-Fatura iptalini API'den desteklemiyor");
+
+        var cancel = await ctx.Http.PostAsJsonAsync($"/api/v1/e-documents/{documentId}/cancel", new { reason = "Yanlış kesildi" });
+        cancel.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(cancel)).Should().Be("EDocuments.CancelUnsupported");
+        (await ctx.GetAsync($"/api/v1/e-documents/{documentId}")).GetProperty("status").GetString()
+            .Should().Be("Issued", "belge iptal reddedildi durumuna düşürülmez");
     }
 
     [Fact]
@@ -269,6 +338,122 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
         undocumented.GetProperty("items").GetArrayLength().Should().Be(0, "devir bakiyesi belgesiz sayılmaz (ADR-048 T3)");
         var reminders = await ctx.GetAsync($"/api/v1/e-documents/reminders?clinicId={ctx.ClinicId}");
         reminders.GetProperty("undocumentedPaidCount").GetInt32().Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Auto_Issue_Should_Cover_Charges_Whose_Payment_Completes_While_Enabled_Regardless_Of_Creation_Time()
+    {
+        var ctx = await SeedAsync();
+        var clientId = await ctx.CreateClientAsync(new { personType = "Individual", nationalId = Tckn });
+        var paidBefore = await ctx.ChargeAsync(clientId, 120m, "Service");
+        await ctx.PayAsync(clientId, paidBefore, 120m);
+        var writtenBefore = await ctx.ChargeAsync(clientId, 80m, "Service");
+
+        await ctx.PutAsync($"/api/v1/clinics/{ctx.ClinicId}/e-document-settings", new { autoIssueMode = "OnPayment", endOfDayTime = "23:59", issueOnPaymentByDefault = false });
+        await ctx.PayAsync(clientId, writtenBefore, 80m);
+
+        await _factory.Services.GetRequiredService<Backend.Veteriner.Infrastructure.EDocuments.EDocumentAutomationProcessor>().RunOnceAsync(CancellationToken.None);
+
+        (await ctx.GetAsync($"/api/v1/charges/{writtenBefore}")).GetProperty("eDocumentId").ValueKind
+            .Should().Be(JsonValueKind.String, "ayar açılmadan yazılıp açıkken ödenen ücret kesilir");
+        (await ctx.GetAsync($"/api/v1/charges/{paidBefore}")).GetProperty("eDocumentId").ValueKind
+            .Should().Be(JsonValueKind.Null, "ayar açıldığında zaten ödenmiş eski ücret geriye dönük kesilmez");
+    }
+
+    [Fact]
+    public async Task Auto_Issue_Should_Pause_On_Account_Wide_Error_Notify_And_Resume_When_Settings_Saved()
+    {
+        var ctx = await SeedAsync();
+        await ctx.PutAsync($"/api/v1/clinics/{ctx.ClinicId}/e-document-settings", new { autoIssueMode = "OnPayment", endOfDayTime = "23:59", issueOnPaymentByDefault = false });
+
+        var broke = await ctx.CreateClientAsync(new { personType = "Individual", nationalId = Tckn });
+        await RenameClientAsync(broke, "Kontörsüz Müşteri");
+        var brokeCharge = await ctx.ChargeAsync(broke, 100m, "Service");
+        await ctx.PayAsync(broke, brokeCharge, 100m);
+        var waiting = await ctx.CreateClientAsync(new { personType = "Individual", nationalId = Tckn });
+        var waitingCharge = await ctx.ChargeAsync(waiting, 200m, "Service");
+        await ctx.PayAsync(waiting, waitingCharge, 200m);
+
+        var processor = _factory.Services.GetRequiredService<Backend.Veteriner.Infrastructure.EDocuments.EDocumentAutomationProcessor>();
+        await processor.RunOnceAsync(CancellationToken.None);
+
+        var settings = await ctx.GetAsync($"/api/v1/clinics/{ctx.ClinicId}/e-document-settings");
+        settings.GetProperty("autoIssuePausedAtUtc").ValueKind.Should().Be(JsonValueKind.String);
+        settings.GetProperty("autoIssuePauseReason").GetString().Should().Contain("Kontör");
+        (await ctx.GetAsync($"/api/v1/charges/{waitingCharge}")).GetProperty("eDocumentId").ValueKind
+            .Should().Be(JsonValueKind.Null, "kalıcı hesap hatasından sonra tur durur, sıradaki ücret aynı hatayı almaz");
+
+        var before = _provider.IssueCount;
+        await processor.RunOnceAsync(CancellationToken.None);
+        _provider.IssueCount.Should().Be(before, "durdurulmuş otomatik kesme yeni belge göndermez");
+
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (await db.UserNotifications.AsNoTracking().CountAsync(n =>
+                    n.UserId == ctx.UserId && n.Type == Backend.Veteriner.Domain.Notifications.UserNotificationType.EDocumentsAutoIssuePaused))
+                .Should().Be(1, "durdurma bir kez bildirilir");
+        }
+
+        var resumed = await ctx.PutAsync($"/api/v1/clinics/{ctx.ClinicId}/e-document-settings", new { autoIssueMode = "OnPayment", endOfDayTime = "23:59", issueOnPaymentByDefault = false });
+        resumed.GetProperty("autoIssuePausedAtUtc").ValueKind.Should().Be(JsonValueKind.Null);
+        await processor.RunOnceAsync(CancellationToken.None);
+        (await ctx.GetAsync($"/api/v1/charges/{waitingCharge}")).GetProperty("eDocumentId").ValueKind.Should().Be(JsonValueKind.String);
+    }
+
+    [Fact]
+    public async Task Document_Should_Never_Go_To_Another_Provider_After_Connection_Switch()
+    {
+        var ctx = await SeedAsync();
+        var clientId = await ctx.CreateClientAsync(new { personType = "Individual", nationalId = Tckn });
+        var product = await ctx.ChargeAsync(clientId, 300m, "Product");
+        var document = await ctx.PostAsync("/api/v1/e-documents", new { requestId = Guid.NewGuid(), clinicId = ctx.ClinicId, chargeIds = new[] { product } });
+        document.GetProperty("status").GetString().Should().Be("Sending");
+        var documentId = document.GetProperty("id").GetGuid();
+
+        // Klinik, belge sonucu beklenirken başka sağlayıcıya geçti.
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var protector = scope.ServiceProvider.GetRequiredService<ISecretProtector>();
+            var connection = await db.EDocumentConnections.SingleAsync(c => c.ClinicId == ctx.ClinicId);
+            connection.Authorize(
+                KeyProvider.Code, EDocumentEnvironment.Test, protector.Protect(EDocumentProviderGateway.CredentialsPurpose, KeyProvider.ValidKey),
+                "1234567801", "Test Kurum", ctx.UserId, DateTime.UtcNow);
+            await db.SaveChangesAsync();
+        }
+
+        var refreshed = await ctx.PostAsync($"/api/v1/e-documents/{documentId}/refresh", new { });
+        refreshed.GetProperty("status").GetString().Should().Be("Failed");
+        refreshed.GetProperty("lastError").GetProperty("message").GetString().Should().Contain("Sahte Sağlayıcı").And.Contain("başka bir entegratöre");
+
+        // Yeniden deneme de yeni sağlayıcıya gitmez (KeyProvider.IssueAsync çağrılsa NotSupportedException olurdu).
+        var retried = await ctx.PostAsync($"/api/v1/e-documents/{documentId}/retry", new { });
+        retried.GetProperty("status").GetString().Should().Be("Failed");
+    }
+
+    [Fact]
+    public async Task Voiding_Payment_Of_Documented_Charge_Should_Keep_Document_And_Notify()
+    {
+        var ctx = await SeedAsync();
+        var clientId = await ctx.CreateClientAsync(new { personType = "Individual", nationalId = Tckn });
+        var service = await ctx.ChargeAsync(clientId, 500m, "Service");
+        var paymentId = await ctx.PayAsync(clientId, service, 500m);
+        var issued = await ctx.PostAsync("/api/v1/e-documents", new { requestId = Guid.NewGuid(), clinicId = ctx.ClinicId, chargeIds = new[] { service } });
+        issued.GetProperty("status").GetString().Should().Be("Issued");
+        var documentId = issued.GetProperty("id").GetGuid();
+
+        var voided = await ctx.Http.PostAsJsonAsync($"/api/v1/payments/{paymentId}/void", new { reason = "Yanlış kayıt" });
+        voided.IsSuccessStatusCode.Should().BeTrue(await voided.Content.ReadAsStringAsync());
+
+        (await ctx.GetAsync($"/api/v1/e-documents/{documentId}")).GetProperty("status").GetString()
+            .Should().Be("Issued", "ödeme iptali belgeyi kendiliğinden iptal etmez");
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var notice = await db.UserNotifications.AsNoTracking().SingleAsync(n =>
+            n.UserId == ctx.UserId && n.Type == Backend.Veteriner.Domain.Notifications.UserNotificationType.EDocumentPaymentVoided);
+        notice.TargetId.Should().Be(documentId);
+        notice.Body.Should().Contain("SMM-1");
     }
 
     /// <summary>İçe aktarma partisiyle devir ücreti (ADR-048 T3); içe aktarma sihirbazının yazdığı kaydın aynısı.</summary>
@@ -399,6 +584,68 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
         }
     }
 
+    /// <summary>API anahtarıyla bağlanan sağlayıcı: yalnız <see cref="ValidKey"/> geçerli, hesabı VKN'dir.</summary>
+    private sealed class KeyProvider : IEDocumentProvider, IEDocumentCredentialProvider
+    {
+        public const string Code = "anahtarli";
+        public const string ValidKey = "gecerli-test-anahtari";
+
+        public string ProviderCode => Code;
+        public string DisplayName => "Anahtarlı Sağlayıcı";
+        public bool IsConfigured => true;
+        public EDocumentEnvironment Environment => EDocumentEnvironment.Test;
+
+        public Task<ProviderResult<ProviderAccountInfo>> IdentifyAsync(string credentials, CancellationToken ct)
+            => Task.FromResult(credentials == ValidKey
+                ? ProviderResult<ProviderAccountInfo>.Ok(new ProviderAccountInfo("1234567801", "Test Kurum", "1234567801"))
+                : ProviderResult<ProviderAccountInfo>.Fail(new ProviderError(EDocumentErrorKind.Authorization, "API anahtarı geçersiz.")));
+
+        public Task<ProviderResult<ProviderAccountCheck>> VerifyAsync(EDocumentProviderAccount account, CancellationToken ct)
+            => Task.FromResult(account.Credentials == ValidKey
+                ? ProviderResult<ProviderAccountCheck>.Ok(new ProviderAccountCheck("Test Kurum", null))
+                : ProviderResult<ProviderAccountCheck>.Fail(new ProviderError(EDocumentErrorKind.Authorization, "API anahtarı geçersiz.")));
+
+        public Task<ProviderResult<string?>> FindEInvoiceRecipientAsync(EDocumentProviderAccount account, string taxNumber, CancellationToken ct)
+            => throw new NotSupportedException();
+
+        public Task<ProviderResult<ProviderIssueOutcome>> IssueAsync(EDocumentProviderAccount account, EDocumentSendRequest request, CancellationToken ct)
+            => throw new NotSupportedException();
+
+        public Task<ProviderResult<ProviderIssueOutcome>> CheckAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct)
+            => throw new NotSupportedException();
+
+        public bool CanCancel(EDocumentType type) => true;
+
+        public Task<ProviderResult<ProviderCancelOutcome>> CancelAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct)
+            => throw new NotSupportedException();
+
+        public Task<ProviderResult<bool>> DiscardDraftAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct)
+            => throw new NotSupportedException();
+
+        public Task<ProviderResult<ProviderPdf>> GetPdfAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct)
+            => throw new NotSupportedException();
+    }
+
+    /// <summary>Ayarla kapatılmış entegratör (canlıda Paraşüt): listede görünmez, çağrılmaz.</summary>
+    private sealed class ClosedProvider : IEDocumentProvider
+    {
+        public const string Code = "kapali";
+
+        public string ProviderCode => Code;
+        public string DisplayName => "Kapalı Sağlayıcı";
+        public bool IsConfigured => false;
+        public EDocumentEnvironment Environment => EDocumentEnvironment.Test;
+        public bool CanCancel(EDocumentType type) => true;
+
+        public Task<ProviderResult<ProviderAccountCheck>> VerifyAsync(EDocumentProviderAccount account, CancellationToken ct) => throw new NotSupportedException();
+        public Task<ProviderResult<string?>> FindEInvoiceRecipientAsync(EDocumentProviderAccount account, string taxNumber, CancellationToken ct) => throw new NotSupportedException();
+        public Task<ProviderResult<ProviderIssueOutcome>> IssueAsync(EDocumentProviderAccount account, EDocumentSendRequest request, CancellationToken ct) => throw new NotSupportedException();
+        public Task<ProviderResult<ProviderIssueOutcome>> CheckAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct) => throw new NotSupportedException();
+        public Task<ProviderResult<ProviderCancelOutcome>> CancelAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct) => throw new NotSupportedException();
+        public Task<ProviderResult<bool>> DiscardDraftAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct) => throw new NotSupportedException();
+        public Task<ProviderResult<ProviderPdf>> GetPdfAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct) => throw new NotSupportedException();
+    }
+
     /// <summary>Sağlayıcı davranışını taklit eder: e-SMM eşzamanlı kesilir, e-Arşiv / e-Fatura sonucu sonradan gelir.</summary>
     private sealed class FakeProvider : IEDocumentProvider
     {
@@ -407,6 +654,11 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
 
         public int IssueCount => _issueCount;
         public string? LastRecipient { get; private set; }
+
+        /// <summary>Paraşüt e-Fatura iptal edebilir; Nilvera gibi edemeyen entegratörü taklit etmek için kapatılır.</summary>
+        public bool CancelsEInvoice { get; set; } = true;
+
+        public bool CanCancel(EDocumentType type) => type != EDocumentType.EInvoice || CancelsEInvoice;
 
         public string ProviderCode => Code;
         public string DisplayName => "Sahte Sağlayıcı";
@@ -424,6 +676,8 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
             account.Credentials.Should().Be("fake-credentials");
             Interlocked.Increment(ref _issueCount);
             LastRecipient = request.EInvoiceRecipient;
+            if (request.Buyer.Name.Contains("Kontörsüz", StringComparison.Ordinal))
+                return Task.FromResult(ProviderResult<ProviderIssueOutcome>.Fail(new ProviderError(EDocumentErrorKind.AccountSuspended, "Kontör bitti; kontör yükleyin.", "2000")));
             if (request.Buyer.Name.Contains("Hatalı", StringComparison.Ordinal))
                 return Task.FromResult(ProviderResult<ProviderIssueOutcome>.Fail(new ProviderError(EDocumentErrorKind.InvalidData, "Alıcı adresi zorunlu.", "422")));
             var invoiceId = $"inv-{request.ExternalReference:N}";

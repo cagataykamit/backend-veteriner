@@ -170,16 +170,20 @@ public sealed class SalesByChargeIdsSpec : Specification<Sale>
     }
 }
 
-/// <summary>Otomatik kesmeye uygun ücretler: tamamen ödenmiş, iptal edilmemiş, belgesiz ve otomatik kesme açıldıktan sonra yazılmış.</summary>
+/// <summary>
+/// Otomatik kesmeye uygun ücretler: iptal edilmemiş, belgesiz ve **ödemesi otomatik kesme açıkken tamamlanmış**
+/// (<c>FullyPaidAtUtc ≥ açılış</c>; ücretin ne zaman yazıldığı fark etmez). Açılışta zaten ödenmiş eski ücretler kesilmez
+/// (kullanıcı kararı 2026-11-12). Tamamlanma sırasına göre.
+/// </summary>
 public sealed class AutoIssueEligibleChargesSpec : Specification<Charge>
 {
     public AutoIssueEligibleChargesSpec(Guid tenantId, Guid clinicId, DateTime sinceUtc, int take)
     {
         Query.AsNoTracking();
         Query.Where(c => c.TenantId == tenantId && c.ClinicId == clinicId && c.VoidedAtUtc == null && c.EDocumentId == null
-                         && c.AllocatedAmount == c.Amount && c.CreatedAtUtc >= sinceUtc);
+                         && c.AllocatedAmount == c.Amount && c.FullyPaidAtUtc >= sinceUtc);
         Query.Where(EDocumentRules.IsDocumentableCharge);
-        Query.OrderBy(c => c.CreatedAtUtc).Take(take);
+        Query.OrderBy(c => c.FullyPaidAtUtc).Take(take);
     }
 }
 

@@ -61,7 +61,7 @@ public sealed class EDocumentIssuer
         {
             return Result<EDocument>.Failure(new Error(
                 "EDocuments.BuyerIdentityMissing",
-                "Kurumsal alıcının vergi numarası eksik; müşterinin fatura bilgilerini tamamlayın.",
+                EDocumentDraftBuilder.MissingBuyerMessage(draft.MissingBuyerFields),
                 new Dictionary<string, object?> { ["missingFields"] = draft.MissingBuyerFields }));
         }
 

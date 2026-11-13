@@ -57,6 +57,16 @@ public sealed class EDocumentTests
         buyer.Name.Should().Be("Ayşe Yılmaz");
     }
 
+    [Theory]
+    [InlineData("Ayşe")]
+    [InlineData("  Ayşe  ")]
+    public void Individual_Buyer_Name_Should_Have_First_And_Last_Name(string name)
+        => EDocumentBuyer.Individual(name, "10000000146", null, null, null, null).Error.Code.Should().Be("EDocuments.BuyerIdentityMissing");
+
+    [Fact]
+    public void Individual_Buyer_Without_Name_Should_Be_Unknown_Buyer_Name()
+        => EDocumentBuyer.Individual(" ", null, null, null, null, null).Value!.Name.Should().Be(EDocumentRules.UnknownBuyerName);
+
     [Fact]
     public void Corporate_Buyer_Should_Require_Valid_Tax_Number()
     {

@@ -28,6 +28,9 @@ public interface IEDocumentProvider
     /// <summary>Asenkron sonucu sorar (iş bitti mi, belge oluştu mu).</summary>
     Task<ProviderResult<ProviderIssueOutcome>> CheckAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct);
 
+    /// <summary>Bu belge türü entegratörün API'sinden iptal edilebilir mi (Nilvera'da e-Fatura iptali yok).</summary>
+    bool CanCancel(EDocumentType type);
+
     Task<ProviderResult<ProviderCancelOutcome>> CancelAsync(EDocumentProviderAccount account, EDocumentProviderRefs refs, CancellationToken ct);
 
     /// <summary>Belgesi oluşmamış taslak kaydı sağlayıcıda geri alır (vazgeçme); kayıt yoksa başarı.</summary>
@@ -50,6 +53,18 @@ public interface IEDocumentOAuthProvider
 
     /// <summary>Kullanıcının erişebildiği hesaplar (Paraşüt firmaları).</summary>
     Task<ProviderResult<IReadOnlyList<ProviderAccountInfo>>> ListAccountsAsync(string credentials, CancellationToken ct);
+}
+
+/// <summary>
+/// API anahtarıyla bağlanan entegratör (Nilvera): klinik kendi hesabında ürettiği anahtarı girer; anahtar sağlayıcıya özel
+/// kimlik bilgisidir, şifreli saklanır. OAuth kullanan entegratör bunu uygulamaz.
+/// </summary>
+public interface IEDocumentCredentialProvider
+{
+    string ProviderCode { get; }
+
+    /// <summary>Anahtarla sağlayıcıya bağlanıp anahtarın ait olduğu hesabı döndürür (geçersiz anahtar <see cref="EDocumentErrorKind.Authorization"/>).</summary>
+    Task<ProviderResult<ProviderAccountInfo>> IdentifyAsync(string credentials, CancellationToken ct);
 }
 
 public sealed record EDocumentProviderAccount(string AccountId, string Credentials);
@@ -87,18 +102,23 @@ public sealed record EDocumentSendBuyer(
     string? AddressLine,
     string? Email);
 
+/// <param name="IssuedAtLocal">Düzenlenme anı, İstanbul saati (belgenin oluşturulduğu an; yeniden denemede değişmez).</param>
 /// <param name="EInvoiceRecipient">e-Fatura'da alıcının gelen kutusu adresi.</param>
 /// <param name="ExistingInvoiceId">Önceki denemede oluşan sağlayıcı fatura kaydı (yeniden denemede).</param>
 public sealed record EDocumentSendRequest(
     EDocumentType Type,
     Guid ExternalReference,
-    DateOnly IssueDate,
+    DateTime IssuedAtLocal,
     EDocumentSendBuyer Buyer,
     IReadOnlyList<EDocumentSendLine> Lines,
     decimal? WithholdingRate,
     string? Note,
     string? EInvoiceRecipient,
-    string? ExistingInvoiceId);
+    string? ExistingInvoiceId)
+{
+    /// <summary>Düzenlenme günü (İstanbul).</summary>
+    public DateOnly IssueDate => DateOnly.FromDateTime(IssuedAtLocal);
+}
 
 public sealed record EDocumentProviderRefs(
     EDocumentType Type,

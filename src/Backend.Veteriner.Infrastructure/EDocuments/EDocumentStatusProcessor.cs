@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.EDocuments;
+using Backend.Veteriner.Application.EDocuments.Automation;
 using Backend.Veteriner.Application.EDocuments.Specs;
 using Backend.Veteriner.Domain.EDocuments;
 using Microsoft.EntityFrameworkCore;
@@ -78,6 +79,13 @@ public sealed class EDocumentStatusProcessor
             new EDocumentConnectionByClinicSpec(item.TenantId, document.ClinicId, tracked: true), ct);
 
         await sender.CheckAsync(document, connection, _options.MaxAttempts, ct);
+        if (document.Status == EDocumentStatus.Failed
+            && (EDocumentAutoIssueGuard.IsAccountWide(document.LastErrorKind) || connection is { Status: EDocumentConnectionStatus.ReauthorizationRequired }))
+        {
+            // Sonucu sonradan gelen belgede hesap genelinde kalıcı hata: otomatik kesme açıksa durur (yeni ücretler aynı hatayı almasın).
+            await services.GetRequiredService<EDocumentAutoIssueGuard>().PauseAsync(item.TenantId, document.ClinicId, document.LastErrorMessage, ct);
+        }
+
         try
         {
             await uow.SaveChangesAsync(ct);
