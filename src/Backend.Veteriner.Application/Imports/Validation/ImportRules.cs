@@ -118,7 +118,9 @@ public static class ImportRules
         "Aynı hasta, aynı aşı ve aynı uygulama günü için kayıt zaten var; bu satır atlanacak.");
 
     // Bağlantılar
-    public static readonly ImportRule OwnerNotFound = new("Imports.OwnerNotFound", ImportIssueSeverity.Error,
+    public static readonly ImportRule OwnerlessPetSkipped = new("Imports.OwnerlessPetSkipped", ImportIssueSeverity.Info,
+        "Hastanın sahibi yok (eski programda müşteri kartı silinmiş) ve bağlı aşı, muayene ya da randevusu yok; atlanacak.");
+    public static readonly ImportRule OwnerNotFound =new("Imports.OwnerNotFound", ImportIssueSeverity.Error,
         "Hastanın sahibi dosyada veya kayıtlı müşterilerde bulunamadı.");
     public static readonly ImportRule OwnerRowInvalid = new("Imports.OwnerRowInvalid", ImportIssueSeverity.Error,
         "Sahip müşteri aktarılamadığı için bu satır aktarılamaz.");

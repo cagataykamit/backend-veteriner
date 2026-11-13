@@ -219,6 +219,18 @@ public sealed partial class ImportValidationEngine
             owner?.Key, reference, name, speciesId, breedId, breedText, gender, birthDate, neutered,
             chip.Value, colorId, weight, passport, notes.Length == 0 ? null : notes, alertNote, deceased, deceasedOn, patternId);
 
+        // Sahipsiz hasta: eski programda müşteri kartı silinmiş (sahip adı boş ya da "."). Bağlı aşı / klinik geçmiş / randevusu yoksa
+        // aktarılacak bilgi yoktur: hata değil, bilerek atlanır. Geçmişi varsa sahip hatası kalır (kayıt kaybı görünür kalsın).
+        if (owner is null && IsOwnerless(reader) && (reference is null || !HasLinkedRecords(reference)))
+        {
+            issues.RemoveAll(i => i.Code == ImportRules.OwnerNotFound.Code || i.Code == ImportRules.OwnerRowInvalid.Code);
+            if (!HasError(issues))
+            {
+                issues.Add(ImportRules.OwnerlessPetSkipped.At());
+                return Complete(node, Finish(ImportTable.Pets, reader.RowNumber, issues, normalized, ImportRowAction.Skip));
+            }
+        }
+
         if (HasError(issues) || owner is null)
             return Complete(node, Finish(ImportTable.Pets, reader.RowNumber, issues, normalized));
 
@@ -304,6 +316,24 @@ public sealed partial class ImportValidationEngine
 
         issues.Add(ImportRules.DeceasedDateIgnored.At("VefatTarihi", value: rawDate));
         return (true, null);
+    }
+
+    /// <summary>Satırın sahip adı harf/rakam taşımıyor ya da tek karakter (E-vet'te silinmiş müşteri kartı: ".").</summary>
+    private static bool IsOwnerless(ImportRowReader reader)
+        => reader.Raw("SahipAdSoyad") is { } ownerName && ImportTextFolding.Fold(ownerName).Length < 2;
+
+    private HashSet<string>? _petRefsWithRecords;
+
+    /// <summary>Aşı, klinik geçmiş ya da randevu satırı bu hasta numarasına bağlanıyor mu.</summary>
+    private bool HasLinkedRecords(string reference)
+    {
+        _petRefsWithRecords ??= new[] { ImportTable.Vaccinations, ImportTable.ClinicalRecords, ImportTable.Appointments }
+            .Where(_input.Tables.ContainsKey)
+            .SelectMany(t => _input.Tables[t].Select(row => new ImportRowReader(_input.Mapping.ColumnsOf(t), row).Raw("HayvanNo")))
+            .Select(ImportValueParsers.NormalizeText)
+            .OfType<string>()
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return _petRefsWithRecords.Contains(reference);
     }
 
     private static ImportRowResult Complete(PetNode node, ImportRowResult result)

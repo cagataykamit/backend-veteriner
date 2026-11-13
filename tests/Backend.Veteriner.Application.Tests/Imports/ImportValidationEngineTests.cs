@@ -436,6 +436,26 @@ public sealed class ImportValidationEngineTests
     }
 
     [Fact]
+    public void Ownerless_Pet_Should_Be_Skipped_Unless_Records_Link_To_It()
+    {
+        var output = Run(
+            customers: Customers(Customer(no: "M-1")),
+            pets: Pets(
+                Pet(owner: ".", petNo: "H-1", name: "Kayıtsız"),
+                Pet(owner: ".", petNo: "H-2", name: "Geçmişli")),
+            vaccinations: Vaccinations(Vaccination(petNo: "H-2")));
+
+        var withoutRecords = Single(output, ImportTable.Pets, 2);
+        withoutRecords.Status.Should().Be(ImportRowValidationStatus.Valid);
+        withoutRecords.Normalized.Action.Should().Be(ImportRowAction.Skip);
+        Codes(withoutRecords).Should().Equal("Imports.OwnerlessPetSkipped");
+
+        var withRecords = Single(output, ImportTable.Pets, 3);
+        withRecords.Status.Should().Be(ImportRowValidationStatus.Error);
+        Codes(withRecords).Should().Equal("Imports.OwnerNotFound");
+    }
+
+    [Fact]
     public void Pet_Of_Invalid_Customer_Row_Should_Cascade_As_Owner_Row_Invalid()
     {
         var output = Run(

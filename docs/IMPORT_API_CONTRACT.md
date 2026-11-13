@@ -356,6 +356,7 @@ Kural kodları, önem dereceleri ve varsayılan mesajlar kodda **tek yerde** tan
 | `Imports.SharedPhone` | Info | Aynı telefon başka adlı müşteride var (dosyada veya kiracıda); yeni müşteri oluşur. |
 | `Imports.PossibleDuplicate` | Warning | Telefon ve e-posta yok ve aynı (katlanmış) ad dosyada/kiracıda zaten var; yeni müşteri oluşur. |
 | `Imports.OwnerNotFound` | Error | Hasta satırının sahibi dosyada veya kiracıda bulunamadı / belirsiz. |
+| `Imports.OwnerlessPetSkipped` | Info | Sahipsiz hasta (2026-11-14): `SahipAdSoyad` dolu ama harf/rakam taşımıyor ya da tek karakter (E-vet'te silinmiş müşteri kartı: `.`), sahip çözülemedi ve hiçbir aşı / klinik geçmiş / randevu satırı bu `HayvanNo`'ya bağlanmıyor: aktarılacak bilgi olmadığından satır **atlanır** (hata değil). Bağlı kaydı olan sahipsiz hasta `OwnerNotFound` / `OwnerRowInvalid` hatası almaya devam eder. Yer tutucu müşteri yapılmadı: gerçek yedekte sahipsiz 5 hastanın 4'ü sahibi değişen hayvanın eski kaydıydı ve birleştirmeyle çözüldü; kalan 1 hastanın kaydı yok. |
 | `Imports.OwnerRowInvalid` | Error | Sahip müşteri satırı hatalı olduğundan hasta aktarılamaz. Mesaj asıl nedeni taşır: `Müşteri aktarılmadı: <müşteri satırının ilk hatası> (Müşteriler satır N)` (2026-11-14). |
 | `Imports.PetNotFound` | Error | Aşı satırının hastası dosyada veya kiracıda bulunamadı / belirsiz. |
 | `Imports.PetRowInvalid` | Error | Hasta satırı hatalı olduğundan aşı / klinik geçmiş / randevu aktarılamaz. Mesaj asıl nedeni taşır: `Hasta aktarılmadı: <hasta satırının ilk hatası> (Hastalar satır N)` (2026-11-14). |
