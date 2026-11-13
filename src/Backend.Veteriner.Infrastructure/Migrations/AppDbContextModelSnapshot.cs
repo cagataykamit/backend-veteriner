@@ -1231,6 +1231,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -1250,6 +1253,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "BLACK",
                             DisplayOrder = 1,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Siyah"
                         },
                         new
@@ -1258,6 +1262,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "WHITE",
                             DisplayOrder = 2,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Beyaz"
                         },
                         new
@@ -1266,6 +1271,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "BROWN",
                             DisplayOrder = 3,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Kahverengi"
                         },
                         new
@@ -1274,6 +1280,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "GRAY",
                             DisplayOrder = 4,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Gri"
                         },
                         new
@@ -1282,6 +1289,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "YELLOW",
                             DisplayOrder = 5,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Sarı"
                         },
                         new
@@ -1290,6 +1298,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "CREAM",
                             DisplayOrder = 6,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Krem"
                         },
                         new
@@ -1298,6 +1307,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "RED",
                             DisplayOrder = 7,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Kızıl"
                         },
                         new
@@ -1306,6 +1316,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "ORANGE",
                             DisplayOrder = 8,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Turuncu"
                         },
                         new
@@ -1314,6 +1325,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "BLACK_WHITE",
                             DisplayOrder = 9,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Siyah-Beyaz"
                         },
                         new
@@ -1322,6 +1334,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "BROWN_WHITE",
                             DisplayOrder = 10,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Kahverengi-Beyaz"
                         },
                         new
@@ -1330,31 +1343,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "GRAY_WHITE",
                             DisplayOrder = 11,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Gri-Beyaz"
-                        },
-                        new
-                        {
-                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020012"),
-                            Code = "SPOTTED",
-                            DisplayOrder = 12,
-                            IsActive = true,
-                            Name = "Benekli"
-                        },
-                        new
-                        {
-                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020013"),
-                            Code = "STRIPED",
-                            DisplayOrder = 13,
-                            IsActive = true,
-                            Name = "Çizgili"
-                        },
-                        new
-                        {
-                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020014"),
-                            Code = "PIEBALD",
-                            DisplayOrder = 14,
-                            IsActive = true,
-                            Name = "Alacalı"
                         },
                         new
                         {
@@ -1362,23 +1352,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "MULTI_COLOR",
                             DisplayOrder = 15,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Çok Renkli"
-                        },
-                        new
-                        {
-                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020018"),
-                            Code = "BRINDLE",
-                            DisplayOrder = 20,
-                            IsActive = true,
-                            Name = "Kırçıllı"
-                        },
-                        new
-                        {
-                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020019"),
-                            Code = "BRINDLE_WHITE",
-                            DisplayOrder = 21,
-                            IsActive = true,
-                            Name = "Kırçıllı-Beyaz"
                         },
                         new
                         {
@@ -1386,6 +1361,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "YELLOW_WHITE",
                             DisplayOrder = 22,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Sarı-Beyaz"
                         },
                         new
@@ -1394,6 +1370,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "BROWN_BLACK",
                             DisplayOrder = 23,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Kahverengi-Siyah"
                         },
                         new
@@ -1402,6 +1379,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "LIGHT_BROWN",
                             DisplayOrder = 24,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Açık Kahverengi"
                         },
                         new
@@ -1410,6 +1388,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "DUN",
                             DisplayOrder = 25,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Boz"
                         },
                         new
@@ -1418,6 +1397,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "BEIGE",
                             DisplayOrder = 26,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Bej"
                         },
                         new
@@ -1426,7 +1406,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "BLUE",
                             DisplayOrder = 27,
                             IsActive = true,
-                            Name = "Mavi"
+                            Kind = 1,
+                            Name = "Mavi (Seyreltik Siyah)"
                         },
                         new
                         {
@@ -1434,6 +1415,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "BLACK_YELLOW",
                             DisplayOrder = 28,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Siyah-Sarı"
                         },
                         new
@@ -1442,6 +1424,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "GRAY_BLACK",
                             DisplayOrder = 29,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Gri-Siyah"
                         },
                         new
@@ -1450,6 +1433,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "BROWN_CREAM",
                             DisplayOrder = 30,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Kahverengi-Krem"
                         },
                         new
@@ -1458,15 +1442,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "BEIGE_WHITE",
                             DisplayOrder = 31,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Bej-Beyaz"
-                        },
-                        new
-                        {
-                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020030"),
-                            Code = "BROWN_BRINDLE",
-                            DisplayOrder = 32,
-                            IsActive = true,
-                            Name = "Kahverengi-Kırçıllı"
                         },
                         new
                         {
@@ -1474,6 +1451,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "CHAMPAGNE",
                             DisplayOrder = 33,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Şampanya"
                         },
                         new
@@ -1482,6 +1460,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "CHOCOLATE",
                             DisplayOrder = 34,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Çikolata"
                         },
                         new
@@ -1490,15 +1469,134 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "ORANGE_WHITE",
                             DisplayOrder = 35,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Turuncu-Beyaz"
                         },
                         new
                         {
-                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020034"),
-                            Code = "CALICO",
-                            DisplayOrder = 36,
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020035"),
+                            Code = "SMOKE",
+                            DisplayOrder = 37,
                             IsActive = true,
-                            Name = "Üç Renkli (Calico)"
+                            Kind = 1,
+                            Name = "Dumanlı (Smoke)"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020036"),
+                            Code = "SILVER",
+                            DisplayOrder = 38,
+                            IsActive = true,
+                            Kind = 1,
+                            Name = "Gümüş (Silver)"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020037"),
+                            Code = "LILAC",
+                            DisplayOrder = 39,
+                            IsActive = true,
+                            Kind = 1,
+                            Name = "Lila (Lilac)"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020038"),
+                            Code = "CINNAMON",
+                            DisplayOrder = 40,
+                            IsActive = true,
+                            Kind = 1,
+                            Name = "Tarçın (Cinnamon)"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020039"),
+                            Code = "FAWN",
+                            DisplayOrder = 41,
+                            IsActive = true,
+                            Kind = 1,
+                            Name = "Fawn (Açık Sarı-Kahve)"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020040"),
+                            Code = "BLACK_TAN",
+                            DisplayOrder = 42,
+                            IsActive = true,
+                            Kind = 1,
+                            Name = "Siyah-Bakır (Black and Tan)"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020041"),
+                            Code = "SABLE",
+                            DisplayOrder = 43,
+                            IsActive = true,
+                            Kind = 1,
+                            Name = "Samur (Sable)"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020042"),
+                            Code = "TRICOLOR",
+                            DisplayOrder = 44,
+                            IsActive = true,
+                            Kind = 1,
+                            Name = "Siyah-Beyaz-Kahve (Tricolor)"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020043"),
+                            Code = "HORSE_BAY",
+                            DisplayOrder = 60,
+                            IsActive = true,
+                            Kind = 1,
+                            Name = "Doru (At)"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020044"),
+                            Code = "HORSE_CHESTNUT",
+                            DisplayOrder = 61,
+                            IsActive = true,
+                            Kind = 1,
+                            Name = "Al (At)"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020045"),
+                            Code = "HORSE_GREY",
+                            DisplayOrder = 62,
+                            IsActive = true,
+                            Kind = 1,
+                            Name = "Kır (At)"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020046"),
+                            Code = "HORSE_BLACK",
+                            DisplayOrder = 63,
+                            IsActive = true,
+                            Kind = 1,
+                            Name = "Yağız (At)"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020047"),
+                            Code = "HORSE_DUN",
+                            DisplayOrder = 64,
+                            IsActive = true,
+                            Kind = 1,
+                            Name = "Kula (At)"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020048"),
+                            Code = "HORSE_ISABELLINE",
+                            DisplayOrder = 65,
+                            IsActive = true,
+                            Kind = 1,
+                            Name = "İzabel (At)"
                         },
                         new
                         {
@@ -1506,6 +1604,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "OTHER",
                             DisplayOrder = 98,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Diğer"
                         },
                         new
@@ -1514,7 +1613,134 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                             Code = "UNKNOWN",
                             DisplayOrder = 99,
                             IsActive = true,
+                            Kind = 1,
                             Name = "Bilinmiyor"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020049"),
+                            Code = "TABBY",
+                            DisplayOrder = 101,
+                            IsActive = true,
+                            Kind = 2,
+                            Name = "Tekir (Tabby)"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020018"),
+                            Code = "BRINDLE",
+                            DisplayOrder = 102,
+                            IsActive = true,
+                            Kind = 2,
+                            Name = "Kaplan Çizgili (Brindle)"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020012"),
+                            Code = "SPOTTED",
+                            DisplayOrder = 103,
+                            IsActive = true,
+                            Kind = 2,
+                            Name = "Benekli"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020013"),
+                            Code = "STRIPED",
+                            DisplayOrder = 104,
+                            IsActive = true,
+                            Kind = 2,
+                            Name = "Çizgili"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020014"),
+                            Code = "PIEBALD",
+                            DisplayOrder = 105,
+                            IsActive = true,
+                            Kind = 2,
+                            Name = "Alacalı"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020034"),
+                            Code = "CALICO",
+                            DisplayOrder = 106,
+                            IsActive = true,
+                            Kind = 2,
+                            Name = "Üç Renkli (Calico)"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020050"),
+                            Code = "TORTOISESHELL",
+                            DisplayOrder = 107,
+                            IsActive = true,
+                            Kind = 2,
+                            Name = "Kaplumbağa Kabuğu (Tortoiseshell)"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020051"),
+                            Code = "COLORPOINT",
+                            DisplayOrder = 108,
+                            IsActive = true,
+                            Kind = 2,
+                            Name = "Sivri Renk (Colorpoint)"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020052"),
+                            Code = "VAN",
+                            DisplayOrder = 109,
+                            IsActive = true,
+                            Kind = 2,
+                            Name = "Van Deseni"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020053"),
+                            Code = "MERLE",
+                            DisplayOrder = 110,
+                            IsActive = true,
+                            Kind = 2,
+                            Name = "Merle"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020054"),
+                            Code = "HARLEQUIN",
+                            DisplayOrder = 111,
+                            IsActive = true,
+                            Kind = 2,
+                            Name = "Harlequin"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020055"),
+                            Code = "ROAN",
+                            DisplayOrder = 112,
+                            IsActive = true,
+                            Kind = 2,
+                            Name = "Kırçıl (Roan)"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020019"),
+                            Code = "BRINDLE_WHITE",
+                            DisplayOrder = 21,
+                            IsActive = false,
+                            Kind = 1,
+                            Name = "Kaplan Çizgili-Beyaz"
+                        },
+                        new
+                        {
+                            Id = new Guid("3d2d8f3a-6b0b-4d1e-9f2a-111111020030"),
+                            Code = "BROWN_BRINDLE",
+                            DisplayOrder = 32,
+                            IsActive = false,
+                            Kind = 1,
+                            Name = "Kahverengi Kaplan Çizgili"
                         });
                 });
 
@@ -1553,6 +1779,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("Category")
+                        .HasColumnType("int");
 
                     b.Property<string>("Code")
                         .IsRequired()
@@ -5261,6 +5490,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<Guid?>("PatternId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -5290,6 +5522,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasIndex("BreedId");
 
                     b.HasIndex("ColorId");
+
+                    b.HasIndex("PatternId");
 
                     b.HasIndex("SpeciesId");
 
@@ -8440,6 +8674,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasForeignKey("ColorId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Backend.Veteriner.Domain.Catalog.PetColor", "PatternRef")
+                        .WithMany()
+                        .HasForeignKey("PatternId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Backend.Veteriner.Domain.Catalog.Species", "Species")
                         .WithMany()
                         .HasForeignKey("SpeciesId")
@@ -8449,6 +8688,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Navigation("BreedRef");
 
                     b.Navigation("ColorRef");
+
+                    b.Navigation("PatternRef");
 
                     b.Navigation("Species");
                 });

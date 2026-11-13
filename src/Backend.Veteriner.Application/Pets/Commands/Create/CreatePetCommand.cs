@@ -23,7 +23,8 @@ public sealed record CreatePetCommand(
     bool IsNeutered = false,
     IReadOnlyList<string>? AlertFlags = null,
     string? AlertNote = null,
-    string? HbsAnimalId = null)
+    string? HbsAnimalId = null,
+    Guid? PatternId = null)
     : IRequest<Result<Guid>>, IActivationSignalRequest
 {
     public ActivationSignalKind ActivationSignal => ActivationSignalKind.PetCreated;

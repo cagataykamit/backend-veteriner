@@ -9,6 +9,7 @@ public sealed class PetByIdSpec : Specification<Pet>
     {
         Query.Where(p => p.TenantId == tenantId && p.Id == id)
             .Include(p => p.Species!)
-            .Include(p => p.ColorRef!);
+            .Include(p => p.ColorRef!)
+            .Include(p => p.PatternRef!);
     }
 }

@@ -20,7 +20,7 @@ public sealed class GetPetColorsListQueryHandler
     {
         var rows = await _colors.ListAsync(new PetColorsActiveOrderedSpec(), ct);
         var items = rows
-            .Select(c => new PetColorListItemDto(c.Id, c.Code, c.Name, c.IsActive, c.DisplayOrder))
+            .Select(c => new PetColorListItemDto(c.Id, c.Code, c.Name, c.IsActive, c.DisplayOrder, c.Kind))
             .ToList();
 
         return Result<IReadOnlyList<PetColorListItemDto>>.Success(items);

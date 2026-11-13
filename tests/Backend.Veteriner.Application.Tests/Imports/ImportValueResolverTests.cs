@@ -33,8 +33,8 @@ public sealed class ImportValueResolverTests
         [
             new(Rabies, "Kuduz", "RABIES", null),
             new(Mixed, "Karma", "MIXED", null),
-            new(FeLv, "Lösemi (FeLV)", "LEUKEMIA", Cat),
-            new(Bronchine, "Bronşin (Bordetella)", "BRONCHINE", Dog),
+            new(FeLv, "Kedi Lösemisi (FeLV)", "LEUKEMIA", Cat),
+            new(Bronchine, "Bordetella / Parainfluenza (Bronşin)", "BRONCHINE", Dog),
         ]);
 
     private static ImportValueResolver Resolver(params ImportValueMapping[] userMappings) => new(Catalogs, userMappings);
@@ -49,6 +49,9 @@ public sealed class ImportValueResolverTests
     private static readonly Guid Internal = Guid.NewGuid();
     private static readonly Guid Fungal = Guid.NewGuid();
     private static readonly Guid MixedRabies = Guid.NewGuid();
+    private static readonly Guid MixedRabiesCat = Guid.NewGuid();
+    private static readonly Guid MixedDog = Guid.NewGuid();
+    private static readonly Guid MixedCat = Guid.NewGuid();
     private static readonly Guid DistemperParvo = Guid.NewGuid();
     private static readonly Guid Tetanus = Guid.NewGuid();
     private static readonly Guid Mastitis = Guid.NewGuid();
@@ -74,7 +77,7 @@ public sealed class ImportValueResolverTests
 
     private static readonly ImportValueResolver Extended = new(new ImportCatalogs(
         Species: [new(Dog, "Köpek", "DOG", null), new(Cat, "Kedi", "CAT", null), new(GuineaPig, "Kobay (Gine Domuzu)", "GUINEA_PIG", null), new(Exotic, "Egzotik", "EXOTIC", null), new(Ferret, "Ferret (Gelincik)", "FERRET", null), new(Other, "Diğer", "OTHER", null)],
-        Breeds: [new(ScottishFold, "Scottish Fold", null, Cat), new(BritishShorthair, "British Shorthair", null, Cat), new(Setter, "İngiliz Setter", null, Dog), new(Malinois, "Belçika Malinois", null, Dog), new(Maltese, "Maltese", null, Dog), new(Husky, "Sibirya Kurdu (Siberian Husky)", null, Dog), new(Dobermann, "Dobermann", null, Dog), new(Vizsla, "Vizsla (Macar Kısa Tüylü Pointer)", null, Dog), new(Brittany, "Epagneul Breton (Brittany)", null, Dog)],
+        Breeds: [new(ScottishFold, "Scottish Fold", null, Cat), new(BritishShorthair, "British Shorthair", null, Cat), new(Setter, "İngiliz Setter", null, Dog), new(Malinois, "Belçika Çoban Köpeği (Malinois)", null, Dog), new(Maltese, "Maltese", null, Dog), new(Husky, "Sibirya Kurdu (Siberian Husky)", null, Dog), new(Dobermann, "Dobermann", null, Dog), new(Vizsla, "Vizsla (Macar Kısa Tüylü Pointer)", null, Dog), new(Brittany, "Epagneul Breton (Brittany)", null, Dog)],
         Colors:
         [
             new(Piebald, "Alacalı", "PIEBALD", null),
@@ -88,13 +91,15 @@ public sealed class ImportValueResolverTests
         ],
         Vaccines:
         [
-            new(Mixed, "Karma", "MIXED", null),
             new(InternalExternal, "İç-Dış Parazit", "INTERNAL_EXTERNAL_PARASITE", null),
             new(External, "Dış Parazit", "EXTERNAL_PARASITE", null),
             new(Internal, "İç Parazit", "INTERNAL_PARASITE", null),
             new(Fungal, "Mantar (Dermatofitoz)", "DERMATOPHYTOSIS", null),
-            new(MixedRabies, "Karma + Kuduz", "MIXED_RABIES", null),
-            new(DistemperParvo, "DP (Distemper-Parvo)", "DISTEMPER_PARVO", null),
+            new(MixedRabies, "Köpek Karma + Kuduz", "MIXED_RABIES_DOG", Dog),
+            new(MixedRabiesCat, "Kedi Karma + Kuduz", "MIXED_RABIES_CAT", Cat),
+            new(MixedDog, "Köpek Karma (DHPPi±L)", "MIXED_DOG", Dog),
+            new(MixedCat, "Kedi Karma (FVRCP)", "MIXED_CAT", Cat),
+            new(DistemperParvo, "Köpek DP (Distemper-Parvovirüs)", "DISTEMPER_PARVO", Dog),
             new(Tetanus, "Tetanoz", "TETANUS", null),
             new(Mastitis, "Mastitis", "MASTITIS", null),
             new(Enterotoxemia, "Enterotoksemi", "ENTEROTOXEMIA", null),
@@ -115,7 +120,7 @@ public sealed class ImportValueResolverTests
         { "MANTAR", nameof(Fungal) },
         { "MANTAR 2", nameof(Fungal) },
         { "Dermatofitoz", nameof(Fungal) },
-        { "Kedi Karma + Kuduz", nameof(MixedRabies) },
+        { "Karma + Kuduz", nameof(MixedRabies) },
         { "Köpek Karma +Kuduz", nameof(MixedRabies) },
         { "PUPPY DP", nameof(DistemperParvo) },
         { "TETANOZ YILLIK", nameof(Tetanus) },
@@ -175,6 +180,37 @@ public sealed class ImportValueResolverTests
         Extended.Resolve(ImportValueKind.Breed, "Belçika Kurdu", Dog).TargetId.Should().Be(Malinois);
         Extended.Resolve(ImportValueKind.Breed, "Terrier", Dog).Kind.Should().Be(ImportValueResolutionKind.Unmapped);
         Extended.Resolve(ImportValueKind.Breed, "British Blue Point", Cat).TargetId.Should().Be(BritishShorthair);
+    }
+
+    [Fact]
+    public void Mixed_Vaccine_Should_Resolve_To_The_Species_Specific_Definition()
+    {
+        // Karma türe göre ayrıldı (köpek DHPPi±L, kedi FVRCP): eski "Karma" yazımı hastanın türündeki tanıma gider.
+        Extended.Resolve(ImportValueKind.Vaccine, "Karma", Dog).TargetId.Should().Be(MixedDog);
+        Extended.Resolve(ImportValueKind.Vaccine, "Karma", Cat).TargetId.Should().Be(MixedCat);
+        Extended.Resolve(ImportValueKind.Vaccine, "YILLIK KEDİ KARMA", Cat).TargetId.Should().Be(MixedCat);
+        Extended.Resolve(ImportValueKind.Vaccine, "Karma + Kuduz", Cat).TargetId.Should().Be(MixedRabiesCat);
+        Extended.Resolve(ImportValueKind.Vaccine, "Kedi Karma + Kuduz", Cat).TargetId.Should().Be(MixedRabiesCat);
+    }
+
+    [Fact]
+    public void Coat_Pattern_Names_Should_Resolve_And_Be_Reported_As_Pattern()
+    {
+        var tabby = Guid.NewGuid();
+        var brindle = Guid.NewGuid();
+        var black = Guid.NewGuid();
+        var resolver = new ImportValueResolver(
+            new ImportCatalogs(
+                Species: [], Breeds: [], Vaccines: [],
+                Colors: [new(tabby, "Tekir (Tabby)", "TABBY", null), new(brindle, "Kaplan Çizgili (Brindle)", "BRINDLE", null), new(black, "Siyah", "BLACK", null)],
+                PatternIds: new HashSet<Guid> { tabby, brindle }),
+            []);
+
+        resolver.Resolve(ImportValueKind.Color, "Tekir").TargetId.Should().Be(tabby);
+        // Eski "Kırçıllı" adı brindle (kaplan çizgili) anlamında kullanılıyordu.
+        resolver.Resolve(ImportValueKind.Color, "Kırçıllı").TargetId.Should().Be(brindle);
+        resolver.IsPattern(tabby).Should().BeTrue();
+        resolver.IsPattern(black).Should().BeFalse();
     }
 
     [Fact]

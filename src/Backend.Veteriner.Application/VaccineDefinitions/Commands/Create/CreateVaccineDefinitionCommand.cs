@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.SpeciesReference.Specs;
 using Backend.Veteriner.Application.VaccineDefinitions.Specs;
@@ -12,7 +13,8 @@ public sealed record CreateVaccineDefinitionCommand(
     string Name,
     string Code,
     string? Description,
-    int? DefaultNextDueDays) : IRequest<Result<Guid>>;
+    int? DefaultNextDueDays,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] VaccineCategory? Category = null) : IRequest<Result<Guid>>;
 
 public sealed class CreateVaccineDefinitionCommandHandler
     : IRequestHandler<CreateVaccineDefinitionCommand, Result<Guid>>
@@ -70,6 +72,7 @@ public sealed class CreateVaccineDefinitionCommandHandler
             request.Description,
             request.DefaultNextDueDays,
             isCore: false);
+        entity.SetCategory(request.Category, utcNow);
 
         await _definitionsWrite.AddAsync(entity, ct);
         await _definitionsWrite.SaveChangesAsync(ct);

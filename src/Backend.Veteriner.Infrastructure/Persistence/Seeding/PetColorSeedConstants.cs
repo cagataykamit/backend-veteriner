@@ -44,4 +44,31 @@ public static class PetColorSeedConstants
 
     // Üç renkli kedi (siyah-turuncu-beyaz); alacadan ayrı desen.
     public static readonly Guid Calico = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020034");
+
+    // Renk ile desen ayrımı (FIFe EMS; research/sistem-kataloglari-kaynak-arastirmasi-2026-11.md §5, 2026-11-13).
+    public static readonly Guid Smoke = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020035");
+    public static readonly Guid Silver = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020036");
+    public static readonly Guid Lilac = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020037");
+    public static readonly Guid Cinnamon = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020038");
+    public static readonly Guid Fawn = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020039");
+    public static readonly Guid BlackTan = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020040");
+    public static readonly Guid Sable = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020041");
+    public static readonly Guid Tricolor = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020042");
+
+    // At donları.
+    public static readonly Guid Bay = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020043");
+    public static readonly Guid Chestnut = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020044");
+    public static readonly Guid HorseGrey = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020045");
+    public static readonly Guid HorseBlack = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020046");
+    public static readonly Guid HorseDun = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020047");
+    public static readonly Guid Isabelline = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020048");
+
+    // Desenler (Spotted, Striped, Piebald, Brindle ve Calico da desendir).
+    public static readonly Guid Tabby = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020049");
+    public static readonly Guid Tortoiseshell = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020050");
+    public static readonly Guid Colorpoint = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020051");
+    public static readonly Guid VanPattern = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020052");
+    public static readonly Guid Merle = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020053");
+    public static readonly Guid Harlequin = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020054");
+    public static readonly Guid Roan = Guid.Parse("3d2d8f3a-6b0b-4d1e-9f2a-111111020055");
 }

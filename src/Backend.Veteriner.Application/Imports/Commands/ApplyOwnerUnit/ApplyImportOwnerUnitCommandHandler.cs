@@ -407,7 +407,8 @@ public sealed class ApplyImportOwnerUnitCommandHandler
                 data.PassportOrTagNumber,
                 IsNeutered: data.IsNeutered,
                 AlertFlags: data.AlertNote is null ? null : [nameof(PetAlertFlags.Allergy)],
-                AlertNote: data.AlertNote),
+                AlertNote: data.AlertNote,
+                PatternId: data.PatternId),
             ct);
         if (!created.IsSuccess)
             return Result<Guid>.Failure(ImportOwnerUnitErrors.ForRow(row.Id, created.Error));

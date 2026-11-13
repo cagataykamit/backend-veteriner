@@ -112,16 +112,10 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
             breedRef = breed;
         }
 
-        PetColor? colorRef = null;
-        if (request.ColorId is { } colorId)
-        {
-            var color = await _colorsRead.FirstOrDefaultAsync(new PetColorByIdSpec(colorId), ct);
-            if (color is null || !color.IsActive)
-                return Result<Guid>.Failure(
-                    "Pets.ColorNotFound",
-                    "Renk bulunamadı veya pasif; geçerli bir ColorId gönderin.");
-            colorRef = color;
-        }
+        var coat = await PetCoatResolver.ResolveAsync(_colorsRead, request.ColorId, request.PatternId, ct);
+        if (!coat.IsSuccess)
+            return Result<Guid>.Failure(coat.Error);
+        var colorRef = coat.Value!.Color;
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         if (request.BirthDate.HasValue
@@ -151,7 +145,8 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
             request.MicrochipNumber,
             request.PassportOrTagNumber,
             request.SpecialProtocolNumber,
-            request.IsNeutered);
+            request.IsNeutered,
+            request.PatternId);
 
         var alerts = pet.ApplyAlerts(request.AlertFlags, request.AlertNote);
         if (!alerts.IsSuccess)

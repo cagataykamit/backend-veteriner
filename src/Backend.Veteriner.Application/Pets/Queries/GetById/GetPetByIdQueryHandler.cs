@@ -73,7 +73,9 @@ public sealed class GetPetByIdQueryHandler : IRequestHandler<GetPetByIdQuery, Re
             pet.Status,
             pet.DeceasedOn,
             ExaminationRowVersion.Encode(pet.RowVersion),
-            pet.HbsAnimalId);
+            pet.HbsAnimalId,
+            pet.PatternId,
+            pet.PatternRef?.Name);
         return Result<PetDetailDto>.Success(dto);
     }
 }

@@ -35,6 +35,7 @@ public sealed class ImportCatalogLoader
             species.Select(s => new ImportCatalogEntry(s.Id, s.Name, s.Code, null)).ToList(),
             breeds.Select(b => new ImportCatalogEntry(b.Id, b.Name, null, b.SpeciesId)).ToList(),
             colors.Select(c => new ImportCatalogEntry(c.Id, c.Name, c.Code, null)).ToList(),
-            vaccines.Select(v => new ImportCatalogEntry(v.Id, v.Name, v.Code, v.SpeciesId)).ToList());
+            vaccines.Select(v => new ImportCatalogEntry(v.Id, v.Name, v.Code, v.SpeciesId)).ToList(),
+            colors.Where(c => c.Kind == PetColorKind.Pattern).Select(c => c.Id).ToHashSet());
     }
 }

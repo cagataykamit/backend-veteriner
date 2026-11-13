@@ -12,5 +12,6 @@ public sealed class CreateVaccineDefinitionCommandValidator : AbstractValidator<
         RuleFor(x => x.DefaultNextDueDays)
             .GreaterThanOrEqualTo(1)
             .When(x => x.DefaultNextDueDays.HasValue);
+        RuleFor(x => x.Category).IsInEnum().When(x => x.Category.HasValue);
     }
 }
