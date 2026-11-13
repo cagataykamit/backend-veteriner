@@ -537,7 +537,7 @@ internal static class EVetBackupConverter
         if (state.Reports.Vaccines is not null)
         {
             warnings.Add(new ImportReadWarning(WarningCode, ImportTable.Vaccinations,
-                $"Aşı Bilgi raporu: {serialMatched} aşıya ürün adı ve seri numarası eklendi; {serialUnmatched} rapor satırı yedekteki "
+                $"Aşı Bilgisi raporu: {serialMatched} aşıya ürün adı ve seri numarası eklendi; {serialUnmatched} rapor satırı yedekteki "
                 + "tamamlanmış aşılarla eşleşmedi (o gün tamamlanmış aşı yok ya da ürün adından ayırt edilemedi)."));
         }
 
@@ -573,7 +573,7 @@ internal static class EVetBackupConverter
         ]);
 
     /// <summary>
-    /// Aşı Bilgi satırını aynı sahip + hasta + gündeki tamamlanmış aşıya bağlar: o gün tek aşı ve tek rapor satırı varsa doğrudan;
+    /// Aşı Bilgisi satırını aynı sahip + hasta + gündeki tamamlanmış aşıya bağlar: o gün tek aşı ve tek rapor satırı varsa doğrudan;
     /// birden çoksa raporun ürün adı aşı serisini içeriyorsa (<c>Rabisin ( Kuduz )</c> ↔ <c>KUDUZ</c>) ve eşleşme tekse.
     /// Döner: eşleşen aşı sayısı, eşleşmeyen rapor satırı sayısı.
     /// </summary>
@@ -654,7 +654,7 @@ internal static class EVetBackupConverter
         public DateTime Start { get; } = start;
         public DateTime? DueAt { get; set; }
 
-        /// <summary>Aşı Bilgi raporundaki karşılığı (ürün adı, seri no); eşleşmediyse null.</summary>
+        /// <summary>Aşı Bilgisi raporundaki karşılığı (ürün adı, seri no); eşleşmediyse null.</summary>
         public EVetVaccineReportRow? Report { get; set; }
 
         public ImportSourceRow ToRow()
