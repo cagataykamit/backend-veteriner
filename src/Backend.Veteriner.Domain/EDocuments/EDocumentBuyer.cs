@@ -34,10 +34,17 @@ public sealed class EDocumentBuyer
         return Build(EDocumentBuyerKind.Corporate, name, identity, isUnknown: false, taxOffice, province, district, addressLine, email);
     }
 
-    /// <summary>TCKN yoksa bilinmeyen alıcı yer tutucusu kullanılır (<see cref="EDocumentRules.UnknownBuyerNationalId"/>).</summary>
+    /// <summary>
+    /// TCKN yoksa bilinmeyen alıcı yer tutucusu kullanılır (<see cref="EDocumentRules.UnknownBuyerNationalId"/>). Ad verilmişse ad ve
+    /// soyad birlikte olmalıdır: e-Arşiv / e-SMM'de kişi alıcı ad + soyad ister (Nilvera test ortamı tek kelimelik adı reddetti,
+    /// 2026-11-12); belge alıcı bilgisini kopyaladığı için sonradan düzeltmek yeniden denemeyle olmaz, kesmeden önce yakalanır.
+    /// </summary>
     public static Result<EDocumentBuyer> Individual(
         string? name, string? nationalId, string? province, string? district, string? addressLine, string? email)
     {
+        if (!string.IsNullOrWhiteSpace(name) && !HasFirstAndLastName(name))
+            return Result<EDocumentBuyer>.Failure("EDocuments.BuyerIdentityMissing", "Bireysel alıcının adı ve soyadı birlikte yazılmalıdır.");
+
         var identity = TurkishTaxIdentity.Normalize(nationalId);
         if (identity is not null && !TurkishTaxIdentity.IsValidNationalId(identity))
             identity = null;
@@ -55,6 +62,10 @@ public sealed class EDocumentBuyer
             addressLine,
             email);
     }
+
+    /// <summary>Kişi adında en az iki sözcük (ad + soyad) var mı.</summary>
+    public static bool HasFirstAndLastName(string name)
+        => name.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length >= 2;
 
     public static EDocumentBuyer UnknownIndividual()
         => Individual(EDocumentRules.UnknownBuyerName, null, null, null, null, null).Value!;

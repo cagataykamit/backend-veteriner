@@ -46,6 +46,34 @@ public sealed class EDocumentProviderGateway
             new EDocumentProviderSession(provider, new EDocumentProviderAccount(connection.AccountId!, credentials)));
     }
 
+    /// <summary>
+    /// Kesilmiş / gönderilmiş belge için sağlayıcıyı açar: klinik o arada başka sağlayıcıya veya ortama (test ↔ canlı) geçtiyse
+    /// belge yeni sağlayıcıya hiç gönderilmez, sorulmaz, iptal edilmez (çapraz gönderim çift belge üretir).
+    /// </summary>
+    public Result<EDocumentProviderSession> OpenFor(EDocument document, EDocumentConnection? connection)
+    {
+        if (connection is not null
+            && (!string.Equals(connection.ProviderCode, document.ProviderCode, StringComparison.Ordinal)
+                || connection.Environment != document.Environment))
+        {
+            return Result<EDocumentProviderSession>.Failure(ProviderMismatch(document));
+        }
+
+        return Open(connection);
+    }
+
+    public Error ProviderMismatch(EDocument document)
+    {
+        var name = _providers.Find(document.ProviderCode)?.DisplayName ?? document.ProviderCode;
+        var environment = document.Environment == EDocumentEnvironment.Test ? " test ortamı" : string.Empty;
+        return new Error(
+            ProviderMismatchCode,
+            $"Belge {name}{environment} hesabıyla gönderildi; klinik artık başka bir entegratöre bağlı. Belgeyi {name} ekranından " +
+            "takip edin; kesilmediyse vazgeçip yeniden kesin.");
+    }
+
+    public const string ProviderMismatchCode = "EDocuments.ProviderMismatch";
+
     /// <summary>Sağlayıcı sonucunu bağlantıya yansıtır: yenilenen belirteci saklar, yetki reddinde bağlantıyı düşürür.</summary>
     public void Absorb<T>(EDocumentConnection connection, ProviderResult<T> result)
     {

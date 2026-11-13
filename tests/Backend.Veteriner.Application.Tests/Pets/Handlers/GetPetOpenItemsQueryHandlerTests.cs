@@ -128,7 +128,7 @@ public sealed class GetPetOpenItemsQueryHandlerTests
         var c = Charge.Create(_tenantId, _clinicId, _pet.ClientId, petId, null, null, "Muayene", 1, unitPrice,
             Guid.NewGuid(), Now.AddDays(-2), null).Value!;
         if (allocated > 0)
-            c.ApplyAllocation(allocated);
+            c.ApplyAllocation(allocated, DateTime.UtcNow);
         _charges.Add(c);
         return c;
     }

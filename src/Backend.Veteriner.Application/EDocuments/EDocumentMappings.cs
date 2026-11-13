@@ -35,7 +35,7 @@ internal static class EDocumentMappings
             d.CreatedByUserId,
             d.IssuedAtUtc,
             d.CancellableUntilUtc,
-            CanCancel(d, utcNow),
+            CanCancel(d, utcNow) && (providers.Find(d.ProviderCode)?.CanCancel(d.Type) ?? true),
             d.Status == EDocumentStatus.Failed,
             d.Status == EDocumentStatus.Failed && !d.HasProviderDocument,
             CanDownloadPdf(d),

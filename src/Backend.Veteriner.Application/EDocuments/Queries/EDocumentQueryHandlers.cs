@@ -141,7 +141,7 @@ public sealed class GetEDocumentPdfQueryHandler : IRequestHandler<GetEDocumentPd
 
         var connection = await _connections.FirstOrDefaultAsync(
             new EDocumentConnectionByClinicSpec(document.TenantId, document.ClinicId, tracked: true), ct);
-        var opened = _gateway.Open(connection);
+        var opened = _gateway.OpenFor(document, connection);
         if (!opened.IsSuccess)
             return Result<EDocumentPdfDto>.Failure(opened.Error);
 
@@ -319,8 +319,8 @@ public sealed class GetUndocumentedChargesQueryHandler
     {
         if (charge.EDocumentId is not null)
             return string.IsNullOrWhiteSpace(failedMessage) ? "Belge kesilemedi." : $"Belge kesilemedi: {failedMessage}";
-        if (client is not null && EDocumentDraftBuilder.BuildBuyer(client).Buyer is null)
-            return "Müşterinin vergi numarası eksik.";
+        if (client is not null && EDocumentDraftBuilder.BuildBuyer(client) is { Buyer: null, Missing: var missing })
+            return EDocumentDraftBuilder.MissingBuyerMessage(missing);
         if (charge.OutstandingAmount > 0m)
             return "Ödeme bekliyor.";
         return null;

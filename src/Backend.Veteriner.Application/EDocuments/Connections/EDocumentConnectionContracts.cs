@@ -60,6 +60,19 @@ public sealed record SelectEDocumentAccountCommand(Guid ClinicId, string? Accoun
     public string? AuditTarget => $"ClinicId={ClinicId}";
 }
 
+/// <summary>
+/// POST /clinics/{clinicId}/e-document-connection/credentials. <c>Clinics.Update</c>. API anahtarıyla bağlanan sağlayıcı;
+/// <see cref="ApiKey"/> denetim kaydında maskelenir, günlüğe ve yanıta yazılmaz.
+/// </summary>
+public sealed record ConnectEDocumentWithCredentialsCommand(Guid ClinicId, string? Provider, string? ApiKey)
+    : IRequest<Result<EDocumentConnectionDto>>, IAuditableRequest
+{
+    public const int MaxApiKeyLength = 500;
+
+    public string AuditAction => "Clinic.EDocumentConnection.Connect";
+    public string? AuditTarget => $"ClinicId={ClinicId}";
+}
+
 /// <summary>POST /clinics/{clinicId}/e-document-connection/verify. <c>Clinics.Update</c>.</summary>
 public sealed record VerifyEDocumentConnectionCommand(Guid ClinicId)
     : IRequest<Result<EDocumentConnectionDto>>, IAuditableRequest

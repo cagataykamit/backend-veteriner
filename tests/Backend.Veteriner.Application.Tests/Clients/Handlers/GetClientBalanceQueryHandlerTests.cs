@@ -67,7 +67,7 @@ public sealed class GetClientBalanceQueryHandlerTests
                 Guid.NewGuid(), DateTime.UtcNow, null)
             .Value!;
         if (allocated > 0)
-            charge.ApplyAllocation(allocated).IsSuccess.Should().BeTrue();
+            charge.ApplyAllocation(allocated, DateTime.UtcNow).IsSuccess.Should().BeTrue();
         return charge;
     }
 

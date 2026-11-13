@@ -26,6 +26,9 @@ public sealed class ParasutEDocumentProvider : IEDocumentProvider, IEDocumentOAu
     public bool IsConfigured => _client.Options.IsConfigured;
     public EDocumentEnvironment Environment => _client.Options.Environment;
 
+    /// <summary>İptal satış faturası iptaliyle yapılır; üç tür için de geçerli.</summary>
+    public bool CanCancel(EDocumentType type) => true;
+
     public string BuildAuthorizationUrl(string state, string codeChallenge) => _client.AuthorizationUrl(state, codeChallenge);
 
     public async Task<ProviderResult<string>> ExchangeCodeAsync(string code, string codeVerifier, CancellationToken ct)

@@ -18,6 +18,9 @@ public sealed class EDocumentSender
     /// <summary>Gönderim sürerken süreç düşerse arka plan işinin belgeye yeniden bakacağı süre (tekrar gönderim çift belge üretmez).</summary>
     public static readonly TimeSpan InFlightGrace = TimeSpan.FromMinutes(5);
 
+    /// <summary>Belge, bağlantı başka sağlayıcıya / ortama geçtiği için gönderilmedi (sağlayıcı yanıt kodu yerine).</summary>
+    public const string ProviderMismatchCode = "provider-mismatch";
+
     private static readonly TimeSpan FirstCheckDelay = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan MaxCheckDelay = TimeSpan.FromMinutes(30);
 
@@ -44,10 +47,15 @@ public sealed class EDocumentSender
     /// </summary>
     public async Task SendAsync(EDocument document, EDocumentConnection connection, CancellationToken ct)
     {
-        var opened = _gateway.Open(connection);
+        var opened = _gateway.OpenFor(document, connection);
         if (!opened.IsSuccess)
         {
-            document.MarkFailed(EDocumentErrorKind.Authorization, opened.Error.Message, null, Now());
+            var mismatch = opened.Error.Code == EDocumentProviderGateway.ProviderMismatchCode;
+            document.MarkFailed(
+                mismatch ? EDocumentErrorKind.ProviderRejected : EDocumentErrorKind.Authorization,
+                opened.Error.Message,
+                mismatch ? ProviderMismatchCode : null,
+                Now());
             return;
         }
 
@@ -120,6 +128,16 @@ public sealed class EDocumentSender
             return;
         }
 
+        if (_gateway.OpenFor(document, connection) is { IsSuccess: false, Error.Code: EDocumentProviderGateway.ProviderMismatchCode } mismatch)
+        {
+            // Bağlantı başka sağlayıcıya / ortama geçti: belge eski sağlayıcıda kalır, yeniden gönderilmez ve sorulmaz.
+            if (document.Status == EDocumentStatus.Sending)
+                document.MarkFailed(EDocumentErrorKind.ProviderRejected, mismatch.Error.Message, ProviderMismatchCode, Now());
+            else
+                document.MarkCancelRejected(mismatch.Error.Message, ProviderMismatchCode, Now());
+            return;
+        }
+
         if (document.Status == EDocumentStatus.CancelRequested)
         {
             await CancelAsync(document, connection, ct);
@@ -133,7 +151,7 @@ public sealed class EDocumentSender
             return;
         }
 
-        var opened = _gateway.Open(connection);
+        var opened = _gateway.OpenFor(document, connection);
         if (!opened.IsSuccess)
         {
             Postpone(document, opened.Error.Message);
@@ -155,7 +173,7 @@ public sealed class EDocumentSender
     /// <summary><c>CancelRequested</c> belgeyi sağlayıcıda iptal eder; başarıda ücretler serbest kalır.</summary>
     public async Task CancelAsync(EDocument document, EDocumentConnection connection, CancellationToken ct)
     {
-        var opened = _gateway.Open(connection);
+        var opened = _gateway.OpenFor(document, connection);
         if (!opened.IsSuccess)
         {
             document.MarkCancelRejected(opened.Error.Message, null, Now());
@@ -188,7 +206,7 @@ public sealed class EDocumentSender
     /// <summary>Hatalı belgeden vazgeçmede sağlayıcıdaki taslak kayıt geri alınır (en iyi çaba; hata vazgeçmeyi durdurmaz).</summary>
     public async Task DiscardDraftAsync(EDocument document, EDocumentConnection? connection, CancellationToken ct)
     {
-        var opened = _gateway.Open(connection);
+        var opened = _gateway.OpenFor(document, connection);
         if (!opened.IsSuccess)
             return;
 
@@ -233,7 +251,7 @@ public sealed class EDocumentSender
         return new EDocumentSendRequest(
             document.Type,
             document.ExternalReference,
-            OperationDayBounds.ToLocalDate(document.CreatedAtUtc),
+            OperationDayBounds.ToLocal(document.CreatedAtUtc),
             new EDocumentSendBuyer(
                 buyer.Kind, buyer.Name, buyer.IdentityNumber, buyer.IsUnknownBuyer, buyer.TaxOffice,
                 buyer.Province, buyer.District, buyer.AddressLine, buyer.Email),

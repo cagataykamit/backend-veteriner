@@ -296,7 +296,7 @@ public sealed class Payment : AggregateRoot, IClinicScoped, ITenantOwned
         var allocations = new List<PaymentAllocation>(lines.Count);
         foreach (var (charge, amount) in lines)
         {
-            var applied = charge.ApplyAllocation(amount);
+            var applied = charge.ApplyAllocation(amount, nowUtc);
             if (!applied.IsSuccess)
                 return Result<IReadOnlyList<PaymentAllocation>>.Failure(applied.Error);
 

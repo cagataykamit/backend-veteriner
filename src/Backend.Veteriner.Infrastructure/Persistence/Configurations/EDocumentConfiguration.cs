@@ -108,6 +108,8 @@ public sealed class ClinicEDocumentSettingsConfiguration : IEntityTypeConfigurat
         b.Property(x => x.IssueOnPaymentByDefault).IsRequired();
         b.Property(x => x.AutoIssueEnabledAtUtc);
         b.Property(x => x.LastEndOfDayRunDate);
+        b.Property(x => x.AutoIssuePausedAtUtc);
+        b.Property(x => x.AutoIssuePauseReason).HasMaxLength(ClinicEDocumentSettings.MaxPauseReasonLength);
         b.Property(x => x.UpdatedByUserId).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();

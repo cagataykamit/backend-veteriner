@@ -3,10 +3,13 @@ using Backend.Veteriner.Application.ClientCredits;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Finance;
+using Backend.Veteriner.Application.EDocuments.Specs;
+using Backend.Veteriner.Application.Notifications;
 using Backend.Veteriner.Application.Payments.IntegrationEvents;
 using Backend.Veteriner.Application.Payments.Specs;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.ClientCredits;
+using Backend.Veteriner.Domain.EDocuments;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
@@ -28,6 +31,8 @@ public sealed class VoidPaymentCommandHandler : IRequestHandler<VoidPaymentComma
     private readonly IPaymentIntegrationEventOutbox _eventOutbox;
     private readonly TimeProvider _timeProvider;
     private readonly IRepository<ClientCredit> _credits;
+    private readonly IReadRepository<EDocument> _documents;
+    private readonly IUserNotificationPublisher _notifications;
 
     public VoidPaymentCommandHandler(
         ITenantContext tenantContext,
@@ -40,9 +45,13 @@ public sealed class VoidPaymentCommandHandler : IRequestHandler<VoidPaymentComma
         IRepository<Charge> charges,
         IPaymentIntegrationEventOutbox eventOutbox,
         TimeProvider timeProvider,
-        IRepository<ClientCredit> credits)
+        IRepository<ClientCredit> credits,
+        IReadRepository<EDocument> documents,
+        IUserNotificationPublisher notifications)
     {
         _credits = credits;
+        _documents = documents;
+        _notifications = notifications;
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clientContext = clientContext;
@@ -101,6 +110,7 @@ public sealed class VoidPaymentCommandHandler : IRequestHandler<VoidPaymentComma
         if (!voided.IsSuccess)
             return voided;
 
+        await NotifyDocumentedChargesAsync(tenantId, payment.ClinicId, charges, ct);
 
         try
         {
@@ -123,5 +133,20 @@ public sealed class VoidPaymentCommandHandler : IRequestHandler<VoidPaymentComma
         }
 
         return Result.Success();
+    }
+
+    /// <summary>
+    /// Belgesi kesilmiş ücretin ödemesi geri alındı: belge kendiliğinden iptal edilmez (tahsilat düzeltmesi, kısmi iade, yanlış
+    /// ödeme kaydı olabilir; e-Fatura iptali her sağlayıcıda yok). Belge iptal yetkisi olanlara belge başına bildirim gider; karar
+    /// onların (ADR-036). Bildirim ödeme iptaliyle aynı kayıtta yazılır.
+    /// </summary>
+    private async Task NotifyDocumentedChargesAsync(Guid tenantId, Guid clinicId, IReadOnlyList<Charge> charges, CancellationToken ct)
+    {
+        foreach (var documentId in charges.Where(c => c.EDocumentId is not null).Select(c => c.EDocumentId!.Value).Distinct())
+        {
+            var document = await _documents.FirstOrDefaultAsync(new EDocumentByIdSpec(tenantId, documentId), ct);
+            if (document is { HoldsCharges: true, Status: not EDocumentStatus.Failed })
+                await _notifications.EDocumentPaymentVoidedAsync(tenantId, clinicId, document.Id, document.DocumentNumber, ct);
+        }
     }
 }
