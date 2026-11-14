@@ -71,6 +71,8 @@ public sealed class PrescriptionItemsIntegrationTests : IClassFixture<CustomWebA
             ["title"] = "Güncel başlık",
             ["content"] = "Güncel içerik",
         };
+        using (var detail = await GetDetailAsync(c.Http, c.PrescriptionId))
+            body["rowVersion"] = detail.RootElement.GetProperty("rowVersion").GetString();
         if (includeItems)
             body["items"] = items;
 

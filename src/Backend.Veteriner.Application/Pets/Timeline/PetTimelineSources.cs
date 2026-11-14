@@ -141,6 +141,7 @@ internal sealed class PrescriptionTimelineSource(IReadRepository<Prescription> r
             RelatedVisitId: null,
             RelatedAppointmentId: null,
             UpdatedAtUtc: p.UpdatedAtUtc,
+            AddedAfterFinalization: p.AddedAfterFinalization,
             RelatedTreatmentId: p.TreatmentId);
 }
 

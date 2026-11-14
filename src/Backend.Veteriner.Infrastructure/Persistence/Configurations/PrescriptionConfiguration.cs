@@ -18,6 +18,10 @@ public sealed class PrescriptionConfiguration : IEntityTypeConfiguration<Prescri
 
         b.HasKey(x => x.Id);
 
+        b.Property(x => x.RowVersion)
+            .IsRowVersion()
+            .IsConcurrencyToken();
+
         b.Property(x => x.TenantId).IsRequired();
         b.Property(x => x.ClinicId).IsRequired();
         b.Property(x => x.PetId).IsRequired();

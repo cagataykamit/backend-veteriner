@@ -115,7 +115,8 @@ public sealed class PrescriptionWriteClinicAssignmentCommandHandlerTests
             "Başlık",
             "İçerik",
             null,
-            null);
+            null,
+            RowVersion: "AAAAAAAAB9E=");
 
     private static Prescription ExistingPrescription(Guid tid, Guid cid, Guid petId)
         => new(

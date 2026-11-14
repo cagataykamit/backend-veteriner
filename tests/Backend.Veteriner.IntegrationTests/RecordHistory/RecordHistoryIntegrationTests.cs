@@ -123,10 +123,12 @@ public sealed class RecordHistoryIntegrationTests : IClassFixture<CustomWebAppli
         create.StatusCode.Should().Be(HttpStatusCode.Created);
         var id = await create.Content.ReadFromJsonAsync<Guid>();
 
+        var version = (await client.GetFromJsonAsync<JsonElement>($"/api/v1/prescriptions/{id}")).GetProperty("rowVersion").GetString();
         var update = await client.PutAsJsonAsync($"/api/v1/prescriptions/{id}", new
         {
             ClinicId = clinicId, PetId = petId, PrescribedAtUtc = AtUtc, Title = "Reçete", Content = "İçerik",
             Items = new[] { new { Name = "Amoksisilin 250 mg", Quantity = 10m, Instructions = "Günde 2 kez" } },
+            RowVersion = version,
         });
         update.IsSuccessStatusCode.Should().BeTrue();
 

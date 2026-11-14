@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.Prescriptions.Access;
 using Backend.Veteriner.Application.Prescriptions.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
@@ -7,14 +8,16 @@ using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Mediator;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Prescriptions.Commands.Cancel;
 
 /// <summary>
 /// POST /api/v1/prescriptions/{id}/cancel (RECORD-008): reçete gerekçeyle iptal edilir, silinmez. Kesinleşmiş muayeneye bağlı reçetede de
 /// yapılabilir (düzeltme yolu: iptal + yeni reçete, ADR-013); bu yüzden <c>ExaminationLinkedRecordLock</c> çağrılmaz.
+/// <see cref="RowVersion"/> zorunludur (ADR-043 K5).
 /// </summary>
-public sealed record CancelPrescriptionCommand(Guid Id, string? Reason) : IRequest<Result>, IAuditableRequest
+public sealed record CancelPrescriptionCommand(Guid Id, string? Reason, string? RowVersion = null) : IRequest<Result>, IAuditableRequest
 {
     public string AuditAction => "Prescription.Cancel";
     public string? AuditTarget => $"PrescriptionId={Id}";
@@ -77,12 +80,25 @@ public sealed class CancelPrescriptionCommandHandler : IRequestHandler<CancelPre
         if (!access.IsSuccess)
             return access;
 
+        if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
+            return Result.Failure("Prescriptions.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+
         var cancelled = p.Cancel(userId, request.Reason, _timeProvider.GetUtcNow().UtcDateTime);
         if (!cancelled.IsSuccess)
             return cancelled;
 
-        await _prescriptionsWrite.UpdateAsync(p, ct);
-        await _prescriptionsWrite.SaveChangesAsync(ct);
+        p.SetExpectedRowVersion(expectedRowVersion);
+
+        try
+        {
+            await _prescriptionsWrite.UpdateAsync(p, ct);
+            await _prescriptionsWrite.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result.Failure(PrescriptionConcurrency.ConflictCode, PrescriptionConcurrency.ConflictMessage);
+        }
+
         return Result.Success();
     }
 }

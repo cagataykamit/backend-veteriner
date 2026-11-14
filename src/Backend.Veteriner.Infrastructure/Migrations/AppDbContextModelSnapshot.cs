@@ -5630,6 +5630,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<DateTime>("PrescribedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 

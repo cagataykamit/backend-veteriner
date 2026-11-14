@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
@@ -126,7 +127,8 @@ public sealed class GetPrescriptionByIdQueryHandler
             cancelledByName,
             p.CancelReason,
             p.AddedAfterFinalization,
-            p.LateEntryReason);
+            p.LateEntryReason,
+            ExaminationRowVersion.Encode(p.RowVersion));
 
         return Result<PrescriptionDetailDto>.Success(dto);
     }

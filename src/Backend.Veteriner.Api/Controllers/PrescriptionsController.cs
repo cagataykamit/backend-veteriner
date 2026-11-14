@@ -90,7 +90,8 @@ public sealed class PrescriptionsController : ControllerBase
             body.Content,
             body.Notes,
             body.FollowUpDateUtc,
-            body.Items);
+            body.Items,
+            body.RowVersion);
 
         var result = await _mediator.Send(cmd, ct);
         return result.ToActionResult(this);
@@ -124,7 +125,7 @@ public sealed class PrescriptionsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new CancelPrescriptionCommand(id, body.Reason), ct);
+        var result = await _mediator.Send(new CancelPrescriptionCommand(id, body.Reason, body.RowVersion), ct);
         return result.ToActionResult(this);
     }
 

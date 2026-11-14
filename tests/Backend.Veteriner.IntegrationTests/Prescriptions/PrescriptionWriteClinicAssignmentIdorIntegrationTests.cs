@@ -189,6 +189,7 @@ public sealed class PrescriptionWriteClinicAssignmentIdorIntegrationTests : ICla
             PrescribedAtUtc = ValidPrescribedAtUtc,
             Title = "Admin update",
             Content = "İçerik",
+            RowVersion = await GetRowVersionAsync(prescriptionId),
         });
         updateResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
@@ -257,5 +258,13 @@ public sealed class PrescriptionWriteClinicAssignmentIdorIntegrationTests : ICla
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.Prescriptions.AsNoTracking().SingleAsync(p => p.Id == prescriptionId);
         return (row.ClinicId, row.PetId, row.Title);
+    }
+
+    private async Task<string> GetRowVersionAsync(Guid prescriptionId)
+    {
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var version = await db.Prescriptions.AsNoTracking().Where(p => p.Id == prescriptionId).Select(p => p.RowVersion).SingleAsync();
+        return Convert.ToBase64String(version);
     }
 }
