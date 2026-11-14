@@ -7,6 +7,7 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Hospitalizations.Commands.Cancel;
 using Backend.Veteriner.Application.Hospitalizations.Commands.Create;
 using Backend.Veteriner.Application.Hospitalizations.Commands.Discharge;
 using Backend.Veteriner.Application.Hospitalizations.Commands.Update;
@@ -114,6 +115,24 @@ public sealed class HospitalizationsController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <summary>Yanlış açılan yatışı gerekçeyle iptal eder (silmez; ADR-043 AK-5); iptal edilen yatış değiştirilemez ve etkin sayılmaz.</summary>
+    [HttpPost("{id:guid}/cancel")]
+    [Authorize(Policy = PermissionCatalog.Hospitalizations.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(HospitalizationWriteResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Cancel([FromRoute] Guid id, [FromBody] CancelHospitalizationBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new CancelHospitalizationCommand(id, body.Reason, body.RowVersion), ct);
+        return result.ToActionResult(this);
+    }
+
     /// <summary>Yatışın değişiklik geçmişi (RECORD-002), yeniden eskiye; bkz. docs/RECORD_HISTORY_API_CONTRACT.md.</summary>
     [HttpGet("{id:guid}/history")]
     [Authorize(Policy = PermissionCatalog.Hospitalizations.Read)]
@@ -147,6 +166,7 @@ public sealed class HospitalizationsController : ControllerBase
     /// <summary>
     /// Paged list. <c>search</c> (or <c>page.search</c>): reason, notes, and pet/client name match.
     /// <c>activeOnly=true</c> limits to open stays; <c>false</c> to discharged only; omit for all.
+    /// Cancelled stays (ADR-043 AK-5) are hidden unless <c>includeCancelled=true</c> (only with <c>activeOnly</c> omitted).
     /// Sorting: <c>sort=admittedAtUtc</c>, <c>order=asc|desc</c>; other sort values return 400. Without sort: newest first.
     /// </summary>
     [HttpGet]
@@ -163,6 +183,7 @@ public sealed class HospitalizationsController : ControllerBase
         [FromQuery] bool? activeOnly = null,
         [FromQuery] DateTime? dateFromUtc = null,
         [FromQuery] DateTime? dateToUtc = null,
+        [FromQuery] bool includeCancelled = false,
         CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
@@ -176,7 +197,8 @@ public sealed class HospitalizationsController : ControllerBase
                 petId,
                 activeOnly,
                 dateFromUtc,
-                dateToUtc),
+                dateToUtc,
+                includeCancelled),
             ct);
         return result.ToActionResult(this);
     }

@@ -117,7 +117,8 @@ public sealed class GetHospitalizationsListQueryHandler
                 request.DateToUtc,
                 searchPattern,
                 searchPetIds,
-                accessibleClinicIds),
+                accessibleClinicIds,
+                request.IncludeCancelled),
             ct);
 
         var rows = await _hospitalizations.ListAsync(
@@ -133,7 +134,8 @@ public sealed class GetHospitalizationsListQueryHandler
                 searchPattern,
                 searchPetIds,
                 accessibleClinicIds,
-                HospitalizationListSort.Catalog.Resolve(request.PageRequest)),
+                HospitalizationListSort.Catalog.Resolve(request.PageRequest),
+                request.IncludeCancelled),
             ct);
 
         var petIds = rows.Select(x => x.PetId).Distinct().ToArray();
@@ -161,7 +163,7 @@ public sealed class GetHospitalizationsListQueryHandler
                     ? cn
                     : string.Empty;
 
-                var isActive = h.DischargedAtUtc is null;
+                var isActive = h.IsActive;
                 var room = h.RoomId is { } roomId && roomNamesById.TryGetValue(roomId, out var names) ? names : null;
 
                 return new HospitalizationListItemDto(
@@ -181,7 +183,8 @@ public sealed class GetHospitalizationsListQueryHandler
                     h.Location,
                     h.RoomId,
                     room?.RoomName,
-                    room?.WardName);
+                    room?.WardName,
+                    h.IsCancelled);
             })
             .ToList();
 

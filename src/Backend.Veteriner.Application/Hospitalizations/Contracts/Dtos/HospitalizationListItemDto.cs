@@ -17,4 +17,5 @@ public sealed record HospitalizationListItemDto(
     string? Location,
     Guid? RoomId,
     string? RoomName,
-    string? WardName);
+    string? WardName,
+    bool IsCancelled = false);

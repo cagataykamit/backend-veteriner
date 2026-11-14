@@ -228,7 +228,8 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
                 ClinicName(h.ClinicId),
                 h.Reason,
                 h.DischargedAtUtc,
-                h.DischargedAtUtc is null))
+                h.IsActive,
+                h.IsCancelled))
             .ToList();
 
         var adminDtos = admins

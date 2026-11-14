@@ -1,4 +1,5 @@
 using Backend.Veteriner.Domain.Hospitalizations;
+using Backend.Veteriner.Domain.Shared;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -8,7 +9,8 @@ public sealed class HospitalizationConfiguration : IEntityTypeConfiguration<Hosp
 {
     public void Configure(EntityTypeBuilder<Hospitalization> b)
     {
-        b.ToTable("Hospitalizations");
+        b.ToTable("Hospitalizations", t =>
+            t.HasCheckConstraint("CK_Hospitalizations_Cancel_Consistent", "([CancelledAtUtc] IS NULL AND [CancelReason] IS NULL AND [CancelledByUserId] IS NULL) OR ([CancelledAtUtc] IS NOT NULL AND [CancelReason] IS NOT NULL AND [CancelledByUserId] IS NOT NULL)"));
 
         b.HasKey(x => x.Id);
 
@@ -28,6 +30,10 @@ public sealed class HospitalizationConfiguration : IEntityTypeConfiguration<Hosp
         b.Property(x => x.DischargeNote).HasMaxLength(4000);
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);
+        b.Property(x => x.CancelledAtUtc);
+        b.Property(x => x.CancelledByUserId);
+        b.Property(x => x.CancelReason).HasMaxLength(CorrectionReason.MaxLength);
+
 
         b.Property(x => x.RowVersion)
             .IsRowVersion()
@@ -46,9 +52,9 @@ public sealed class HospitalizationConfiguration : IEntityTypeConfiguration<Hosp
             .HasForeignKey(x => x.RoomId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // At most one active (not discharged) stay per pet per clinic within a tenant.
+        // At most one active (not discharged, not cancelled; Hospitalization.IsActiveExpression) stay per pet per clinic within a tenant.
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.PetId })
             .IsUnique()
-            .HasFilter("[DischargedAtUtc] IS NULL");
+            .HasFilter("[DischargedAtUtc] IS NULL AND [CancelledAtUtc] IS NULL");
     }
 }

@@ -14,6 +14,7 @@ public sealed class HospitalizationsForPetRecentSpec : Specification<Hospitaliza
         IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
         Query.Where(x => x.TenantId == tenantId && x.PetId == petId);
+        Query.Where(Hospitalization.IsNotCancelledExpression);
         Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderByDescending(x => x.AdmittedAtUtc)
             .ThenByDescending(x => x.Id)

@@ -33,6 +33,13 @@ public sealed class UpdateHospitalizationBody
     public string? RowVersion { get; init; }
 }
 
+/// <summary>POST /api/v1/hospitalizations/{id}/cancel body; gerekçe 5-500 karakter, rowVersion zorunlu.</summary>
+public sealed class CancelHospitalizationBody
+{
+    public string? Reason { get; init; }
+    public string? RowVersion { get; init; }
+}
+
 /// <summary>POST /api/v1/hospitalizations/{id}/discharge body.</summary>
 public sealed class DischargeHospitalizationBody
 {

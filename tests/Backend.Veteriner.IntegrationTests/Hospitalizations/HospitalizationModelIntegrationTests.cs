@@ -197,6 +197,64 @@ public sealed class HospitalizationModelIntegrationTests : IClassFixture<CustomW
     }
 
     [Fact]
+    public async Task Cancel_Should_Keep_Record_Free_The_Pet_For_A_New_Stay_And_Hide_It_By_Default()
+    {
+        var (client, clinicId, petId) = await AdminClientAsync();
+        var id = await CreateAsync(client, new
+        {
+            ClinicId = clinicId,
+            PetId = petId,
+            AdmittedAtUtc = DateTime.UtcNow.AddHours(-3),
+            Reason = "Yanlış hasta",
+        });
+        var version = (await GetAsync(client, id)).GetProperty("rowVersion").GetString();
+
+        var missingVersion = await client.PostAsJsonAsync($"/api/v1/hospitalizations/{id}/cancel", new { Reason = "Yanlış hastaya açıldı" });
+        missingVersion.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var tooShort = await client.PostAsJsonAsync($"/api/v1/hospitalizations/{id}/cancel", new { Reason = "x", RowVersion = version });
+        tooShort.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(tooShort)).Should().Be("Hospitalizations.Validation");
+
+        var stale = await client.PostAsJsonAsync(
+            $"/api/v1/hospitalizations/{id}/cancel",
+            new { Reason = "Yanlış hastaya açıldı", RowVersion = Convert.ToBase64String(new byte[8]) });
+        stale.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(stale)).Should().Be("Hospitalizations.ConcurrencyConflict");
+
+        var ok = await client.PostAsJsonAsync($"/api/v1/hospitalizations/{id}/cancel", new { Reason = "Yanlış hastaya açıldı", RowVersion = version });
+        ok.StatusCode.Should().Be(HttpStatusCode.OK, await ok.Content.ReadAsStringAsync());
+
+        var detail = await GetAsync(client, id);
+        detail.GetProperty("isActive").GetBoolean().Should().BeFalse();
+        detail.GetProperty("cancelReason").GetString().Should().Be("Yanlış hastaya açıldı");
+        detail.GetProperty("cancelledAtUtc").ValueKind.Should().Be(JsonValueKind.String);
+
+        var discharge = await client.PostAsJsonAsync(
+            $"/api/v1/hospitalizations/{id}/discharge",
+            new { DischargedAtUtc = DateTime.UtcNow, RowVersion = detail.GetProperty("rowVersion").GetString() });
+        discharge.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(discharge)).Should().Be("Hospitalizations.AlreadyCancelled");
+
+        // İptal edilen yatış etkin sayılmaz: aynı hayvana yeni yatış açılabilir.
+        await CreateAsync(client, new { ClinicId = clinicId, PetId = petId, AdmittedAtUtc = DateTime.UtcNow.AddHours(-1), Reason = "Doğru yatış" });
+
+        var list = await client.GetFromJsonAsync<JsonElement>($"/api/v1/hospitalizations?clinicId={clinicId:D}&petId={petId:D}");
+        list.GetProperty("items").EnumerateArray().Select(r => r.GetProperty("id").GetGuid()).Should().NotContain(id);
+        var withCancelled = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/v1/hospitalizations?clinicId={clinicId:D}&petId={petId:D}&includeCancelled=true");
+        withCancelled.GetProperty("items").EnumerateArray().Single(r => r.GetProperty("id").GetGuid() == id)
+            .GetProperty("isCancelled").GetBoolean().Should().BeTrue();
+
+        var timeline = await client.GetFromJsonAsync<JsonElement>($"/api/v1/pets/{petId:D}/timeline");
+        timeline.GetProperty("items").EnumerateArray().Select(r => r.GetProperty("sourceId").GetGuid()).Should().NotContain(id);
+        var timelineWithVoided = await client.GetFromJsonAsync<JsonElement>($"/api/v1/pets/{petId:D}/timeline?includeVoided=true");
+        timelineWithVoided.GetProperty("items").EnumerateArray()
+            .Single(r => r.GetProperty("sourceId").GetGuid() == id)
+            .GetProperty("status").GetString().Should().Be("Cancelled");
+    }
+
+    [Fact]
     public async Task Discharge_With_Legacy_Notes_Field_Should_Not_Overwrite_Admission_Notes()
     {
         var (client, clinicId, petId) = await AdminClientAsync();

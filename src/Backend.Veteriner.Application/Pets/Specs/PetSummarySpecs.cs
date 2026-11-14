@@ -7,7 +7,7 @@ using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Pets.Specs;
 
-/// <summary>Aktif yatış (taburcu edilmemiş); history-summary'deki son 10 sınırından bağımsız.</summary>
+/// <summary>Aktif yatış (taburcu ve iptal edilmemiş); history-summary'deki son 10 sınırından bağımsız.</summary>
 public sealed class ActiveHospitalizationForPetSummarySpec : Specification<Hospitalization>
 {
     public ActiveHospitalizationForPetSummarySpec(
@@ -16,7 +16,8 @@ public sealed class ActiveHospitalizationForPetSummarySpec : Specification<Hospi
         Guid petId,
         IReadOnlyCollection<Guid>? accessibleClinicIds)
     {
-        Query.Where(h => h.TenantId == tenantId && h.PetId == petId && h.DischargedAtUtc == null);
+        Query.Where(h => h.TenantId == tenantId && h.PetId == petId);
+        Query.Where(Hospitalization.IsActiveExpression);
         Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderByDescending(h => h.AdmittedAtUtc)
             .ThenByDescending(h => h.Id)

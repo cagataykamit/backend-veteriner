@@ -65,7 +65,7 @@ Bölüm zarfı: `{ "state": "Ok" | "Empty" | "Forbidden" | "Unavailable", "data"
 | `Unavailable` | Bölüm sorgusu hata verdi; diğer bölümler yine döner | `null` |
 
 - `petAlerts` ve `profileWeightKg` `Pets.Read` altındadır ve bölüm zarfı taşımaz (ayrı sorgu değil, hayvan kaydıyla gelir). Uyarı yoksa `flags: []` ("uyarı yok"); `petAlerts` null olmaz. `profileWeightKg` tarihsizdir (`Pet.Weight`), tarih uydurulmaz.
-- `activeHospitalization`: `DischargedAtUtc == null` olan kayıt (`history-summary`'deki son 10 sınırından bağımsız, ayrı sorgu). Birden fazla klinikte aktif yatış nadir de olsa mümkünse en yeni `AdmittedAtUtc` döner. İzin: `Hospitalizations.Read`.
+- `activeHospitalization`: taburcu ve iptal edilmemiş (`DischargedAtUtc == null`, `CancelledAtUtc == null`; ADR-043 AK-5) kayıt (`history-summary`'deki son 10 sınırından bağımsız, ayrı sorgu). Birden fazla klinikte aktif yatış nadir de olsa mümkünse en yeni `AdmittedAtUtc` döner. İzin: `Hospitalizations.Read`.
 - `vaccinations` (`Vaccinations.Read`): `lastApplied` = `Status=Applied` olanlar içinde en yeni `AppliedAtUtc`; `nextDue` = `Status=Scheduled` olanlar içinde **en erken** `DueAtUtc` (gecikmiş olabilir: `isOverdue = dueAtUtc <` bugünün İstanbul gün başı, ADR-028 — bugün vadeli aşı gecikmiş değildir; **vefat eden hayvanda hep `false`**, ADR-020 S5 — kayıt yine görünür). İkisi ayrı alandır; ikisi de yoksa `state: "Empty"`, biri varsa `Ok` ve diğeri `null`.
 - `latestWeight` (`Examinations.Read`): `WeightKg` dolu muayeneler içinde `VitalsMeasuredAtUtc` (yoksa `ExaminedAtUtc`) en yeni olan. `source` bugün hep `"Examination"`.
 - `lastVisit` (`Visits.Read`): yanlış işaretli (`VoidedAtUtc != null`) olmayan en yeni `ArrivedAtUtc`.
@@ -84,7 +84,7 @@ Sorgu parametreleri (hepsi opsiyonel):
 | `types` | string, tekrarlı (`types=Visit&types=Examination`) | Yalnız bu türler. Bilinmeyen veya henüz desteklenmeyen ad (`Payment`, `Appointment`) → `400 Pets.Validation`. Boş = yetkili tüm türler |
 | `fromUtc` / `toUtc` | ISO-8601 | Olay tarihi aralığı: `fromUtc <= eventAtUtc < toUtc` (yarı açık). `fromUtc >= toUtc` → `400 Pets.Validation` |
 | `clinicId` | Guid | Klinik süzgeci (scope kuralı yukarıdaki gibi; erişilemeyen klinik `Clinics.AccessDenied`) |
-| `includeVoided` | bool, varsayılan `false` | `true`: yanlış işaretli geliş ve iptal edilmiş aşı da döner (`isVoided=true`) |
+| `includeVoided` | bool, varsayılan `false` | `true`: yanlış işaretli geliş, iptal edilmiş aşı, reçete, lab, uygulama, görüntüleme ve yatış da döner (`isVoided=true`) |
 | `limit` | int, varsayılan 20, **en çok 50** | Sayfa boyutu. Aralık dışı → `400 Pets.Validation` |
 | `cursor` | string | Önceki yanıttaki `nextCursor` (opak) |
 

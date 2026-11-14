@@ -220,7 +220,10 @@ internal sealed class VaccinationTimelineSource(IReadRepository<Vaccination> rep
     }
 }
 
-/// <summary>Yatış tek olaydır (kabul tarihinde); taburcu <c>Status</c> ile ifade edilir.</summary>
+/// <summary>
+/// Yatış tek olaydır (kabul tarihinde); taburcu <c>Status</c> ile ifade edilir. İptal edilen yatış (ADR-043 AK-5) yalnız
+/// <c>includeVoided</c> ile gelir, <c>Status = "Cancelled"</c>.
+/// </summary>
 internal sealed class HospitalizationTimelineSource(IReadRepository<Hospitalization> repository)
     : PetTimelineSourceBase<Hospitalization>(repository)
 {
@@ -231,7 +234,9 @@ internal sealed class HospitalizationTimelineSource(IReadRepository<Hospitalizat
     protected override Expression<Func<Hospitalization, Guid>> Id => h => h.Id;
 
     protected override Expression<Func<Hospitalization, bool>> Filter(PetTimelineSourceQuery q)
-        => h => h.TenantId == q.TenantId && h.PetId == q.PetId;
+        => q.IncludeVoided
+            ? h => h.TenantId == q.TenantId && h.PetId == q.PetId
+            : h => h.TenantId == q.TenantId && h.PetId == q.PetId && h.CancelledAtUtc == null;
 
     protected override ISpecificationBuilder<Hospitalization> ApplyClinicScope(ISpecificationBuilder<Hospitalization> builder, PetTimelineSourceQuery q)
         => builder.ApplyClinicScope(q.SingleClinicId, q.AccessibleClinicIds);
@@ -244,8 +249,8 @@ internal sealed class HospitalizationTimelineSource(IReadRepository<Hospitalizat
             h.ClinicId,
             h.Reason,
             Summary: null,
-            Status: h.DischargedAtUtc is null ? "Active" : "Discharged",
-            IsVoided: false,
+            Status: h.IsCancelled ? "Cancelled" : h.DischargedAtUtc is null ? "Active" : "Discharged",
+            IsVoided: h.IsCancelled,
             RelatedExaminationId: h.ExaminationId,
             RelatedVisitId: h.VisitId,
             RelatedAppointmentId: null,

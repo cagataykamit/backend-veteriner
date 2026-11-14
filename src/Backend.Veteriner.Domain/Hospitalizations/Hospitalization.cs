@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Domain.Hospitalizations;
@@ -7,6 +8,17 @@ namespace Backend.Veteriner.Domain.Hospitalizations;
 /// </summary>
 public sealed class Hospitalization : AggregateRoot, IClinicScoped, ITenantOwned
 {
+    /// <summary>Etkin yatış kuralı (tek yer): taburcu edilmemiş ve iptal edilmemiş. Sorgular bu ifadeyi kullanır.</summary>
+    public static readonly Expression<Func<Hospitalization, bool>> IsActiveExpression
+        = h => h.DischargedAtUtc == null && h.CancelledAtUtc == null;
+
+    /// <summary>Taburcu edilmiş ve iptal edilmemiş (liste "geçmiş yatışlar" filtresi).</summary>
+    public static readonly Expression<Func<Hospitalization, bool>> IsDischargedExpression
+        = h => h.DischargedAtUtc != null && h.CancelledAtUtc == null;
+
+    public static readonly Expression<Func<Hospitalization, bool>> IsNotCancelledExpression
+        = h => h.CancelledAtUtc == null;
+
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
     public Guid ClinicId { get; private set; }
@@ -32,6 +44,18 @@ public sealed class Hospitalization : AggregateRoot, IClinicScoped, ITenantOwned
     public string? DischargeNote { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
+
+    /// <summary>
+    /// Gerekçeli iptal (ADR-043 AK-5): yanlış açılan yatış silinmez; iptal edilen yatış etkin sayılmaz ve değiştirilemez.
+    /// Etkin ve taburcu edilmiş yatışta yapılabilir.
+    /// </summary>
+    public DateTime? CancelledAtUtc { get; private set; }
+    public Guid? CancelledByUserId { get; private set; }
+    public string? CancelReason { get; private set; }
+    public bool IsCancelled => CancelledAtUtc.HasValue;
+
+    /// <summary><see cref="IsActiveExpression"/> ile aynı kural, bellekteki kayıt için.</summary>
+    public bool IsActive => DischargedAtUtc is null && !IsCancelled;
 
     /// <summary>SQL Server rowversion — eşzamanlı güncelleme için.</summary>
     public byte[] RowVersion { get; private set; } = default!;
@@ -95,6 +119,8 @@ public sealed class Hospitalization : AggregateRoot, IClinicScoped, ITenantOwned
         string? location,
         DateTime utcNow)
     {
+        if (IsCancelled)
+            return CancelledFailure();
         if (DischargedAtUtc.HasValue)
             return Result.Failure("Hospitalizations.AlreadyDischarged", "Discharged hospitalization cannot be updated.");
 
@@ -132,6 +158,8 @@ public sealed class Hospitalization : AggregateRoot, IClinicScoped, ITenantOwned
     /// </summary>
     public Result Discharge(DateTime dischargedAtUtc, string? dischargeNote, DateTime utcNow)
     {
+        if (IsCancelled)
+            return CancelledFailure();
         if (DischargedAtUtc.HasValue)
             return Result.Failure("Hospitalizations.AlreadyDischarged", "Hospitalization is already discharged.");
 
@@ -160,6 +188,8 @@ public sealed class Hospitalization : AggregateRoot, IClinicScoped, ITenantOwned
         ArgumentNullException.ThrowIfNull(room);
         ArgumentNullException.ThrowIfNull(ward);
 
+        if (IsCancelled)
+            return CancelledFailure();
         if (DischargedAtUtc.HasValue)
             return Result.Failure("Hospitalizations.AlreadyDischarged", "Discharged hospitalization cannot be updated.");
         if (room.WardId != ward.Id)
@@ -175,12 +205,34 @@ public sealed class Hospitalization : AggregateRoot, IClinicScoped, ITenantOwned
     /// <summary>Oda bağını kaldırır; konum metni (<see cref="Location"/>) olduğu gibi kalır.</summary>
     public Result ClearRoom()
     {
+        if (IsCancelled)
+            return CancelledFailure();
         if (DischargedAtUtc.HasValue)
             return Result.Failure("Hospitalizations.AlreadyDischarged", "Discharged hospitalization cannot be updated.");
 
         RoomId = null;
         return Result.Success();
     }
+
+    /// <summary>Yatışı gerekçeyle iptal eder (silmez; kural <see cref="RecordCancellationRules"/>). Kesinleşmiş muayeneye bağlı yatışta da yapılabilir.</summary>
+    public Result Cancel(Guid cancelledByUserId, string? reason, DateTime utcNow)
+    {
+        if (IsCancelled)
+            return Result.Failure("Hospitalizations.AlreadyCancelled", "Yatış zaten iptal edilmiş.");
+
+        var cancellation = RecordCancellationRules.Resolve(cancelledByUserId, reason, utcNow, "Hospitalizations.Validation");
+        if (!cancellation.IsSuccess)
+            return Result.Failure(cancellation.Error);
+
+        CancelledAtUtc = cancellation.Value!.CancelledAtUtc;
+        CancelledByUserId = cancellation.Value.CancelledByUserId;
+        CancelReason = cancellation.Value.Reason;
+        UpdatedAtUtc = utcNow;
+        return Result.Success();
+    }
+
+    private static Result CancelledFailure()
+        => Result.Failure("Hospitalizations.AlreadyCancelled", "İptal edilmiş yatış değiştirilemez.");
 
     /// <summary>Odadan türetilen konum metni biçimi tek yerde: "Bölüm / Oda".</summary>
     public static string FormatRoomLocation(string wardName, string roomName)

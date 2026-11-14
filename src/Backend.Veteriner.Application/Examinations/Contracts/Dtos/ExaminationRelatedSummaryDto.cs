@@ -57,7 +57,8 @@ public sealed record ExaminationRelatedHospitalizationItemDto(
     string ClinicName,
     string Reason,
     DateTime? DischargedAtUtc,
-    bool IsActive);
+    bool IsActive,
+    bool IsCancelled = false);
 
 /// <summary>İptal edilmemiş uygulama; <see cref="AddedAfterFinalization"/> "kesinleştirmeden sonra eklendi" rozetidir.</summary>
 public sealed record ExaminationRelatedAdministrationItemDto(

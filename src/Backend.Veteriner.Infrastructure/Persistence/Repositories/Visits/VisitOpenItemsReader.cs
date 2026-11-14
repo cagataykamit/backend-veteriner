@@ -237,7 +237,7 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
         {
             var hospitalizations =
                 from h in _db.Hospitalizations.AsNoTracking()
-                where h.TenantId == tenantId && h.ClinicId == clinicId
+                where h.TenantId == tenantId && h.ClinicId == clinicId && h.CancelledAtUtc == null
                 join e in _db.Examinations.AsNoTracking() on h.ExaminationId equals e.Id into hospitalizationExaminations
                 from e in hospitalizationExaminations.DefaultIfEmpty()
                 let visitId = h.VisitId ?? (e != null ? e.VisitId : null)

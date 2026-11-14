@@ -446,6 +446,8 @@ public static class DataExportTables
                 DataExportColumn<Hospitalization>.Text("Konum", "Konum.", x => x.Location),
                 DataExportColumn<Hospitalization>.Text("Not", "Not.", x => x.Notes),
                 DataExportColumn<Hospitalization>.Text("TaburcuNotu", "Taburcu notu.", x => x.DischargeNote),
+                DataExportColumn<Hospitalization>.Instant("Iptal", "İptal zamanı.", x => x.CancelledAtUtc),
+                DataExportColumn<Hospitalization>.Text("IptalNedeni", "İptal gerekçesi.", x => x.CancelReason),
             ]),
 
         new DataExportTable<CareInstruction>("bakim_talimatlari.csv", "Bakım talimatları",

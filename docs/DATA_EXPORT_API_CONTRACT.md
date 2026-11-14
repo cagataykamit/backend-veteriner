@@ -140,7 +140,7 @@ dosyanın sütun açıklamaları. CRLF, UTF-8 BOM'lu.
 | `lab_sonuclari.csv` | Lab istek ve sonuçları: test, durum, zamanlar, sonuç metni, yorum, iptal | Ekli dosyaların içeriği |
 | `goruntuleme.csv` | Görüntüleme kayıtları | Görüntü dosyaları |
 | `dosyalar.csv` | Yüklenen dosyaların kaydı: bağlı kayıt, dosya adı, tür, boyut, durum | Dosya içeriği, depo anahtarı, SHA-256 |
-| `yatislar.csv` | Yatışlar: zamanlar, neden, konum, not, taburcu notu | Oda kimliği |
+| `yatislar.csv` | Yatışlar: zamanlar, neden, konum, not, taburcu notu, iptal zamanı ve gerekçesi | Oda kimliği |
 | `bakim_talimatlari.csv` | Bakım talimatları | — |
 | `ucretler.csv` | Ücretler: açıklama, tür, miktar, birim fiyat, tutar, KDV, para birimi, kapanan tutar, iptal; devir bakiyesinde içe aktarma partisi (`IceAktarmaPartisiId`, ADR-048) | İstek anahtarı, değişiklik sayacı |
 | `eski-program-hareketleri.csv` | Eski program hesap hareketleri (içe aktarılmış, salt okunur; bakiyeyi etkilemez, ADR-048): tarih, borç/tahsilat, tutar, açıklama, ödeme şekli, belge no, hasta adı | İçe aktarma partisi kimliği |

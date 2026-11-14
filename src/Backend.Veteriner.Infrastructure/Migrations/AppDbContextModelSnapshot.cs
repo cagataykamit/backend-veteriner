@@ -3886,6 +3886,16 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<DateTime>("AdmittedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("CancelledAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CancelledByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("ClinicId")
                         .HasColumnType("uniqueidentifier");
 
@@ -3957,9 +3967,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "ClinicId", "PetId")
                         .IsUnique()
-                        .HasFilter("[DischargedAtUtc] IS NULL");
+                        .HasFilter("[DischargedAtUtc] IS NULL AND [CancelledAtUtc] IS NULL");
 
-                    b.ToTable("Hospitalizations", (string)null);
+                    b.ToTable("Hospitalizations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Hospitalizations_Cancel_Consistent", "([CancelledAtUtc] IS NULL AND [CancelReason] IS NULL AND [CancelledByUserId] IS NULL) OR ([CancelledAtUtc] IS NOT NULL AND [CancelReason] IS NOT NULL AND [CancelledByUserId] IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Hospitalizations.HospitalizationRoom", b =>
