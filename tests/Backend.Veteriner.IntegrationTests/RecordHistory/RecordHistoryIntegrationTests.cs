@@ -27,6 +27,9 @@ public sealed class RecordHistoryIntegrationTests : IClassFixture<CustomWebAppli
         PermissionCatalog.Prescriptions.Create,
         PermissionCatalog.Prescriptions.Update,
         PermissionCatalog.Prescriptions.Read,
+        PermissionCatalog.Hospitalizations.Create,
+        PermissionCatalog.Hospitalizations.Update,
+        PermissionCatalog.Hospitalizations.Read,
     ];
 
     private readonly CustomWebApplicationFactory _factory;
@@ -63,6 +66,33 @@ public sealed class RecordHistoryIntegrationTests : IClassFixture<CustomWebAppli
         changes[0].GetProperty("newValue").GetString().Should().Be("Pansuman ve temizlik");
         history[1].GetProperty("kind").GetString().Should().Be("Created");
         history[1].GetProperty("changes").GetArrayLength().Should().Be(0);
+    }
+
+    [Fact]
+    public async Task VersionCheckedUpdate_Should_ListFieldDiff()
+    {
+        // Sürüm denetimli güncelleme (rowVersion) de alan farkını yazmalı: yatış PUT'u istemcinin sürümüyle kaydedilir.
+        var (client, clinicId, petId, _) = await AuthorizedClientAsync();
+        var create = await client.PostAsJsonAsync("/api/v1/hospitalizations", new
+        {
+            ClinicId = clinicId, PetId = petId, AdmittedAtUtc = AtUtc, Reason = "Gözlem",
+        });
+        create.StatusCode.Should().Be(HttpStatusCode.Created);
+        var id = await create.Content.ReadFromJsonAsync<Guid>();
+        var version = (await client.GetFromJsonAsync<JsonElement>($"/api/v1/hospitalizations/{id}")).GetProperty("rowVersion").GetString();
+
+        var update = await client.PutAsJsonAsync($"/api/v1/hospitalizations/{id}", new
+        {
+            ClinicId = clinicId, PetId = petId, AdmittedAtUtc = AtUtc, Reason = "Gözlem ve serum", RowVersion = version,
+        });
+        update.IsSuccessStatusCode.Should().BeTrue();
+
+        var history = await ReadHistoryAsync(client, $"/api/v1/hospitalizations/{id}/history");
+
+        history.Should().HaveCount(2);
+        var change = history[0].GetProperty("changes").EnumerateArray().Should().ContainSingle().Subject;
+        change.GetProperty("field").GetString().Should().Be("Reason");
+        change.GetProperty("oldValue").GetString().Should().Be("Gözlem");
     }
 
     [Fact]

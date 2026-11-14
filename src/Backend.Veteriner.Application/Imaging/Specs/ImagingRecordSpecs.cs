@@ -14,14 +14,13 @@ public sealed class ImagingRecordByIdSpec : Specification<ImagingRecord>
 }
 
 /// <summary>
-/// Güncelleme/iptal için izlenmeyen yükleme: kayıt sonra istemcinin beklenen sürümüyle eklenir, böylece UPDATE koşulundaki
-/// rowversion istemcinin gönderdiği değerdir (LabResult deseni).
+/// Güncelleme/iptal için izlenen yükleme: istemcinin beklediği sürüm <c>SetExpectedRowVersion</c> ile yazılır ve kaydetmede UPDATE
+/// koşuluna taşınır (<c>ExpectedRowVersionSaveChangesInterceptor</c>); özgün değerler korunduğu için değişiklik geçmişi alan farkını yazar.
 /// </summary>
 public sealed class ImagingRecordForUpdateByIdSpec : Specification<ImagingRecord>
 {
     public ImagingRecordForUpdateByIdSpec(Guid tenantId, Guid id)
     {
-        Query.AsNoTracking();
         Query.Where(x => x.TenantId == tenantId && x.Id == id);
     }
 }
