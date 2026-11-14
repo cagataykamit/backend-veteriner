@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Specifications;
 using Backend.Veteriner.Application.Imaging;
 using Backend.Veteriner.Application.Pets.Access;
 using Backend.Veteriner.Domain.Imaging;
@@ -28,15 +29,7 @@ internal sealed class ImagingTimelineSource(IReadRepository<ImagingRecord> repos
     protected override ISpecificationBuilder<ImagingRecord> ApplyClinicScope(
         ISpecificationBuilder<ImagingRecord> builder,
         PetTimelineSourceQuery q)
-    {
-        if (q.SingleClinicId is { } clinicId)
-            return builder.Where(r => r.ClinicId == clinicId);
-        if (q.AccessibleClinicIds is not { } accessible)
-            return builder;
-        return accessible.Count == 0
-            ? builder.Where(_ => false)
-            : builder.Where(r => accessible.Contains(r.ClinicId));
-    }
+        => builder.ApplyClinicScope(q.SingleClinicId, q.AccessibleClinicIds);
 
     protected override PetTimelineRow ToRow(ImagingRecord r)
         => new(

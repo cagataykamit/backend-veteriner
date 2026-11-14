@@ -1,5 +1,6 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Common;
+using Backend.Veteriner.Application.Common.Specifications;
 using Backend.Veteriner.Domain.Imaging;
 using Microsoft.EntityFrameworkCore;
 
@@ -44,18 +45,7 @@ internal static class ImagingRecordListFilterExtensions
     public static void Apply(this ISpecificationBuilder<ImagingRecord> query, ImagingRecordListFilter f)
     {
         query.Where(x => x.TenantId == f.TenantId);
-        if (f.ClinicId.HasValue)
-        {
-            query.Where(x => x.ClinicId == f.ClinicId.Value);
-        }
-        else if (f.AccessibleClinicIds is not null)
-        {
-            var ids = f.AccessibleClinicIds;
-            if (ids.Count == 0)
-                query.Where(x => false);
-            else
-                query.Where(x => ids.Contains(x.ClinicId));
-        }
+        query.ApplyClinicScope(f.ClinicId, f.AccessibleClinicIds);
 
         if (f.PetId.HasValue)
             query.Where(x => x.PetId == f.PetId.Value);

@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Hospitalizations;
+using Backend.Veteriner.Domain.Imaging;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Prescriptions;
 using Backend.Veteriner.Domain.RecordHistory;
@@ -34,6 +35,7 @@ public sealed class RecordHistorySaveChangesInterceptor : SaveChangesInterceptor
         [typeof(LabResult)] = RecordHistoryTypes.LabResult,
         [typeof(Administration)] = RecordHistoryTypes.Administration,
         [typeof(Hospitalization)] = RecordHistoryTypes.Hospitalization,
+        [typeof(ImagingRecord)] = RecordHistoryTypes.Imaging,
     };
 
     /// <summary>Kimlik, kiracı, eşzamanlılık ve zaman damgası gibi klinik anlamı olmayan alanlar.</summary>
