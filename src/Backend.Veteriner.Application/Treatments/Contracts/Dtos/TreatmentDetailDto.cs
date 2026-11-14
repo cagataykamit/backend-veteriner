@@ -18,4 +18,6 @@ public sealed record TreatmentDetailDto(
     DateTime? UpdatedAtUtc,
     string? RowVersion = null,
     DateTime? CancelledAtUtc = null,
-    string? CancelReason = null);
+    string? CancelReason = null,
+    bool AddedAfterFinalization = false,
+    string? LateEntryReason = null);

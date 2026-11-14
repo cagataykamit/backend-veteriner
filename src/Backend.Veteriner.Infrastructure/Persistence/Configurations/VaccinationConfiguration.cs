@@ -14,7 +14,10 @@ public sealed class VaccinationConfiguration : IEntityTypeConfiguration<Vaccinat
     public void Configure(EntityTypeBuilder<Vaccination> b)
     {
         b.ToTable("Vaccinations", t =>
-            t.HasCheckConstraint("CK_Vaccinations_Cancel_Consistent", "([CancelledAtUtc] IS NULL AND [CancelReason] IS NULL AND [CancelledByUserId] IS NULL) OR ([CancelledAtUtc] IS NOT NULL AND [CancelReason] IS NOT NULL AND [CancelledByUserId] IS NOT NULL AND [Status] = 2)"));
+        {
+            t.HasCheckConstraint("CK_Vaccinations_Cancel_Consistent", "([CancelledAtUtc] IS NULL AND [CancelReason] IS NULL AND [CancelledByUserId] IS NULL) OR ([CancelledAtUtc] IS NOT NULL AND [CancelReason] IS NOT NULL AND [CancelledByUserId] IS NOT NULL AND [Status] = 2)");
+            t.HasCheckConstraint("CK_Vaccinations_LateEntry_Consistent", "([AddedAfterFinalization] = 0 AND [LateEntryReason] IS NULL) OR ([AddedAfterFinalization] = 1 AND [LateEntryReason] IS NOT NULL)");
+        });
 
         b.HasKey(x => x.Id);
 
@@ -35,6 +38,8 @@ public sealed class VaccinationConfiguration : IEntityTypeConfiguration<Vaccinat
         b.Property(x => x.CancelledAtUtc);
         b.Property(x => x.CancelledByUserId);
         b.Property(x => x.CancelReason).HasMaxLength(CorrectionReason.MaxLength);
+        b.Property(x => x.AddedAfterFinalization).IsRequired();
+        b.Property(x => x.LateEntryReason).HasMaxLength(CorrectionReason.MaxLength);
 
         b.Property(x => x.RowVersion)
             .IsRowVersion()

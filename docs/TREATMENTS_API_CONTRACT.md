@@ -42,3 +42,11 @@ Backend tek doğruluk kaynağıdır. Bu belge tedavi kaydının yaşam döngüs�
 | Muayene kayıt defteri | Tedavi şekli hücresinde başlık ` (iptal)` ekiyle kalır (reçete deseni) |
 | Açık işler, otomatik kontrol hatırlatması | İptal edilen tedavi sayılmaz |
 | Veri dışa aktarma `tedaviler.csv` | `[YENİ]` `Iptal`, `IptalNedeni` |
+
+## 4) Kesinleşmiş muayeneye tedavi (ADR-043 AK-6, ADR-013 Ek 2) `[DEĞİŞTİ]`
+
+- `POST /treatments` kesinleşmiş muayeneye artık reddedilmez (önce 409 `Examinations.Finalized`). Gövdede `[YENİ]` `lateEntryReason` (5–500) zorunludur; yoksa 400 `Treatments.LateEntryReasonRequired`. Kayıt "Kesinleştirmeden sonra eklendi" olarak yazılır (`addedAfterFinalization = true`, `lateEntryReason`).
+- Muayene açıksa `lateEntryReason` yok sayılır.
+- Mevcut tedavi kilidi değişmedi: kesinleşmiş muayeneye bağlı tedavi `PUT` ile değiştirilemez (409 `Examinations.Finalized`); düzeltme gerekçeli iptal + yeni kayıttır.
+- `GET /treatments/{id}`, muayene özeti ve zaman çizelgesi `[YENİ]` `addedAfterFinalization` taşır (detayda `lateEntryReason` da).
+- Migration `AddTreatmentAndVaccinationLateEntry`.

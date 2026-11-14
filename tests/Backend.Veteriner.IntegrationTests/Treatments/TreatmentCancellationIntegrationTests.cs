@@ -5,6 +5,7 @@ using System.Text.Json;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Infrastructure.Persistence;
 using AwesomeAssertions;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -99,6 +100,53 @@ public sealed class TreatmentCancellationIntegrationTests : IClassFixture<Custom
 
         var timeline = await client.GetFromJsonAsync<JsonElement>($"/api/v1/pets/{petId:D}/timeline");
         timeline.GetProperty("items").EnumerateArray().Select(r => r.GetProperty("sourceId").GetGuid()).Should().NotContain(id);
+    }
+
+    [Fact]
+    public async Task Create_On_Finalized_Examination_Should_Require_Reason_And_Mark_Late_Entry()
+    {
+        // ADR-043 AK-6 (ADR-013 Ek 2): kesinleşmiş muayeneye tedavi gerekçeyle "sonradan eklendi" olarak yazılır; mevcut tedavi kilitli kalır.
+        var (client, clinicId, _) = await AuthorizedClientAsync();
+        var seed = await IntegrationTestAuthHelper.SeedExaminationInClinicAsync(_factory.Services, clinicId);
+        Guid petId;
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var exam = db.Examinations.Single(e => e.Id == seed.ExaminationId);
+            exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+            await db.SaveChangesAsync();
+            petId = exam.PetId;
+        }
+
+        object Create(string? reason) => new
+        {
+            ClinicId = clinicId, PetId = petId, ExaminationId = seed.ExaminationId, TreatmentDateUtc = AtUtc,
+            Title = "Pansuman", Description = "Sol arka bacak", LateEntryReason = reason,
+        };
+
+        var withoutReason = await client.PostAsJsonAsync("/api/v1/treatments", Create(null));
+        withoutReason.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(withoutReason)).Should().Be("Treatments.LateEntryReasonRequired");
+
+        var withReason = await client.PostAsJsonAsync("/api/v1/treatments", Create("Kesinleştirmeden sonra hatırlandı"));
+        withReason.StatusCode.Should().Be(HttpStatusCode.Created);
+        var id = await withReason.Content.ReadFromJsonAsync<Guid>();
+
+        var detail = await DetailAsync(client, id);
+        detail.GetProperty("addedAfterFinalization").GetBoolean().Should().BeTrue();
+        detail.GetProperty("lateEntryReason").GetString().Should().Be("Kesinleştirmeden sonra hatırlandı");
+
+        var timeline = await client.GetFromJsonAsync<JsonElement>($"/api/v1/pets/{petId:D}/timeline");
+        timeline.GetProperty("items").EnumerateArray().Single(r => r.GetProperty("sourceId").GetGuid() == id)
+            .GetProperty("addedAfterFinalization").GetBoolean().Should().BeTrue();
+
+        var put = await client.PutAsJsonAsync($"/api/v1/treatments/{id}", new
+        {
+            ClinicId = clinicId, PetId = petId, ExaminationId = seed.ExaminationId, TreatmentDateUtc = AtUtc,
+            Title = "Değişti", Description = "Sol arka bacak", RowVersion = detail.GetProperty("rowVersion").GetString(),
+        });
+        put.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(put)).Should().Be("Examinations.Finalized");
     }
 
     private static object Body(Guid clinicId, Guid petId, string title, string? rowVersion)

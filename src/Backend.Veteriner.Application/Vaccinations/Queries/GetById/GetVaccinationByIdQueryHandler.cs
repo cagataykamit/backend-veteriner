@@ -154,7 +154,9 @@ public sealed class GetVaccinationByIdQueryHandler
             v.Site,
             ExaminationRowVersion.Encode(v.RowVersion),
             v.CancelledAtUtc,
-            v.CancelReason);
+            v.CancelReason,
+            v.AddedAfterFinalization,
+            v.LateEntryReason);
         return Result<VaccinationDetailDto>.Success(dto);
     }
 }

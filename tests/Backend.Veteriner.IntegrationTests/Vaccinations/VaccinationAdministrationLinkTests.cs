@@ -318,6 +318,53 @@ public sealed class VaccinationAdministrationLinkTests : IClassFixture<CustomWeb
     }
 
     [Fact]
+    public async Task Finalized_Examination_Should_Accept_Product_Vaccination_With_Reason_And_Mark_Both_Records()
+    {
+        // ADR-043 AK-6 (ADR-013 Ek 2): ürünlü aşı da kesinleşmiş muayeneye gerekçeyle eklenir; gerekçe bağlı uygulamaya da yazılır.
+        var ctx = await SeedAsync(stock: 10m);
+        var client = ClientFor(ctx);
+        Guid examinationId;
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var exam = new Backend.Veteriner.Domain.Examinations.Examination(
+                ctx.TenantId, ctx.ClinicId, ctx.PetId, null, DateTime.UtcNow.AddHours(-1), "Kontrol", "Bulgu", null, null, DateTime.UtcNow);
+            exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+            db.Examinations.Add(exam);
+            await db.SaveChangesAsync();
+            examinationId = exam.Id;
+        }
+
+        object Body(string? reason) => new
+        {
+            clinicId = ctx.ClinicId, petId = ctx.PetId, examinationId, vaccineDefinitionId = ctx.VaccineDefinitionId,
+            status = VaccinationStatus.Applied, appliedAtUtc = DateTime.UtcNow.AddMinutes(-5), productId = ctx.ProductId, lateEntryReason = reason,
+        };
+
+        var withoutReason = await client.PostAsJsonAsync("/api/v1/vaccinations", Body(null));
+        withoutReason.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadProblemCodeAsync(withoutReason)).Should().Be("Vaccinations.LateEntryReasonRequired");
+
+        var created = await client.PostAsJsonAsync("/api/v1/vaccinations", Body("Sahip aşıyı sonradan getirdi"));
+        created.StatusCode.Should().Be(HttpStatusCode.Created, await created.Content.ReadAsStringAsync());
+        var json = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var vaccinationId = json.GetProperty("id").GetGuid();
+        var administrationId = json.GetProperty("administration").GetProperty("id").GetGuid();
+
+        var detail = await (await client.GetAsync($"/api/v1/vaccinations/{vaccinationId:D}")).Content.ReadFromJsonAsync<JsonElement>();
+        detail.GetProperty("addedAfterFinalization").GetBoolean().Should().BeTrue();
+        detail.GetProperty("lateEntryReason").GetString().Should().Be("Sahip aşıyı sonradan getirdi");
+
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var administration = await db.Administrations.AsNoTracking().SingleAsync(a => a.Id == administrationId);
+            administration.AddedAfterFinalization.Should().BeTrue();
+            administration.LateEntryReason.Should().Be("Sahip aşıyı sonradan getirdi");
+        }
+    }
+
+    [Fact]
     public async Task Applied_Vaccination_Should_Not_Return_To_Scheduled()
     {
         var ctx = await SeedAsync(stock: 10m);

@@ -13,6 +13,8 @@ namespace Backend.Veteriner.Application.Vaccinations.Commands.Create;
 /// POST /api/v1/vaccinations. <see cref="ProductId"/> verilirse aynı transaction'da stoktan düşen uygulama da yazılır
 /// (<c>CreateAdministrationCommand</c> yeniden kullanılır) ve aşı kaydına bağlanır; <see cref="Quantity"/> (varsayılan 1),
 /// <see cref="BatchId"/> (varsayılan FEFO) ve <see cref="RequestId"/> (tekrar koruması) yalnız ürünle birlikte anlamlıdır.
+/// <see cref="LateEntryReason"/> bağlı muayene kesinleşmişse zorunludur (5–500; ADR-043 AK-6): aşı ve varsa bağlı uygulama
+/// "Kesinleştirmeden sonra eklendi" olarak yazılır.
 /// </summary>
 public sealed record CreateVaccinationCommand(
     Guid ClinicId,
@@ -28,7 +30,8 @@ public sealed record CreateVaccinationCommand(
     Guid? BatchId = null,
     Guid? RequestId = null,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] AdministrationRoute? Route = null,
-    string? Site = null)
+    string? Site = null,
+    string? LateEntryReason = null)
     : IRequest<Result<VaccinationCreateResultDto>>, ITransactionalRollbackOnFailureRequest, IActivationSignalRequest
 {
     public ActivationSignalKind ActivationSignal => ActivationSignalKind.VaccinationCreated;

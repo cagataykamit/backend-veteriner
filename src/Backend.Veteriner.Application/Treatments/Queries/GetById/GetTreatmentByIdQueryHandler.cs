@@ -106,7 +106,9 @@ public sealed class GetTreatmentByIdQueryHandler
             t.UpdatedAtUtc,
             ExaminationRowVersion.Encode(t.RowVersion),
             t.CancelledAtUtc,
-            t.CancelReason);
+            t.CancelReason,
+            t.AddedAfterFinalization,
+            t.LateEntryReason);
 
         return Result<TreatmentDetailDto>.Success(dto);
     }

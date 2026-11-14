@@ -29,6 +29,14 @@ public sealed class Treatment : AggregateRoot, IClinicScoped, ITenantOwned
     public string? CancelReason { get; private set; }
     public bool IsCancelled => CancelledAtUtc.HasValue;
 
+    /// <summary>
+    /// Bağlı muayene kayıt anında kesinleşmişse true (ADR-043 AK-6, ADR-013 Ek 2); gerekçe <see cref="LateEntryReason"/>.
+    /// </summary>
+    public bool AddedAfterFinalization { get; private set; }
+    public string? LateEntryReason { get; private set; }
+
+    public const string LateEntryReasonRequiredCode = "Treatments.LateEntryReasonRequired";
+
     /// <summary>SQL Server rowversion — eşzamanlı güncelleme için (ADR-043 K5).</summary>
     public byte[] RowVersion { get; private set; } = default!;
 
@@ -121,6 +129,18 @@ public sealed class Treatment : AggregateRoot, IClinicScoped, ITenantOwned
         CancelledByUserId = cancellation.Value.CancelledByUserId;
         CancelReason = cancellation.Value.Reason;
         UpdatedAtUtc = utcNow;
+        return Result.Success();
+    }
+
+    /// <summary>Kesinleşmiş muayeneye sonradan eklenen tedaviyi işaretler; gerekçe zorunlu (5–500). Yalnız oluşturmada çağrılır.</summary>
+    public Result MarkAddedAfterFinalization(string? reason)
+    {
+        var check = CorrectionReason.Validate(reason, LateEntryReasonRequiredCode);
+        if (!check.IsSuccess)
+            return check;
+
+        AddedAfterFinalization = true;
+        LateEntryReason = reason!.Trim();
         return Result.Success();
     }
 

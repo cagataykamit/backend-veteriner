@@ -109,7 +109,8 @@ internal sealed class TreatmentTimelineSource(IReadRepository<Treatment> reposit
             RelatedExaminationId: t.ExaminationId,
             RelatedVisitId: null,
             RelatedAppointmentId: null,
-            UpdatedAtUtc: t.UpdatedAtUtc);
+            UpdatedAtUtc: t.UpdatedAtUtc,
+            AddedAfterFinalization: t.AddedAfterFinalization);
 }
 
 internal sealed class PrescriptionTimelineSource(IReadRepository<Prescription> repository)
@@ -219,7 +220,8 @@ internal sealed class VaccinationTimelineSource(IReadRepository<Vaccination> rep
             RelatedExaminationId: v.ExaminationId,
             RelatedVisitId: null,
             RelatedAppointmentId: null,
-            UpdatedAtUtc: v.UpdatedAtUtc);
+            UpdatedAtUtc: v.UpdatedAtUtc,
+            AddedAfterFinalization: v.AddedAfterFinalization);
     }
 }
 

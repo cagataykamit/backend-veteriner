@@ -26,4 +26,6 @@ public sealed record VaccinationDetailDto(
     string? Site = null,
     string? RowVersion = null,
     DateTime? CancelledAtUtc = null,
-    string? CancelReason = null);
+    string? CancelReason = null,
+    bool AddedAfterFinalization = false,
+    string? LateEntryReason = null);

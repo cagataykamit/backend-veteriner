@@ -7131,6 +7131,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<bool>("AddedAfterFinalization")
+                        .HasColumnType("bit");
+
                     b.Property<string>("CancelReason")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -7157,6 +7160,10 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.Property<DateTime?>("FollowUpDateUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("LateEntryReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(4000)
@@ -7200,6 +7207,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("Treatments", null, t =>
                         {
                             t.HasCheckConstraint("CK_Treatments_Cancel_Consistent", "([CancelledAtUtc] IS NULL AND [CancelReason] IS NULL AND [CancelledByUserId] IS NULL) OR ([CancelledAtUtc] IS NOT NULL AND [CancelReason] IS NOT NULL AND [CancelledByUserId] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_Treatments_LateEntry_Consistent", "([AddedAfterFinalization] = 0 AND [LateEntryReason] IS NULL) OR ([AddedAfterFinalization] = 1 AND [LateEntryReason] IS NOT NULL)");
                         });
                 });
 
@@ -7330,6 +7339,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<bool>("AddedAfterFinalization")
+                        .HasColumnType("bit");
+
                     b.Property<DateTime?>("AppliedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -7379,6 +7391,10 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.Property<Guid?>("ImportBatchId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LateEntryReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(4000)
@@ -7445,6 +7461,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("Vaccinations", null, t =>
                         {
                             t.HasCheckConstraint("CK_Vaccinations_Cancel_Consistent", "([CancelledAtUtc] IS NULL AND [CancelReason] IS NULL AND [CancelledByUserId] IS NULL) OR ([CancelledAtUtc] IS NOT NULL AND [CancelReason] IS NOT NULL AND [CancelledByUserId] IS NOT NULL AND [Status] = 2)");
+
+                            t.HasCheckConstraint("CK_Vaccinations_LateEntry_Consistent", "([AddedAfterFinalization] = 0 AND [LateEntryReason] IS NULL) OR ([AddedAfterFinalization] = 1 AND [LateEntryReason] IS NOT NULL)");
                         });
                 });
 

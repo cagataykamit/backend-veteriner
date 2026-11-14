@@ -194,7 +194,8 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
                 t.ClinicId,
                 ClinicName(t.ClinicId),
                 t.Title,
-                t.IsCancelled))
+                t.IsCancelled,
+                t.AddedAfterFinalization))
             .ToList();
 
         var prescriptionDtos = prescriptions
@@ -254,7 +255,8 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
                 v.VaccineName,
                 v.Status,
                 v.AppliedAtUtc,
-                v.DueAtUtc))
+                v.DueAtUtc,
+                v.AddedAfterFinalization))
             .ToList();
 
         var imagingDtos = images

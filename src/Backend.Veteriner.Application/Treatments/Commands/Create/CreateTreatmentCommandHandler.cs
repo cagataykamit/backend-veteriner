@@ -130,10 +130,9 @@ public sealed class CreateTreatmentCommandHandler : IRequestHandler<CreateTreatm
             }
         }
 
-        var locked = await ExaminationLinkedRecordLock.EnsureOpenAsync(
+        // Kesinleşmiş muayene yeni tedaviyi reddetmez (ADR-043 AK-6): gerekçeli sonradan ekleme olarak yazılır.
+        var addedAfterFinalization = await ExaminationLinkedRecordLock.AnyFinalizedAsync(
             _examinations, tenantId, [request.ExaminationId], ct);
-        if (!locked.IsSuccess)
-            return Result<Guid>.Failure(locked.Error);
 
         var treatment = new Treatment(
             tenantId,
@@ -146,6 +145,13 @@ public sealed class CreateTreatmentCommandHandler : IRequestHandler<CreateTreatm
             request.Notes,
             request.FollowUpDateUtc,
             utcNow);
+
+        if (addedAfterFinalization)
+        {
+            var late = treatment.MarkAddedAfterFinalization(request.LateEntryReason);
+            if (!late.IsSuccess)
+                return Result<Guid>.Failure(late.Error);
+        }
 
         await _treatmentsWrite.AddAsync(treatment, ct);
         await _treatmentsWrite.SaveChangesAsync(ct);

@@ -29,7 +29,8 @@ public sealed record ExaminationRelatedTreatmentItemDto(
     Guid ClinicId,
     string ClinicName,
     string Title,
-    bool IsCancelled = false);
+    bool IsCancelled = false,
+    bool AddedAfterFinalization = false);
 
 public sealed record ExaminationRelatedPrescriptionItemDto(
     Guid Id,
@@ -81,7 +82,8 @@ public sealed record ExaminationRelatedVaccinationItemDto(
     string VaccineName,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] VaccinationStatus Status,
     DateTime? AppliedAtUtc,
-    DateTime? DueAtUtc);
+    DateTime? DueAtUtc,
+    bool AddedAfterFinalization = false);
 
 public sealed record ExaminationRelatedPaymentItemDto(
     Guid Id,
