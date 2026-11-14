@@ -162,6 +162,10 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
             request.Notes,
             utcNow);
 
+        // Tanısal kayıt kesinleşmiş muayeneye serbest eklenir; rozet taşır (ADR-043 AK-4, ADR-013 Ek 2).
+        if (exam is { IsFinalized: true })
+            entity.MarkAddedAfterFinalization();
+
         await _labResultsWrite.AddAsync(entity, ct);
         await _labResultsWrite.SaveChangesAsync(ct);
         return Result<Guid>.Success(entity.Id);

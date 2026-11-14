@@ -130,3 +130,7 @@ Eklenen: `status`, `requestedAtUtc`, `awaitingInterpretation`; `resultDateUtc` n
 ## Güncellemede hasta ve klinik değişmez (ADR-043 AK-10) `[DEĞİŞTİ]`
 
 Kaydın hastası ve kliniği oluşturulduktan sonra değişmez (ADR-043 K6 / AK-10, 2026-11-14; kural `RecordSubjectRule`). `PUT` gövdesindeki `petId` ya da `clinicId` kayıttakinden farklıysa 400 `LabResults.SubjectChangeNotAllowed`. Yanlış hasta için kayıt gerekçeyle iptal edilir ve doğru hastaya yeni kayıt açılır. Muayene bağı aynı hasta içinde değişebilir (kilit kuralına tabi).
+
+## "Kesinleştirmeden sonra eklendi" rozeti (ADR-043 AK-4, 2026-11-14) `[YENİ]`
+
+Kesinleşmiş muayeneye yeni lab kaydı eklemek serbesttir (değişmedi; tanısal kayıt, gerekçe istenmez). Kayıt oluşturma anında bağlı muayene kesinleşmişse `addedAfterFinalization = true` saklanır (görüntüleme deseni). `GET /lab-results/{id}`, muayene özeti (`related-summary`) ve hayvan zaman çizelgesi bu alanı taşır. Migration `AddLabResultLateEntryMark` (yalnız yerel); mevcut kayıtlar `false`.

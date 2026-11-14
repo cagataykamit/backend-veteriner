@@ -50,7 +50,8 @@ public sealed record ExaminationRelatedLabResultItemDto(
     string TestName,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] LabResultStatus Status,
     DateTime RequestedAtUtc,
-    bool AwaitingInterpretation);
+    bool AwaitingInterpretation,
+    bool AddedAfterFinalization = false);
 
 public sealed record ExaminationRelatedHospitalizationItemDto(
     Guid Id,

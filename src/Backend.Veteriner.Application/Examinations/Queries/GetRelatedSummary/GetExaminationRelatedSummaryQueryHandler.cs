@@ -219,7 +219,8 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
                 l.TestName,
                 l.Status,
                 l.RequestedAtUtc,
-                l.AwaitingInterpretation))
+                l.AwaitingInterpretation,
+                l.AddedAfterFinalization))
             .ToList();
 
         var hospDtos = hosp

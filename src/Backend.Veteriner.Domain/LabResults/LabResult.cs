@@ -39,6 +39,12 @@ public sealed class LabResult : AggregateRoot, IClinicScoped, ITenantOwned
     /// <summary>SQL Server rowversion — eşzamanlı güncelleme için.</summary>
     public byte[] RowVersion { get; private set; } = default!;
 
+    /// <summary>
+    /// Kesinleşmiş muayeneye sonradan eklenen tanısal kayıt (ADR-043 AK-4; görüntüleme deseni): gerekçe istenmez, rozet gösterilir.
+    /// Yalnız oluşturmada işaretlenir (<see cref="MarkAddedAfterFinalization"/>).
+    /// </summary>
+    public bool AddedAfterFinalization { get; private set; }
+
     /// <summary>Yeni kayıtlarda true; yorum gerekmiyor sayılan eski (migration ile gelen) kayıtlarda false.</summary>
     public bool InterpretationRequired { get; private set; }
 
@@ -180,6 +186,9 @@ public sealed class LabResult : AggregateRoot, IClinicScoped, ITenantOwned
     }
 
     /// <summary>Test adı, hayvan, klinik veya muayene bağı değişiyor mu; sonuç alanları (tarih, metin, yorum, not) kimlik sayılmaz.</summary>
+    /// <summary>Bağlı muayene kayıt anında kesinleşmişse çağrılır; yalnız oluşturmada.</summary>
+    public void MarkAddedAfterFinalization() => AddedAfterFinalization = true;
+
     public bool ChangesIdentity(Guid clinicId, Guid petId, Guid? examinationId, string testName)
         => ClinicId != clinicId
            || PetId != petId

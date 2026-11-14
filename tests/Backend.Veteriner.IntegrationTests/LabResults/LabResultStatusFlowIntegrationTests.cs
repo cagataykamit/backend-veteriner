@@ -206,6 +206,27 @@ public sealed class LabResultStatusFlowIntegrationTests : IClassFixture<CustomWe
         detail.GetProperty("cancelledAtUtc").ValueKind.Should().Be(JsonValueKind.String);
     }
 
+    [Fact]
+    public async Task Create_On_Finalized_Examination_Should_Be_Free_And_Marked_As_Added_After()
+    {
+        // ADR-043 AK-4: tanısal kayıt kesinleşmiş muayeneye gerekçesiz eklenir, rozet taşır.
+        var (client, clinicId, petId) = await AdminClientAsync();
+        var examinationId = await SeedFinalizedExaminationAsync(clinicId, petId);
+
+        var late = await client.PostAsJsonAsync("/api/v1/lab-results", new { ClinicId = clinicId, PetId = petId, ExaminationId = examinationId, TestName = "Biyokimya" });
+        late.StatusCode.Should().Be(HttpStatusCode.Created);
+        var lateId = await late.Content.ReadFromJsonAsync<Guid>();
+        var open = await client.PostAsJsonAsync("/api/v1/lab-results", new { ClinicId = clinicId, PetId = petId, TestName = "CBC" });
+        var openId = await open.Content.ReadFromJsonAsync<Guid>();
+
+        (await GetAsync(client, lateId)).GetProperty("addedAfterFinalization").GetBoolean().Should().BeTrue();
+        (await GetAsync(client, openId)).GetProperty("addedAfterFinalization").GetBoolean().Should().BeFalse();
+
+        var summary = await client.GetFromJsonAsync<JsonElement>($"/api/v1/examinations/{examinationId}/related-summary");
+        summary.GetProperty("labResults").EnumerateArray().Single(r => r.GetProperty("id").GetGuid() == lateId)
+            .GetProperty("addedAfterFinalization").GetBoolean().Should().BeTrue();
+    }
+
     private async Task<Guid> SeedFinalizedExaminationAsync(Guid clinicId, Guid petId)
     {
         await using var scope = _factory.Services.CreateSystemScope();

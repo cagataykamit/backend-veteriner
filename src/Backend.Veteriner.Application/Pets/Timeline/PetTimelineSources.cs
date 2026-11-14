@@ -178,7 +178,8 @@ internal sealed class LabResultTimelineSource(IReadRepository<LabResult> reposit
             RelatedExaminationId: l.ExaminationId,
             RelatedVisitId: l.VisitId,
             RelatedAppointmentId: null,
-            UpdatedAtUtc: l.UpdatedAtUtc);
+            UpdatedAtUtc: l.UpdatedAtUtc,
+            AddedAfterFinalization: l.AddedAfterFinalization);
 }
 
 /// <summary>

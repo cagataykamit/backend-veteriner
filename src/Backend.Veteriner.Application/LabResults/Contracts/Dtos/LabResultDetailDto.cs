@@ -27,4 +27,5 @@ public sealed record LabResultDetailDto(
     DateTime? CancelledAtUtc,
     Guid? CancelledByUserId,
     string? CancelReason,
-    string RowVersion);
+    string RowVersion,
+    bool AddedAfterFinalization = false);
