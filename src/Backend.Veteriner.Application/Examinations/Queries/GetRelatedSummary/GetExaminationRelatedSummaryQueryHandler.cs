@@ -193,7 +193,8 @@ public sealed class GetExaminationRelatedSummaryQueryHandler
                 t.TreatmentDateUtc,
                 t.ClinicId,
                 ClinicName(t.ClinicId),
-                t.Title))
+                t.Title,
+                t.IsCancelled))
             .ToList();
 
         var prescriptionDtos = prescriptions

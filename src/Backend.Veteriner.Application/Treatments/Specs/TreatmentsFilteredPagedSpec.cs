@@ -20,10 +20,14 @@ public sealed class TreatmentsFilteredPagedSpec : Specification<Treatment, Treat
         Guid[] searchPetIds,
         IReadOnlyCollection<Guid>? accessibleClinicIds = null,
         ListSortChoice<TreatmentListSortField>? sort = null,
-        DateTime? activeFollowUpFromUtc = null)
+        DateTime? activeFollowUpFromUtc = null,
+        bool includeCancelled = false)
     {
         Query.AsNoTracking();
         Query.Where(t => t.TenantId == tenantId);
+        // İptal edilen tedavi (ADR-043 AK-2) varsayılan gizli.
+        if (!includeCancelled)
+            Query.Where(t => t.CancelledAtUtc == null);
         Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         if (petId.HasValue)
             Query.Where(t => t.PetId == petId.Value);
@@ -63,6 +67,7 @@ public sealed class TreatmentsFilteredPagedSpec : Specification<Treatment, Treat
             t.TreatmentDateUtc,
             t.Title,
             t.ExaminationId,
-            t.FollowUpDateUtc));
+            t.FollowUpDateUtc,
+            t.CancelledAtUtc != null));
     }
 }

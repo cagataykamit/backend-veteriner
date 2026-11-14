@@ -12,5 +12,6 @@ public sealed record GetTreatmentsListQuery(
     Guid? PetId = null,
     DateTime? DateFromUtc = null,
     DateTime? DateToUtc = null,
-    bool ActiveOnly = false)
+    bool ActiveOnly = false,
+    bool IncludeCancelled = false)
     : IRequest<Result<PagedResult<TreatmentListItemDto>>>;

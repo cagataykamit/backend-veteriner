@@ -187,6 +187,7 @@ public sealed class TreatmentWriteClinicAssignmentIdorIntegrationTests : IClassF
             TreatmentDateUtc = ValidTreatmentAtUtc,
             Title = "Admin update",
             Description = "Açıklama",
+            RowVersion = await GetRowVersionAsync(treatmentId),
         });
         updateResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
@@ -254,5 +255,13 @@ public sealed class TreatmentWriteClinicAssignmentIdorIntegrationTests : IClassF
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.Treatments.AsNoTracking().SingleAsync(t => t.Id == treatmentId);
         return (row.ClinicId, row.PetId, row.Title);
+    }
+
+    private async Task<string> GetRowVersionAsync(Guid treatmentId)
+    {
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var version = await db.Treatments.AsNoTracking().Where(t => t.Id == treatmentId).Select(t => t.RowVersion).SingleAsync();
+        return Convert.ToBase64String(version);
     }
 }

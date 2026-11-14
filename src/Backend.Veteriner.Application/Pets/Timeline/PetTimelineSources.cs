@@ -89,7 +89,9 @@ internal sealed class TreatmentTimelineSource(IReadRepository<Treatment> reposit
     protected override Expression<Func<Treatment, Guid>> Id => t => t.Id;
 
     protected override Expression<Func<Treatment, bool>> Filter(PetTimelineSourceQuery q)
-        => t => t.TenantId == q.TenantId && t.PetId == q.PetId;
+        => q.IncludeVoided
+            ? t => t.TenantId == q.TenantId && t.PetId == q.PetId
+            : t => t.TenantId == q.TenantId && t.PetId == q.PetId && t.CancelledAtUtc == null;
 
     protected override ISpecificationBuilder<Treatment> ApplyClinicScope(ISpecificationBuilder<Treatment> builder, PetTimelineSourceQuery q)
         => builder.ApplyClinicScope(q.SingleClinicId, q.AccessibleClinicIds);
@@ -102,8 +104,8 @@ internal sealed class TreatmentTimelineSource(IReadRepository<Treatment> reposit
             t.ClinicId,
             t.Title,
             Summary: null,
-            Status: null,
-            IsVoided: false,
+            Status: t.IsCancelled ? "Cancelled" : null,
+            IsVoided: t.IsCancelled,
             RelatedExaminationId: t.ExaminationId,
             RelatedVisitId: null,
             RelatedAppointmentId: null,

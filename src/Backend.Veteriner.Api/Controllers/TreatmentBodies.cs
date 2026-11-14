@@ -14,4 +14,14 @@ public sealed class UpdateTreatmentBody
     public string Description { get; init; } = default!;
     public string? Notes { get; init; }
     public DateTime? FollowUpDateUtc { get; init; }
+
+    /// <summary>Base64 version from GET; required (ADR-043 K5).</summary>
+    public string? RowVersion { get; init; }
+}
+
+/// <summary>POST /api/v1/treatments/{id}/cancel body; reason 5-500 characters, rowVersion required.</summary>
+public sealed class CancelTreatmentBody
+{
+    public string? Reason { get; init; }
+    public string? RowVersion { get; init; }
 }

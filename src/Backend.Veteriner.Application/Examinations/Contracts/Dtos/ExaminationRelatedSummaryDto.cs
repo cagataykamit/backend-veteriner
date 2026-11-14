@@ -28,7 +28,8 @@ public sealed record ExaminationRelatedTreatmentItemDto(
     DateTime TreatmentDateUtc,
     Guid ClinicId,
     string ClinicName,
-    string Title);
+    string Title,
+    bool IsCancelled = false);
 
 public sealed record ExaminationRelatedPrescriptionItemDto(
     Guid Id,

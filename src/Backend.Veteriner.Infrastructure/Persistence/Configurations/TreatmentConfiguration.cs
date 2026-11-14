@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Treatments;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -8,7 +9,8 @@ public sealed class TreatmentConfiguration : IEntityTypeConfiguration<Treatment>
 {
     public void Configure(EntityTypeBuilder<Treatment> b)
     {
-        b.ToTable("Treatments");
+        b.ToTable("Treatments", t =>
+            t.HasCheckConstraint("CK_Treatments_Cancel_Consistent", "([CancelledAtUtc] IS NULL AND [CancelReason] IS NULL AND [CancelledByUserId] IS NULL) OR ([CancelledAtUtc] IS NOT NULL AND [CancelReason] IS NOT NULL AND [CancelledByUserId] IS NOT NULL)"));
 
         b.HasKey(x => x.Id);
 
@@ -24,6 +26,13 @@ public sealed class TreatmentConfiguration : IEntityTypeConfiguration<Treatment>
         b.Property(x => x.FollowUpDateUtc);
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);
+        b.Property(x => x.CancelledAtUtc);
+        b.Property(x => x.CancelledByUserId);
+        b.Property(x => x.CancelReason).HasMaxLength(CorrectionReason.MaxLength);
+
+        b.Property(x => x.RowVersion)
+            .IsRowVersion()
+            .IsConcurrencyToken();
 
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.TreatmentDateUtc });

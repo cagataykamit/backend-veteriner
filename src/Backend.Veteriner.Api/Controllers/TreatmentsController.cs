@@ -7,6 +7,7 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Treatments.Commands.Cancel;
 using Backend.Veteriner.Application.Treatments.Commands.Create;
 using Backend.Veteriner.Application.Treatments.Commands.Update;
 using Backend.Veteriner.Application.Treatments.Contracts.Dtos;
@@ -83,9 +84,31 @@ public sealed class TreatmentsController : ControllerBase
             body.Title,
             body.Description,
             body.Notes,
-            body.FollowUpDateUtc);
+            body.FollowUpDateUtc,
+            body.RowVersion);
 
         var result = await _mediator.Send(cmd, ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Tedaviyi gerekçeyle iptal eder (silmez; ADR-043 AK-2). Bağlı etkin reçete ya da uygulama varsa 409
+    /// <c>Treatments.LinkedRecordsActive</c>; önce onlar iptal edilir.
+    /// </summary>
+    [HttpPost("{id:guid}/cancel")]
+    [Authorize(Policy = PermissionCatalog.Treatments.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Cancel([FromRoute] Guid id, [FromBody] CancelTreatmentBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new CancelTreatmentCommand(id, body.Reason, body.RowVersion), ct);
         return result.ToActionResult(this);
     }
 
@@ -138,6 +161,7 @@ public sealed class TreatmentsController : ControllerBase
         [FromQuery] DateTime? dateFromUtc = null,
         [FromQuery] DateTime? dateToUtc = null,
         [FromQuery] bool active = false,
+        [FromQuery] bool includeCancelled = false,
         CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
@@ -151,7 +175,8 @@ public sealed class TreatmentsController : ControllerBase
                 petId,
                 dateFromUtc,
                 dateToUtc,
-                active),
+                active,
+                includeCancelled),
             ct);
         return result.ToActionResult(this);
     }

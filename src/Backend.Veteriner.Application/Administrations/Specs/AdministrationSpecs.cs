@@ -97,3 +97,13 @@ public sealed class AdministrationsByVaccinationIdsSpec : Specification<Administ
         Query.Where(a => a.TenantId == tenantId && a.VaccinationId != null && vaccinationIds.Contains(a.VaccinationId.Value));
     }
 }
+
+/// <summary>Tedaviye bağlı iptal edilmemiş uygulamalar (tedavi iptali öncesi denetim, ADR-043 AK-2).</summary>
+public sealed class ActiveAdministrationsByTreatmentSpec : Specification<Administration>
+{
+    public ActiveAdministrationsByTreatmentSpec(Guid tenantId, Guid treatmentId)
+    {
+        Query.AsNoTracking();
+        Query.Where(a => a.TenantId == tenantId && a.TreatmentId == treatmentId && a.VoidedAtUtc == null);
+    }
+}

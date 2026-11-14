@@ -143,7 +143,8 @@ public sealed class GetTreatmentsListQueryHandler
                 searchPattern,
                 searchPetIds,
                 accessibleClinicIds,
-                activeFollowUpFromUtc),
+                activeFollowUpFromUtc,
+                request.IncludeCancelled),
             ct);
         MarkStep("treatmentsCount");
 
@@ -160,7 +161,8 @@ public sealed class GetTreatmentsListQueryHandler
                 searchPetIds,
                 accessibleClinicIds,
                 TreatmentListSort.Catalog.Resolve(request.PageRequest),
-                activeFollowUpFromUtc),
+                activeFollowUpFromUtc,
+                request.IncludeCancelled),
             ct);
         MarkStep("treatmentsPage");
 
@@ -200,7 +202,8 @@ public sealed class GetTreatmentsListQueryHandler
                     t.TreatmentDateUtc,
                     t.Title,
                     t.ExaminationId,
-                    t.FollowUpDateUtc);
+                    t.FollowUpDateUtc,
+                    t.IsCancelled);
             })
             .ToList();
 

@@ -51,6 +51,7 @@ public sealed class RecordHistoryIntegrationTests : IClassFixture<CustomWebAppli
         var update = await client.PutAsJsonAsync($"/api/v1/treatments/{id}", new
         {
             ClinicId = clinicId, PetId = petId, TreatmentDateUtc = AtUtc, Title = "Pansuman ve temizlik", Description = "Sol arka bacak",
+            RowVersion = await TreatmentVersionAsync(client, id),
         });
         update.IsSuccessStatusCode.Should().BeTrue();
 
@@ -103,7 +104,11 @@ public sealed class RecordHistoryIntegrationTests : IClassFixture<CustomWebAppli
 
         var create = await client.PostAsJsonAsync("/api/v1/treatments", body);
         var id = await create.Content.ReadFromJsonAsync<Guid>();
-        (await client.PutAsJsonAsync($"/api/v1/treatments/{id}", body)).IsSuccessStatusCode.Should().BeTrue();
+        (await client.PutAsJsonAsync($"/api/v1/treatments/{id}", new
+        {
+            ClinicId = clinicId, PetId = petId, TreatmentDateUtc = AtUtc, Title = "Aynı", Description = "Aynı",
+            RowVersion = await TreatmentVersionAsync(client, id),
+        })).IsSuccessStatusCode.Should().BeTrue();
 
         var history = await ReadHistoryAsync(client, $"/api/v1/treatments/{id}/history");
 
@@ -159,6 +164,9 @@ public sealed class RecordHistoryIntegrationTests : IClassFixture<CustomWebAppli
 
         history.Should().BeEmpty();
     }
+
+    private static async Task<string?> TreatmentVersionAsync(HttpClient client, Guid id)
+        => (await client.GetFromJsonAsync<JsonElement>($"/api/v1/treatments/{id}")).GetProperty("rowVersion").GetString();
 
     private async Task<(HttpClient Client, Guid ClinicId, Guid PetId, Guid UserId)> AuthorizedClientAsync()
     {

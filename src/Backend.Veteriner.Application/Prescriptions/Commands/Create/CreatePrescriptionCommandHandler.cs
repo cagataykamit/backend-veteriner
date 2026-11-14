@@ -152,6 +152,10 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
                     "Treatment not found or does not belong to tenant.");
             }
 
+            var acceptsLink = treatment.EnsureAcceptsLinkedRecords();
+            if (!acceptsLink.IsSuccess)
+                return Result<Guid>.Failure(acceptsLink.Error);
+
             if (treatment.ClinicId != effectiveClinicId)
             {
                 return Result<Guid>.Failure(

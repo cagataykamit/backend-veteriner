@@ -275,6 +275,8 @@ public static class DataExportTables
                 DataExportColumn<Treatment>.Text("Not", "Not.", x => x.Notes),
                 DataExportColumn<Treatment>.Instant("Kontrol", "Kontrol (takip) zamanı.", x => x.FollowUpDateUtc),
                 DataExportColumn<Treatment>.Instant("Olusturma", "Kayıt zamanı.", x => x.CreatedAtUtc),
+                DataExportColumn<Treatment>.Instant("Iptal", "İptal zamanı.", x => x.CancelledAtUtc),
+                DataExportColumn<Treatment>.Text("IptalNedeni", "İptal gerekçesi.", x => x.CancelReason),
             ]),
 
         new DataExportTable<Prescription>("receteler.csv", "Reçeteler",

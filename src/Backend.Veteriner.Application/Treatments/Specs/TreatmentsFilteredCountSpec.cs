@@ -16,10 +16,14 @@ public sealed class TreatmentsFilteredCountSpec : Specification<Treatment>
         string? searchContainsLikePattern,
         Guid[] searchPetIds,
         IReadOnlyCollection<Guid>? accessibleClinicIds = null,
-        DateTime? activeFollowUpFromUtc = null)
+        DateTime? activeFollowUpFromUtc = null,
+        bool includeCancelled = false)
     {
         Query.AsNoTracking();
         Query.Where(t => t.TenantId == tenantId);
+        // İptal edilen tedavi (ADR-043 AK-2) varsayılan gizli.
+        if (!includeCancelled)
+            Query.Where(t => t.CancelledAtUtc == null);
         Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         if (petId.HasValue)
             Query.Where(t => t.PetId == petId.Value);

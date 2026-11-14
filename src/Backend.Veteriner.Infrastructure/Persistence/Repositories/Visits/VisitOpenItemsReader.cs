@@ -208,7 +208,7 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
             result = result.Concat(
                 from t in _db.Treatments.AsNoTracking()
                 join e in examinations on t.ExaminationId equals e.Id
-                where t.TenantId == tenantId && t.ClinicId == clinicId
+                where t.TenantId == tenantId && t.ClinicId == clinicId && t.CancelledAtUtc == null
                 select e.VisitId!.Value);
         }
 

@@ -157,6 +157,10 @@ public sealed class CreateAdministrationCommandHandler
             if (treatment is null)
                 return Fail("Treatments.NotFound", "Tedavi bulunamadı veya kiracıya ait değil.");
 
+            var acceptsLink = treatment.EnsureAcceptsLinkedRecords();
+            if (!acceptsLink.IsSuccess)
+                return Fail(acceptsLink.Error.Code, acceptsLink.Error.Message);
+
             if (treatment.ClinicId != clinicId)
                 return Fail("Administrations.TreatmentClinicMismatch", "Tedavi ile klinik bilgisi uyuşmuyor.");
 

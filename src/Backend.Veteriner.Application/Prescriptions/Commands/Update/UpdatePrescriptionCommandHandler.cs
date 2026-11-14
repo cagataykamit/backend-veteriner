@@ -171,6 +171,14 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
                     "Treatment not found or does not belong to tenant.");
             }
 
+            // Yeni bağ iptal edilmiş tedaviye kurulamaz (ADR-043 AK-2); mevcut bağ korunur.
+            if (treatmentId != p.TreatmentId)
+            {
+                var acceptsLink = treatment.EnsureAcceptsLinkedRecords();
+                if (!acceptsLink.IsSuccess)
+                    return acceptsLink;
+            }
+
             if (treatment.ClinicId != effectiveClinicId)
             {
                 return Result.Failure(

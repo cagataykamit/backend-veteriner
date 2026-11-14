@@ -131,7 +131,7 @@ dosyanın sütun açıklamaları. CRLF, UTF-8 BOM'lu.
 | `gelisler.csv` | Gelişler: hasta, randevu, hekim, zamanlar, durum, acil, neden, hatalı işaretleme | Değişiklik sayacı |
 | `muayeneler.csv` | Muayeneler: tüm metin alanları (şikâyet, anamnez, bulgular, değerlendirme, plan, not), vital bulgular, durum, kesinleştirme zamanı ve kişi | — |
 | `muayene_ek_notlari.csv` | Kesinleşmiş muayene ek notları: gerekçe, metin, ekleyen | — |
-| `tedaviler.csv` | Tedaviler | — |
+| `tedaviler.csv` | Tedaviler; iptal zamanı ve gerekçesi | — |
 | `receteler.csv` | Reçeteler: içerik, HBS durumu, iptal, geç giriş | HBS işaretleyen kişi |
 | `recete_satirlari.csv` | Reçete satırları: ilaç, ürün, miktar, doz, birim, kullanım, seri no | — |
 | `asilar.csv` | Aşılar (uygulanan ve planlanan): ad, durum, zamanlar, yol/bölge, not, HBS | İçe aktarma partisi kimliği |

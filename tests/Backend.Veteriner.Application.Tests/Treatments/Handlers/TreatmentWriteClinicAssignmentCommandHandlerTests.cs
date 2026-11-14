@@ -85,7 +85,7 @@ public sealed class TreatmentWriteClinicAssignmentCommandHandlerTests
         Guid clinicId,
         Guid petId,
         Guid? examinationId = null)
-        => new(id, clinicId, petId, examinationId, ValidTreatmentAt, "Başlık", "Açıklama", null, null);
+        => new(id, clinicId, petId, examinationId, ValidTreatmentAt, "Başlık", "Açıklama", null, null, RowVersion: "AAAAAAAAB9E=");
 
     private static Treatment ExistingTreatment(Guid tid, Guid cid, Guid petId)
         => new(tid, cid, petId, null, ValidTreatmentAt.AddDays(-1), "Eski", "Eski açıklama", null, null, DateTime.UtcNow);
