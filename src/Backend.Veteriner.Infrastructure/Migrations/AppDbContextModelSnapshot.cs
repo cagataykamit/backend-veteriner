@@ -6893,6 +6893,73 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("ScheduledSubscriptionPlanChanges", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Tenants.SignupPhoneVerification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("FailedAttempts")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("InvalidatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(12)");
+
+                    b.Property<string>("RequestIpHash")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<DateTime?>("SignupTokenExpiresAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SignupTokenHash")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<DateTime?>("UsedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UsedByTenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("VerifiedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("Phone")
+                        .IsUnique()
+                        .HasDatabaseName("UX_SignupPhoneVerifications_Phone_Used")
+                        .HasFilter("[UsedAtUtc] IS NOT NULL");
+
+                    b.HasIndex("Phone", "CreatedAtUtc");
+
+                    b.HasIndex("RequestIpHash", "CreatedAtUtc");
+
+                    b.ToTable("SignupPhoneVerifications", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Tenants.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -7324,6 +7391,14 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PhoneNumber")
+                        .HasMaxLength(12)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(12)");
+
+                    b.Property<DateTime?>("PhoneVerifiedAtUtc")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("datetime2");

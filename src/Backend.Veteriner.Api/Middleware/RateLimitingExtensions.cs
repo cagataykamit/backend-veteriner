@@ -18,6 +18,8 @@ public static partial class RateLimitingExtensions
 {
     public const string DiscountCodeValidatePolicy = "discount-code-validate";
     public const string DemoRequestPolicy = "demo-request";
+    public const string SignupPhoneCodePolicy = "signup-phone-code";
+    public const string SignupPhoneVerifyPolicy = "signup-phone-verify";
     public const string PublicSitePolicy = "public-site";
     public const string PublicSiteImagePolicy = "public-site-image";
     public const string ExternalApiPolicy = "external-api";
@@ -287,6 +289,39 @@ public static partial class RateLimitingExtensions
 
             // -- CONTACT: spam korumas�
             options.AddPolicy("contact", httpContext =>
+            {
+                var key = GetClientIp(httpContext);
+                return RateLimitPartition.GetSlidingWindowLimiter(
+                    key,
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(1),
+                        SegmentsPerWindow = 6,
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    });
+            });
+
+            // -- DENEME KAYDI TELEFON KODU (TRIAL-001): her istek SMS ücretidir. Numara/IP başına bekleme ve günlük sınır alan
+            //    kuralındadır (SignupPhoneVerification); burada kısa pencereli IP tavanı.
+            options.AddPolicy(SignupPhoneCodePolicy, httpContext =>
+            {
+                var key = GetClientIp(httpContext);
+                return RateLimitPartition.GetSlidingWindowLimiter(
+                    key,
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 5,
+                        Window = TimeSpan.FromMinutes(10),
+                        SegmentsPerWindow = 10,
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    });
+            });
+
+            // -- DENEME KAYDI TELEFON KODU DOĞRULAMA: kod başına 5 deneme alan kuralında; burada tahmin denemesine karşı IP tavanı.
+            options.AddPolicy(SignupPhoneVerifyPolicy, httpContext =>
             {
                 var key = GetClientIp(httpContext);
                 return RateLimitPartition.GetSlidingWindowLimiter(

@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Auth.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.LegalAcceptances;
 using Backend.Veteriner.Application.Public.Contracts.Dtos;
+using Backend.Veteriner.Application.Public.PhoneVerification;
 using Backend.Veteriner.Application.SalesPartners;
 using Backend.Veteriner.Application.SalesPartners.Contracts;
 using Backend.Veteriner.Application.Tenants;
@@ -11,6 +12,7 @@ using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.CashRegisters;
+using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Legal;
 using Backend.Veteriner.Domain.SalesPartners;
@@ -48,6 +50,7 @@ public sealed class PublicOwnerSignupCommandHandler
     private readonly TimeProvider _timeProvider;
     private readonly IRepository<CashRegister> _cashRegistersWrite;
     private readonly IRepository<CashMovementCategory> _cashCategoriesWrite;
+    private readonly SignupPhoneVerificationService _phoneVerification;
 
     public PublicOwnerSignupCommandHandler(
         IReadRepository<User> usersRead,
@@ -70,6 +73,7 @@ public sealed class PublicOwnerSignupCommandHandler
         TimeProvider timeProvider,
         IRepository<CashRegister> cashRegistersWrite,
         IRepository<CashMovementCategory> cashCategoriesWrite,
+        SignupPhoneVerificationService phoneVerification,
         ILogger<PublicOwnerSignupCommandHandler>? logger = null)
     {
         _usersRead = usersRead;
@@ -93,6 +97,7 @@ public sealed class PublicOwnerSignupCommandHandler
         _timeProvider = timeProvider;
         _cashRegistersWrite = cashRegistersWrite;
         _cashCategoriesWrite = cashCategoriesWrite;
+        _phoneVerification = phoneVerification;
     }
 
     public async ValueTask<Result<PublicOwnerSignupResultDto>> Handle(PublicOwnerSignupCommand request, CancellationToken ct)
@@ -159,6 +164,15 @@ public sealed class PublicOwnerSignupCommandHandler
             return Result<PublicOwnerSignupResultDto>.Failure(legalCheck.Error);
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+
+        // Telefon doğrulaması (TRIAL-001): doğrulanmamış numarayla ya da daha önce deneme açılmış numarayla kayıt yapılmaz.
+        if (!TurkishMobilePhone.TryNormalize(request.MobilePhone, out var phone) || phone is null)
+            return Result<PublicOwnerSignupResultDto>.Failure(SignupPhoneErrors.VerificationRequired);
+        var phoneVerification = await _phoneVerification.FindForSignupAsync(phone, request.PhoneVerificationToken, utcNow, ct);
+        MarkStep("phoneVerification");
+        if (!phoneVerification.IsSuccess)
+            return Result<PublicOwnerSignupResultDto>.Failure(phoneVerification.Error);
+
         var user = new User(email, _hasher.Hash(request.Password), utcNow);
         MarkStep("hashAndCreateUser");
         var roleResult = user.AddRole("Admin", utcNow);
@@ -188,6 +202,7 @@ public sealed class PublicOwnerSignupCommandHandler
             redemption = redeemed.Value!;
         }
 
+        SignupPhoneVerificationService.UseForSignup(phoneVerification.Value!, tenant.Id, user, utcNow);
         await _usersWrite.AddAsync(user, ct);
         await _tenantsWrite.AddAsync(tenant, ct);
         await _subscriptionsWrite.AddAsync(subscription, ct);

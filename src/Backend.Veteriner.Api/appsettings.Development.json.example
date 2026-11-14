@@ -144,6 +144,10 @@
     }
   },
 
+  "Sms": {
+    "Provider": "Log"
+  },
+
   "Smtp": {
     "Host": "smtp.gmail.com",
     "Port": 587,

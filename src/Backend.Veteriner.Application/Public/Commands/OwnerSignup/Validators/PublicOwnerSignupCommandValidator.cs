@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Common.Validation;
+using Backend.Veteriner.Application.Public.PhoneVerification;
 using FluentValidation;
 
 namespace Backend.Veteriner.Application.Public.Commands.OwnerSignup.Validators;
@@ -35,5 +36,11 @@ public sealed class PublicOwnerSignupCommandValidator : AbstractValidator<Public
         RuleFor(x => x.Password)
             .NotEmpty()
             .StrongPasswordRules(includeMaxLength: true);
+
+        RuleFor(x => x.MobilePhone).ValidTrialMobilePhone();
+
+        RuleFor(x => x.PhoneVerificationToken)
+            .NotEmpty().WithMessage(SignupPhoneErrors.VerificationRequired.Message)
+            .MaximumLength(200);
     }
 }

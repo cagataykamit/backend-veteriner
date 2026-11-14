@@ -129,6 +129,17 @@ public static class ResultExtensions
             return (StatusCodes.Status502BadGateway, "https://httpstatuses.io/502");
         }
 
+        // Deneme kaydı telefon doğrulaması (TRIAL_PHONE_VERIFICATION_API_CONTRACT.md §4): bekleme ve günlük sınır 429, SMS sağlayıcısı 503.
+        if (normalized is "signupphone.resendtoosoon" or "signupphone.dailylimitreached")
+        {
+            return (StatusCodes.Status429TooManyRequests, "https://httpstatuses.io/429");
+        }
+
+        if (normalized is "sms.notconfigured" or "sms.sendfailed")
+        {
+            return (StatusCodes.Status503ServiceUnavailable, "https://httpstatuses.io/503");
+        }
+
         // Saklama süresi sonunda temizlenen satır verisi (ADR-019 K9).
         if (normalized is "imports.payloadpurged")
         {
@@ -458,6 +469,7 @@ public static class ResultExtensions
             StatusCodes.Status403Forbidden => "Erişim reddedildi",
             StatusCodes.Status404NotFound => "Bulunamadı",
             StatusCodes.Status409Conflict => "Çakışma",
+            StatusCodes.Status429TooManyRequests => "Çok fazla istek",
             StatusCodes.Status502BadGateway => "Upstream servis hatası",
             StatusCodes.Status503ServiceUnavailable => "Servis kullanılamıyor",
             StatusCodes.Status500InternalServerError => "Sunucu hatası",

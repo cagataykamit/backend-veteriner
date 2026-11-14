@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text.Json;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Auditing;
+using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Shared;
 using Mediator;
 using Microsoft.Extensions.Logging;
@@ -34,7 +35,18 @@ public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
 
         // Özel geliştirme talebi (TIER-010): serbest metinler yanlışlıkla kişisel ya da hasta verisi taşıyabilir; denetimde yalnız tür,
         // öncelik ve durum kalır. "RequestText" ve "ResponseNote" yukarıda.
-        "RequestTitle", "RequestTarget", "DecisionReason"
+        "RequestTitle", "RequestTarget", "DecisionReason",
+
+        // Deneme kaydı telefon doğrulaması (TRIAL-001): kayıtta kullanılan tek kullanımlık jeton.
+        "PhoneVerificationToken"
+    };
+
+    /// <summary>
+    /// Deneme kaydında doğrulanan cep telefonu (case-insensitive; TRIAL-001): <see cref="TurkishMobilePhone.Mask"/> ile maskelenir.
+    /// </summary>
+    private static readonly HashSet<string> MobilePhonePayloadKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "MobilePhone"
     };
 
     /// <summary>
@@ -185,6 +197,8 @@ public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
                         writer.WriteStringValue("***");
                     else if (IdentityNumberPayloadKeys.Contains(prop.Name) && prop.Value.ValueKind == JsonValueKind.String)
                         writer.WriteStringValue(TurkishTaxIdentity.Mask(prop.Value.GetString()));
+                    else if (MobilePhonePayloadKeys.Contains(prop.Name) && prop.Value.ValueKind == JsonValueKind.String)
+                        writer.WriteStringValue(TurkishMobilePhone.Mask(prop.Value.GetString()));
                     else if (FreeTextPayloadKeys.Contains(prop.Name) && prop.Value.ValueKind == JsonValueKind.String
                              && !string.IsNullOrWhiteSpace(prop.Value.GetString()))
                         writer.WriteStringValue("***");
