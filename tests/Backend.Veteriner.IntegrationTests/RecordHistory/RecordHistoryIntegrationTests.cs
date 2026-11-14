@@ -27,6 +27,9 @@ public sealed class RecordHistoryIntegrationTests : IClassFixture<CustomWebAppli
         PermissionCatalog.Prescriptions.Create,
         PermissionCatalog.Prescriptions.Update,
         PermissionCatalog.Prescriptions.Read,
+        PermissionCatalog.Hospitalizations.Create,
+        PermissionCatalog.Hospitalizations.Update,
+        PermissionCatalog.Hospitalizations.Read,
     ];
 
     private readonly CustomWebApplicationFactory _factory;
@@ -48,6 +51,7 @@ public sealed class RecordHistoryIntegrationTests : IClassFixture<CustomWebAppli
         var update = await client.PutAsJsonAsync($"/api/v1/treatments/{id}", new
         {
             ClinicId = clinicId, PetId = petId, TreatmentDateUtc = AtUtc, Title = "Pansuman ve temizlik", Description = "Sol arka bacak",
+            RowVersion = await TreatmentVersionAsync(client, id),
         });
         update.IsSuccessStatusCode.Should().BeTrue();
 
@@ -66,6 +70,33 @@ public sealed class RecordHistoryIntegrationTests : IClassFixture<CustomWebAppli
     }
 
     [Fact]
+    public async Task VersionCheckedUpdate_Should_ListFieldDiff()
+    {
+        // Sürüm denetimli güncelleme (rowVersion) de alan farkını yazmalı: yatış PUT'u istemcinin sürümüyle kaydedilir.
+        var (client, clinicId, petId, _) = await AuthorizedClientAsync();
+        var create = await client.PostAsJsonAsync("/api/v1/hospitalizations", new
+        {
+            ClinicId = clinicId, PetId = petId, AdmittedAtUtc = AtUtc, Reason = "Gözlem",
+        });
+        create.StatusCode.Should().Be(HttpStatusCode.Created);
+        var id = await create.Content.ReadFromJsonAsync<Guid>();
+        var version = (await client.GetFromJsonAsync<JsonElement>($"/api/v1/hospitalizations/{id}")).GetProperty("rowVersion").GetString();
+
+        var update = await client.PutAsJsonAsync($"/api/v1/hospitalizations/{id}", new
+        {
+            ClinicId = clinicId, PetId = petId, AdmittedAtUtc = AtUtc, Reason = "Gözlem ve serum", RowVersion = version,
+        });
+        update.IsSuccessStatusCode.Should().BeTrue();
+
+        var history = await ReadHistoryAsync(client, $"/api/v1/hospitalizations/{id}/history");
+
+        history.Should().HaveCount(2);
+        var change = history[0].GetProperty("changes").EnumerateArray().Should().ContainSingle().Subject;
+        change.GetProperty("field").GetString().Should().Be("Reason");
+        change.GetProperty("oldValue").GetString().Should().Be("Gözlem");
+    }
+
+    [Fact]
     public async Task UnchangedUpdate_Should_NotWriteHistoryRow()
     {
         var (client, clinicId, petId, _) = await AuthorizedClientAsync();
@@ -73,7 +104,11 @@ public sealed class RecordHistoryIntegrationTests : IClassFixture<CustomWebAppli
 
         var create = await client.PostAsJsonAsync("/api/v1/treatments", body);
         var id = await create.Content.ReadFromJsonAsync<Guid>();
-        (await client.PutAsJsonAsync($"/api/v1/treatments/{id}", body)).IsSuccessStatusCode.Should().BeTrue();
+        (await client.PutAsJsonAsync($"/api/v1/treatments/{id}", new
+        {
+            ClinicId = clinicId, PetId = petId, TreatmentDateUtc = AtUtc, Title = "Aynı", Description = "Aynı",
+            RowVersion = await TreatmentVersionAsync(client, id),
+        })).IsSuccessStatusCode.Should().BeTrue();
 
         var history = await ReadHistoryAsync(client, $"/api/v1/treatments/{id}/history");
 
@@ -93,10 +128,12 @@ public sealed class RecordHistoryIntegrationTests : IClassFixture<CustomWebAppli
         create.StatusCode.Should().Be(HttpStatusCode.Created);
         var id = await create.Content.ReadFromJsonAsync<Guid>();
 
+        var version = (await client.GetFromJsonAsync<JsonElement>($"/api/v1/prescriptions/{id}")).GetProperty("rowVersion").GetString();
         var update = await client.PutAsJsonAsync($"/api/v1/prescriptions/{id}", new
         {
             ClinicId = clinicId, PetId = petId, PrescribedAtUtc = AtUtc, Title = "Reçete", Content = "İçerik",
             Items = new[] { new { Name = "Amoksisilin 250 mg", Quantity = 10m, Instructions = "Günde 2 kez" } },
+            RowVersion = version,
         });
         update.IsSuccessStatusCode.Should().BeTrue();
 
@@ -127,6 +164,9 @@ public sealed class RecordHistoryIntegrationTests : IClassFixture<CustomWebAppli
 
         history.Should().BeEmpty();
     }
+
+    private static async Task<string?> TreatmentVersionAsync(HttpClient client, Guid id)
+        => (await client.GetFromJsonAsync<JsonElement>($"/api/v1/treatments/{id}")).GetProperty("rowVersion").GetString();
 
     private async Task<(HttpClient Client, Guid ClinicId, Guid PetId, Guid UserId)> AuthorizedClientAsync()
     {

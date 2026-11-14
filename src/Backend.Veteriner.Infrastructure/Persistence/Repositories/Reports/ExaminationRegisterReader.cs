@@ -83,9 +83,10 @@ public sealed class ExaminationRegisterReader : IRegisterReader<ExaminationRegis
         var treatments = (await _db.Treatments.AsNoTracking()
                 .Where(t => t.TenantId == request.TenantId && pageIds.Contains(t.ExaminationId!.Value))
                 .OrderBy(t => t.TreatmentDateUtc).ThenBy(t => t.CreatedAtUtc).ThenBy(t => t.Id)
-                .Select(t => new { ExaminationId = t.ExaminationId!.Value, t.Title })
+                .Select(t => new { ExaminationId = t.ExaminationId!.Value, t.Title, IsCancelled = t.CancelledAtUtc != null })
                 .ToListAsync(ct))
-            .ToLookup(t => t.ExaminationId, t => t.Title);
+            // İptal edilen tedavi (ADR-043 AK-2) defterden çıkmaz, işaretlenir.
+            .ToLookup(t => t.ExaminationId, t => RegisterCancellationMark.Apply(t.Title, t.IsCancelled));
 
         var prescriptions = (await _db.Prescriptions.AsNoTracking()
                 .Where(p => p.TenantId == request.TenantId && pageIds.Contains(p.ExaminationId!.Value))

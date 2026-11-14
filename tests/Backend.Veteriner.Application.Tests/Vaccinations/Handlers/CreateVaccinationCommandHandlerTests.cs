@@ -832,8 +832,9 @@ public sealed class CreateVaccinationCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_ReturnFailure_When_ExaminationFinalized()
+    public async Task Handle_Should_RequireReason_And_MarkLateEntry_When_ExaminationFinalized()
     {
+        // ADR-043 AK-6 (ADR-013 Ek 2): kesinleşmiş muayeneye aşı (ürünsüz de) gerekçeyle "sonradan eklendi" olarak yazılır.
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var pid = Guid.NewGuid();
@@ -855,11 +856,21 @@ public sealed class CreateVaccinationCommandHandlerTests
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);
 
-        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+        var withoutReason = await CreateHandler().Handle(cmd, CancellationToken.None);
 
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Code.Should().Be("Examinations.Finalized");
+        withoutReason.IsSuccess.Should().BeFalse();
+        withoutReason.Error.Code.Should().Be(Vaccination.LateEntryReasonRequiredCode);
         _vaccinationsWrite.Verify(r => r.AddAsync(It.IsAny<Vaccination>(), It.IsAny<CancellationToken>()), Times.Never);
-        _vaccinationsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+
+        Vaccination? added = null;
+        _vaccinationsWrite.Setup(r => r.AddAsync(It.IsAny<Vaccination>(), It.IsAny<CancellationToken>()))
+            .Callback<Vaccination, CancellationToken>((v, _) => added = v)
+            .ReturnsAsync((Vaccination v, CancellationToken _) => v);
+
+        var withReason = await CreateHandler().Handle(cmd with { LateEntryReason = "Sahip sonradan getirdi" }, CancellationToken.None);
+
+        withReason.IsSuccess.Should().BeTrue();
+        added!.AddedAfterFinalization.Should().BeTrue();
+        added.LateEntryReason.Should().Be("Sahip sonradan getirdi");
     }
 }

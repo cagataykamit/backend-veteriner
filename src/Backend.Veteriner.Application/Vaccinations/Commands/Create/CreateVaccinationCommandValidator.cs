@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.Vaccinations;
 using FluentValidation;
 
 namespace Backend.Veteriner.Application.Vaccinations.Commands.Create;
@@ -12,6 +13,12 @@ public sealed class CreateVaccinationCommandValidator : AbstractValidator<Create
 
         RuleFor(x => x.Status)
             .IsInEnum();
+
+        // İptal ayrı eylemdir (ADR-043 AK-3); kayıt iptal durumunda açılmaz.
+        RuleFor(x => x.Status)
+            .NotEqual(VaccinationStatus.Cancelled)
+            .WithMessage("Aşı kaydı iptal durumunda oluşturulamaz.")
+            .WithErrorCode(Vaccination.InvalidStatusTransitionCode);
 
         RuleFor(x => x.ProductId).NotEmpty().When(x => x.ProductId.HasValue);
         RuleFor(x => x.Quantity).GreaterThan(0).When(x => x.Quantity.HasValue);

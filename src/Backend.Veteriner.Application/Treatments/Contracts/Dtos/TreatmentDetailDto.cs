@@ -15,4 +15,9 @@ public sealed record TreatmentDetailDto(
     string? Notes,
     DateTime? FollowUpDateUtc,
     DateTime CreatedAtUtc,
-    DateTime? UpdatedAtUtc);
+    DateTime? UpdatedAtUtc,
+    string? RowVersion = null,
+    DateTime? CancelledAtUtc = null,
+    string? CancelReason = null,
+    bool AddedAfterFinalization = false,
+    string? LateEntryReason = null);

@@ -216,6 +216,7 @@ public sealed class VisitTodayReader : IVisitTodayReader
                 where h.TenantId == request.TenantId
                       && h.ClinicId == request.ClinicId
                       && h.DischargedAtUtc == null
+                      && h.CancelledAtUtc == null
                 orderby h.AdmittedAtUtc, h.Id
                 select new TodayHospitalizationDto(
                     h.Id,

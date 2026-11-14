@@ -10,7 +10,8 @@ Backend tek doğruluk kaynağıdır. Uçlar `api/v1` altında; hata zarfı stand
 
 - **Geçmiş satırı (`RecordChange`)**: bir kaydın tek kaydetme anındaki değişikliği. Append-only; düzenlenmez, silinmez.
 - **Yazım tek yerde**: geçmiş, kayıt kaydedilirken altyapıda (EF kaydetme yakalayıcısı) **aynı transaction'da** yazılır. Uygulama kodu geçmiş üretmez; yeni bir yazma yolu eklense de geçmiş kendiliğinden tutulur.
-- **İzlenen türler**: muayene, tedavi, reçete (satırlarıyla), aşı, laboratuvar sonucu, uygulama kaydı, yatış.
+- **İzlenen türler**: muayene, tedavi, reçete (satırlarıyla), aşı, laboratuvar sonucu, uygulama kaydı, yatış, görüntüleme (`imaging`, ADR-043 K5, 2026-11-14).
+- **Sürüm denetimli güncellemeler de yazılır** (2026-11-14 düzeltmesi): `rowVersion` ile kaydedilen güncellemeler önceden alan farkı üretmiyordu (kayıt izlenmeden yükleniyordu); artık kayıt izlenerek yüklenir, fark yazılır.
 - **Kullanıcısız değişiklik kaydedilmez**: arka plan işleri (içe aktarma, sistem görevleri) geçmiş satırı üretmez; geçmiş yalnız oturum açmış kullanıcının değişikliğini gösterir.
 - **Geriye dönük kayıt yoktur**: bu özellikten önceki değişikliklerin geçmişi yoktur; eski kayıtlarda liste boş olabilir.
 - `AuditLogs` (güvenlik denetimi) ayrı kalır ve bu ekrana kaynak değildir.
@@ -26,6 +27,7 @@ Backend tek doğruluk kaynağıdır. Uçlar `api/v1` altında; hata zarfı stand
 | `GET /lab-results/{id}/history` | `LabResults.Read` |
 | `GET /administrations/{id}/history` | `Administrations.Read` |
 | `GET /hospitalizations/{id}/history` | `Hospitalizations.Read` |
+| `GET /imaging-records/{id}/history` `[YENİ]` | `Imaging.Read` |
 
 Yeni izin yoktur. Yanıt **200**, yeniden eskiye en çok **200** satır:
 

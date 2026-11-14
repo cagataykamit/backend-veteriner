@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Administrations.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
+using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Hbs;
@@ -150,7 +151,12 @@ public sealed class GetVaccinationByIdQueryHandler
             administrationDto,
             await HbsEntryDtoFactory.ForVaccinationAsync(v, _names, ct),
             v.Route?.ToString(),
-            v.Site);
+            v.Site,
+            ExaminationRowVersion.Encode(v.RowVersion),
+            v.CancelledAtUtc,
+            v.CancelReason,
+            v.AddedAfterFinalization,
+            v.LateEntryReason);
         return Result<VaccinationDetailDto>.Success(dto);
     }
 }

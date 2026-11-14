@@ -113,7 +113,8 @@ public sealed class VaccinationWriteClinicAssignmentCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             ValidDueAt,
-            null);
+            null,
+            RowVersion: "AAAAAAAAB9E=");
 
     private static Vaccination ExistingVaccination(Guid tid, Guid cid, Guid petId)
         => new(
@@ -354,7 +355,7 @@ public sealed class VaccinationWriteClinicAssignmentCommandHandlerTests
     }
 
     [Fact]
-    public async Task Update_Should_Succeed_When_TenantWide_DefaultResolver()
+    public async Task Update_Should_Reject_Clinic_Change_When_TenantWide_DefaultResolver()
     {
         var tid = Guid.NewGuid();
         var entityCid = Guid.NewGuid();
@@ -372,8 +373,13 @@ public sealed class VaccinationWriteClinicAssignmentCommandHandlerTests
             UpdateCmd(v.Id, targetCid, petId),
             CancellationToken.None);
 
-        result.IsSuccess.Should().BeTrue();
-        v.ClinicId.Should().Be(targetCid);
+        // ADR-043 AK-10: kaydın kliniği güncellemeyle değişmez (kiracı geneli yetkide de).
+
+        result.IsSuccess.Should().BeFalse();
+
+        result.Error.Code.Should().Be("Vaccinations.SubjectChangeNotAllowed");
+
+        v.ClinicId.Should().Be(entityCid);
     }
 
     [Fact]

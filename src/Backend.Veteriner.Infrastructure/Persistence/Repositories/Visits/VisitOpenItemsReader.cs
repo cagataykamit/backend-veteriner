@@ -208,7 +208,7 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
             result = result.Concat(
                 from t in _db.Treatments.AsNoTracking()
                 join e in examinations on t.ExaminationId equals e.Id
-                where t.TenantId == tenantId && t.ClinicId == clinicId
+                where t.TenantId == tenantId && t.ClinicId == clinicId && t.CancelledAtUtc == null
                 select e.VisitId!.Value);
         }
 
@@ -237,7 +237,7 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
         {
             var hospitalizations =
                 from h in _db.Hospitalizations.AsNoTracking()
-                where h.TenantId == tenantId && h.ClinicId == clinicId
+                where h.TenantId == tenantId && h.ClinicId == clinicId && h.CancelledAtUtc == null
                 join e in _db.Examinations.AsNoTracking() on h.ExaminationId equals e.Id into hospitalizationExaminations
                 from e in hospitalizationExaminations.DefaultIfEmpty()
                 let visitId = h.VisitId ?? (e != null ? e.VisitId : null)

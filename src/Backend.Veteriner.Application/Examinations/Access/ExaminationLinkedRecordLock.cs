@@ -11,10 +11,9 @@ namespace Backend.Veteriner.Application.Examinations.Access;
 /// Tedavi, reçete ve aşı gibi muayeneye bağlı kayıtların yazma handler'ları için ortak kilit denetimi:
 /// ilgili muayenelerden biri kesinleşmişse yazma reddedilir (kural <see cref="Examination.EnsureAcceptsLinkedRecords"/>).
 /// Hem hedef hem mevcut (taşınan/ayrılan) muayene verilmelidir; muayenesi bulunamayanlar burada atlanır, varlık denetimi çağıranındır.
-/// Kontrollü istisna (ADR-013): uygulama kaydı (administration) bu kilide takılmaz; kesinleşmiş muayeneye gerekçeli "sonradan ekleme" olarak
-/// yazılır (kural <c>CreateAdministrationCommandHandler</c> ve <c>Administration.Create</c> içinde), tedavi/aşı/yatış kilidi değişmez.
-/// Reçete (RECORD-008, ADR-013 uyarlaması): <b>yeni</b> reçete aynı istisnayla gerekçeli sonradan ekleme olur
-/// (<see cref="AnyFinalizedAsync"/>, <c>Prescription.MarkAddedAfterFinalization</c>); mevcut reçete kilitli kalır, düzeltme gerekçeli iptal + yeni reçetedir.
+/// Yeni kayıt (ADR-043 K3, ADR-013 Ek 2): tedavi edici kayıtlar (uygulama, reçete, tedavi, aşı) kesinleşmiş muayeneye bu kilide takılmadan
+/// gerekçeli "sonradan ekleme" olarak yazılır (<see cref="AnyFinalizedAsync"/> + kaydın <c>MarkAddedAfterFinalization</c>'ı); tanısal kayıtlar
+/// (lab, görüntüleme) serbesttir, rozet taşır; yatış kesinleşmiş muayeneye bağlanmaz. <b>Mevcut</b> kayıt kilitli kalır: düzeltme gerekçeli iptal + yeni kayıttır.
 /// HBS geri kaydı (e-Reçete No / ATS seri no, ADR-036 Dilim 2) klinik içerik değildir; ayrı PATCH uçları bu kilidi çağırmaz
 /// (<c>UpdatePrescriptionHbsCommandHandler</c>, <c>UpdateVaccinationHbsCommandHandler</c>).
 /// </summary>

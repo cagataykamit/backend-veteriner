@@ -110,7 +110,7 @@ ADR-013 ilkelerinin reçeteye uyarlanması. Yeni izin yoktur.
 
 ### `POST /api/v1/prescriptions/{id}/cancel` — `Prescriptions.Update`
 
-Gövde `{ "reason": "string" }` (kırpılır, 5–500). Yanıt **204**. Reçete **silinmez**; `cancelledAtUtc`, iptal eden ve gerekçe saklanır. Kesinleşmiş muayeneye bağlı reçetede de yapılır (muayene kilidine takılmaz).
+Gövde `{ "reason": "string", "rowVersion": "base64" }` (gerekçe kırpılır, 5–500; `rowVersion` zorunlu, §9). Yanıt **204**. Reçete **silinmez**; `cancelledAtUtc`, iptal eden ve gerekçe saklanır. Kesinleşmiş muayeneye bağlı reçetede de yapılır (muayene kilidine takılmaz).
 
 | Durum | Kod | HTTP |
 |---|---|---|
@@ -128,7 +128,7 @@ HBS geri kaydı (`PATCH .../hbs`) iptalden etkilenmez; iptal edilen reçete HBS 
 
 | Uç | Yeni alanlar |
 |---|---|
-| `GET /prescriptions/{id}` | `status` (`Active` \| `Cancelled`), `cancelledAtUtc`, `cancelledByName`, `cancelReason`, `addedAfterFinalization`, `lateEntryReason` |
+| `GET /prescriptions/{id}` | `status` (`Active` \| `Cancelled`), `cancelledAtUtc`, `cancelledByName`, `cancelReason`, `addedAfterFinalization`, `lateEntryReason`, `rowVersion` (§9) |
 | `GET /prescriptions` | Satırda `status`, `addedAfterFinalization`. İptal edilen reçete listede kalır |
 | `GET /examinations/{id}/related-summary` | Reçete satırında `isCancelled`, `addedAfterFinalization` |
 | Hasta timeline | İptal edilen reçete varsayılan gizli; `includeVoided=true` ile `status = Cancelled`, `isVoided = true` döner (lab iptali ile aynı) |
@@ -138,3 +138,15 @@ Kayıt defterleri (muayene/reçete defteri) bu sürümde değişmedi: iptal edil
 ### Veri modeli
 
 Migration `AddPrescriptionCancellationAndLateEntry`: `Prescriptions` tablosuna `CancelledAtUtc`, `CancelledByUserId`, `CancelReason` (500), `AddedAfterFinalization` (bit, varsayılan 0), `LateEntryReason` (500); tutarlılık CHECK kısıtları `CK_Prescriptions_Cancel_Consistent`, `CK_Prescriptions_LateEntry_Consistent`. Mevcut satırlar etkin ve normal kalır, backfill yok.
+
+## 9) Eşzamanlılık (ADR-043 K5, 2026-11-14) `[YENİ]`
+
+- `GET /prescriptions/{id}` yanıtında `rowVersion` (Base64, 8 bayt).
+- `PUT /prescriptions/{id}` ve `POST /prescriptions/{id}/cancel` gövdesinde `rowVersion` **zorunlu**; yoksa ya da geçersizse 400 `Prescriptions.Validation`, eskiyse 409 `Prescriptions.ConcurrencyConflict` ("Reçete eşzamanlı olarak güncellendi; formu yenileyip tekrar deneyin."). Satır listesi (`items`) aynı sürümle korunur: başka kullanıcının satır değişikliği sessizce ezilmez.
+- HBS geri kaydı (`PATCH /prescriptions/{id}/hbs`) sürüm istemez (klinik içerik değil).
+- Migration `AddPrescriptionRowVersion` (yalnız yerel geliştirme veritabanına). **Sözleşme kırıcı:** backend ve panel aynı yayında çıkmalıdır.
+- Hayvan zaman çizelgesinde reçete satırı `addedAfterFinalization` taşır (`PET_TIMELINE_API_CONTRACT.md`).
+
+## Güncellemede hasta ve klinik değişmez (ADR-043 AK-10) `[DEĞİŞTİ]`
+
+Kaydın hastası ve kliniği oluşturulduktan sonra değişmez (ADR-043 K6 / AK-10, 2026-11-14; kural `RecordSubjectRule`). `PUT` gövdesindeki `petId` ya da `clinicId` kayıttakinden farklıysa 400 `Prescriptions.SubjectChangeNotAllowed`. Yanlış hasta için kayıt gerekçeyle iptal edilir ve doğru hastaya yeni kayıt açılır. Muayene bağı aynı hasta içinde değişebilir (kilit kuralına tabi).

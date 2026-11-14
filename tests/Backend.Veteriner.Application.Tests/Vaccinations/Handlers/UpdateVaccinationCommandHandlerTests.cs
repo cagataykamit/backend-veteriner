@@ -71,7 +71,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(3),
-            null);
+            null,
+            RowVersion: "AAAAAAAAB9E=");
 
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
@@ -101,7 +102,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(3),
-            null);
+            null,
+            RowVersion: "AAAAAAAAB9E=");
 
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
@@ -130,7 +132,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(3),
-            null);
+            null,
+            RowVersion: "AAAAAAAAB9E=");
 
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
@@ -155,7 +158,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(3),
-            null);
+            null,
+            RowVersion: "AAAAAAAAB9E=");
 
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
@@ -205,7 +209,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(7),
-            null);
+            null,
+            RowVersion: "AAAAAAAAB9E=");
 
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
@@ -254,7 +259,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(7),
-            null);
+            null,
+            RowVersion: "AAAAAAAAB9E=");
 
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
@@ -305,7 +311,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(7),
-            null);
+            null,
+            RowVersion: "AAAAAAAAB9E=");
 
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
@@ -367,7 +374,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(7),
-            null);
+            null,
+            RowVersion: "AAAAAAAAB9E=");
 
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
@@ -412,7 +420,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             DateTime.UtcNow.AddHours(-2),
             DateTime.UtcNow.AddDays(7),
-            null);
+            null,
+            RowVersion: "AAAAAAAAB9E=");
 
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
@@ -457,7 +466,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Applied,
             DateTime.UtcNow.AddYears(3),
             null,
-            null);
+            null,
+            RowVersion: "AAAAAAAAB9E=");
 
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
@@ -509,7 +519,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             due,
-            "not");
+            "not",
+            RowVersion: "AAAAAAAAB9E=");
 
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
@@ -563,7 +574,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             null,
-            null);
+            null,
+            RowVersion: "AAAAAAAAB9E=");
 
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 
@@ -622,7 +634,8 @@ public sealed class UpdateVaccinationCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             DateTime.UtcNow.AddDays(7),
-            null);
+            null,
+            RowVersion: "AAAAAAAAB9E=");
 
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 

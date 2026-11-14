@@ -163,6 +163,7 @@ public static class DependencyInjection
         services.AddScoped<OutboxSaveChangesInterceptor>();
         services.AddScoped<ChangeTrackedSaveChangesInterceptor>();
         services.AddScoped<RecordHistorySaveChangesInterceptor>();
+        services.AddScoped<ExpectedRowVersionSaveChangesInterceptor>();
         services.AddScoped<SlowQueryLoggingInterceptor>();
         services.AddScoped<DbConnectionSlowOpenInterceptor>();
 
@@ -174,6 +175,7 @@ public static class DependencyInjection
                 sp.GetRequiredService<ChangeTrackedSaveChangesInterceptor>(),
                 sp.GetRequiredService<OutboxSaveChangesInterceptor>(),
                 sp.GetRequiredService<RecordHistorySaveChangesInterceptor>(),
+                sp.GetRequiredService<ExpectedRowVersionSaveChangesInterceptor>(),
                 sp.GetRequiredService<SlowQueryLoggingInterceptor>(),
                 sp.GetRequiredService<DbConnectionSlowOpenInterceptor>());
         });

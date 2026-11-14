@@ -344,8 +344,9 @@ public sealed class CreateTreatmentCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_ReturnFailure_When_ExaminationFinalized()
+    public async Task Handle_Should_RequireReason_And_MarkLateEntry_When_ExaminationFinalized()
     {
+        // ADR-043 AK-6 (ADR-013 Ek 2): kesinleşmiş muayeneye tedavi gerekçeyle "sonradan eklendi" olarak yazılır.
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
         var petId = Guid.NewGuid();
@@ -360,11 +361,22 @@ public sealed class CreateTreatmentCommandHandlerTests
         _examinations.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ExaminationByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(exam);
 
-        var result = await CreateHandler().Handle(Cmd(cid, petId, examinationId: examId), CancellationToken.None);
+        var withoutReason = await CreateHandler().Handle(Cmd(cid, petId, examinationId: examId), CancellationToken.None);
 
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Code.Should().Be("Examinations.Finalized");
+        withoutReason.IsSuccess.Should().BeFalse();
+        withoutReason.Error.Code.Should().Be(Treatment.LateEntryReasonRequiredCode);
         _treatmentsWrite.Verify(r => r.AddAsync(It.IsAny<Treatment>(), It.IsAny<CancellationToken>()), Times.Never);
-        _treatmentsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+
+        Treatment? added = null;
+        _treatmentsWrite.Setup(r => r.AddAsync(It.IsAny<Treatment>(), It.IsAny<CancellationToken>()))
+            .Callback<Treatment, CancellationToken>((t, _) => added = t)
+            .ReturnsAsync((Treatment t, CancellationToken _) => t);
+
+        var withReason = await CreateHandler().Handle(
+            Cmd(cid, petId, examinationId: examId) with { LateEntryReason = " Kesinleştirmeden sonra hatırlandı " }, CancellationToken.None);
+
+        withReason.IsSuccess.Should().BeTrue();
+        added!.AddedAfterFinalization.Should().BeTrue();
+        added.LateEntryReason.Should().Be("Kesinleştirmeden sonra hatırlandı");
     }
 }

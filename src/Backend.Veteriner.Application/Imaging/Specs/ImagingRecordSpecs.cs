@@ -1,5 +1,6 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Common;
+using Backend.Veteriner.Application.Common.Specifications;
 using Backend.Veteriner.Domain.Imaging;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,14 +15,13 @@ public sealed class ImagingRecordByIdSpec : Specification<ImagingRecord>
 }
 
 /// <summary>
-/// Güncelleme/iptal için izlenmeyen yükleme: kayıt sonra istemcinin beklenen sürümüyle eklenir, böylece UPDATE koşulundaki
-/// rowversion istemcinin gönderdiği değerdir (LabResult deseni).
+/// Güncelleme/iptal için izlenen yükleme: istemcinin beklediği sürüm <c>SetExpectedRowVersion</c> ile yazılır ve kaydetmede UPDATE
+/// koşuluna taşınır (<c>ExpectedRowVersionSaveChangesInterceptor</c>); özgün değerler korunduğu için değişiklik geçmişi alan farkını yazar.
 /// </summary>
 public sealed class ImagingRecordForUpdateByIdSpec : Specification<ImagingRecord>
 {
     public ImagingRecordForUpdateByIdSpec(Guid tenantId, Guid id)
     {
-        Query.AsNoTracking();
         Query.Where(x => x.TenantId == tenantId && x.Id == id);
     }
 }
@@ -45,18 +45,7 @@ internal static class ImagingRecordListFilterExtensions
     public static void Apply(this ISpecificationBuilder<ImagingRecord> query, ImagingRecordListFilter f)
     {
         query.Where(x => x.TenantId == f.TenantId);
-        if (f.ClinicId.HasValue)
-        {
-            query.Where(x => x.ClinicId == f.ClinicId.Value);
-        }
-        else if (f.AccessibleClinicIds is not null)
-        {
-            var ids = f.AccessibleClinicIds;
-            if (ids.Count == 0)
-                query.Where(x => false);
-            else
-                query.Where(x => ids.Contains(x.ClinicId));
-        }
+        query.ApplyClinicScope(f.ClinicId, f.AccessibleClinicIds);
 
         if (f.PetId.HasValue)
             query.Where(x => x.PetId == f.PetId.Value);

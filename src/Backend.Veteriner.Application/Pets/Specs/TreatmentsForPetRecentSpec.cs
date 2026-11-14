@@ -13,7 +13,7 @@ public sealed class TreatmentsForPetRecentSpec : Specification<Treatment>
         int take,
         IReadOnlyCollection<Guid>? accessibleClinicIds = null)
     {
-        Query.Where(t => t.TenantId == tenantId && t.PetId == petId);
+        Query.Where(t => t.TenantId == tenantId && t.PetId == petId && t.CancelledAtUtc == null);
         Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderByDescending(t => t.TreatmentDateUtc)
             .ThenByDescending(t => t.Id)

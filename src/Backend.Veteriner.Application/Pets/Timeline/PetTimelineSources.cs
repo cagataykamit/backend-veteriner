@@ -89,7 +89,9 @@ internal sealed class TreatmentTimelineSource(IReadRepository<Treatment> reposit
     protected override Expression<Func<Treatment, Guid>> Id => t => t.Id;
 
     protected override Expression<Func<Treatment, bool>> Filter(PetTimelineSourceQuery q)
-        => t => t.TenantId == q.TenantId && t.PetId == q.PetId;
+        => q.IncludeVoided
+            ? t => t.TenantId == q.TenantId && t.PetId == q.PetId
+            : t => t.TenantId == q.TenantId && t.PetId == q.PetId && t.CancelledAtUtc == null;
 
     protected override ISpecificationBuilder<Treatment> ApplyClinicScope(ISpecificationBuilder<Treatment> builder, PetTimelineSourceQuery q)
         => builder.ApplyClinicScope(q.SingleClinicId, q.AccessibleClinicIds);
@@ -102,12 +104,13 @@ internal sealed class TreatmentTimelineSource(IReadRepository<Treatment> reposit
             t.ClinicId,
             t.Title,
             Summary: null,
-            Status: null,
-            IsVoided: false,
+            Status: t.IsCancelled ? "Cancelled" : null,
+            IsVoided: t.IsCancelled,
             RelatedExaminationId: t.ExaminationId,
             RelatedVisitId: null,
             RelatedAppointmentId: null,
-            UpdatedAtUtc: t.UpdatedAtUtc);
+            UpdatedAtUtc: t.UpdatedAtUtc,
+            AddedAfterFinalization: t.AddedAfterFinalization);
 }
 
 internal sealed class PrescriptionTimelineSource(IReadRepository<Prescription> repository)
@@ -141,6 +144,7 @@ internal sealed class PrescriptionTimelineSource(IReadRepository<Prescription> r
             RelatedVisitId: null,
             RelatedAppointmentId: null,
             UpdatedAtUtc: p.UpdatedAtUtc,
+            AddedAfterFinalization: p.AddedAfterFinalization,
             RelatedTreatmentId: p.TreatmentId);
 }
 
@@ -174,7 +178,8 @@ internal sealed class LabResultTimelineSource(IReadRepository<LabResult> reposit
             RelatedExaminationId: l.ExaminationId,
             RelatedVisitId: l.VisitId,
             RelatedAppointmentId: null,
-            UpdatedAtUtc: l.UpdatedAtUtc);
+            UpdatedAtUtc: l.UpdatedAtUtc,
+            AddedAfterFinalization: l.AddedAfterFinalization);
 }
 
 /// <summary>
@@ -216,11 +221,15 @@ internal sealed class VaccinationTimelineSource(IReadRepository<Vaccination> rep
             RelatedExaminationId: v.ExaminationId,
             RelatedVisitId: null,
             RelatedAppointmentId: null,
-            UpdatedAtUtc: v.UpdatedAtUtc);
+            UpdatedAtUtc: v.UpdatedAtUtc,
+            AddedAfterFinalization: v.AddedAfterFinalization);
     }
 }
 
-/// <summary>Yatış tek olaydır (kabul tarihinde); taburcu <c>Status</c> ile ifade edilir.</summary>
+/// <summary>
+/// Yatış tek olaydır (kabul tarihinde); taburcu <c>Status</c> ile ifade edilir. İptal edilen yatış (ADR-043 AK-5) yalnız
+/// <c>includeVoided</c> ile gelir, <c>Status = "Cancelled"</c>.
+/// </summary>
 internal sealed class HospitalizationTimelineSource(IReadRepository<Hospitalization> repository)
     : PetTimelineSourceBase<Hospitalization>(repository)
 {
@@ -231,7 +240,9 @@ internal sealed class HospitalizationTimelineSource(IReadRepository<Hospitalizat
     protected override Expression<Func<Hospitalization, Guid>> Id => h => h.Id;
 
     protected override Expression<Func<Hospitalization, bool>> Filter(PetTimelineSourceQuery q)
-        => h => h.TenantId == q.TenantId && h.PetId == q.PetId;
+        => q.IncludeVoided
+            ? h => h.TenantId == q.TenantId && h.PetId == q.PetId
+            : h => h.TenantId == q.TenantId && h.PetId == q.PetId && h.CancelledAtUtc == null;
 
     protected override ISpecificationBuilder<Hospitalization> ApplyClinicScope(ISpecificationBuilder<Hospitalization> builder, PetTimelineSourceQuery q)
         => builder.ApplyClinicScope(q.SingleClinicId, q.AccessibleClinicIds);
@@ -244,8 +255,8 @@ internal sealed class HospitalizationTimelineSource(IReadRepository<Hospitalizat
             h.ClinicId,
             h.Reason,
             Summary: null,
-            Status: h.DischargedAtUtc is null ? "Active" : "Discharged",
-            IsVoided: false,
+            Status: h.IsCancelled ? "Cancelled" : h.DischargedAtUtc is null ? "Active" : "Discharged",
+            IsVoided: h.IsCancelled,
             RelatedExaminationId: h.ExaminationId,
             RelatedVisitId: h.VisitId,
             RelatedAppointmentId: null,

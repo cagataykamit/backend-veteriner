@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Administrations.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.Vaccinations.Access;
 using Backend.Veteriner.Application.Examinations.Access;
 using Backend.Veteriner.Application.Examinations.Specs;
@@ -17,6 +18,7 @@ using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Vaccinations;
 using Mediator;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Vaccinations.Commands.Update;
 
@@ -188,6 +190,9 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
                 "Uygulamaya (stok düşümü) bağlı aşı kaydında yalnız notlar ve sonraki doz tarihi değişebilir; iptal için uygulama iptal edilmelidir.");
         }
 
+        if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
+            return Result.Failure("Vaccinations.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+
         var domain = v.UpdateDetails(
             request.PetId,
             effectiveClinicId,
@@ -207,8 +212,20 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
         if (!routeSite.IsSuccess)
             return Result.Failure(routeSite.Error);
 
-        await _vaccinationsWrite.UpdateAsync(v, ct);
-        await _vaccinationsWrite.SaveChangesAsync(ct);
+        v.SetExpectedRowVersion(expectedRowVersion);
+
+        try
+        {
+            await _vaccinationsWrite.UpdateAsync(v, ct);
+            await _vaccinationsWrite.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result.Failure(
+                VaccinationConcurrency.ConflictCode,
+                VaccinationConcurrency.ConflictMessage);
+        }
+
         return Result.Success();
     }
 }

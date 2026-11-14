@@ -6,6 +6,8 @@ Backend tek doğruluk kaynağıdır. Kaynak: `docs/ASAMA7_DISCOVERY.md` (D1, D2,
 
 > **HOSP-002 — Yatış konum ataması (2026-10-24, dal `feat/hosp-002-ward-room`):** D5'teki "konum listesi yok" kararı değişti; klinik tanımlı **Bölüm / Oda** modeli eklendi (§10). Migration `20261024180200_AddHospitalizationWardsAndRooms` üretildi (`HospitalizationWards`, `HospitalizationRooms` tabloları + `Hospitalizations.RoomId`), **hiçbir paylaşılan/geliştirme veritabanına uygulanmadı**. **Yeni izin yok**, seed gerekmez (yalnız yeni composite okuma policy'si `Clinics_HospitalizationWardsRead`, §10.2).
 
+> **Yatış iptali (ADR-043 AK-5, 2026-11-14, dal `feature/kayit-modeli-adr043`):** yanlış açılan yatış gerekçeyle iptal edilir (§11). Migration `AddHospitalizationCancellation` (3 sütun + denetim kısıtı), yalnız yerel geliştirme veritabanına. Yeni izin yok.
+
 **Frontend için değişenler `[DEĞİŞTİ]` / `[YENİ]` ile işaretlidir.** Eski ekranlar değişiklik yapılmadan çalışmaya devam eder; farklar §6'da ve §10.6'da.
 
 ---
@@ -220,3 +222,43 @@ Oda doğrulaması muayene/geliş doğrulamalarından **sonra**, yazımdan önce 
 - **Yatış listesi/kartı:** `wardName / roomName` (yoksa `location`).
 - **Eski ekranlar:** `roomId`/`clearRoom` göndermeyen PUT oda bağını değiştirmez; `location` kuralı aynen.
 - Smoke: bölüm/oda CRUD + 409 çakışma; odalı yatış oluştur → detay/liste `roomName`/`wardName`/`location`; pasif oda → 409; başka klinik odası → 404; `clearRoom`.
+
+---
+
+## 11) Yatış iptali (ADR-043 AK-5) `[YENİ]`
+
+Yanlış açılan yatış silinmez, gerekçeyle iptal edilir. İptal son durumdur (geri alınmaz). Kural tek yerde: `RecordCancellationRules` (gerekçe 5–500, kırpılır; reçete, lab ve görüntüleme iptaliyle aynı).
+
+### `POST /hospitalizations/{id}/cancel` (`Hospitalizations.Update`)
+
+```json
+{ "reason": "string (5–500)", "rowVersion": "base64 (zorunlu)" }
+```
+
+- Yanıt **200** + `{ "id": "guid", "rowVersion": "base64" }`.
+- Etkin ve taburcu edilmiş yatışta yapılabilir. Kesinleşmiş muayene kilidi iptali engellemez (düzeltme yolu "gerekçeli iptal + yeni kayıt").
+- İşlem transaction ve audit işaretlidir (`Hospitalization.Cancel`).
+
+| Kod | HTTP | Ne zaman |
+|---|---|---|
+| `Hospitalizations.Validation` | 400 | Gerekçe 5–500 değil; `rowVersion` yok ya da geçersiz |
+| `Hospitalizations.AlreadyCancelled` | 409 | Zaten iptal; iptal edilen yatışta PUT, taburcu ve oda değişikliği |
+| `Hospitalizations.ConcurrencyConflict` | 409 | `rowVersion` eski |
+| `Hospitalizations.NotFound` | 404 | Yok ya da klinik kapsamı dışında |
+
+### Okuma etkisi
+
+| Yer | Davranış |
+|---|---|
+| Etkin yatış kuralı | Etkin = taburcu edilmemiş **ve** iptal edilmemiş (`Hospitalization.IsActiveExpression`, tek yer). İptal edilen yatış "tek etkin yatış" kuralına girmez; hayvana yeni yatış açılabilir |
+| `GET /hospitalizations/{id}` | `[YENİ]` `cancelledAtUtc`, `cancelledByUserId`, `cancelReason`; iptalde `isActive=false` |
+| `GET /hospitalizations` | İptal edilenler varsayılan gizli. `[YENİ]` `includeCancelled=true` (yalnız `activeOnly` verilmediğinde) ile gelir; satırda `[YENİ]` `isCancelled`. `activeOnly=true/false` iptali hiç içermez |
+| Muayene özeti (`related-summary`) | Yatış satırı kalır; `[YENİ]` `isCancelled` (reçete deseni) |
+| Hasta özeti, geçmiş özeti, Bugün, açık işler | İptal edilen yatış etkin sayılmaz ve listelenmez |
+| Zaman çizelgesi | Varsayılan gizli; `includeVoided=true` ile `isVoided=true`, `status="Cancelled"` |
+| Veri dışa aktarma `yatislar.csv` | `[YENİ]` `Iptal`, `IptalNedeni` sütunları |
+| Değişiklik geçmişi | İptal alanları değişiklik olarak yazılır (mevcut yakalayıcı) |
+
+## Güncellemede hasta ve klinik değişmez (ADR-043 AK-10) `[DEĞİŞTİ]`
+
+Kaydın hastası ve kliniği oluşturulduktan sonra değişmez (ADR-043 K6 / AK-10, 2026-11-14; kural `RecordSubjectRule`). `PUT` gövdesindeki `petId` ya da `clinicId` kayıttakinden farklıysa 400 `Hospitalizations.SubjectChangeNotAllowed`. Yanlış hasta için kayıt gerekçeyle iptal edilir ve doğru hastaya yeni kayıt açılır. Muayene bağı aynı hasta içinde değişebilir (kilit kuralına tabi).

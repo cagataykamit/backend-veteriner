@@ -210,7 +210,7 @@ public sealed class GetPetHistorySummaryQueryHandler
                 ClinicName(h.ClinicId),
                 h.Reason,
                 h.DischargedAtUtc,
-                h.DischargedAtUtc is null,
+                h.IsActive,
                 h.ExaminationId,
                 h.UpdatedAtUtc))
             .ToList();

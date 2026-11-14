@@ -31,4 +31,5 @@ public sealed record PrescriptionDetailDto(
     string? CancelledByName = null,
     string? CancelReason = null,
     bool AddedAfterFinalization = false,
-    string? LateEntryReason = null);
+    string? LateEntryReason = null,
+    string? RowVersion = null);

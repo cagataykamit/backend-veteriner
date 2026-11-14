@@ -248,6 +248,30 @@ public sealed class ImagingRecordsIntegrationTests : IClassFixture<CustomWebAppl
     }
 
     [Fact]
+    public async Task History_Should_List_Update_With_Field_Diff()
+    {
+        // ADR-043 K5: görüntüleme değişiklik geçmişine yazılır.
+        var (client, clinicId, petId) = await AdminClientAsync();
+        var id = await CreateRecordAsync(client, clinicId, petId);
+        var before = (await GetAsync(client, id)).GetProperty("description").GetString();
+        var version = (await GetAsync(client, id)).GetProperty("rowVersion").GetString();
+
+        (await client.PutAsJsonAsync($"/api/v1/imaging-records/{id}", new
+        {
+            PerformedAtUtc = DateTime.UtcNow.AddHours(-2), Modality = "Ultrasound", Description = "Geçmiş için yeni açıklama", RowVersion = version,
+        })).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var history = await client.GetFromJsonAsync<JsonElement>($"/api/v1/imaging-records/{id}/history");
+
+        history.GetArrayLength().Should().Be(2);
+        history[0].GetProperty("kind").GetString().Should().Be("Updated");
+        var description = history[0].GetProperty("changes").EnumerateArray().Single(c => c.GetProperty("field").GetString() == "Description");
+        description.GetProperty("oldValue").GetString().Should().Be(before);
+        description.GetProperty("newValue").GetString().Should().Be("Geçmiş için yeni açıklama");
+        history[1].GetProperty("kind").GetString().Should().Be("Created");
+    }
+
+    [Fact]
     public async Task Finalized_Examination_Should_Freeze_Existing_Record_But_Accept_New_Imaging()
     {
         var (client, clinicId, petId) = await AdminClientAsync();

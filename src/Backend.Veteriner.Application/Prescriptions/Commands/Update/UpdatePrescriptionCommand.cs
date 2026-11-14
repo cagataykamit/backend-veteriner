@@ -4,6 +4,7 @@ using Mediator;
 
 namespace Backend.Veteriner.Application.Prescriptions.Commands.Update;
 
+/// <summary>PUT /api/v1/prescriptions/{id}. <see cref="RowVersion"/> zorunludur (ADR-043 K5).</summary>
 public sealed record UpdatePrescriptionCommand(
     Guid Id,
     Guid ClinicId,
@@ -15,5 +16,6 @@ public sealed record UpdatePrescriptionCommand(
     string Content,
     string? Notes,
     DateTime? FollowUpDateUtc,
-    IReadOnlyList<PrescriptionItemRequest>? Items = null)
+    IReadOnlyList<PrescriptionItemRequest>? Items = null,
+    string? RowVersion = null)
     : IRequest<Result>;

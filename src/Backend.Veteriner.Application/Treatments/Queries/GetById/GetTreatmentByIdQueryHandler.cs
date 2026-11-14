@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -102,7 +103,12 @@ public sealed class GetTreatmentByIdQueryHandler
             t.Notes,
             t.FollowUpDateUtc,
             t.CreatedAtUtc,
-            t.UpdatedAtUtc);
+            t.UpdatedAtUtc,
+            ExaminationRowVersion.Encode(t.RowVersion),
+            t.CancelledAtUtc,
+            t.CancelReason,
+            t.AddedAfterFinalization,
+            t.LateEntryReason);
 
         return Result<TreatmentDetailDto>.Success(dto);
     }

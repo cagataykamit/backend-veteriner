@@ -28,7 +28,9 @@ public sealed record ExaminationRelatedTreatmentItemDto(
     DateTime TreatmentDateUtc,
     Guid ClinicId,
     string ClinicName,
-    string Title);
+    string Title,
+    bool IsCancelled = false,
+    bool AddedAfterFinalization = false);
 
 public sealed record ExaminationRelatedPrescriptionItemDto(
     Guid Id,
@@ -48,7 +50,8 @@ public sealed record ExaminationRelatedLabResultItemDto(
     string TestName,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] LabResultStatus Status,
     DateTime RequestedAtUtc,
-    bool AwaitingInterpretation);
+    bool AwaitingInterpretation,
+    bool AddedAfterFinalization = false);
 
 public sealed record ExaminationRelatedHospitalizationItemDto(
     Guid Id,
@@ -57,7 +60,8 @@ public sealed record ExaminationRelatedHospitalizationItemDto(
     string ClinicName,
     string Reason,
     DateTime? DischargedAtUtc,
-    bool IsActive);
+    bool IsActive,
+    bool IsCancelled = false);
 
 /// <summary>İptal edilmemiş uygulama; <see cref="AddedAfterFinalization"/> "kesinleştirmeden sonra eklendi" rozetidir.</summary>
 public sealed record ExaminationRelatedAdministrationItemDto(
@@ -79,7 +83,8 @@ public sealed record ExaminationRelatedVaccinationItemDto(
     string VaccineName,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] VaccinationStatus Status,
     DateTime? AppliedAtUtc,
-    DateTime? DueAtUtc);
+    DateTime? DueAtUtc,
+    bool AddedAfterFinalization = false);
 
 public sealed record ExaminationRelatedPaymentItemDto(
     Guid Id,

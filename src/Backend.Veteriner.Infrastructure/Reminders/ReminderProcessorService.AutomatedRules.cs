@@ -66,6 +66,7 @@ public sealed partial class ReminderProcessorService
             .Where(t => t.TenantId == tenantId
                 && t.ClinicId == rule.ClinicId
                 && t.FollowUpDateUtc != null
+                && t.CancelledAtUtc == null
                 && t.FollowUpDateUtc > nowUtc
                 && t.FollowUpDateUtc <= maxDueUtc
                 && eligiblePetIds.Contains(t.PetId)

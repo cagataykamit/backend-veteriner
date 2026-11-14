@@ -112,7 +112,8 @@ public sealed class GetLabResultByIdQueryHandler
             row.CancelledAtUtc,
             row.CancelledByUserId,
             row.CancelReason,
-            ExaminationRowVersion.Encode(row.RowVersion));
+            ExaminationRowVersion.Encode(row.RowVersion),
+            row.AddedAfterFinalization);
 
         return Result<LabResultDetailDto>.Success(dto);
     }

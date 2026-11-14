@@ -185,6 +185,7 @@ public sealed class VaccinationWriteClinicAssignmentIdorIntegrationTests : IClas
         });
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
         var vaccinationId = await createResponse.Content.ReadFromJsonAsync<Guid>();
+        var rowVersion = await GetRowVersionAsync(vaccinationId);
 
         var updateResponse = await client.PutAsJsonAsync($"/api/v1/vaccinations/{vaccinationId}", new
         {
@@ -195,6 +196,7 @@ public sealed class VaccinationWriteClinicAssignmentIdorIntegrationTests : IClas
             Status = VaccinationStatus.Scheduled,
             DueAtUtc = ValidDueAtUtc.AddDays(1),
             Notes = "Admin update",
+            RowVersion = rowVersion,
         });
         updateResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
@@ -272,5 +274,13 @@ public sealed class VaccinationWriteClinicAssignmentIdorIntegrationTests : IClas
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.Vaccinations.AsNoTracking().SingleAsync(v => v.Id == vaccinationId);
         return (row.ClinicId, row.PetId, row.Notes);
+    }
+
+    private async Task<string> GetRowVersionAsync(Guid vaccinationId)
+    {
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var version = await db.Vaccinations.AsNoTracking().Where(v => v.Id == vaccinationId).Select(v => v.RowVersion).SingleAsync();
+        return Convert.ToBase64String(version);
     }
 }

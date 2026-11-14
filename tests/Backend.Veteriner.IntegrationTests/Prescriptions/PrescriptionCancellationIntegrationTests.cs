@@ -23,6 +23,7 @@ public sealed class PrescriptionCancellationIntegrationTests : IClassFixture<Cus
         PermissionCatalog.Prescriptions.Create,
         PermissionCatalog.Prescriptions.Update,
         PermissionCatalog.Prescriptions.Read,
+        PermissionCatalog.Pets.Read,
     ];
 
     private readonly CustomWebApplicationFactory _factory;
@@ -36,7 +37,7 @@ public sealed class PrescriptionCancellationIntegrationTests : IClassFixture<Cus
         var id = await CreateAsync(client, clinicId, petId);
         var itemId = (await DetailAsync(client, id)).GetProperty("items")[0].GetProperty("id").GetGuid();
 
-        var put = await client.PutAsJsonAsync($"/api/v1/prescriptions/{id}", Body(clinicId, petId, new { id = itemId, name = "Amoksisilin", quantity = 10m }));
+        var put = await client.PutAsJsonAsync($"/api/v1/prescriptions/{id}", Body(clinicId, petId, new { id = itemId, name = "Amoksisilin", quantity = 10m }, await VersionAsync(client, id)));
 
         put.IsSuccessStatusCode.Should().BeTrue();
         var item = (await DetailAsync(client, id)).GetProperty("items")[0];
@@ -50,10 +51,18 @@ public sealed class PrescriptionCancellationIntegrationTests : IClassFixture<Cus
         var (client, clinicId, petId) = await AuthorizedClientAsync();
         var id = await CreateAsync(client, clinicId, petId);
 
-        var tooShort = await client.PostAsJsonAsync($"/api/v1/prescriptions/{id}/cancel", new { reason = "x" });
+        var version = await VersionAsync(client, id);
+        var tooShort = await client.PostAsJsonAsync($"/api/v1/prescriptions/{id}/cancel", new { reason = "x", rowVersion = version });
         tooShort.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
-        var cancel = await client.PostAsJsonAsync($"/api/v1/prescriptions/{id}/cancel", new { reason = "Yanlış hastaya yazıldı" });
+        var noVersion = await client.PostAsJsonAsync($"/api/v1/prescriptions/{id}/cancel", new { reason = "Yanlış hastaya yazıldı" });
+        noVersion.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var stale = await client.PostAsJsonAsync($"/api/v1/prescriptions/{id}/cancel", new { reason = "Yanlış hastaya yazıldı", rowVersion = Convert.ToBase64String(new byte[8]) });
+        stale.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(stale)).Should().Be("Prescriptions.ConcurrencyConflict");
+
+        var cancel = await client.PostAsJsonAsync($"/api/v1/prescriptions/{id}/cancel", new { reason = "Yanlış hastaya yazıldı", rowVersion = version });
         cancel.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         var detail = await DetailAsync(client, id);
@@ -61,11 +70,12 @@ public sealed class PrescriptionCancellationIntegrationTests : IClassFixture<Cus
         detail.GetProperty("cancelReason").GetString().Should().Be("Yanlış hastaya yazıldı");
         detail.GetProperty("cancelledAtUtc").ValueKind.Should().Be(JsonValueKind.String);
 
-        var put = await client.PutAsJsonAsync($"/api/v1/prescriptions/{id}", Body(clinicId, petId, new { name = "Yeni" }));
+        var newVersion = detail.GetProperty("rowVersion").GetString();
+        var put = await client.PutAsJsonAsync($"/api/v1/prescriptions/{id}", Body(clinicId, petId, new { name = "Yeni" }, newVersion));
         put.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await IntegrationTestProblemDetails.ReadCodeAsync(put)).Should().Be("Prescriptions.AlreadyCancelled");
 
-        var again = await client.PostAsJsonAsync($"/api/v1/prescriptions/{id}/cancel", new { reason = "Tekrar iptal ediliyor" });
+        var again = await client.PostAsJsonAsync($"/api/v1/prescriptions/{id}/cancel", new { reason = "Tekrar iptal ediliyor", rowVersion = newVersion });
         again.StatusCode.Should().Be(HttpStatusCode.Conflict);
 
         var list = await (await client.GetAsync($"/api/v1/prescriptions?clinicId={clinicId:D}&petId={petId:D}")).Content.ReadFromJsonAsync<JsonElement>();
@@ -107,6 +117,11 @@ public sealed class PrescriptionCancellationIntegrationTests : IClassFixture<Cus
         detail.GetProperty("addedAfterFinalization").GetBoolean().Should().BeTrue();
         detail.GetProperty("lateEntryReason").GetString().Should().Be("Kesinleştirmeden sonra hatırlandı");
 
+        // Zaman çizelgesinde de "sonradan eklendi" rozeti (ADR-043).
+        var timeline = await client.GetFromJsonAsync<JsonElement>($"/api/v1/pets/{petId:D}/timeline");
+        timeline.GetProperty("items").EnumerateArray().Single(r => r.GetProperty("sourceId").GetGuid() == id)
+            .GetProperty("addedAfterFinalization").GetBoolean().Should().BeTrue();
+
         // Mevcut reçete kilitli kalır: düzeltme iptal + yeni reçetedir; iptal kilide takılmaz.
         var put = await client.PutAsJsonAsync($"/api/v1/prescriptions/{id}", new
         {
@@ -114,12 +129,31 @@ public sealed class PrescriptionCancellationIntegrationTests : IClassFixture<Cus
         });
         put.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await IntegrationTestProblemDetails.ReadCodeAsync(put)).Should().Be("Examinations.Finalized");
-        (await client.PostAsJsonAsync($"/api/v1/prescriptions/{id}/cancel", new { reason = "Doz yanlış yazıldı" }))
+        (await client.PostAsJsonAsync($"/api/v1/prescriptions/{id}/cancel", new { reason = "Doz yanlış yazıldı", rowVersion = await VersionAsync(client, id) }))
             .StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
-    private static object Body(Guid clinicId, Guid petId, object item)
-        => new { ClinicId = clinicId, PetId = petId, PrescribedAtUtc = AtUtc, Title = "Reçete", Content = "İçerik", Items = new[] { item } };
+    [Fact]
+    public async Task Put_Should_Return409_When_Version_Is_Stale()
+    {
+        var (client, clinicId, petId) = await AuthorizedClientAsync();
+        var id = await CreateAsync(client, clinicId, petId);
+        var version = await VersionAsync(client, id);
+
+        (await client.PutAsJsonAsync($"/api/v1/prescriptions/{id}", Body(clinicId, petId, new { name = "Birinci" }, version)))
+            .IsSuccessStatusCode.Should().BeTrue();
+        var second = await client.PutAsJsonAsync($"/api/v1/prescriptions/{id}", Body(clinicId, petId, new { name = "İkinci" }, version));
+
+        second.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(second)).Should().Be("Prescriptions.ConcurrencyConflict");
+        (await DetailAsync(client, id)).GetProperty("items")[0].GetProperty("name").GetString().Should().Be("Birinci");
+    }
+
+    private static object Body(Guid clinicId, Guid petId, object item, string? rowVersion = null)
+        => new { ClinicId = clinicId, PetId = petId, PrescribedAtUtc = AtUtc, Title = "Reçete", Content = "İçerik", Items = new[] { item }, RowVersion = rowVersion };
+
+    private static async Task<string?> VersionAsync(HttpClient client, Guid id)
+        => (await DetailAsync(client, id)).GetProperty("rowVersion").GetString();
 
     private static async Task<Guid> CreateAsync(HttpClient client, Guid clinicId, Guid petId)
     {

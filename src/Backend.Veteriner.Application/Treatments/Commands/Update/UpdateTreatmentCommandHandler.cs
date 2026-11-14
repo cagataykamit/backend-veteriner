@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -14,6 +15,7 @@ using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Treatments;
 using Mediator;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Treatments.Commands.Update;
 
@@ -152,6 +154,9 @@ public sealed class UpdateTreatmentCommandHandler : IRequestHandler<UpdateTreatm
         if (!locked.IsSuccess)
             return locked;
 
+        if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
+            return Result.Failure("Treatments.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+
         var update = t.UpdateDetails(
             effectiveClinicId,
             request.PetId,
@@ -166,8 +171,18 @@ public sealed class UpdateTreatmentCommandHandler : IRequestHandler<UpdateTreatm
         if (!update.IsSuccess)
             return update;
 
-        await _treatmentsWrite.UpdateAsync(t, ct);
-        await _treatmentsWrite.SaveChangesAsync(ct);
+        t.SetExpectedRowVersion(expectedRowVersion);
+
+        try
+        {
+            await _treatmentsWrite.UpdateAsync(t, ct);
+            await _treatmentsWrite.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result.Failure(TreatmentConcurrency.ConflictCode, TreatmentConcurrency.ConflictMessage);
+        }
+
         return Result.Success();
     }
 }

@@ -59,7 +59,8 @@ public sealed class UpdateTreatmentCommandHandlerTests
             "Başlık",
             "Açıklama",
             null,
-            followUp);
+            followUp,
+            RowVersion: "AAAAAAAAB9E=");
 
     private void SetupTenantClinicPet(Guid tid, Guid cid, Guid petId)
     {
@@ -188,7 +189,8 @@ public sealed class UpdateTreatmentCommandHandlerTests
             "Güncel",
             "D",
             null,
-            null);
+            null,
+            RowVersion: "AAAAAAAAB9E=");
 
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 

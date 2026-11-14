@@ -74,7 +74,7 @@ public sealed class PrescriptionItemsCommandHandlerTests
         => new(_cid, _petId, examinationId, null, DateTime.UtcNow.AddHours(-1), "Başlık", "İçerik", null, null, items);
 
     private UpdatePrescriptionCommand UpdateCmd(Prescription rx, IReadOnlyList<PrescriptionItemRequest>? items)
-        => new(rx.Id, _cid, _petId, rx.ExaminationId, null, DateTime.UtcNow.AddHours(-1), "Başlık", "İçerik", null, null, items);
+        => new(rx.Id, _cid, _petId, rx.ExaminationId, null, DateTime.UtcNow.AddHours(-1), "Başlık", "İçerik", null, null, items, RowVersion: "AAAAAAAAB9E=");
 
     private Prescription Existing(Guid? examinationId = null, params PrescriptionItemDraft[] items)
     {

@@ -10,4 +10,5 @@ public static class RecordHistoryTypes
     public const string LabResult = "labResult";
     public const string Administration = "administration";
     public const string Hospitalization = "hospitalization";
+    public const string Imaging = "imaging";
 }

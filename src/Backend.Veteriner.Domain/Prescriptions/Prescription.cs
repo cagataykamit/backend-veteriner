@@ -43,6 +43,9 @@ public sealed class Prescription : AggregateRoot, IClinicScoped, ITenantOwned
 
     public const string LateEntryReasonRequiredCode = "Prescriptions.LateEntryReasonRequired";
 
+    /// <summary>SQL Server rowversion — eşzamanlı güncelleme için (ADR-043 K5).</summary>
+    public byte[] RowVersion { get; private set; } = default!;
+
     private readonly List<PrescriptionItem> _items = new();
 
     /// <summary>Yapılandırılmış reçete satırları; eski (serbest metin) reçetelerde boştur.</summary>
@@ -104,6 +107,9 @@ public sealed class Prescription : AggregateRoot, IClinicScoped, ITenantOwned
             return CancelledFailure();
         if (clinicId == Guid.Empty)
             return Result.Failure("Prescriptions.Validation", "ClinicId is invalid.");
+        var subject = RecordSubjectRule.EnsureUnchanged(ClinicId, PetId, clinicId, petId, "Prescriptions");
+        if (!subject.IsSuccess)
+            return subject;
         if (petId == Guid.Empty)
             return Result.Failure("Prescriptions.Validation", "PetId is invalid.");
         if (string.IsNullOrWhiteSpace(title))
@@ -186,22 +192,28 @@ public sealed class Prescription : AggregateRoot, IClinicScoped, ITenantOwned
     {
         if (IsCancelled)
             return Result.Failure("Prescriptions.AlreadyCancelled", "Reçete zaten iptal edilmiş.");
-        if (cancelledByUserId == Guid.Empty)
-            return Result.Failure("Prescriptions.Validation", "İptal eden kullanıcı geçersiz.");
+        var cancellation = RecordCancellationRules.Resolve(cancelledByUserId, reason, utcNow, "Prescriptions.Validation");
+        if (!cancellation.IsSuccess)
+            return Result.Failure(cancellation.Error);
 
-        var check = CorrectionReason.Validate(reason, "Prescriptions.Validation");
-        if (!check.IsSuccess)
-            return check;
-
-        CancelledAtUtc = NormalizeUtc(utcNow);
-        CancelledByUserId = cancelledByUserId;
-        CancelReason = reason!.Trim();
+        CancelledAtUtc = cancellation.Value!.CancelledAtUtc;
+        CancelledByUserId = cancellation.Value.CancelledByUserId;
+        CancelReason = cancellation.Value.Reason;
         UpdatedAtUtc = utcNow;
         return Result.Success();
     }
 
     private static Result CancelledFailure()
         => Result.Failure("Prescriptions.AlreadyCancelled", "İptal edilmiş reçete değiştirilemez.");
+
+    /// <summary>İstemcinin gördüğü sürüm: kalıcı yazma yalnızca veritabanındaki sürüm bu değere eşitse gerçekleşir.</summary>
+    public void SetExpectedRowVersion(byte[] expectedRowVersion)
+    {
+        if (expectedRowVersion is null || expectedRowVersion.Length == 0)
+            throw new ArgumentException("RowVersion geçersiz.", nameof(expectedRowVersion));
+
+        RowVersion = expectedRowVersion;
+    }
 
     /// <summary>HBS geri kaydını yazar (kural <see cref="HbsEntryRules"/>); klinik alanlara ve <see cref="UpdatedAtUtc"/>'e dokunmaz.</summary>
     public Result ApplyHbsEntry(

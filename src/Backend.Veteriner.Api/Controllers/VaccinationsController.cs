@@ -7,6 +7,7 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Vaccinations.Commands.Cancel;
 using Backend.Veteriner.Application.Vaccinations.Commands.Create;
 using Backend.Veteriner.Application.Vaccinations.Commands.Update;
 using Backend.Veteriner.Application.Vaccinations.Commands.UpdateHbs;
@@ -121,9 +122,31 @@ public sealed class VaccinationsController : ControllerBase
             body.DueAtUtc,
             body.Notes,
             body.Route,
-            body.Site);
+            body.Site,
+            body.RowVersion);
 
         var result = await _mediator.Send(cmd, ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Aşı kaydını gerekçeyle iptal eder (silmez; ADR-043 AK-3). İptal son durumdur. Uygulamaya bağlı aşı 409
+    /// <c>Vaccinations.LinkedToAdministration</c>: iptal uygulama iptaliyle yapılır.
+    /// </summary>
+    [HttpPost("{id:guid}/cancel")]
+    [Authorize(Policy = PermissionCatalog.Vaccinations.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Cancel([FromRoute] Guid id, [FromBody] CancelVaccinationBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new CancelVaccinationCommand(id, body.Reason, body.RowVersion), ct);
         return result.ToActionResult(this);
     }
 

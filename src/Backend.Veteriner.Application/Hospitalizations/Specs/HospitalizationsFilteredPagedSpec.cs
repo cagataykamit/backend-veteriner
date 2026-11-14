@@ -20,16 +20,20 @@ public sealed class HospitalizationsFilteredPagedSpec : Specification<Hospitaliz
         string? searchContainsLikePattern,
         Guid[] searchPetIds,
         IReadOnlyCollection<Guid>? accessibleClinicIds = null,
-        ListSortChoice<HospitalizationListSortField>? sort = null)
+        ListSortChoice<HospitalizationListSortField>? sort = null,
+        bool includeCancelled = false)
     {
         Query.Where(x => x.TenantId == tenantId);
         Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         if (petId.HasValue)
             Query.Where(x => x.PetId == petId.Value);
+        // İptal edilen yatış (ADR-043 AK-5) varsayılan gizli; etkin/geçmiş filtreleri iptali hiç içermez.
         if (activeOnly == true)
-            Query.Where(x => x.DischargedAtUtc == null);
+            Query.Where(Hospitalization.IsActiveExpression);
         else if (activeOnly == false)
-            Query.Where(x => x.DischargedAtUtc != null);
+            Query.Where(Hospitalization.IsDischargedExpression);
+        else if (!includeCancelled)
+            Query.Where(Hospitalization.IsNotCancelledExpression);
 
         if (dateFromUtc.HasValue)
             Query.Where(x => x.AdmittedAtUtc >= dateFromUtc.Value);

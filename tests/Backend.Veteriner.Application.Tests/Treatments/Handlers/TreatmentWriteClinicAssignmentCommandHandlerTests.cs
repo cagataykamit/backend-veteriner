@@ -85,7 +85,7 @@ public sealed class TreatmentWriteClinicAssignmentCommandHandlerTests
         Guid clinicId,
         Guid petId,
         Guid? examinationId = null)
-        => new(id, clinicId, petId, examinationId, ValidTreatmentAt, "Başlık", "Açıklama", null, null);
+        => new(id, clinicId, petId, examinationId, ValidTreatmentAt, "Başlık", "Açıklama", null, null, RowVersion: "AAAAAAAAB9E=");
 
     private static Treatment ExistingTreatment(Guid tid, Guid cid, Guid petId)
         => new(tid, cid, petId, null, ValidTreatmentAt.AddDays(-1), "Eski", "Eski açıklama", null, null, DateTime.UtcNow);
@@ -351,7 +351,7 @@ public sealed class TreatmentWriteClinicAssignmentCommandHandlerTests
     }
 
     [Fact]
-    public async Task Update_Should_Succeed_When_TenantWide_DefaultResolver()
+    public async Task Update_Should_Reject_Clinic_Change_When_TenantWide_DefaultResolver()
     {
         var tid = Guid.NewGuid();
         var entityCid = Guid.NewGuid();
@@ -369,8 +369,13 @@ public sealed class TreatmentWriteClinicAssignmentCommandHandlerTests
             UpdateCmd(tx.Id, targetCid, petId),
             CancellationToken.None);
 
-        result.IsSuccess.Should().BeTrue();
-        tx.ClinicId.Should().Be(targetCid);
+        // ADR-043 AK-10: kaydın kliniği güncellemeyle değişmez (kiracı geneli yetkide de).
+
+        result.IsSuccess.Should().BeFalse();
+
+        result.Error.Code.Should().Be("Treatments.SubjectChangeNotAllowed");
+
+        tx.ClinicId.Should().Be(entityCid);
     }
 
     [Fact]

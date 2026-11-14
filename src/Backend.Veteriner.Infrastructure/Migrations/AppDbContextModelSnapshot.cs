@@ -3886,6 +3886,16 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<DateTime>("AdmittedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("CancelledAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CancelledByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("ClinicId")
                         .HasColumnType("uniqueidentifier");
 
@@ -3957,9 +3967,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "ClinicId", "PetId")
                         .IsUnique()
-                        .HasFilter("[DischargedAtUtc] IS NULL");
+                        .HasFilter("[DischargedAtUtc] IS NULL AND [CancelledAtUtc] IS NULL");
 
-                    b.ToTable("Hospitalizations", (string)null);
+                    b.ToTable("Hospitalizations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Hospitalizations_Cancel_Consistent", "([CancelledAtUtc] IS NULL AND [CancelReason] IS NULL AND [CancelledByUserId] IS NULL) OR ([CancelledAtUtc] IS NOT NULL AND [CancelReason] IS NOT NULL AND [CancelledByUserId] IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Hospitalizations.HospitalizationRoom", b =>
@@ -4699,6 +4712,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("AddedAfterFinalization")
+                        .HasColumnType("bit");
 
                     b.Property<string>("CancelReason")
                         .HasMaxLength(500)
@@ -5616,6 +5632,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.Property<DateTime>("PrescribedAtUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
@@ -7112,6 +7134,19 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<bool>("AddedAfterFinalization")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("CancelledAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CancelledByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("ClinicId")
                         .HasColumnType("uniqueidentifier");
 
@@ -7129,12 +7164,22 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<DateTime?>("FollowUpDateUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("LateEntryReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
 
                     b.Property<Guid>("PetId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
@@ -7162,7 +7207,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "TreatmentDateUtc");
 
-                    b.ToTable("Treatments", (string)null);
+                    b.ToTable("Treatments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Treatments_Cancel_Consistent", "([CancelledAtUtc] IS NULL AND [CancelReason] IS NULL AND [CancelledByUserId] IS NULL) OR ([CancelledAtUtc] IS NOT NULL AND [CancelReason] IS NOT NULL AND [CancelledByUserId] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_Treatments_LateEntry_Consistent", "([AddedAfterFinalization] = 0 AND [LateEntryReason] IS NULL) OR ([AddedAfterFinalization] = 1 AND [LateEntryReason] IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Users.RefreshToken", b =>
@@ -7292,8 +7342,21 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<bool>("AddedAfterFinalization")
+                        .HasColumnType("bit");
+
                     b.Property<DateTime?>("AppliedAtUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("CancelledAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CancelledByUserId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("ChangedAtUtc")
                         .ValueGeneratedOnAdd()
@@ -7332,6 +7395,10 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid?>("ImportBatchId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("LateEntryReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
@@ -7341,6 +7408,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.Property<int?>("Route")
                         .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<string>("Site")
                         .HasMaxLength(100)
@@ -7388,7 +7461,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "ClinicId", "HbsStatus");
 
-                    b.ToTable("Vaccinations", (string)null);
+                    b.ToTable("Vaccinations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Vaccinations_Cancel_Consistent", "([CancelledAtUtc] IS NULL AND [CancelReason] IS NULL AND [CancelledByUserId] IS NULL) OR ([CancelledAtUtc] IS NOT NULL AND [CancelReason] IS NOT NULL AND [CancelledByUserId] IS NOT NULL AND [Status] = 2)");
+
+                            t.HasCheckConstraint("CK_Vaccinations_LateEntry_Consistent", "([AddedAfterFinalization] = 0 AND [LateEntryReason] IS NULL) OR ([AddedAfterFinalization] = 1 AND [LateEntryReason] IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Vaccinations.VaccinationScheduleItem", b =>

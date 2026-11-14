@@ -95,7 +95,7 @@ public sealed class GetHospitalizationByIdQueryHandler
             : null;
         var clientName = client?.FullName ?? string.Empty;
 
-        var isActive = row.DischargedAtUtc is null;
+        var isActive = row.IsActive;
 
         var roomNames = await HospitalizationRoomNamesLookup.ResolveAsync(_rooms, _wards, tenantId, [row.RoomId], ct);
         var room = row.RoomId is { } roomId && roomNames.TryGetValue(roomId, out var names) ? names : null;
@@ -123,7 +123,10 @@ public sealed class GetHospitalizationByIdQueryHandler
             ExaminationRowVersion.Encode(row.RowVersion),
             row.RoomId,
             room?.RoomName,
-            room?.WardName);
+            room?.WardName,
+            row.CancelledAtUtc,
+            row.CancelledByUserId,
+            row.CancelReason);
 
         return Result<HospitalizationDetailDto>.Success(dto);
     }

@@ -23,4 +23,7 @@ public sealed record HospitalizationDetailDto(
     string RowVersion,
     Guid? RoomId,
     string? RoomName,
-    string? WardName);
+    string? WardName,
+    DateTime? CancelledAtUtc = null,
+    Guid? CancelledByUserId = null,
+    string? CancelReason = null);

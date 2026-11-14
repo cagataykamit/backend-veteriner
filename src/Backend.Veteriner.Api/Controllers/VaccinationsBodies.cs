@@ -27,4 +27,14 @@ public sealed class UpdateVaccinationBody
 
     /// <summary>Uygulama bölgesi, serbest metin (en çok 100; tam değiştirme).</summary>
     public string? Site { get; init; }
+
+    /// <summary>GET'ten alınan sürüm (Base64); zorunlu (ADR-043 K5).</summary>
+    public string? RowVersion { get; init; }
+}
+
+/// <summary>POST /api/v1/vaccinations/{id}/cancel body; gerekçe 5-500 karakter, rowVersion zorunlu.</summary>
+public sealed class CancelVaccinationBody
+{
+    public string? Reason { get; init; }
+    public string? RowVersion { get; init; }
 }

@@ -11,5 +11,6 @@ public sealed record GetHospitalizationsListQuery(
     Guid? PetId = null,
     bool? ActiveOnly = null,
     DateTime? DateFromUtc = null,
-    DateTime? DateToUtc = null)
+    DateTime? DateToUtc = null,
+    bool IncludeCancelled = false)
     : IRequest<Result<PagedResult<HospitalizationListItemDto>>>;

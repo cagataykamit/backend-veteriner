@@ -191,10 +191,9 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
             }
         }
 
-        var locked = await ExaminationLinkedRecordLock.EnsureOpenAsync(
+        // Kesinleşmiş muayene yeni aşıyı reddetmez (ADR-043 AK-6): ürünlü ve ürünsüz aşı gerekçeli sonradan ekleme olarak yazılır.
+        var addedAfterFinalization = await ExaminationLinkedRecordLock.AnyFinalizedAsync(
             _examinations, tenantId, [request.ExaminationId], ct);
-        if (!locked.IsSuccess)
-            return Result<VaccinationCreateResultDto>.Failure(locked.Error);
 
         var vaccination = new Vaccination(
             tenantId,
@@ -211,6 +210,13 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
         var routeSite = vaccination.SetRouteAndSite(request.Route, request.Site);
         if (!routeSite.IsSuccess)
             return Result<VaccinationCreateResultDto>.Failure(routeSite.Error);
+
+        if (addedAfterFinalization)
+        {
+            var late = vaccination.MarkAddedAfterFinalization(request.LateEntryReason);
+            if (!late.IsSuccess)
+                return Result<VaccinationCreateResultDto>.Failure(late.Error);
+        }
 
         await _vaccinationsWrite.AddAsync(vaccination, ct);
         await _vaccinationsWrite.SaveChangesAsync(ct);
@@ -278,7 +284,7 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
                 request.Quantity ?? DefaultQuantity,
                 administeredAtUtc,
                 Notes: null,
-                LateEntryReason: null,
+                LateEntryReason: request.LateEntryReason,
                 request.RequestId,
                 request.BatchId,
                 vaccinationId),

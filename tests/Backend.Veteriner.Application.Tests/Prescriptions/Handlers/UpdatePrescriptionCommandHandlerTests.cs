@@ -68,7 +68,8 @@ public sealed class UpdatePrescriptionCommandHandlerTests
             "Başlık",
             "İçerik",
             null,
-            followUp);
+            followUp,
+            RowVersion: "AAAAAAAAB9E=");
 
     private void SetupTenantClinicPet(Guid tid, Guid cid, Guid petId)
     {
@@ -199,7 +200,8 @@ public sealed class UpdatePrescriptionCommandHandlerTests
             "T",
             "C",
             null,
-            null);
+            null,
+            RowVersion: "AAAAAAAAB9E=");
 
         var result = await CreateHandler().Handle(cmd, CancellationToken.None);
 

@@ -14,6 +14,9 @@ using Backend.Veteriner.Application.Imaging.Commands.Update;
 using Backend.Veteriner.Application.Imaging.Contracts.Dtos;
 using Backend.Veteriner.Application.Imaging.Queries.GetById;
 using Backend.Veteriner.Application.Imaging.Queries.GetList;
+using Backend.Veteriner.Application.RecordHistory.Contracts.Dtos;
+using Backend.Veteriner.Application.RecordHistory.Queries.GetRecordHistory;
+using Backend.Veteriner.Domain.RecordHistory;
 using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.Imaging;
 using Backend.Veteriner.Domain.Shared;
@@ -116,6 +119,20 @@ public sealed class ImagingRecordsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new CancelImagingRecordCommand(id, body.Reason, body.RowVersion), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Görüntüleme kaydının değişiklik geçmişi (RECORD-002, ADR-043 K5), yeniden eskiye; bkz. docs/RECORD_HISTORY_API_CONTRACT.md.</summary>
+    [HttpGet("{id:guid}/history")]
+    [Authorize(Policy = PermissionCatalog.Imaging.Read)]
+    [ProducesResponseType(typeof(IReadOnlyList<RecordChangeDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetHistory([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetRecordHistoryQuery(RecordHistoryTypes.Imaging, id), ct);
         return result.ToActionResult(this);
     }
 

@@ -44,10 +44,11 @@ internal static class ExaminationRegisterColumns
         return string.Join("; ", parts);
     }
 
+
     /// <summary><c>Başlık: İlaç ×Miktar, İlaç</c>; satırsız (eski) reçetede yalnız başlık; iptal edilen reçetede ` (iptal)` eki.</summary>
     private static string FormatPrescription(RegisterPrescriptionDto p)
     {
-        var suffix = p.IsCancelled ? " (iptal)" : string.Empty;
+        var suffix = p.IsCancelled ? RegisterCancellationMark.Suffix : string.Empty;
         if (p.Items.Count == 0)
             return p.Title + suffix;
 
@@ -59,5 +60,5 @@ internal static class ExaminationRegisterColumns
     private static string FormatAdministration(RegisterAdministrationDto a)
         => $"{a.ProductName} {RegisterDisplay.Quantity(a.Quantity)} {a.Unit}"
            + (a.AddedAfterFinalization ? " (sonradan eklendi)" : string.Empty)
-           + (a.IsVoided ? " (iptal)" : string.Empty);
+           + (a.IsVoided ? RegisterCancellationMark.Suffix : string.Empty);
 }

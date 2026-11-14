@@ -20,10 +20,14 @@ public sealed class UpdatePrescriptionBody
 
     /// <summary>null = satırlara dokunma; [] = tümünü sil; dolu dizi = liste bu olur (kimliği verilen satır yerinde güncellenir, RECORD-008).</summary>
     public IReadOnlyList<PrescriptionItemRequest>? Items { get; init; }
+
+    /// <summary>GET'ten alınan sürüm (Base64); zorunlu (ADR-043 K5).</summary>
+    public string? RowVersion { get; init; }
 }
 
-/// <summary>POST /prescriptions/{id}/cancel gövdesi; gerekçe 5–500 karakter.</summary>
+/// <summary>POST /prescriptions/{id}/cancel gövdesi; gerekçe 5–500 karakter, rowVersion zorunlu.</summary>
 public sealed class CancelPrescriptionBody
 {
     public string? Reason { get; init; }
+    public string? RowVersion { get; init; }
 }

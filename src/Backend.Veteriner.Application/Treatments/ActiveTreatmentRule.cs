@@ -5,7 +5,8 @@ using Backend.Veteriner.Domain.Treatments;
 namespace Backend.Veteriner.Application.Treatments;
 
 /// <summary>
-/// "Aktif tedavi" (ADR-025 madde 2): takip tarihi klinik yerel günüyle (Europe/Istanbul) bugün veya sonrası olan tedavi.
+/// "Aktif tedavi" (ADR-025 madde 2): takip tarihi klinik yerel günüyle (Europe/Istanbul) bugün veya sonrası olan, iptal edilmemiş
+/// (ADR-043 AK-2) tedavi.
 /// Takip tarihi olmayan tedavi aktif sayılmaz; takip günü geçince kendiliğinden aktiflikten düşer. Tanım yalnızca burada yaşar;
 /// liste süzgeci ve sayaçlar (<c>GET /treatments?active=true</c>, <c>totalCount</c>) bunu kullanır.
 /// </summary>
@@ -15,5 +16,5 @@ public static class ActiveTreatmentRule
     public static DateTime FollowUpFromUtc(DateTime utcNow) => OperationDayBounds.ForUtcNow(utcNow).DayStartUtc;
 
     public static Expression<Func<Treatment, bool>> IsActive(DateTime followUpFromUtc)
-        => t => t.FollowUpDateUtc != null && t.FollowUpDateUtc >= followUpFromUtc;
+        => t => t.FollowUpDateUtc != null && t.FollowUpDateUtc >= followUpFromUtc && t.CancelledAtUtc == null;
 }

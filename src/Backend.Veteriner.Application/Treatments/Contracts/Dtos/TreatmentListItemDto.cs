@@ -10,4 +10,5 @@ public sealed record TreatmentListItemDto(
     DateTime TreatmentDateUtc,
     string Title,
     Guid? ExaminationId,
-    DateTime? FollowUpDateUtc);
+    DateTime? FollowUpDateUtc,
+    bool IsCancelled = false);

@@ -36,6 +36,27 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned, IC
     public DateTime ChangedAtUtc { get; private set; }
 
     /// <summary>
+    /// Gerekçeli iptal (ADR-043 AK-3): ayrı eylemdir, son durumdur. Bağlı uygulamanın iptaliyle iptal edilen aşıda boştur
+    /// (gerekçe uygulama kaydındadır).
+    /// </summary>
+    public DateTime? CancelledAtUtc { get; private set; }
+    public Guid? CancelledByUserId { get; private set; }
+    public string? CancelReason { get; private set; }
+    public bool IsCancelled => Status == VaccinationStatus.Cancelled;
+
+    /// <summary>
+    /// Bağlı muayene kayıt anında kesinleşmişse true (ADR-043 AK-6, ADR-013 Ek 2); gerekçe <see cref="LateEntryReason"/>.
+    /// Ürünlü ve ürünsüz aşıda aynı kural.
+    /// </summary>
+    public bool AddedAfterFinalization { get; private set; }
+    public string? LateEntryReason { get; private set; }
+
+    public const string LateEntryReasonRequiredCode = "Vaccinations.LateEntryReasonRequired";
+
+    /// <summary>SQL Server rowversion — eşzamanlı güncelleme için.</summary>
+    public byte[] RowVersion { get; private set; } = default!;
+
+    /// <summary>
     /// Kaydı oluşturan içe aktarma partisi; günlük girişte boştur. Partinin hatırlatmaları serbest bırakılana kadar
     /// kayıt hatırlatma adaylarından dışlanır (ADR-019 K3).
     /// </summary>
@@ -141,6 +162,14 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned, IC
         if (string.IsNullOrWhiteSpace(vaccineNameSnapshot))
             return Result.Failure("Vaccinations.Validation", "Asi adi snapshot bos olamaz.");
 
+        var transition = EnsureStatusTransition(Status, status);
+        if (!transition.IsSuccess)
+            return transition;
+
+        var subject = RecordSubjectRule.EnsureUnchanged(ClinicId, PetId, clinicId, petId, "Vaccinations");
+        if (!subject.IsSuccess)
+            return subject;
+
         PetId = petId;
         ClinicId = clinicId;
         ExaminationId = examinationId;
@@ -165,6 +194,71 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned, IC
         Site = normalized.Value.Site;
         return Result.Success();
     }
+
+    /// <summary>
+    /// Durum geçişi kuralı (tek yer, ADR-043 AK-3): güncellemede izinli tek geçiş Planlı → Uygulandı. İptal ayrı eylemdir
+    /// (<see cref="Cancel"/>) ve son durumdur; uygulanmış aşı planlıya dönmez.
+    /// </summary>
+    public static Result EnsureStatusTransition(VaccinationStatus current, VaccinationStatus next)
+    {
+        if (current == VaccinationStatus.Cancelled)
+            return CancelledFailure();
+        if (next == current || (current == VaccinationStatus.Scheduled && next == VaccinationStatus.Applied))
+            return Result.Success();
+        if (next == VaccinationStatus.Cancelled)
+            return Result.Failure(InvalidStatusTransitionCode, "Aşı kaydı güncellemeyle iptal edilemez; iptal için gerekçeyle 'İptal et' kullanılır.");
+
+        return Result.Failure(InvalidStatusTransitionCode, "Uygulanmış aşı planlı duruma döndürülemez; yanlış kayıt gerekçeyle iptal edilir.");
+    }
+
+    public const string InvalidStatusTransitionCode = "Vaccinations.InvalidStatusTransition";
+
+    /// <summary>
+    /// Aşı kaydını gerekçeyle iptal eder (silmez; kural <see cref="RecordCancellationRules"/>). Bağlı uygulama (stok düşümü)
+    /// varsa iptal uygulama iptaliyle yapılır; bu denetim çağıranındır. İptal kayıtta uygulama tarihi olmaz (durum/tarih kuralı);
+    /// önceki değer değişiklik geçmişinde kalır.
+    /// </summary>
+    public Result Cancel(Guid cancelledByUserId, string? reason, DateTime utcNow)
+    {
+        if (IsCancelled)
+            return Result.Failure("Vaccinations.AlreadyCancelled", "Aşı kaydı zaten iptal edilmiş.");
+
+        var cancellation = RecordCancellationRules.Resolve(cancelledByUserId, reason, utcNow, "Vaccinations.Validation");
+        if (!cancellation.IsSuccess)
+            return Result.Failure(cancellation.Error);
+
+        Status = VaccinationStatus.Cancelled;
+        AppliedAtUtc = null;
+        CancelledAtUtc = cancellation.Value!.CancelledAtUtc;
+        CancelledByUserId = cancellation.Value.CancelledByUserId;
+        CancelReason = cancellation.Value.Reason;
+        UpdatedAtUtc = utcNow;
+        return Result.Success();
+    }
+
+    /// <summary>Kesinleşmiş muayeneye sonradan eklenen aşıyı işaretler; gerekçe zorunlu (5–500). Yalnız oluşturmada çağrılır.</summary>
+    public Result MarkAddedAfterFinalization(string? reason)
+    {
+        var check = CorrectionReason.Validate(reason, LateEntryReasonRequiredCode);
+        if (!check.IsSuccess)
+            return check;
+
+        AddedAfterFinalization = true;
+        LateEntryReason = reason!.Trim();
+        return Result.Success();
+    }
+
+    /// <summary>İstemcinin gördüğü sürüm: kalıcı yazma yalnızca veritabanındaki sürüm bu değere eşitse gerçekleşir.</summary>
+    public void SetExpectedRowVersion(byte[] expectedRowVersion)
+    {
+        if (expectedRowVersion is null || expectedRowVersion.Length == 0)
+            throw new ArgumentException("RowVersion geçersiz.", nameof(expectedRowVersion));
+
+        RowVersion = expectedRowVersion;
+    }
+
+    private static Result CancelledFailure()
+        => Result.Failure("Vaccinations.AlreadyCancelled", "İptal edilmiş aşı kaydı değiştirilemez.");
 
     /// <summary>
     /// Bağlı uygulama iptal edildiğinde aşı kaydını iptal eder. İptal kayıtta uygulama tarihi olmaz (durum/tarih kuralı);

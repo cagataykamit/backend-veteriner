@@ -113,6 +113,7 @@ public sealed class VaccinationAdministrationLinkTests : IClassFixture<CustomWeb
         {
             clinicId = ctx.ClinicId, petId = ctx.PetId, vaccineDefinitionId = ctx.VaccineDefinitionId,
             status = VaccinationStatus.Applied, appliedAtUtc = appliedAt, route = "Intramuscular",
+            rowVersion = await RowVersionAsync(client, bareId),
         });
 
         update.IsSuccessStatusCode.Should().BeTrue();
@@ -249,14 +250,140 @@ public sealed class VaccinationAdministrationLinkTests : IClassFixture<CustomWeb
         var vaccinationId = created.GetProperty("id").GetGuid();
         var appliedAt = created.GetProperty("administration").GetProperty("administeredAtUtc").GetDateTime();
 
-        var cancel = await client.PutAsJsonAsync($"/api/v1/vaccinations/{vaccinationId:D}", UpdateBody(ctx, VaccinationStatus.Cancelled, null, "iptal"));
+        var version = await RowVersionAsync(client, vaccinationId);
+        var cancel = await client.PutAsJsonAsync($"/api/v1/vaccinations/{vaccinationId:D}", UpdateBody(ctx, VaccinationStatus.Cancelled, null, "iptal", version));
         cancel.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await ReadProblemCodeAsync(cancel)).Should().Be("Vaccinations.LinkedToAdministration");
 
-        var notes = await client.PutAsJsonAsync($"/api/v1/vaccinations/{vaccinationId:D}", UpdateBody(ctx, VaccinationStatus.Applied, appliedAt, "Yeni not"));
+        // Gerekçeli iptal eylemi de uygulamaya bağlı aşıyı iptal etmez: iptal, stok sonucu seçilerek uygulama iptaliyle yapılır.
+        var cancelAction = await client.PostAsJsonAsync($"/api/v1/vaccinations/{vaccinationId:D}/cancel", new { reason = "Yanlış hastaya girildi", rowVersion = version });
+        cancelAction.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await ReadProblemCodeAsync(cancelAction)).Should().Be("Vaccinations.LinkedToAdministration");
+
+        var notes = await client.PutAsJsonAsync($"/api/v1/vaccinations/{vaccinationId:D}", UpdateBody(ctx, VaccinationStatus.Applied, appliedAt, "Yeni not", version));
         notes.StatusCode.Should().Be(HttpStatusCode.NoContent);
         var detail = await (await client.GetAsync($"/api/v1/vaccinations/{vaccinationId:D}")).Content.ReadFromJsonAsync<JsonElement>();
         detail.GetProperty("notes").GetString().Should().Be("Yeni not");
+    }
+
+    [Fact]
+    public async Task Productless_Vaccination_Lifecycle_Should_Require_Version_Block_Backward_Transitions_And_Cancel_With_Reason()
+    {
+        var ctx = await SeedAsync(stock: 10m);
+        var client = ClientFor(ctx);
+        var appliedAt = DateTime.UtcNow.AddMinutes(-5);
+
+        var cancelledCreate = await client.PostAsJsonAsync("/api/v1/vaccinations", new
+        {
+            clinicId = ctx.ClinicId, petId = ctx.PetId, vaccineDefinitionId = ctx.VaccineDefinitionId, status = VaccinationStatus.Cancelled,
+        });
+        cancelledCreate.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var created = await client.PostAsJsonAsync("/api/v1/vaccinations", new
+        {
+            clinicId = ctx.ClinicId, petId = ctx.PetId, vaccineDefinitionId = ctx.VaccineDefinitionId,
+            status = VaccinationStatus.Applied, appliedAtUtc = appliedAt,
+        });
+        var id = await created.Content.ReadFromJsonAsync<Guid>();
+        var version = await RowVersionAsync(client, id);
+
+        var noVersion = await client.PutAsJsonAsync($"/api/v1/vaccinations/{id:D}", UpdateBody(ctx, VaccinationStatus.Applied, appliedAt, "Not", null));
+        noVersion.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadProblemCodeAsync(noVersion)).Should().Be("Vaccinations.Validation");
+
+        var stale = await client.PutAsJsonAsync($"/api/v1/vaccinations/{id:D}", UpdateBody(ctx, VaccinationStatus.Applied, appliedAt, "Not", Convert.ToBase64String(new byte[8])));
+        stale.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await ReadProblemCodeAsync(stale)).Should().Be("Vaccinations.ConcurrencyConflict");
+
+        var toCancelled = await client.PutAsJsonAsync($"/api/v1/vaccinations/{id:D}", UpdateBody(ctx, VaccinationStatus.Cancelled, null, "Not", version));
+        toCancelled.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadProblemCodeAsync(toCancelled)).Should().Be("Vaccinations.InvalidStatusTransition");
+
+        var shortReason = await client.PostAsJsonAsync($"/api/v1/vaccinations/{id:D}/cancel", new { reason = "x", rowVersion = version });
+        shortReason.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var cancel = await client.PostAsJsonAsync($"/api/v1/vaccinations/{id:D}/cancel", new { reason = "Yanlış hastaya girildi", rowVersion = version });
+        cancel.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var detail = await (await client.GetAsync($"/api/v1/vaccinations/{id:D}")).Content.ReadFromJsonAsync<JsonElement>();
+        detail.GetProperty("status").GetInt32().Should().Be((int)VaccinationStatus.Cancelled);
+        detail.GetProperty("cancelReason").GetString().Should().Be("Yanlış hastaya girildi");
+        detail.GetProperty("cancelledAtUtc").ValueKind.Should().Be(JsonValueKind.String);
+        detail.GetProperty("appliedAtUtc").ValueKind.Should().Be(JsonValueKind.Null);
+
+        var newVersion = detail.GetProperty("rowVersion").GetString();
+        var revive = await client.PutAsJsonAsync($"/api/v1/vaccinations/{id:D}", UpdateBody(ctx, VaccinationStatus.Applied, appliedAt, "Geri al", newVersion));
+        revive.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await ReadProblemCodeAsync(revive)).Should().Be("Vaccinations.AlreadyCancelled");
+    }
+
+    [Fact]
+    public async Task Finalized_Examination_Should_Accept_Product_Vaccination_With_Reason_And_Mark_Both_Records()
+    {
+        // ADR-043 AK-6 (ADR-013 Ek 2): ürünlü aşı da kesinleşmiş muayeneye gerekçeyle eklenir; gerekçe bağlı uygulamaya da yazılır.
+        var ctx = await SeedAsync(stock: 10m);
+        var client = ClientFor(ctx);
+        Guid examinationId;
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var exam = new Backend.Veteriner.Domain.Examinations.Examination(
+                ctx.TenantId, ctx.ClinicId, ctx.PetId, null, DateTime.UtcNow.AddHours(-1), "Kontrol", "Bulgu", null, null, DateTime.UtcNow);
+            exam.Finalize(Guid.NewGuid(), DateTime.UtcNow).IsSuccess.Should().BeTrue();
+            db.Examinations.Add(exam);
+            await db.SaveChangesAsync();
+            examinationId = exam.Id;
+        }
+
+        object Body(string? reason) => new
+        {
+            clinicId = ctx.ClinicId, petId = ctx.PetId, examinationId, vaccineDefinitionId = ctx.VaccineDefinitionId,
+            status = VaccinationStatus.Applied, appliedAtUtc = DateTime.UtcNow.AddMinutes(-5), productId = ctx.ProductId, lateEntryReason = reason,
+        };
+
+        var withoutReason = await client.PostAsJsonAsync("/api/v1/vaccinations", Body(null));
+        withoutReason.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadProblemCodeAsync(withoutReason)).Should().Be("Vaccinations.LateEntryReasonRequired");
+
+        var created = await client.PostAsJsonAsync("/api/v1/vaccinations", Body("Sahip aşıyı sonradan getirdi"));
+        created.StatusCode.Should().Be(HttpStatusCode.Created, await created.Content.ReadAsStringAsync());
+        var json = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var vaccinationId = json.GetProperty("id").GetGuid();
+        var administrationId = json.GetProperty("administration").GetProperty("id").GetGuid();
+
+        var detail = await (await client.GetAsync($"/api/v1/vaccinations/{vaccinationId:D}")).Content.ReadFromJsonAsync<JsonElement>();
+        detail.GetProperty("addedAfterFinalization").GetBoolean().Should().BeTrue();
+        detail.GetProperty("lateEntryReason").GetString().Should().Be("Sahip aşıyı sonradan getirdi");
+
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var administration = await db.Administrations.AsNoTracking().SingleAsync(a => a.Id == administrationId);
+            administration.AddedAfterFinalization.Should().BeTrue();
+            administration.LateEntryReason.Should().Be("Sahip aşıyı sonradan getirdi");
+        }
+    }
+
+    [Fact]
+    public async Task Applied_Vaccination_Should_Not_Return_To_Scheduled()
+    {
+        var ctx = await SeedAsync(stock: 10m);
+        var client = ClientFor(ctx);
+        var created = await client.PostAsJsonAsync("/api/v1/vaccinations", new
+        {
+            clinicId = ctx.ClinicId, petId = ctx.PetId, vaccineDefinitionId = ctx.VaccineDefinitionId,
+            status = VaccinationStatus.Applied, appliedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+        });
+        var id = await created.Content.ReadFromJsonAsync<Guid>();
+
+        var back = await client.PutAsJsonAsync($"/api/v1/vaccinations/{id:D}", new
+        {
+            clinicId = ctx.ClinicId, petId = ctx.PetId, vaccineDefinitionId = ctx.VaccineDefinitionId,
+            status = VaccinationStatus.Scheduled, dueAtUtc = DateTime.UtcNow.AddDays(10), rowVersion = await RowVersionAsync(client, id),
+        });
+
+        back.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadProblemCodeAsync(back)).Should().Be("Vaccinations.InvalidStatusTransition");
     }
 
     [Fact]
@@ -304,7 +431,7 @@ public sealed class VaccinationAdministrationLinkTests : IClassFixture<CustomWeb
             requestId = includeProduct ? requestId : null,
         });
 
-    private static object UpdateBody(SeedCtx ctx, VaccinationStatus status, DateTime? appliedAt, string notes)
+    private static object UpdateBody(SeedCtx ctx, VaccinationStatus status, DateTime? appliedAt, string notes, string? rowVersion)
         => new
         {
             clinicId = ctx.ClinicId,
@@ -313,7 +440,12 @@ public sealed class VaccinationAdministrationLinkTests : IClassFixture<CustomWeb
             status,
             appliedAtUtc = appliedAt,
             notes,
+            rowVersion,
         };
+
+    private static async Task<string?> RowVersionAsync(HttpClient client, Guid vaccinationId)
+        => (await (await client.GetAsync($"/api/v1/vaccinations/{vaccinationId:D}")).Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("rowVersion").GetString();
 
     private static async Task<string?> ReadProblemCodeAsync(HttpResponseMessage response)
     {

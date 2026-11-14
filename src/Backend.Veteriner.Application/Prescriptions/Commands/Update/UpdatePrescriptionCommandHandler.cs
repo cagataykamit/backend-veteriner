@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.Prescriptions.Access;
 using Backend.Veteriner.Application.Prescriptions.Items;
 using Backend.Veteriner.Application.Examinations.Access;
@@ -18,6 +19,7 @@ using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Treatments;
 using Mediator;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Prescriptions.Commands.Update;
 
@@ -169,6 +171,14 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
                     "Treatment not found or does not belong to tenant.");
             }
 
+            // Yeni bağ iptal edilmiş tedaviye kurulamaz (ADR-043 AK-2); mevcut bağ korunur.
+            if (treatmentId != p.TreatmentId)
+            {
+                var acceptsLink = treatment.EnsureAcceptsLinkedRecords();
+                if (!acceptsLink.IsSuccess)
+                    return acceptsLink;
+            }
+
             if (treatment.ClinicId != effectiveClinicId)
             {
                 return Result.Failure(
@@ -209,6 +219,9 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
             itemDrafts = resolved.Value!;
         }
 
+        if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
+            return Result.Failure("Prescriptions.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+
         var update = p.UpdateDetails(
             effectiveClinicId,
             request.PetId,
@@ -231,8 +244,18 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
                 return itemsResult;
         }
 
-        await _prescriptionsWrite.UpdateAsync(p, ct);
-        await _prescriptionsWrite.SaveChangesAsync(ct);
+        p.SetExpectedRowVersion(expectedRowVersion);
+
+        try
+        {
+            await _prescriptionsWrite.UpdateAsync(p, ct);
+            await _prescriptionsWrite.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result.Failure(PrescriptionConcurrency.ConflictCode, PrescriptionConcurrency.ConflictMessage);
+        }
+
         return Result.Success();
     }
 }
