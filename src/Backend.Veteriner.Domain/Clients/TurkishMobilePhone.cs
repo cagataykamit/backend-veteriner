@@ -41,6 +41,20 @@ public static class TurkishMobilePhone
         return true;
     }
 
+    /// <summary>
+    /// Denetim kaydı ve günlük için maskeli gösterim: operatör kodu ve son iki hane kalır (<c>90532*****67</c>). Geçersiz giriş
+    /// tamamen maskelenir (<c>***</c>), boş giriş olduğu gibi döner.
+    /// </summary>
+    public static string? Mask(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+            return input;
+
+        return TryNormalize(input, out var normalized) && normalized is not null
+            ? $"{normalized[..5]}*****{normalized[^2..]}"
+            : "***";
+    }
+
     private static string ExtractDigits(string input)
     {
         Span<char> buffer = stackalloc char[input.Length];

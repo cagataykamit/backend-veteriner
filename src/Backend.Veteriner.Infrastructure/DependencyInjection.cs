@@ -26,7 +26,8 @@ using Backend.Veteriner.Application.Common.Outbox;                              
 using Backend.Veteriner.Application.Outbox;                                      // IOutboxAdminRepository
 using Backend.Veteriner.Application.Common.Auditing;                            // IAuditLogWriter, IAuditContext
 using Backend.Veteriner.Infrastructure.Caching;                                  // PermissionReader
-using Backend.Veteriner.Infrastructure.Mailing;                                   // MailKitEmailSender, TransactionalEmailSender, SmtpOptions
+using Backend.Veteriner.Infrastructure.Sms;
+using Backend.Veteriner.Infrastructure.Mailing;                                 // MailKitEmailSender, TransactionalEmailSender, SmtpOptions
 using Backend.Veteriner.Infrastructure.Outbox;                                    // EfOutbox, OutboxProcessor, OutboxOptions, OutboxBuffer, OutboxSaveChangesInterceptor
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
 using Backend.Veteriner.Infrastructure.Projections.Clients;
@@ -265,6 +266,18 @@ public static class DependencyInjection
         services.AddSingleton<IValidateOptions<SmtpOptions>, SmtpOptionsValidator>();
         services.AddScoped<IEmailSenderImmediate, MailKitEmailSender>(); // SMTP ile gönderir
         services.AddScoped<IEmailSender, TransactionalEmailSender>();    // Outbox'a yazar
+
+        // ===== SMS (INT-003) =====
+        // Sağlayıcı Sms:Provider ile seçilir; yapılandırılmamışsa gönderim yapılmaz ve deneme kaydı açık hatayla durur.
+        // Numara ve kimlik bilgisi içerdiği için varsayılan HttpClient günlükleri kapalı.
+        services.Configure<SmsOptions>(configuration.GetSection(SmsOptions.SectionName));
+        services.AddHttpClient(NetgsmSmsSender.HttpClientName, (sp, client) =>
+                client.Timeout = TimeSpan.FromSeconds(Math.Clamp(sp.GetRequiredService<IOptions<SmsOptions>>().Value.TimeoutSeconds, 3, 30)))
+            .RemoveAllLoggers();
+        services.AddSingleton<NetgsmAccessTokenCache>();
+        services.AddScoped<NetgsmSmsSender>();
+        services.AddScoped<LogOnlySmsSender>();
+        services.AddScoped<ISmsSender>(SmsSenderSelector.Select);
 
         // ===== Permissions cache/reader =====
         services.AddMemoryCache();
