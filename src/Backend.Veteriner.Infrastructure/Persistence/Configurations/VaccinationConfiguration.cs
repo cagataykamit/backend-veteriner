@@ -13,7 +13,8 @@ public sealed class VaccinationConfiguration : IEntityTypeConfiguration<Vaccinat
 {
     public void Configure(EntityTypeBuilder<Vaccination> b)
     {
-        b.ToTable("Vaccinations");
+        b.ToTable("Vaccinations", t =>
+            t.HasCheckConstraint("CK_Vaccinations_Cancel_Consistent", "([CancelledAtUtc] IS NULL AND [CancelReason] IS NULL AND [CancelledByUserId] IS NULL) OR ([CancelledAtUtc] IS NOT NULL AND [CancelReason] IS NOT NULL AND [CancelledByUserId] IS NOT NULL AND [Status] = 2)"));
 
         b.HasKey(x => x.Id);
 
@@ -31,6 +32,13 @@ public sealed class VaccinationConfiguration : IEntityTypeConfiguration<Vaccinat
         b.Property(x => x.Site).HasMaxLength(AdministrationRouteSite.SiteMaxLength);
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);
+        b.Property(x => x.CancelledAtUtc);
+        b.Property(x => x.CancelledByUserId);
+        b.Property(x => x.CancelReason).HasMaxLength(CorrectionReason.MaxLength);
+
+        b.Property(x => x.RowVersion)
+            .IsRowVersion()
+            .IsConcurrencyToken();
 
         // HBS ATS geri kaydı (ADR-036 Dilim 2); mevcut kayıtlar Girilmedi (0) başlar.
         b.Property(x => x.HbsStatus).IsRequired();

@@ -113,7 +113,8 @@ public sealed class VaccinationWriteClinicAssignmentCommandHandlerTests
             VaccinationStatus.Scheduled,
             null,
             ValidDueAt,
-            null);
+            null,
+            RowVersion: "AAAAAAAAB9E=");
 
     private static Vaccination ExistingVaccination(Guid tid, Guid cid, Guid petId)
         => new(

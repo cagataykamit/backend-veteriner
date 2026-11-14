@@ -23,4 +23,7 @@ public sealed record VaccinationDetailDto(
     VaccinationAdministrationDto? Administration = null,
     HbsEntryDto? Hbs = null,
     string? Route = null,
-    string? Site = null);
+    string? Site = null,
+    string? RowVersion = null,
+    DateTime? CancelledAtUtc = null,
+    string? CancelReason = null);

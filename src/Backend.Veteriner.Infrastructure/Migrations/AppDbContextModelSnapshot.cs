@@ -7308,6 +7308,16 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<DateTime?>("AppliedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("CancelledAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CancelledByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("ChangedAtUtc")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
@@ -7355,6 +7365,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<int?>("Route")
                         .HasColumnType("int");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<string>("Site")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -7401,7 +7417,10 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "ClinicId", "HbsStatus");
 
-                    b.ToTable("Vaccinations", (string)null);
+                    b.ToTable("Vaccinations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Vaccinations_Cancel_Consistent", "([CancelledAtUtc] IS NULL AND [CancelReason] IS NULL AND [CancelledByUserId] IS NULL) OR ([CancelledAtUtc] IS NOT NULL AND [CancelReason] IS NOT NULL AND [CancelledByUserId] IS NOT NULL AND [Status] = 2)");
+                        });
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Vaccinations.VaccinationScheduleItem", b =>
