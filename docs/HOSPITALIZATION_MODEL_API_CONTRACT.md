@@ -258,3 +258,7 @@ Yanlış açılan yatış silinmez, gerekçeyle iptal edilir. İptal son durumdu
 | Zaman çizelgesi | Varsayılan gizli; `includeVoided=true` ile `isVoided=true`, `status="Cancelled"` |
 | Veri dışa aktarma `yatislar.csv` | `[YENİ]` `Iptal`, `IptalNedeni` sütunları |
 | Değişiklik geçmişi | İptal alanları değişiklik olarak yazılır (mevcut yakalayıcı) |
+
+## Güncellemede hasta ve klinik değişmez (ADR-043 AK-10) `[DEĞİŞTİ]`
+
+Kaydın hastası ve kliniği oluşturulduktan sonra değişmez (ADR-043 K6 / AK-10, 2026-11-14; kural `RecordSubjectRule`). `PUT` gövdesindeki `petId` ya da `clinicId` kayıttakinden farklıysa 400 `Hospitalizations.SubjectChangeNotAllowed`. Yanlış hasta için kayıt gerekçeyle iptal edilir ve doğru hastaya yeni kayıt açılır. Muayene bağı aynı hasta içinde değişebilir (kilit kuralına tabi).

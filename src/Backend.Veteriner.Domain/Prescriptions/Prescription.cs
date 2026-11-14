@@ -107,6 +107,9 @@ public sealed class Prescription : AggregateRoot, IClinicScoped, ITenantOwned
             return CancelledFailure();
         if (clinicId == Guid.Empty)
             return Result.Failure("Prescriptions.Validation", "ClinicId is invalid.");
+        var subject = RecordSubjectRule.EnsureUnchanged(ClinicId, PetId, clinicId, petId, "Prescriptions");
+        if (!subject.IsSuccess)
+            return subject;
         if (petId == Guid.Empty)
             return Result.Failure("Prescriptions.Validation", "PetId is invalid.");
         if (string.IsNullOrWhiteSpace(title))

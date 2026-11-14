@@ -50,3 +50,7 @@ Backend tek doğruluk kaynağıdır. Bu belge tedavi kaydının yaşam döngüs�
 - Mevcut tedavi kilidi değişmedi: kesinleşmiş muayeneye bağlı tedavi `PUT` ile değiştirilemez (409 `Examinations.Finalized`); düzeltme gerekçeli iptal + yeni kayıttır.
 - `GET /treatments/{id}`, muayene özeti ve zaman çizelgesi `[YENİ]` `addedAfterFinalization` taşır (detayda `lateEntryReason` da).
 - Migration `AddTreatmentAndVaccinationLateEntry`.
+
+## Güncellemede hasta ve klinik değişmez (ADR-043 AK-10) `[DEĞİŞTİ]`
+
+Kaydın hastası ve kliniği oluşturulduktan sonra değişmez (ADR-043 K6 / AK-10, 2026-11-14; kural `RecordSubjectRule`). `PUT` gövdesindeki `petId` ya da `clinicId` kayıttakinden farklıysa 400 `Treatments.SubjectChangeNotAllowed`. Yanlış hasta için kayıt gerekçeyle iptal edilir ve doğru hastaya yeni kayıt açılır. Muayene bağı aynı hasta içinde değişebilir (kilit kuralına tabi).

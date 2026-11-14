@@ -146,3 +146,7 @@ Migration `AddPrescriptionCancellationAndLateEntry`: `Prescriptions` tablosuna `
 - HBS geri kaydı (`PATCH /prescriptions/{id}/hbs`) sürüm istemez (klinik içerik değil).
 - Migration `AddPrescriptionRowVersion` (yalnız yerel geliştirme veritabanına). **Sözleşme kırıcı:** backend ve panel aynı yayında çıkmalıdır.
 - Hayvan zaman çizelgesinde reçete satırı `addedAfterFinalization` taşır (`PET_TIMELINE_API_CONTRACT.md`).
+
+## Güncellemede hasta ve klinik değişmez (ADR-043 AK-10) `[DEĞİŞTİ]`
+
+Kaydın hastası ve kliniği oluşturulduktan sonra değişmez (ADR-043 K6 / AK-10, 2026-11-14; kural `RecordSubjectRule`). `PUT` gövdesindeki `petId` ya da `clinicId` kayıttakinden farklıysa 400 `Prescriptions.SubjectChangeNotAllowed`. Yanlış hasta için kayıt gerekçeyle iptal edilir ve doğru hastaya yeni kayıt açılır. Muayene bağı aynı hasta içinde değişebilir (kilit kuralına tabi).

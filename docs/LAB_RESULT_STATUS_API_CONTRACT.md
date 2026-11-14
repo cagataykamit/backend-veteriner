@@ -126,3 +126,7 @@ Eklenen: `status`, `requestedAtUtc`, `awaitingInterpretation`; `resultDateUtc` n
 - `resultDateUtc/resultText` nullable: liste/detay şablonları null güvenli olmalı.
 - Rozetler: `status` ve `awaitingInterpretation` (yalnız yeni kayıtlarda, yorum boşken true; eski kayıtlarda hiç true dönmez).
 - **Dilim 1b değişiklikleri (2026-10-12 kararları):** (1) eski kayıtlarda `awaitingInterpretation` false; (2) doğrudan sonuçlu POST kaydında `requestedAtUtc` = sonuç tarihi (liste/timeline sırası değişir); (3) kesinleşmiş muayenede `Resulted` lab kaydı artık gerekçeli iptal edilebilir (`POST /lab-results/{id}/cancel` bu durumda `Examinations.Finalized` dönmez; arayüzde iptal düğmesi kesinleşmiş muayenede de açık olmalı).
+
+## Güncellemede hasta ve klinik değişmez (ADR-043 AK-10) `[DEĞİŞTİ]`
+
+Kaydın hastası ve kliniği oluşturulduktan sonra değişmez (ADR-043 K6 / AK-10, 2026-11-14; kural `RecordSubjectRule`). `PUT` gövdesindeki `petId` ya da `clinicId` kayıttakinden farklıysa 400 `LabResults.SubjectChangeNotAllowed`. Yanlış hasta için kayıt gerekçeyle iptal edilir ve doğru hastaya yeni kayıt açılır. Muayene bağı aynı hasta içinde değişebilir (kilit kuralına tabi).

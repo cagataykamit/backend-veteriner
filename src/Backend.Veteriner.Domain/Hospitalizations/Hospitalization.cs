@@ -130,6 +130,9 @@ public sealed class Hospitalization : AggregateRoot, IClinicScoped, ITenantOwned
             return Result.Failure("Hospitalizations.Validation", "PetId is invalid.");
         if (string.IsNullOrWhiteSpace(reason))
             return Result.Failure("Hospitalizations.Validation", "Reason is required.");
+        var subject = RecordSubjectRule.EnsureUnchanged(ClinicId, PetId, clinicId, petId, "Hospitalizations");
+        if (!subject.IsSuccess)
+            return subject;
 
         var admitted = NormalizeUtc(admittedAtUtc);
         if (plannedDischargeAtUtc.HasValue && NormalizeUtc(plannedDischargeAtUtc.Value) < admitted)

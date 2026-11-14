@@ -93,6 +93,9 @@ public sealed class Treatment : AggregateRoot, IClinicScoped, ITenantOwned
             return CancelledFailure();
         if (clinicId == Guid.Empty)
             return Result.Failure("Treatments.Validation", "ClinicId is invalid.");
+        var subject = RecordSubjectRule.EnsureUnchanged(ClinicId, PetId, clinicId, petId, "Treatments");
+        if (!subject.IsSuccess)
+            return subject;
         if (petId == Guid.Empty)
             return Result.Failure("Treatments.Validation", "PetId is invalid.");
         if (string.IsNullOrWhiteSpace(title))

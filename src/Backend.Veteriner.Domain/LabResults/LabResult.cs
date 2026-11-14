@@ -128,6 +128,9 @@ public sealed class LabResult : AggregateRoot, IClinicScoped, ITenantOwned
             return Result.Failure("LabResults.Validation", "PetId is invalid.");
         if (string.IsNullOrWhiteSpace(testName))
             return Result.Failure("LabResults.Validation", "TestName is required.");
+        var subject = RecordSubjectRule.EnsureUnchanged(ClinicId, PetId, clinicId, petId, "LabResults");
+        if (!subject.IsSuccess)
+            return subject;
 
         var resultCheck = ValidateResult(resultDateUtc, resultText, interpretation);
         if (!resultCheck.IsSuccess)

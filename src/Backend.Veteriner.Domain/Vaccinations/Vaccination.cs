@@ -166,6 +166,10 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned, IC
         if (!transition.IsSuccess)
             return transition;
 
+        var subject = RecordSubjectRule.EnsureUnchanged(ClinicId, PetId, clinicId, petId, "Vaccinations");
+        if (!subject.IsSuccess)
+            return subject;
+
         PetId = petId;
         ClinicId = clinicId;
         ExaminationId = examinationId;
