@@ -194,6 +194,7 @@ public sealed class BillingWebhookIntegrationTests : IClassFixture<CustomWebAppl
     private async Task<Guid> SignupTenantAsync()
     {
         var suffix = Guid.NewGuid().ToString("N")[..10];
+        var signupPhone = await IntegrationTestSignupPhone.CreateVerifiedAsync(_factory.Services);
         var response = await _client.PostAsJsonAsync("/api/v1/public/owner-signup", new
         {
             planCode = "Basic",
@@ -202,6 +203,8 @@ public sealed class BillingWebhookIntegrationTests : IClassFixture<CustomWebAppl
             clinicCity = "Ankara",
             email = $"webhook-owner-{suffix}@example.com",
             password = "Abc12345!",
+            mobilePhone = signupPhone.MobilePhone,
+            phoneVerificationToken = signupPhone.Token,
             acceptedLegalDocuments = LegalDocumentCatalog.CurrentVersions
                 .Select(kv => new { documentType = kv.Key.ToString(), version = kv.Value })
                 .ToArray()

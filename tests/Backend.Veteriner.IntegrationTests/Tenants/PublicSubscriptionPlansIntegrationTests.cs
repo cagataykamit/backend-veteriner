@@ -109,6 +109,7 @@ public sealed class PublicSubscriptionPlansIntegrationTests : IClassFixture<Cust
             .Select(kv => (object)new { documentType = kv.Key.ToString(), version = kv.Value })
             .ToArray();
 
+        var signupPhone = await IntegrationTestSignupPhone.CreateVerifiedAsync(app.Services);
         var signup = await app.CreateClient().PostAsJsonAsync("/api/v1/public/owner-signup", new
         {
             planCode = "Basic",
@@ -117,6 +118,8 @@ public sealed class PublicSubscriptionPlansIntegrationTests : IClassFixture<Cust
             clinicCity = "Ankara",
             email,
             password = "Abc12345!",
+            mobilePhone = signupPhone.MobilePhone,
+            phoneVerificationToken = signupPhone.Token,
             acceptedLegalDocuments = documents,
         });
         signup.StatusCode.Should().Be(HttpStatusCode.OK, await signup.Content.ReadAsStringAsync());
