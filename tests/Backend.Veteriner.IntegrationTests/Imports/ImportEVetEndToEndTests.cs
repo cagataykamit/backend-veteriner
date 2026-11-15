@@ -162,6 +162,38 @@ public sealed class ImportEVetEndToEndTests : IClassFixture<CustomWebApplication
     }
 
     [Fact]
+    public async Task Ambiguous_Pet_Group_Should_Show_Its_Records_And_Bind_Records_Before_Birth_Automatically()
+    {
+        var ctx = await SeedAsync();
+        var http = ClientFor(ctx.Token);
+        var owner = $"Ayşe {ctx.Suffix}";
+        var bytes = Workbook(
+            ("Müşteri Listesi", [["Kayıt Tarihi", "Müşteriler", "Protokol No", "Durum"], ["2018-01-01", owner, "101", "Aktif"]]),
+            ("Hasta Listesi", [
+                ["Müşteriler", "Hastalar", "Protokol No", "Hasta Türü", "Doğum Tarihi", "Durum"],
+                [owner, "Boncuk", "301", ctx.SpeciesName, "2019-01-01", "Aktif"],
+                [owner, "Boncuk", "302", ctx.SpeciesName, "2024-01-01", "Aktif"]]),
+            ("Muayene Listesi", [
+                ["Tarih", "Hasta Sahibi", "Hasta Adı", "Veteriner Hekim", "Semptom"],
+                ["2023-05-01T11:00:00", owner, "Boncuk", "Dr. A", "Topallık"],
+                ["2025-06-01T11:00:00", owner, "Boncuk", "Dr. A", "Kusma ve ishal"]]));
+
+        var id = await UploadAsync(http, ctx, bytes);
+        await ImportValidationTestRunner.ValidateAsync(_factory.Services, http, id);
+        var preview = await GetJsonAsync(http, $"/api/v1/imports/batches/{id}/preview");
+
+        const string group = "Belirsiz: 301 / 302";
+        preview.GetProperty("unmappedValues").EnumerateArray()
+            .Where(u => u.GetProperty("kind").GetString() == "pet")
+            .Select(u => (u.GetProperty("source").GetString(), u.GetProperty("rowCount").GetInt32()))
+            .Should().Equal((group, 1));
+        var row = preview.GetProperty("petRows").EnumerateArray().Should().ContainSingle().Subject;
+        (row.GetProperty("reference").GetString(), row.GetProperty("table").GetString(), row.GetProperty("date").GetString(),
+                row.GetProperty("title").GetString(), row.GetProperty("summary").GetString())
+            .Should().Be((group, "clinicalRecords", "2025-06-01", "Muayene", "Kusma ve ishal"));
+    }
+
+    [Fact]
     public async Task EVet_Reports_Should_Be_Rejected_Without_EVet_Profile()
     {
         var ctx = await SeedAsync();
