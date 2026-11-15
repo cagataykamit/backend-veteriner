@@ -484,20 +484,11 @@ public static class DependencyInjection
             DataExportProcessor.NewWorkerId()));
         services.AddHostedService<DataExportHostedService>();
 
-        // ===== Dosya katmanı (IMAGING_API_CONTRACT.md): yerel disk deposu, imzalı URL, tarama yeri (v1'de yok), yarım yükleme temizliği =====
+        // ===== Dosya katmanı (IMAGING_API_CONTRACT.md): yerel disk deposu, imzalı URL, virüs taraması, yarım yükleme temizliği =====
         services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
         services.AddSingleton<IFileStorage, LocalDiskFileStorage>();
         services.AddSingleton<IFileAccessSigner, HmacFileAccessSigner>();
-        services.AddSingleton<IFileMalwareScanner, NoMalwareScanner>();
-        services.Configure<StoredFileMaintenanceOptions>(configuration.GetSection(StoredFileMaintenanceOptions.SectionName));
-        services.AddSingleton<StoredFileMaintenanceProcessor>();
-        services.AddHostedService<StoredFileMaintenanceHostedService>();
-
-        // ===== Dosya katmanı (IMAGING_API_CONTRACT.md): yerel disk deposu, imzalı URL, tarama yeri (v1 yok), yarım yükleme temizliği =====
-        services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
-        services.AddSingleton<IFileStorage, LocalDiskFileStorage>();
-        services.AddSingleton<IFileAccessSigner, HmacFileAccessSigner>();
-        services.AddSingleton<IFileMalwareScanner, NoMalwareScanner>();
+        AddFileScanning(services, configuration);
         services.Configure<StoredFileMaintenanceOptions>(configuration.GetSection(StoredFileMaintenanceOptions.SectionName));
         services.AddSingleton<StoredFileMaintenanceProcessor>();
         services.AddHostedService<StoredFileMaintenanceHostedService>();
@@ -510,6 +501,25 @@ public static class DependencyInjection
 
 
         return services;
+    }
+
+    /// <summary>
+    /// Virüs taraması: <c>FileScanning:Enabled</c> açıksa ClamAV (clamd TCP), kapalıysa her içeriği geçiren uygulama. Açıkken
+    /// clamd'ye ulaşılamazsa yükleme reddedilir (<c>UploadMalwareGuard</c>); API'nin açılışı clamd'yi beklemez.
+    /// </summary>
+    private static void AddFileScanning(IServiceCollection services, IConfiguration configuration)
+    {
+        var section = configuration.GetSection(FileScanningOptions.SectionName);
+        services.Configure<FileScanningOptions>(section);
+        if (section.GetValue<bool>(nameof(FileScanningOptions.Enabled)))
+        {
+            services.AddSingleton<ClamAvFileScanner>();
+            services.AddSingleton<IFileMalwareScanner>(sp => sp.GetRequiredService<ClamAvFileScanner>());
+        }
+        else
+        {
+            services.AddSingleton<IFileMalwareScanner, NoMalwareScanner>();
+        }
     }
 
     /// <summary>

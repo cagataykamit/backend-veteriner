@@ -153,6 +153,9 @@ public static class WebApplicationExtensions
 
         CqrsStartupConfigurationLogger.LogEffectiveConfiguration(app);
 
+        if (app.Environment.IsProduction() && !app.Configuration.GetValue<bool>("FileScanning:Enabled"))
+            app.Logger.LogWarning("FileScanning is disabled: uploaded files are not scanned for malware. Set FileScanning__Enabled=true with clamd running.");
+
         return Task.FromResult(app);
     }
 }
