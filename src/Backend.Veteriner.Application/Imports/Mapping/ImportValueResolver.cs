@@ -355,6 +355,18 @@ public sealed class ImportValueResolver
     public static string VaccineSeriesKey(string? vaccineName) => ReduceVaccineKey(ImportTextFolding.Fold(vaccineName));
 
     /// <summary>
+    /// Aşı adının belirttiği tür (katlanmış: <c>kedi</c> ya da <c>kopek</c>; <c>KEDİ KARMA</c>, <c>Yıllık Köpek Kuduz</c>); adda tür
+    /// yoksa ya da ikisi de geçiyorsa null.
+    /// </summary>
+    public static string? VaccineSpecies(string? vaccineName)
+    {
+        var key = ImportTextFolding.Fold(vaccineName);
+        var cat = key.Contains("kedi", StringComparison.Ordinal);
+        var dog = key.Contains("kopek", StringComparison.Ordinal);
+        return cat == dog ? null : cat ? "kedi" : "kopek";
+    }
+
+    /// <summary>
     /// Eski programın aşı paketinde aşı olmayan uygulama (tedavi, bağışıklık destek ürünü): adında <c>tedavi</c> geçer ya da bilinen
     /// tedavi ürünüdür. Aşı geçmişine değil klinik geçmişe yazılır; aşı kataloğuna eklenmez.
     /// </summary>

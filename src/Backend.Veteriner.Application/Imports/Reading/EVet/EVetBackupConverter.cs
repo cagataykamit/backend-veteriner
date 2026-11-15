@@ -114,6 +114,15 @@ internal static class EVetBackupConverter
 
         Add(output, new ImportSourceTable(ImportTable.ClinicalRecords, ClinicalHeaders, clinicalRows));
 
+        if (state.PetsByPair is { AutoResolved: > 0 } or { Unresolved: > 0 })
+        {
+            var (resolved, unresolved) = (state.PetsByPair.AutoResolved, state.PetsByPair.Unresolved);
+            warnings.Add(new ImportReadWarning(WarningCode, ImportTable.Pets,
+                $"Aynı sahipte aynı adlı birden çok hasta: {resolved} muayene / görev satırı tarihten (doğum, E-vet kaydı, vefat), "
+                + "türden (aşı adı, Aşı Bilgisi raporu), mikroçipten, kilodan ya da tek aktif kayıttan doğru hastaya kendiliğinden bağlandı"
+                + (unresolved > 0 ? $"; {unresolved} satırın hangi hastaya ait olduğu aktarma ekranında sorulacak." : ".")));
+        }
+
         foreach (var table in output)
         {
             if (table.Rows.Count > limits.MaxRowsPerTable)
@@ -230,7 +239,9 @@ internal static class EVetBackupConverter
         var (renamed, merged) = SeparateSameNamedPets(entries.Where(e => e.MergedInto is null).ToList());
         foreach (var entry in entries)
         {
-            state.PetsByPair.Append(entry.Pair, new PetCandidate(entry.TargetKey, entry.Root.Status == "aktif", entry.Registered, entry.Died));
+            state.PetsByPair.Append(entry.Pair, new PetCandidate(
+                entry.TargetKey, entry.Root.Status == "aktif", entry.Identity.Species, entry.Chip, entry.WeightKg, entry.Birth, entry.Registered,
+                entry.Died));
             if (entry.MergedInto is null && entry.Key is not null && entry.Status is "olu" or "pasif")
                 state.InactivePets.Add(entry.Key);
         }
@@ -491,7 +502,8 @@ internal static class EVetBackupConverter
             var petName = sheet[row, "Hasta Adı"];
             rows.Add(new ImportSourceRow(row.RowNumber,
             [
-                state.PetsByPair.Resolve(EVetCells.PairKey(ownerName, petName), EVetCells.ParseDateTime(sheet[row, "Tarih"])),
+                state.PetsByPair.Resolve(EVetCells.PairKey(ownerName, petName),
+                    new PetHints(EVetCells.ParseDateTime(sheet[row, "Tarih"]), WeightKg: EVetCells.WeightKg(sheet[row, "Ağırlık"]))),
                 ownerName,
                 petName,
                 EVetCells.Date(sheet[row, "Tarih"]),
@@ -584,7 +596,7 @@ internal static class EVetBackupConverter
                 early++;
             }
 
-            var petProtocol = state.PetsByPair.Resolve(EVetCells.PairKey(ownerName, petName), start.Value);
+            var petProtocol = state.PetsByPair.Resolve(EVetCells.PairKey(ownerName, petName), TaskHints(sheet, row, state.Reports, vaccine, start.Value));
             var petKey = petProtocol ?? EVetCells.PairKey(ownerName, petName);
 
             if (vaccine is not null && status == "tamamlandi")
@@ -692,6 +704,27 @@ internal static class EVetBackupConverter
             vaccinationRows.Count == 0 ? null : new ImportSourceTable(ImportTable.Vaccinations, VaccinationHeaders, vaccinationRows),
             appointments.Count == 0 ? null : new ImportSourceTable(ImportTable.Appointments, AppointmentHeaders, appointments),
             records);
+    }
+
+    /// <summary>
+    /// Görevin hasta ipuçları (<see cref="PetIndex.Resolve"/>): tarih; aşı görevinde türü aşı adından (<c>KEDİ KARMA</c>), yoksa Aşı
+    /// Bilgisi raporunun o gün bu çifte yazdığı türden; mikroçip rapordan; kilo aşı notundan (<c>3.230gr</c>). Raporda o gün birden
+    /// çok farklı tür ya da çip varsa (aynı adlı iki hastaya aşı) o ipucu kullanılmaz.
+    /// </summary>
+    private static PetHints TaskHints(EVetSheet sheet, ImportSourceRow row, EVetReports reports, string? vaccine, DateTime start)
+    {
+        if (vaccine is null)
+            return new PetHints(start);
+
+        var day = (EVetCells.PairKey(sheet[row, "Müşteriler"], sheet[row, "Hastalar"]), DateOnly.FromDateTime(start));
+        var lines = reports.Vaccines?.GetValueOrDefault(day);
+        var species = lines?.Select(l => ImportTextFolding.Fold(l.Species)).Where(s => s.Length > 0).Distinct().ToList();
+        var chips = lines?.Select(l => ChipKey(l.Chip)).OfType<string>().Where(c => c.Length >= MinChipDigits).Distinct().ToList();
+        return new PetHints(
+            start,
+            ImportValueResolver.VaccineSpecies(vaccine) ?? (species is [var onlySpecies] ? onlySpecies : null),
+            chips is [var onlyChip] ? onlyChip : null,
+            EVetCells.NoteWeightKg(sheet[row, "Bilgi"], sheet[row, "Açıklama"]));
     }
 
     /// <summary>
@@ -874,6 +907,7 @@ internal static class EVetBackupConverter
             Registered = EVetCells.ParseDateTime(sheet[row, "Kayıt Tarihi"]);
             Died = EVetCells.ParseDateTime(sheet[row, "Ölüm Zamanı"]);
             Chip = ChipKey(sheet[row, "Çip No"]);
+            WeightKg = EVetCells.WeightKg(sheet[row, "Ağırlık"]);
             Birth = EVetCells.ParseDateTime(sheet[row, "Doğum Tarihi"]);
             Looks = [ImportTextFolding.Fold(sheet[row, "Irk"]), ImportTextFolding.Fold(sheet[row, "Renk"]), ImportTextFolding.Fold(sheet[row, "Cinsiyet"])];
             Traits = string.Join('|', EVetCells.Date(sheet[row, "Doğum Tarihi"]), sheet[row, "Cinsiyet"], sheet[row, "Renk"], Status);
@@ -901,6 +935,9 @@ internal static class EVetBackupConverter
         /// <summary>Mikroçip karşılaştırma anahtarı (<see cref="ChipKey"/>).</summary>
         public string? Chip { get; }
 
+        /// <summary>Kartındaki kilo (kg; 0 ve okunamayan null).</summary>
+        public decimal? WeightKg { get; }
+
         public DateTime? Birth { get; }
 
         /// <summary>Kopya karşılaştırması için katlanmış ırk, renk, cinsiyet (boş: bilinmiyor).</summary>
@@ -919,19 +956,38 @@ internal static class EVetBackupConverter
         public string? TargetKey => MergedInto is not null ? Root.DuplicateOf ?? Root.Key : DuplicateOf ?? Key;
     }
 
-    /// <summary>Sahip + hasta adı çiftinin adayı (yaşam bilgisiyle; <paramref name="Active"/>: aktarılan kaydı E-vet'te aktif).</summary>
-    private sealed record PetCandidate(string? Key, bool Active, DateTime? Registered, DateTime? Died);
+    /// <summary>
+    /// Sahip + hasta adı çiftinin adayı: katlanmış tür, mikroçip anahtarı, kartındaki kilo ve yaşam bilgisiyle (<paramref name="Active"/>:
+    /// aktarılan kaydı E-vet'te aktif).
+    /// </summary>
+    private sealed record PetCandidate(
+        string? Key, bool Active, string Species, string? Chip, decimal? WeightKg, DateTime? Birth, DateTime? Registered, DateTime? Died);
+
+    /// <summary>
+    /// Kaydın hangi hastaya ait olduğuna dair ipuçları: tarih, katlanmış tür (kedi/köpek aşısı ya da Aşı Bilgisi raporunun türü),
+    /// mikroçip (Aşı Bilgisi raporu) ve kilo (muayene ağırlığı ya da görev notundaki <c>3,230 gr</c>); bilinmeyen null.
+    /// </summary>
+    private sealed record PetHints(DateTime? On, string? Species = null, string? Chip = null, decimal? WeightKg = null);
 
     /// <summary>
     /// Sahip + hasta adı → hasta anahtarı (aynı hayvanın kayıtları önce birleşir, <see cref="MergeSameAnimals"/>; adaylar birleşen
-    /// kökün anahtarını taşır). Tek aday varsa o; birden çoksa (1) kaydın tarihinde kayıtlı ve hayatta olan tek aday; (2) o tarihte
-    /// hayatta olanlardan (kimse yoksa hepsinden) yalnız biri aktifse o: yanlışlıkla açılıp vefat girilmiş kopyanın kaydı aktif hastaya
-    /// bağlanır. Yaşam aralığı önce gelir: ölmüş eski hayvanın kendi dönemindeki kaydı yeni hayvana yazılmasın. Ayırt edilemezse
-    /// "Belirsiz: …" anahtarı döner: doğrulama satırı hasta bulunamadı hatasıyla raporlar, yanlış hastaya yazmaz.
+    /// kökün anahtarını taşır). Tek aday varsa o; birden çoksa aday eleme kuralı (tek yer) adayları sırayla daraltır, kimseyi
+    /// bırakmayan adım atlanır, tek aday kalınca ona bağlanır: (1) yaşam aralığı: kaydın tarihi doğumundan ya da E-vet kaydından
+    /// önce, vefatından sonra olan aday elenir; (2) mikroçip: raporun çipi adayınkiyle aynıysa o; (3) tür: öbür türdeki aday elenir;
+    /// (4) kilo: kaydın kilosuyla açıkça uyuşmayan aday elenir (<see cref="WeightRulesOut"/>); (5) kalanlardan yalnız biri aktifse o:
+    /// yanlışlıkla açılıp vefat girilmiş kopyanın kaydı aktif hastaya bağlanır. Yaşam aralığı önce gelir: ölmüş eski hayvanın kendi
+    /// dönemindeki kaydı yeni hayvana yazılmasın. Ayırt edilemezse "Belirsiz: …" anahtarı döner: doğrulama satırı hasta bulunamadı
+    /// hatasıyla raporlar, yanlış hastaya yazmaz; aktarma ekranı hangi hastaya ait olduğunu sorar.
     /// </summary>
     private sealed class PetIndex
     {
         private readonly Dictionary<string, List<PetCandidate>> _items = new(StringComparer.Ordinal);
+
+        /// <summary>Birden çok adaylı çiftte kendiliğinden bağlanan satır sayısı (bilgi notu).</summary>
+        public int AutoResolved { get; private set; }
+
+        /// <summary>Ayırt edilemeyen ("Belirsiz: …") satır sayısı.</summary>
+        public int Unresolved { get; private set; }
 
         public void Append(string pair, PetCandidate candidate)
         {
@@ -941,7 +997,7 @@ internal static class EVetBackupConverter
         }
 
         /// <summary>Çift yoksa null (doğrulama ad kuralıyla arar).</summary>
-        public string? Resolve(string pair, DateTime? on)
+        public string? Resolve(string pair, PetHints hints)
         {
             if (!_items.TryGetValue(pair, out var list))
                 return null;
@@ -950,16 +1006,63 @@ internal static class EVetBackupConverter
             if (keys.Count == 1)
                 return keys[0];
 
-            var alive = on is { } date
-                ? list.Where(c => (c.Registered is null || c.Registered.Value.Date <= date.Date) && (c.Died is null || c.Died.Value.Date >= date.Date)).ToList()
-                : [];
-            if (alive.Select(c => c.Key).Distinct().ToList() is [var onlyAlive])
-                return onlyAlive;
+            var pool = list;
+            if (hints.On is { } date)
+                pool = Narrow(pool, c => !Before(date, c.Birth) && !Before(date, c.Registered) && !Before(c.Died, date));
+            if (hints.Chip is { } chip)
+                pool = Narrow(pool, c => c.Chip == chip);
+            if (hints.Species is { } species)
+                pool = Narrow(pool, c => c.Species == species);
+            if (hints.WeightKg is { } weight)
+                pool = Narrow(pool, c => !WeightRulesOut(weight, hints.On, c));
 
-            if ((alive.Count > 0 ? alive : list).Where(c => c.Active).Select(c => c.Key).Distinct().ToList() is [var onlyActive])
-                return onlyActive;
+            if (TrySingle(pool, out var key) || TrySingle(pool.Where(c => c.Active), out key))
+            {
+                AutoResolved++;
+                return key;
+            }
 
+            Unresolved++;
             return ImportRules.AmbiguousPetReferencePrefix + string.Join(" / ", keys.Select(k => k ?? "?"));
+        }
+
+        /// <summary>Gün olarak <paramref name="date"/> &lt; <paramref name="start"/> (bilinmeyen tarih elemez).</summary>
+        private static bool Before(DateTime? date, DateTime? start) => date is { } d && start is { } s && d.Date < s.Date;
+
+        /// <summary>Kilo farkı eşiği: bu kattan ve <see cref="WeightMinGapKg"/> kg'dan az fark şüphelidir, aday elenmez.</summary>
+        private const decimal WeightRatio = 3m;
+
+        private const decimal WeightMinGapKg = 3m;
+
+        /// <summary>Kartında kilosu olmayan kedinin en çok kilosu (üstündeki kayıt kediye ait olamaz).</summary>
+        private const decimal CatMaxWeightKg = 15m;
+
+        /// <summary>
+        /// Kaydın kilosu adayla açıkça uyuşmuyor mu (kural tek yer; şüphede false): (1) tür sınırı: kedi <see cref="CatMaxWeightKg"/>
+        /// kg'dan ağır olamaz; (2) kart kilosu: aday kayıt tarihinde yetişkinse (doğumdan en az bir yıl; doğumu bilinmeyen elenmez,
+        /// yavru büyür) ve kartındaki kilo kaydınkinin <see cref="WeightRatio"/> katı ve en az <see cref="WeightMinGapKg"/> kg fazlaysa
+        /// (3 kg'lık kayıt 25 kg'lık yetişkin köpeğin olamaz). Kayıt kartınkinden ağırsa elenmez: kart kilosu yavruyken yazılmış olabilir.
+        /// </summary>
+        private static bool WeightRulesOut(decimal weightKg, DateTime? on, PetCandidate candidate)
+        {
+            if (candidate.Species == "kedi" && weightKg > CatMaxWeightKg)
+                return true;
+
+            if (candidate.WeightKg is not { } known || known - weightKg < WeightMinGapKg)
+                return false;
+
+            var adult = on is { } date && candidate.Birth is { } birth && birth.AddYears(1) <= date;
+            return adult && known >= weightKg * WeightRatio;
+        }
+
+        private static List<PetCandidate> Narrow(List<PetCandidate> pool, Func<PetCandidate, bool> keep)
+            => pool.Where(keep).ToList() is { Count: > 0 } kept ? kept : pool;
+
+        private static bool TrySingle(IEnumerable<PetCandidate> candidates, out string? key)
+        {
+            var keys = candidates.Select(c => c.Key).Distinct().ToList();
+            key = keys.Count == 1 ? keys[0] : null;
+            return keys.Count == 1;
         }
     }
 

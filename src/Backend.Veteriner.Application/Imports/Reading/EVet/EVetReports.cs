@@ -3,8 +3,11 @@ using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Application.Imports.Reading.EVet;
 
-/// <summary>Aşı Bilgisi raporunun bir uygulaması: ticari ürün adı, seri numarası ve son kullanma tarihi (<c>gg.aa.yyyy</c>; okunamazsa null).</summary>
-internal sealed record EVetVaccineReportRow(string? Product, string? Serial, string? ExpiresOn = null);
+/// <summary>
+/// Aşı Bilgisi raporunun bir uygulaması: ticari ürün adı, seri numarası, son kullanma tarihi (<c>gg.aa.yyyy</c>; okunamazsa null),
+/// hastanın türü ve mikroçipi (aynı adlı hastalardan hangisine yapıldığını ayırt eder).
+/// </summary>
+internal sealed record EVetVaccineReportRow(string? Product, string? Serial, string? ExpiresOn = null, string? Species = null, string? Chip = null);
 
 /// <summary>
 /// Yedeği tamamlayan iki E-vet raporu (CSV, <c>;</c>). Hasta Listesi (Rapor &gt; Genel &gt; Hasta Listesi) hasta protokolünü müşteri
@@ -135,7 +138,8 @@ internal sealed class EVetReports
             var key = (EVetCells.PairKey(Cell("hastasahibi"), pet), DateOnly.FromDateTime(date));
             if (!result.TryGetValue(key, out var list))
                 result[key] = list = [];
-            list.Add(new EVetVaccineReportRow(EVetCells.Clean(Cell("urun")), EVetCells.Clean(Cell("serino")), EVetCells.NoteDate(Cell("skt"))));
+            list.Add(new EVetVaccineReportRow(EVetCells.Clean(Cell("urun")), EVetCells.Clean(Cell("serino")), EVetCells.NoteDate(Cell("skt")),
+                EVetCells.Clean(Cell("tur")), EVetCells.Clean(Cell("cipno"))));
 
             string? Cell(string name) => columns.TryGetValue(name, out var index) ? At(cells, index) : null;
         }

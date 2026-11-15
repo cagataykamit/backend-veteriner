@@ -51,6 +51,51 @@ public static class ImportPreviewAggregator
         return result.OrderBy(c => c.RowNumber).ToList();
     }
 
+    /// <summary>Belirsiz hasta grubu başına gösterilen kayıt sayısı (kalanı grubun satır sayısından anlaşılır).</summary>
+    public const int PetRowsPerGroup = 5;
+
+    private const int PetRowSummaryWords = 6;
+
+    /// <summary>
+    /// Belirsiz grupların kayıtları (kanonik başlıklar): grup başına tarih sırasıyla ilk <see cref="PetRowsPerGroup"/> satır. Aşıda
+    /// aşı adı; muayene ve randevuda kayıt türü ve notun ilk birkaç kelimesi (tanı, şikâyet, tedavi, not ya da randevu nedeni).
+    /// </summary>
+    public static IReadOnlyList<ImportPetRowDto> PetRows(
+        IEnumerable<(ImportTable Table, int RowNumber, string? SourceJson)> rows, IReadOnlySet<string> references)
+    {
+        var result = new List<ImportPetRowDto>();
+        foreach (var (table, rowNumber, json) in rows)
+        {
+            var values = ImportSourceRow.FromJson(rowNumber, json).Values;
+            string? V(string key) => values.TryGetValue(key, out var v) && !string.IsNullOrWhiteSpace(v) ? v.Trim() : null;
+            if (V("HayvanNo") is not { } reference || !references.Contains(reference))
+                continue;
+
+            result.Add(table switch
+            {
+                ImportTable.Vaccinations => new ImportPetRowDto(reference, ImportCanonicalNames.Key(table), rowNumber, V("UygulamaTarihi"), V("AsiAdi"), null),
+                ImportTable.Appointments => new ImportPetRowDto(reference, ImportCanonicalNames.Key(table), rowNumber, V("Tarih"), V("RandevuTuru"),
+                    FirstWords(V("Neden") ?? V("Not"))),
+                _ => new ImportPetRowDto(reference, ImportCanonicalNames.Key(table), rowNumber, V("Tarih"), V("KayitTuru"),
+                    FirstWords(V("Tani") ?? V("Sikayet") ?? V("Tedavi") ?? V("Not"))),
+            });
+        }
+
+        return result
+            .GroupBy(r => r.Reference, StringComparer.Ordinal)
+            .SelectMany(g => g.OrderBy(r => r.Date, StringComparer.Ordinal).ThenBy(r => r.Table, StringComparer.Ordinal).Take(PetRowsPerGroup))
+            .ToList();
+    }
+
+    private static string? FirstWords(string? text)
+    {
+        if (text is null)
+            return null;
+
+        var words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        return words.Length <= PetRowSummaryWords ? string.Join(' ', words) : string.Join(' ', words.Take(PetRowSummaryWords)) + " …";
+    }
+
     private static readonly System.Text.RegularExpressions.Regex RegisteredOn =
         new(@"Eski programa kayıt: (\d{2}\.\d{2}\.\d{4})", System.Text.RegularExpressions.RegexOptions.Compiled, TimeSpan.FromMilliseconds(100));
 

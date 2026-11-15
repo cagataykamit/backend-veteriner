@@ -19,7 +19,15 @@ public sealed record ImportPreviewDto(
     IReadOnlyList<string> Blockers,
     bool PayloadPurged,
     IReadOnlyList<ImportNotImportedReasonDto> NotImportedReasons,
-    IReadOnlyList<ImportPetCandidateDto> PetCandidates);
+    IReadOnlyList<ImportPetCandidateDto> PetCandidates,
+    IReadOnlyList<ImportPetRowDto> PetRows);
+
+/// <summary>
+/// Belirsiz hasta grubunun kaydı (bölüm 13.4; grup başına ilk birkaç satır): kullanıcı "hangisine ait?" sorusunu bu bilgiyle
+/// yanıtlar. <see cref="Reference"/> grubun <c>source</c> değeridir; <see cref="Title"/> aşı adı ya da kayıt türü,
+/// <see cref="Summary"/> muayene/randevu notunun ilk birkaç kelimesi.
+/// </summary>
+public sealed record ImportPetRowDto(string Reference, string Table, int RowNumber, string? Date, string? Title, string? Summary);
 
 /// <summary>
 /// Belirsiz hasta grubunun (<c>unmappedValues[kind=pet]</c>) adayı (bölüm 13.4): kullanıcı kayıtların hangisine ait olduğunu

@@ -74,7 +74,7 @@ public sealed class GetImportBatchPreviewQueryHandler : IRequestHandler<GetImpor
         {
             return Result<ImportPreviewDto>.Success(new ImportPreviewDto(
                 batch.ValidationId, batch.Status, summary, [], impact,
-                [], false, ImportCommitGate.FileBlockers(batch), PayloadPurged: true, NotImportedReasons: [], PetCandidates: []));
+                [], false, ImportCommitGate.FileBlockers(batch), PayloadPurged: true, NotImportedReasons: [], PetCandidates: [], PetRows: []));
         }
 
         var issueRows = await _rows.ListAsync(new ImportIssueRowsSpec(batch.Id), ct);
@@ -82,25 +82,29 @@ public sealed class GetImportBatchPreviewQueryHandler : IRequestHandler<GetImpor
         var reasons = ImportPreviewAggregator.NotImportedReasons(issueRows.Select(r => (r.Table, r.Status, r.IssuesJson)));
         var blockers = ImportCommitGate.Blockers(batch, unmapped);
         var canCommit = ImportCommitGate.CanCommit(batch, blockers);
-        var candidates = await PetCandidatesAsync(batch.Id, unmapped, ct);
+        var (candidates, petRows) = await AmbiguousPetsAsync(batch.Id, unmapped, ct);
 
         return Result<ImportPreviewDto>.Success(new ImportPreviewDto(
             batch.ValidationId, batch.Status, summary, unmapped, impact, issueCounts, canCommit, blockers, PayloadPurged: false,
-            NotImportedReasons: reasons, PetCandidates: candidates));
+            NotImportedReasons: reasons, PetCandidates: candidates, PetRows: petRows));
     }
 
-    /// <summary>Belirsiz hasta gruplarının adayları; grup yoksa hasta satırları okunmaz.</summary>
-    private async Task<IReadOnlyList<ImportPetCandidateDto>> PetCandidatesAsync(
+    /// <summary>Belirsiz hasta gruplarının adayları ve kayıtları; grup yoksa satırlar okunmaz.</summary>
+    private async Task<(IReadOnlyList<ImportPetCandidateDto> Candidates, IReadOnlyList<ImportPetRowDto> Rows)> AmbiguousPetsAsync(
         Guid batchId, IReadOnlyList<ImportUnmappedValueDto> unmapped, CancellationToken ct)
     {
-        var petNos = unmapped
+        var references = unmapped
             .Where(u => u.Kind == ImportPreviewAggregator.AmbiguousPetKind)
-            .SelectMany(u => Mapping.ImportPetChoice.CandidatesOf(u.Source))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (petNos.Count == 0)
-            return [];
+            .Select(u => u.Source)
+            .ToHashSet(StringComparer.Ordinal);
+        if (references.Count == 0)
+            return ([], []);
 
+        var petNos = references.SelectMany(Mapping.ImportPetChoice.CandidatesOf).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var pets = await _rows.ListAsync(new ImportTableSourceRowsSpec(batchId, ImportTable.Pets), ct);
-        return ImportPreviewAggregator.PetCandidates(pets.Select(r => (r.RowNumber, r.SourceJson)), petNos);
+        var rows = await _rows.ListAsync(new ImportAmbiguousPetRowsSpec(batchId), ct);
+        return (
+            ImportPreviewAggregator.PetCandidates(pets.Select(r => (r.RowNumber, r.SourceJson)), petNos),
+            ImportPreviewAggregator.PetRows(rows.Select(r => (r.Table, r.RowNumber, r.SourceJson)), references));
     }
 }
