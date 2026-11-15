@@ -129,6 +129,17 @@ public static class ResultExtensions
             return (StatusCodes.Status502BadGateway, "https://httpstatuses.io/502");
         }
 
+        // Deneme kaydı ve herkese açık uçların kötüye kullanım önlemleri (TRIAL_SIGNUP_ABUSE_API_CONTRACT.md §5).
+        if (normalized is "signupemail.resendtoosoon" or "signupemail.dailylimitreached")
+        {
+            return (StatusCodes.Status429TooManyRequests, "https://httpstatuses.io/429");
+        }
+
+        if (normalized is "humanverification.unavailable")
+        {
+            return (StatusCodes.Status503ServiceUnavailable, "https://httpstatuses.io/503");
+        }
+
         // Saklama süresi sonunda temizlenen satır verisi (ADR-019 K9).
         if (normalized is "imports.payloadpurged")
         {
@@ -458,6 +469,7 @@ public static class ResultExtensions
             StatusCodes.Status403Forbidden => "Erişim reddedildi",
             StatusCodes.Status404NotFound => "Bulunamadı",
             StatusCodes.Status409Conflict => "Çakışma",
+            StatusCodes.Status429TooManyRequests => "Çok fazla istek",
             StatusCodes.Status502BadGateway => "Upstream servis hatası",
             StatusCodes.Status503ServiceUnavailable => "Servis kullanılamıyor",
             StatusCodes.Status500InternalServerError => "Sunucu hatası",

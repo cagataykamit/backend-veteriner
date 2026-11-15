@@ -39,6 +39,15 @@ public sealed class TenantBillingProfile : AggregateRoot, ITenantOwned
         };
     }
 
+    /// <summary>Deneme kaydında girilen vergi numarasıyla profil (TRIAL-001); diğer alanları yönetici sonra doldurur.</summary>
+    public static TenantBillingProfile CreateWithTaxNumber(Guid tenantId, string taxNumber, DateTime utcNow)
+    {
+        var profile = CreateEmpty(tenantId, utcNow);
+        profile.TaxNumber = TurkishTaxIdentity.Normalize(taxNumber)
+                            ?? throw new ArgumentException("Vergi numarası boş olamaz.", nameof(taxNumber));
+        return profile;
+    }
+
     public void Update(
         string? companyName,
         string? legalCompanyName,

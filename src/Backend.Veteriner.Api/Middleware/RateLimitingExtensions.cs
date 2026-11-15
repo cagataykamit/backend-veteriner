@@ -18,6 +18,8 @@ public static partial class RateLimitingExtensions
 {
     public const string DiscountCodeValidatePolicy = "discount-code-validate";
     public const string DemoRequestPolicy = "demo-request";
+    public const string SignupEmailCodePolicy = "signup-email-code";
+    public const string SignupEmailVerifyPolicy = "signup-email-verify";
     public const string PublicSitePolicy = "public-site";
     public const string PublicSiteImagePolicy = "public-site-image";
     public const string ExternalApiPolicy = "external-api";
@@ -287,6 +289,39 @@ public static partial class RateLimitingExtensions
 
             // -- CONTACT: spam korumas�
             options.AddPolicy("contact", httpContext =>
+            {
+                var key = GetClientIp(httpContext);
+                return RateLimitPartition.GetSlidingWindowLimiter(
+                    key,
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(1),
+                        SegmentsPerWindow = 6,
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    });
+            });
+
+            // -- DENEME KAYDI E-POSTA KODU (TRIAL-001): insan doğrulaması ve adres/IP başına bekleme ve günlük sınır alan
+            //    kuralındadır (SignupEmailVerification); burada kısa pencereli IP tavanı.
+            options.AddPolicy(SignupEmailCodePolicy, httpContext =>
+            {
+                var key = GetClientIp(httpContext);
+                return RateLimitPartition.GetSlidingWindowLimiter(
+                    key,
+                    _ => new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = 5,
+                        Window = TimeSpan.FromMinutes(10),
+                        SegmentsPerWindow = 10,
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    });
+            });
+
+            // -- DENEME KAYDI E-POSTA KODU DOĞRULAMA: kod başına 5 deneme alan kuralında; burada tahmin denemesine karşı IP tavanı.
+            options.AddPolicy(SignupEmailVerifyPolicy, httpContext =>
             {
                 var key = GetClientIp(httpContext);
                 return RateLimitPartition.GetSlidingWindowLimiter(

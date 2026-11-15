@@ -34,7 +34,10 @@ public sealed class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequ
 
         // Özel geliştirme talebi (TIER-010): serbest metinler yanlışlıkla kişisel ya da hasta verisi taşıyabilir; denetimde yalnız tür,
         // öncelik ve durum kalır. "RequestText" ve "ResponseNote" yukarıda.
-        "RequestTitle", "RequestTarget", "DecisionReason"
+        "RequestTitle", "RequestTarget", "DecisionReason",
+
+        // Deneme kaydı (TRIAL-001): insan doğrulaması jetonu ve e-posta doğrulamasından dönen kayıt jetonu.
+        "TurnstileToken", "EmailVerificationToken"
     };
 
     /// <summary>

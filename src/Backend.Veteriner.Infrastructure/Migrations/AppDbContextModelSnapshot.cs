@@ -6893,6 +6893,64 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("ScheduledSubscriptionPlanChanges", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Tenants.SignupEmailVerification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("FailedAttempts")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("InvalidatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RequestIpHash")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<DateTime?>("SignupTokenExpiresAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SignupTokenHash")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<DateTime?>("UsedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("VerifiedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("Email", "CreatedAtUtc");
+
+                    b.HasIndex("RequestIpHash", "CreatedAtUtc");
+
+                    b.ToTable("SignupEmailVerifications", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Tenants.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -7099,6 +7157,41 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasIndex("TrialStartsAtUtc");
 
                     b.ToTable("TenantSubscriptions", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Tenants.TrialSignupIdentity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EmailKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("TaxIdentityNumber")
+                        .HasMaxLength(11)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(11)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmailKey")
+                        .IsUnique();
+
+                    b.HasIndex("TaxIdentityNumber")
+                        .IsUnique()
+                        .HasFilter("[TaxIdentityNumber] IS NOT NULL");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("TrialSignupIdentities", (string)null);
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Tenants.UserTenant", b =>
