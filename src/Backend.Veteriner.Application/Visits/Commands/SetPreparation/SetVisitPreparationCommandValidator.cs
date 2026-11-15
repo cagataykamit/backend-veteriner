@@ -11,6 +11,6 @@ public sealed class SetVisitPreparationCommandValidator : AbstractValidator<SetV
         RuleFor(x => x.ArrivalReason).MaximumLength(Visit.MaxArrivalReasonLength);
         RuleFor(x => x.PreparedExaminationTemplateId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("PreparedExaminationTemplateId gecersiz.");
+            .WithMessage("Geçerli bir muayene şablonu seçin.");
     }
 }

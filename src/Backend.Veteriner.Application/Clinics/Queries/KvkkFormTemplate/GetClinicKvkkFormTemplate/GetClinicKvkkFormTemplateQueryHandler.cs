@@ -7,7 +7,7 @@ using Mediator;
 
 namespace Backend.Veteriner.Application.Clinics.Queries.KvkkFormTemplate.GetClinicKvkkFormTemplate;
 
-/// <summary>Klinik KVKK şablonu (açık rıza veya aydınlatma); o türde kayıt yoksa taslak varsayılan metin döner (ADR-021, ADR-024).</summary>
+/// <summary>Klinik KVKK şablonu (açık rıza veya aydınlatma); o türde kayıt yoksa klinik bilgileriyle doldurulmuş varsayılan metin döner (ADR-021, ADR-024).</summary>
 public sealed class GetClinicKvkkFormTemplateQueryHandler
     : IRequestHandler<GetClinicKvkkFormTemplateQuery, Result<ClinicKvkkFormTemplateDto>>
 {
@@ -68,7 +68,7 @@ public sealed class GetClinicKvkkFormTemplateQueryHandler
             new ClinicKvkkFormTemplateByClinicSpec(tenantId, request.ClinicId, request.Kind), ct);
 
         return Result<ClinicKvkkFormTemplateDto>.Success(row is null
-            ? ClinicKvkkFormTemplateDto.Default(request.ClinicId, request.Kind)
+            ? ClinicKvkkFormTemplateDto.Default(clinic, request.Kind)
             : ClinicKvkkFormTemplateDto.From(row));
     }
 }

@@ -10,7 +10,7 @@ public sealed class UpdateImagingRecordCommandValidator : AbstractValidator<Upda
         RuleFor(x => x.Id).NotEmpty();
         RuleFor(x => x.ExaminationId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("ExaminationId is invalid.");
+            .WithMessage("Geçerli bir muayene seçin.");
         RuleFor(x => x.PerformedAtUtc).NotEqual(default(DateTime));
         RuleFor(x => x.Modality).IsInEnum();
         RuleFor(x => x.Description).MaximumLength(ImagingRecord.DescriptionMaxLength);

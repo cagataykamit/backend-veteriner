@@ -28,7 +28,7 @@ internal static class PrescribedAtUtcWindow
         {
             return Result.Failure(
                 "Prescriptions.DateTooFarInFuture",
-                "Prescription date may be at most 2 years in the future.");
+                "Reçete tarihi en fazla 2 yıl ileride olabilir.");
         }
 
         return Result.Success();
@@ -43,7 +43,7 @@ internal static class PrescribedAtUtcWindow
         {
             return Result.Failure(
                 "Prescriptions.FollowUpBeforePrescription",
-                "Follow-up date must not be before prescription date.");
+                "Kontrol tarihi reçete tarihinden önce olamaz.");
         }
 
         return Result.Success();

@@ -41,7 +41,7 @@ public sealed class AuthController : ControllerBase
         {
             return Result<LoginResultDto>.Failure(
                 "Auth.Validation.InvalidRequestBody",
-                "Istek govdesi bos veya hatali JSON.")
+                "İstek okunamadı. Sayfayı yenileyip tekrar deneyin.")
                 .ToActionResult(this);
         }
 

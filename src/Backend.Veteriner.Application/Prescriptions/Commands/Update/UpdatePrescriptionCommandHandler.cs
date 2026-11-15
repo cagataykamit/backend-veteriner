@@ -100,7 +100,7 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
             effectiveClinicId = p.ClinicId;
 
         if (effectiveClinicId == Guid.Empty)
-            return Result.Failure("Prescriptions.Validation", "ClinicId is required.");
+            return Result.Failure("Prescriptions.Validation", "Klinik seçimi zorunludur.");
 
         var clinicAccess = await PrescriptionClinicWriteScope.EnsureEntityAndTargetWriteAccessAsync(
             _clinicScopeResolver, tenantId, p.ClinicId, effectiveClinicId, ct);
@@ -148,14 +148,14 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
             {
                 return Result.Failure(
                     "Prescriptions.ExaminationClinicMismatch",
-                    "Examination clinic does not match prescription clinic.");
+                    "Seçilen muayene bu kliniğe ait değil.");
             }
 
             if (exam.PetId != request.PetId)
             {
                 return Result.Failure(
                     "Prescriptions.ExaminationPetMismatch",
-                    "Examination pet does not match prescription pet.");
+                    "Seçilen muayene bu hastaya ait değil.");
             }
         }
 
@@ -168,7 +168,7 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
             {
                 return Result.Failure(
                     "Treatments.NotFound",
-                    "Treatment not found or does not belong to tenant.");
+                    "Tedavi kaydı bulunamadı.");
             }
 
             // Yeni bağ iptal edilmiş tedaviye kurulamaz (ADR-043 AK-2); mevcut bağ korunur.
@@ -183,14 +183,14 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
             {
                 return Result.Failure(
                     "Prescriptions.TreatmentClinicMismatch",
-                    "Treatment clinic does not match prescription clinic.");
+                    "Seçilen tedavi bu kliniğe ait değil.");
             }
 
             if (treatment.PetId != request.PetId)
             {
                 return Result.Failure(
                     "Prescriptions.TreatmentPetMismatch",
-                    "Treatment pet does not match prescription pet.");
+                    "Seçilen tedavi bu hastaya ait değil.");
             }
 
             if (request.ExaminationId is { } prescribedExamId)
@@ -199,7 +199,7 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
                 {
                     return Result.Failure(
                         "Prescriptions.ExaminationTreatmentMismatch",
-                        "When both examination and treatment are set, the treatment must reference the same examination.");
+                        "Seçilen tedavi, seçilen muayeneye ait değil.");
                 }
             }
         }
@@ -220,7 +220,7 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
         }
 
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
-            return Result.Failure("Prescriptions.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+            return Result.Failure("Prescriptions.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 
         var update = p.UpdateDetails(
             effectiveClinicId,

@@ -77,7 +77,7 @@ public sealed class CancelVaccinationCommandHandler : IRequestHandler<CancelVacc
             return clinicAccess;
 
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
-            return Result.Failure("Vaccinations.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+            return Result.Failure("Vaccinations.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 
         if (!v.IsCancelled && await _administrations.AnyAsync(new AdministrationByVaccinationIdSpec(tenantId, v.Id), ct))
         {

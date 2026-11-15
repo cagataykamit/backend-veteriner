@@ -73,7 +73,7 @@ public sealed class UpdateCareInstructionCommandHandler
             return Result<CareInstructionWriteResultDto>.Failure(scope.Error);
 
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
-            return Fail("CareInstructions.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+            return Fail("CareInstructions.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var update = existing.UpdateText(userId, request.Text, utcNow);

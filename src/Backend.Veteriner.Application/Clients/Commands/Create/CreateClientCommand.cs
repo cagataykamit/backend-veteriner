@@ -23,6 +23,10 @@ public sealed record CreateClientCommand(
     string? Notes = null)
     : IRequest<Result<ClientCreatedDto>>, IAuditableRequest, IActivationSignalRequest
 {
+    /// <summary>İçe aktarmadan gelen kayıt: telefon zorunluluğu uygulanmaz (<see cref="ClientPhoneRule"/>). API gövdesinden okunmaz.</summary>
+    [JsonIgnore]
+    public bool FromImport { get; init; }
+
     public ActivationSignalKind ActivationSignal => ActivationSignalKind.ClientCreated;
     public string AuditAction => "Client.Create";
     public string? AuditTarget => null;

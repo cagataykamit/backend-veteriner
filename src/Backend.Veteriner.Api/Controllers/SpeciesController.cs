@@ -60,7 +60,7 @@ public sealed class SpeciesController : ControllerBase
         // Route id kaynak-of-truth: body'de id yoksa route'tan enjekte edilir.
         // Body'de id gönderildiyse ve route ile uyuşmuyorsa açıklayıcı hata dön.
         if (cmd.Id != Guid.Empty && id != cmd.Id)
-            return Result.Failure("Species.RouteIdMismatch", "Route id ile body id uyuşmuyor.").ToActionResult(this);
+            return Result.Failure("Species.RouteIdMismatch", "Adresteki kayıt ile gönderilen kayıt eşleşmiyor. Sayfayı yenileyip tekrar deneyin.").ToActionResult(this);
 
         cmd = cmd with { Id = id };
 

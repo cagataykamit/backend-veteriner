@@ -28,7 +28,7 @@ internal static class ResultDateUtcWindow
         {
             return Result.Failure(
                 "LabResults.DateTooFarInFuture",
-                "Result date may be at most 2 years in the future.");
+                "Sonuç tarihi en fazla 2 yıl ileride olabilir.");
         }
 
         return Result.Success();

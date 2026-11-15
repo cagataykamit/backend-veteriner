@@ -24,6 +24,9 @@ public static partial class RateLimitingExtensions
     public const string PublicSiteImagePolicy = "public-site-image";
     public const string ExternalApiPolicy = "external-api";
 
+    /// <summary>429 yanıtının kullanıcıya dönen metni; durum kodu sayfası da bunu kullanır.</summary>
+    public const string ExceededDetail = "İstek sınırı aşıldı. Lütfen biraz sonra tekrar deneyin.";
+
     /// <summary>Dış API'de anahtar başına dakikalık istek sınırı (TIER-009); yapılandırmada 1–600 arası, varsayılan 60.</summary>
     public const string ExternalApiPermitLimitKey = "ExternalApi:PermitLimitPerMinute";
     public const int ExternalApiDefaultPermitLimit = 60;
@@ -63,7 +66,7 @@ public static partial class RateLimitingExtensions
                     Type = "https://httpstatuses.io/429",
                     Title = "Too Many Requests",
                     Status = StatusCodes.Status429TooManyRequests,
-                    Detail = "Istek limiti asildi. Lutfen biraz sonra tekrar deneyin.",
+                    Detail = ExceededDetail,
                     Instance = context.HttpContext.Request.Path
                 };
                 problem.Extensions["code"] = "RateLimit.Exceeded";

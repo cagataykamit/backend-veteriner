@@ -139,7 +139,9 @@ public sealed class KvkkConsentIntegrationTests : IClassFixture<CustomWebApplica
         var initial = await ctx.Http.GetFromJsonAsync<JsonElement>(url);
         initial.GetProperty("isDefault").GetBoolean().Should().BeTrue();
         initial.GetProperty("rowVersion").ValueKind.Should().Be(JsonValueKind.Null);
-        initial.GetProperty("text").GetString().Should().Contain("hukuk danışmanınızca onaylanmış");
+        initial.GetProperty("text").GetString().Should().Contain("AÇIK RIZA BEYANI").And.NotContain("hukuk danışman");
+        initial.GetProperty("missingClinicDetails").EnumerateArray().Select(p => p.GetString())
+            .Should().Equal("address", "email");
         initial.GetProperty("placeholders").EnumerateArray().Select(p => p.GetString())
             .Should().Equal("{{clinicName}}", "{{clientName}}", "{{date}}");
 
@@ -147,6 +149,7 @@ public sealed class KvkkConsentIntegrationTests : IClassFixture<CustomWebApplica
         create.StatusCode.Should().Be(HttpStatusCode.OK, await create.Content.ReadAsStringAsync());
         var created = await create.Content.ReadFromJsonAsync<JsonElement>();
         created.GetProperty("isDefault").GetBoolean().Should().BeFalse();
+        created.GetProperty("missingClinicDetails").GetArrayLength().Should().Be(0);
         var createdRv = created.GetProperty("rowVersion").GetString();
 
         // Varsayılanı görüp sürümsüz kaydeden ikinci istemci 409.
@@ -192,7 +195,9 @@ public sealed class KvkkConsentIntegrationTests : IClassFixture<CustomWebApplica
         var initial = await ctx.Http.GetFromJsonAsync<JsonElement>(url);
         initial.GetProperty("isDefault").GetBoolean().Should().BeTrue();
         initial.GetProperty("rowVersion").ValueKind.Should().Be(JsonValueKind.Null);
-        initial.GetProperty("text").GetString().Should().Contain("AYDINLATMA METNİ").And.Contain("hukuk danışmanınızca onaylanmış");
+        initial.GetProperty("text").GetString().Should().Contain("AYDINLATMA METNİ").And.NotContain("hukuk danışman").And.NotContain("[");
+        initial.GetProperty("missingClinicDetails").EnumerateArray().Select(p => p.GetString())
+            .Should().Equal("address", "phone", "email");
         initial.GetProperty("placeholders").EnumerateArray().Select(p => p.GetString())
             .Should().Equal("{{clinicName}}", "{{clientName}}", "{{date}}");
 

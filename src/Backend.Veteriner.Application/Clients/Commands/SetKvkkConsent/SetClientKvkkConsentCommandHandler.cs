@@ -81,7 +81,7 @@ public sealed class SetClientKvkkConsentCommandHandler
             return Result<ClientKvkkConsentDto>.Failure("Clients.WalkInReadOnly", "Peşin müşteri sistem kaydıdır; düzenlenemez.");
 
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
-            return Result<ClientKvkkConsentDto>.Failure("Clients.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+            return Result<ClientKvkkConsentDto>.Failure("Clients.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 
         var consentText = request.Status == KvkkConsentStatus.None
             ? null
@@ -122,7 +122,7 @@ public sealed class SetClientKvkkConsentCommandHandler
     }
 
     /// <summary>
-    /// İsteğin kliniğinde şu an geçerli açık rıza metni (ADR-032): kayıtlı şablon ya da taslak varsayılan (sürüm 0);
+    /// İsteğin kliniğinde şu an geçerli açık rıza metni (ADR-032): kayıtlı şablon ya da varsayılan (sürüm 0);
     /// <c>GET /clinics/{id}/kvkk-form-template</c> ile aynı sürüm ve özet. Klinik bağlamı yoksa ya da klinik kiracıda
     /// bulunamazsa null (sürüm bilinmiyor).
     /// </summary>
@@ -138,7 +138,7 @@ public sealed class SetClientKvkkConsentCommandHandler
         var row = await _templates.FirstOrDefaultAsync(
             new ClinicKvkkFormTemplateByClinicSpec(tenantId, clinicId, ClinicKvkkFormKind.Consent), ct);
         return row is null
-            ? ClinicKvkkFormTemplateDto.Default(clinicId, ClinicKvkkFormKind.Consent)
+            ? ClinicKvkkFormTemplateDto.Default(clinic, ClinicKvkkFormKind.Consent)
             : ClinicKvkkFormTemplateDto.From(row);
     }
 }

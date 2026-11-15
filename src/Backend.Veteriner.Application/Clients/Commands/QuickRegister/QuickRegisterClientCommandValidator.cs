@@ -12,7 +12,6 @@ public sealed class QuickRegisterClientCommandValidator : AbstractValidator<Quic
     public QuickRegisterClientCommandValidator()
     {
         RuleFor(x => x.FullName).NotEmpty().WithMessage("Ad soyad gereklidir.");
-        RuleFor(x => x.Phone).NotEmpty().WithMessage("Telefon numarası gereklidir.");
         RuleFor(x => x.PetName).NotEmpty().WithMessage("Hayvan adı gereklidir.");
         RuleFor(x => x.SpeciesId).NotEmpty().WithMessage("Tür gereklidir.");
     }

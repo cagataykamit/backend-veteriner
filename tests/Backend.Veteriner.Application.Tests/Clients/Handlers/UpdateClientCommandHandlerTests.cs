@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Clients;
 using Backend.Veteriner.Application.Clients.Commands.Update;
 using Backend.Veteriner.Application.Clients.IntegrationEvents;
 using Backend.Veteriner.Application.Clients.Specs;
@@ -245,5 +246,36 @@ public sealed class UpdateClientCommandHandlerTests
         var result = await handler.Handle(cmd, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("05321112233", null, false)]
+    [InlineData("05321112233", "   ", false)]
+    [InlineData("05321112233", "05329998877", true)]
+    [InlineData(null, null, true)]
+    public async Task Handle_Should_Keep_Stored_Phone_But_Allow_Phoneless_Legacy_Client(
+        string? storedPhone, string? requestPhone, bool succeeds)
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var tenant = new Tenant("Klinik A.Ş.", DateTime.UtcNow);
+        AlignTenantId(tenant, tid);
+        var existing = new Client(tid, "Ayşe Yılmaz", DateTime.UtcNow, storedPhone);
+        typeof(Client).GetProperty(nameof(Client.Id))!.SetValue(existing, cid);
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenantsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tenant);
+        _clientsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        var result = await CreateHandler().Handle(
+            new UpdateClientCommand(cid, "Ayşe Yılmaz", null, requestPhone, "Yeni adres"), CancellationToken.None);
+
+        result.IsSuccess.Should().Be(succeeds);
+        if (!succeeds)
+        {
+            result.Error.Code.Should().Be(ClientPhoneRule.RequiredCode);
+            existing.Phone.Should().Be("905321112233");
+        }
     }
 }

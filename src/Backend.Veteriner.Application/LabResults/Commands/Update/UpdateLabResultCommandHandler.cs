@@ -95,7 +95,7 @@ public sealed class UpdateLabResultCommandHandler
             effectiveClinicId = existing.ClinicId;
 
         if (effectiveClinicId == Guid.Empty)
-            return Fail("LabResults.Validation", "ClinicId is required.");
+            return Fail("LabResults.Validation", "Klinik seçimi zorunludur.");
 
         var clinicAccess = await LabResultClinicWriteScope.EnsureEntityAndTargetWriteAccessAsync(
             _clinicScopeResolver, tenantId, existing.ClinicId, effectiveClinicId, ct);
@@ -109,7 +109,7 @@ public sealed class UpdateLabResultCommandHandler
         }
 
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
-            return Fail("LabResults.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+            return Fail("LabResults.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 
         DateTime? resultUtc = null;
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
@@ -145,14 +145,14 @@ public sealed class UpdateLabResultCommandHandler
             {
                 return Fail(
                     "LabResults.ExaminationClinicMismatch",
-                    "Examination clinic does not match lab result clinic.");
+                    "Seçilen muayene bu kliniğe ait değil.");
             }
 
             if (exam.PetId != request.PetId)
             {
                 return Fail(
                     "LabResults.ExaminationPetMismatch",
-                    "Examination pet does not match lab result pet.");
+                    "Seçilen muayene bu hastaya ait değil.");
             }
         }
 

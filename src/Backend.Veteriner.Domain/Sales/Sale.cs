@@ -162,7 +162,7 @@ public sealed class Sale : AggregateRoot, ITenantOwned
     private static Result<SaleLine> BuildLine(Guid saleId, SaleLineDraft draft)
     {
         if (draft.ProductId == Guid.Empty)
-            return Result<SaleLine>.Failure("Sales.Validation", "ProductId zorunludur.");
+            return Result<SaleLine>.Failure("Sales.Validation", "Ürün seçimi zorunludur.");
 
         if (draft.Quantity <= 0
             || draft.Quantity > Charge.MaxQuantity

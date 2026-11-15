@@ -8,7 +8,7 @@ public sealed class ConfirmPasswordResetValidator : AbstractValidator<ConfirmPas
     public ConfirmPasswordResetValidator()
     {
         RuleFor(x => x.Token)
-            .NotEmpty().WithMessage("Token zorunludur.");
+            .NotEmpty().WithMessage("Şifre sıfırlama bağlantısı geçersiz.");
 
         RuleFor(x => x.NewPassword)
             .NotEmpty().WithMessage("Yeni şifre zorunludur.")

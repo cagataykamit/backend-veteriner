@@ -35,7 +35,7 @@ public static class ClinicSiteErrors
         new("ClinicSites.ClinicInactive", "Pasif klinik için site yayınlanamaz.");
 
     public static readonly Error InvalidRowVersion =
-        new(ClinicSiteConfig.ValidationCode, "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+        new(ClinicSiteConfig.ValidationCode, "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 
     public static Error InvalidSlug(ClinicSiteSlugCheck check) => check == ClinicSiteSlugCheck.Reserved
         ? new(ClinicSiteConfig.ValidationCode, "Bu adres ayrılmış bir sözcük; başka bir adres seçin.")

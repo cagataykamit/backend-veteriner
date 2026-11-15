@@ -26,11 +26,11 @@ public sealed class GetHospitalizationsListQueryValidator : AbstractValidator<Ge
 
         RuleFor(x => x.ClinicId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("clinicId is invalid.");
+            .WithMessage("Klinik filtresi geçersiz.");
 
         RuleFor(x => x.PetId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("petId is invalid.");
+            .WithMessage("Hasta filtresi geçersiz.");
 
         RuleFor(x => x)
             .Must(x => !x.DateFromUtc.HasValue || !x.DateToUtc.HasValue || x.DateFromUtc <= x.DateToUtc)

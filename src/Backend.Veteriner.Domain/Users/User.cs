@@ -59,7 +59,7 @@ public class User : AggregateRoot
     {
         var normalized = string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim();
         if (normalized is { Length: > MaxDisplayNameLength })
-            return Result.Failure("Users.Validation", $"Gorunen ad en fazla {MaxDisplayNameLength} karakter olabilir.");
+            return Result.Failure("Users.Validation", $"Görünen ad en fazla {MaxDisplayNameLength} karakter olabilir.");
 
         DisplayName = normalized;
         UpdatedAtUtc = utcNow;

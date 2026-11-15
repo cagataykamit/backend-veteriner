@@ -9,15 +9,15 @@ public sealed class PrescriptionItemRequestValidator : AbstractValidator<Prescri
     public PrescriptionItemRequestValidator()
     {
         RuleFor(x => x.Name)
-            .NotEmpty().WithMessage("Name is required when ProductId is not set.")
+            .NotEmpty().WithMessage("Ürün seçilmediyse ilaç adı zorunludur.")
             .When(x => !x.ProductId.HasValue);
         RuleFor(x => x.Name).MaximumLength(PrescriptionItem.NameMaxLength);
         RuleFor(x => x.ProductId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("ProductId is invalid.");
+            .WithMessage("Geçerli bir ürün seçin.");
         RuleFor(x => x.Id)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("Item id is invalid.");
+            .WithMessage("Reçete kalemi geçersiz.");
         RuleFor(x => x.Instructions).MaximumLength(PrescriptionItem.InstructionsMaxLength);
         RuleFor(x => x.Dose).MaximumLength(PrescriptionItem.DoseMaxLength);
         RuleFor(x => x.Unit).MaximumLength(PrescriptionItem.UnitMaxLength);

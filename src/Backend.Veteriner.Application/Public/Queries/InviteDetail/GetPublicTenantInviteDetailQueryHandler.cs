@@ -61,7 +61,7 @@ public sealed class GetPublicTenantInviteDetailQueryHandler
         {
             return Result<PublicTenantInviteDetailDto>.Failure(
                 "Invites.TokenRequired",
-                "Davet token zorunludur.");
+                "Davet bağlantısı geçersiz.");
         }
 
         string hash;

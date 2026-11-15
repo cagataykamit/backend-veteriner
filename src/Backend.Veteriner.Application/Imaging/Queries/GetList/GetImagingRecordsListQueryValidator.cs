@@ -25,13 +25,13 @@ public sealed class GetImagingRecordsListQueryValidator : AbstractValidator<GetI
 
         RuleFor(x => x.ClinicId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("clinicId is invalid.");
+            .WithMessage("Klinik filtresi geçersiz.");
         RuleFor(x => x.PetId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("petId is invalid.");
+            .WithMessage("Hasta filtresi geçersiz.");
         RuleFor(x => x.ExaminationId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("examinationId is invalid.");
+            .WithMessage("Muayene filtresi geçersiz.");
         RuleFor(x => x.Modality).IsInEnum().When(x => x.Modality.HasValue);
         RuleFor(x => x.Status).IsInEnum().When(x => x.Status.HasValue);
 

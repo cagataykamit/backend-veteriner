@@ -104,7 +104,7 @@ public sealed class ClinicalSnippetsController : ControllerBase
             return problem!;
 
         if (body.Id is { } bid && bid != Guid.Empty && bid != id)
-            return Result.Failure("ClinicalSnippets.RouteIdMismatch", "Route id ile body id uyuşmuyor.").ToActionResult(this);
+            return Result.Failure("ClinicalSnippets.RouteIdMismatch", "Adresteki kayıt ile gönderilen kayıt eşleşmiyor. Sayfayı yenileyip tekrar deneyin.").ToActionResult(this);
 
         var result = await _mediator.Send(new UpdateClinicalSnippetCommand(id, body.Shortcut, body.Title, body.Body, body.RowVersion), ct);
         return result.ToActionResult(this);

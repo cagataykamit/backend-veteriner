@@ -93,7 +93,7 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
         if (effectiveClinicId == Guid.Empty)
-            return Result<Guid>.Failure("Hospitalizations.Validation", "ClinicId is required.");
+            return Result<Guid>.Failure("Hospitalizations.Validation", "Klinik seçimi zorunludur.");
 
         var clinicAccess = await HospitalizationClinicWriteScope.EnsureWriteAccessAsync(
             _clinicScopeResolver, tenantId, effectiveClinicId, ct);
@@ -111,7 +111,7 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
         {
             return Result<Guid>.Failure(
                 "Hospitalizations.PlannedDischargeBeforeAdmission",
-                "Planned discharge must not be before admission.");
+                "Planlanan taburcu tarihi yatış tarihinden önce olamaz.");
         }
 
         var clinic = await _clinics.FirstOrDefaultAsync(
@@ -138,14 +138,14 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
             {
                 return Result<Guid>.Failure(
                     "Hospitalizations.ExaminationClinicMismatch",
-                    "Examination clinic does not match hospitalization clinic.");
+                    "Seçilen muayene bu kliniğe ait değil.");
             }
 
             if (exam.PetId != request.PetId)
             {
                 return Result<Guid>.Failure(
                     "Hospitalizations.ExaminationPetMismatch",
-                    "Examination pet does not match hospitalization pet.");
+                    "Seçilen muayene bu hastaya ait değil.");
             }
         }
 
@@ -166,7 +166,7 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
         {
             return Result<Guid>.Failure(
                 "Hospitalizations.ActiveHospitalizationExists",
-                "An active hospitalization already exists for this pet at this clinic.");
+                "Bu hastanın bu klinikte devam eden bir yatışı zaten var.");
         }
 
         HospitalizationRoomAssignment? roomAssignment = null;

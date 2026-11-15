@@ -30,7 +30,7 @@ public sealed class GetVaccinationsListQueryValidator : AbstractValidator<GetVac
 
         RuleFor(x => x.ClientId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("clientId is invalid.");
+            .WithMessage("Müşteri filtresi geçersiz.");
 
         RuleFor(x => x.PageRequest.Sort)
             .Must(VaccinationListSort.Catalog.IsAllowedSort)

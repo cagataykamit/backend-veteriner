@@ -76,7 +76,7 @@ public sealed class HospitalizationsController : ControllerBase
             return problem!;
 
         if (body.Id is { } bid && bid != Guid.Empty && bid != id)
-            return Result.Failure("Hospitalizations.RouteIdMismatch", "Route id ile body id uyusmuyor.").ToActionResult(this);
+            return Result.Failure("Hospitalizations.RouteIdMismatch", "Adresteki kayıt ile gönderilen kayıt eşleşmiyor. Sayfayı yenileyip tekrar deneyin.").ToActionResult(this);
 
         var cmd = new UpdateHospitalizationCommand(
             id,

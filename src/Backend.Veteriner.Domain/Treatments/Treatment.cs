@@ -92,16 +92,16 @@ public sealed class Treatment : AggregateRoot, IClinicScoped, ITenantOwned
         if (IsCancelled)
             return CancelledFailure();
         if (clinicId == Guid.Empty)
-            return Result.Failure("Treatments.Validation", "ClinicId is invalid.");
+            return Result.Failure("Treatments.Validation", "Geçerli bir klinik seçin.");
         var subject = RecordSubjectRule.EnsureUnchanged(ClinicId, PetId, clinicId, petId, "Treatments");
         if (!subject.IsSuccess)
             return subject;
         if (petId == Guid.Empty)
-            return Result.Failure("Treatments.Validation", "PetId is invalid.");
+            return Result.Failure("Treatments.Validation", "Geçerli bir hasta seçin.");
         if (string.IsNullOrWhiteSpace(title))
-            return Result.Failure("Treatments.Validation", "Title is required.");
+            return Result.Failure("Treatments.Validation", "Başlık zorunludur.");
         if (string.IsNullOrWhiteSpace(description))
-            return Result.Failure("Treatments.Validation", "Description is required.");
+            return Result.Failure("Treatments.Validation", "Açıklama zorunludur.");
 
         ClinicId = clinicId;
         PetId = petId;

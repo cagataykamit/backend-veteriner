@@ -26,17 +26,17 @@ public sealed class CreateStockMovementCommandValidator : AbstractValidator<Crea
         RuleFor(x => x.ReferenceId)
             .NotEmpty()
             .When(x => !string.IsNullOrWhiteSpace(x.ReferenceType))
-            .WithMessage("ReferenceType verilirse ReferenceId de verilmelidir.");
+            .WithMessage("Referans türü seçildiyse referans kaydı da seçilmelidir.");
 
         RuleFor(x => x.ReferenceType)
             .NotEmpty()
             .When(x => x.ReferenceId.HasValue && x.ReferenceId.Value != Guid.Empty)
-            .WithMessage("ReferenceId verilirse ReferenceType de verilmelidir.");
+            .WithMessage("Referans kaydı seçildiyse referans türü de seçilmelidir.");
 
         RuleFor(x => x.Quantity)
             .GreaterThan(0)
             .When(x => x.MovementType != StockMovementType.Adjustment)
-            .WithMessage("Quantity sıfırdan büyük olmalıdır.");
+            .WithMessage("Miktar sıfırdan büyük olmalıdır.");
 
         RuleFor(x => x.Quantity)
             .GreaterThanOrEqualTo(0)
@@ -45,11 +45,11 @@ public sealed class CreateStockMovementCommandValidator : AbstractValidator<Crea
 
         RuleFor(x => x.Quantity)
             .LessThanOrEqualTo(StockMovement.MaxQuantity)
-            .WithMessage($"Quantity en fazla {StockMovement.MaxQuantity:0} olabilir.");
+            .WithMessage($"Miktar en fazla {StockMovement.MaxQuantity:0} olabilir.");
 
         RuleFor(x => x.UnitCost)
             .Must(uc => !uc.HasValue || uc.Value >= 0)
-            .WithMessage("UnitCost negatif olamaz.");
+            .WithMessage("Birim maliyet negatif olamaz.");
 
         RuleFor(x => x.Batch)
             .Null()

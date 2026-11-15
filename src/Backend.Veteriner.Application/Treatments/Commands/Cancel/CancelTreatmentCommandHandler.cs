@@ -85,7 +85,7 @@ public sealed class CancelTreatmentCommandHandler : IRequestHandler<CancelTreatm
             return clinicAccess;
 
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
-            return Result.Failure("Treatments.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+            return Result.Failure("Treatments.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 
         if (!t.IsCancelled
             && (await _prescriptions.AnyAsync(new ActivePrescriptionsByTreatmentSpec(tenantId, t.Id), ct)

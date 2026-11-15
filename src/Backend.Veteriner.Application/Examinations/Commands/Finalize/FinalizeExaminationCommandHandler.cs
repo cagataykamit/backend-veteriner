@@ -48,7 +48,7 @@ public sealed class FinalizeExaminationCommandHandler
         {
             return Result<ExaminationFinalizeResultDto>.Failure(
                 "Examinations.Validation",
-                "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+                "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
         }
 
         if (_clientContext.UserId is not { } userId)

@@ -66,7 +66,7 @@ public sealed class CareInstruction : AggregateRoot, IClinicScoped, ITenantOwned
     public Result UpdateText(Guid updatedByUserId, string text, DateTime utcNow)
     {
         if (updatedByUserId == Guid.Empty)
-            return Result.Failure("CareInstructions.Validation", "UpdatedByUserId is invalid.");
+            return Result.Failure("CareInstructions.Validation", "Güncelleyen kullanıcı geçersiz.");
 
         var check = ValidateText(text);
         if (!check.IsSuccess)

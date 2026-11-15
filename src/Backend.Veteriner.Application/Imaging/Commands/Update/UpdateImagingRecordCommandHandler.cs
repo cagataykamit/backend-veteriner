@@ -56,7 +56,7 @@ public sealed class UpdateImagingRecordCommandHandler
             return Result<ImagingRecordWriteResultDto>.Failure(scope.Error);
 
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
-            return Fail("ImagingRecords.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+            return Fail("ImagingRecords.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 
         if (existing.Status == ImagingRecordStatus.Cancelled)
             return Fail("ImagingRecords.AlreadyCancelled", "Görüntüleme kaydı iptal edilmiş; değiştirilemez.");

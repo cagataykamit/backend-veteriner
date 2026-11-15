@@ -97,7 +97,7 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
         }
 
         if ((_clinicContext.ClinicId ?? request.ClinicId) is not { } clinicId)
-            return Fail("Sales.Validation", "ClinicId zorunludur (aktif klinik bağlamı yok).");
+            return Fail("Sales.Validation", "Önce çalıştığınız kliniği seçin.");
 
         var clinicAccess = await _clinicScopeResolver.ResolveAsync(tenantId, clinicId, ct);
         if (!clinicAccess.IsSuccess)

@@ -60,6 +60,9 @@ public sealed class UpdateClientCommandHandler : IRequestHandler<UpdateClientCom
         if (client.IsWalkIn)
             return Result.Failure("Clients.WalkInReadOnly", "Peşin müşteri sistem kaydıdır; düzenlenemez.");
 
+        if (!ClientPhoneRule.IsSatisfiedOnUpdate(request.Phone, client.Phone))
+            return Result.Failure(ClientPhoneRule.RequiredCode, ClientPhoneRule.RequiredMessage);
+
         var emailNorm = Client.NormalizeEmailForStorage(request.Email);
         string? phoneNorm = null;
         if (!string.IsNullOrWhiteSpace(request.Phone))

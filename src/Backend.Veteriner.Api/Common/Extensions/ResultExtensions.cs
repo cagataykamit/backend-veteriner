@@ -37,7 +37,7 @@ public static class ResultExtensions
             Status = statusCode,
             Title = ResolveProblemTitle(error.Code, statusCode),
             Detail = string.IsNullOrWhiteSpace(error.Message)
-                ? "A business rule was violated."
+                ? "İşlem tamamlanamadı."
                 : error.Message,
             Type = type,
             Instance = controller.HttpContext.Request.Path

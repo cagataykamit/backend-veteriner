@@ -90,7 +90,7 @@ public sealed class UpdateTreatmentCommandHandler : IRequestHandler<UpdateTreatm
             effectiveClinicId = t.ClinicId;
 
         if (effectiveClinicId == Guid.Empty)
-            return Result.Failure("Treatments.Validation", "ClinicId is required.");
+            return Result.Failure("Treatments.Validation", "Klinik seçimi zorunludur.");
 
         var clinicAccess = await TreatmentClinicWriteScope.EnsureEntityAndTargetWriteAccessAsync(
             _clinicScopeResolver, tenantId, t.ClinicId, effectiveClinicId, ct);
@@ -138,14 +138,14 @@ public sealed class UpdateTreatmentCommandHandler : IRequestHandler<UpdateTreatm
             {
                 return Result.Failure(
                     "Treatments.ExaminationClinicMismatch",
-                    "Examination clinic does not match treatment clinic.");
+                    "Seçilen muayene bu kliniğe ait değil.");
             }
 
             if (exam.PetId != request.PetId)
             {
                 return Result.Failure(
                     "Treatments.ExaminationPetMismatch",
-                    "Examination pet does not match treatment pet.");
+                    "Seçilen muayene bu hastaya ait değil.");
             }
         }
 
@@ -155,7 +155,7 @@ public sealed class UpdateTreatmentCommandHandler : IRequestHandler<UpdateTreatm
             return locked;
 
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
-            return Result.Failure("Treatments.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+            return Result.Failure("Treatments.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 
         var update = t.UpdateDetails(
             effectiveClinicId,

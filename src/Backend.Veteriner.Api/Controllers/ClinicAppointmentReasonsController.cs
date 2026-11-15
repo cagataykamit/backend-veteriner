@@ -96,7 +96,7 @@ public sealed class ClinicAppointmentReasonsController : ControllerBase
             return problem!;
 
         if (body.Id is { } bid && bid != Guid.Empty && bid != reasonId)
-            return Result.Failure("AppointmentReasons.RouteIdMismatch", "Route id ile body id uyusmuyor.").ToActionResult(this);
+            return Result.Failure("AppointmentReasons.RouteIdMismatch", "Adresteki kayıt ile gönderilen kayıt eşleşmiyor. Sayfayı yenileyip tekrar deneyin.").ToActionResult(this);
 
         var result = await _mediator.Send(new UpdateAppointmentReasonCommand(
             clinicId,

@@ -61,7 +61,7 @@ public sealed class UpdateExaminationCommandHandler
         {
             return Result<ExaminationWriteResultDto>.Failure(
                 "Examinations.Validation",
-                "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+                "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
         }
 
         var tenant = await _tenants.FirstOrDefaultAsync(new TenantByIdSpec(tenantId), ct);
@@ -111,7 +111,7 @@ public sealed class UpdateExaminationCommandHandler
             {
                 return Result<ExaminationWriteResultDto>.Failure(
                     "Examinations.Validation",
-                    "AppointmentId gecersiz.");
+                    "Geçerli bir randevu seçin.");
             }
 
             if (e.AppointmentId != requestAppointmentId)

@@ -6,9 +6,6 @@ namespace Backend.Veteriner.Application.Clients.Commands.Create.Validators;
 
 public sealed class CreateClientCommandValidator : AbstractValidator<CreateClientCommand>
 {
-    public const string PhoneInvalidMessage =
-        "Telefon numarası geçerli değil. Türkiye cep telefonu olarak 05XXXXXXXXX, 5XXXXXXXXX veya +90 5XX XXX XX XX biçiminde girin.";
-
     public CreateClientCommandValidator()
     {
         RuleFor(x => x.FullName)
@@ -24,7 +21,12 @@ public sealed class CreateClientCommandValidator : AbstractValidator<CreateClien
             .EmailAddress().WithMessage("Geçerli bir e-posta adresi giriniz.")
             .When(x => !string.IsNullOrWhiteSpace(x.Email));
 
-        // Telefon opsiyonel; doluysa Türkiye cep standardı (905XXXXXXXXX).
+        // Telefon zorunlu (içe aktarma hariç) ve Türkiye cep standardı (905XXXXXXXXX); kural ClientPhoneRule.
+        RuleFor(x => x.Phone)
+            .Must((cmd, p) => ClientPhoneRule.IsSatisfiedOnCreate(p, cmd.FromImport))
+            .WithErrorCode(ClientPhoneRule.RequiredCode)
+            .WithMessage(ClientPhoneRule.RequiredMessage);
+
         RuleFor(x => x.Phone)
             .MaximumLength(50).WithMessage("Telefon numarası en fazla 50 karakter olabilir.")
             .When(x => !string.IsNullOrWhiteSpace(x.Phone));
@@ -32,7 +34,7 @@ public sealed class CreateClientCommandValidator : AbstractValidator<CreateClien
         RuleFor(x => x.Phone)
             .Must(p => string.IsNullOrWhiteSpace(p) || TurkishMobilePhone.TryNormalize(p, out _))
             .When(x => !string.IsNullOrWhiteSpace(x.Phone))
-            .WithMessage(PhoneInvalidMessage);
+            .WithMessage(ClientPhoneRule.InvalidMessage);
 
         RuleFor(x => x.Address)
             .MaximumLength(500).WithMessage("Adres en fazla 500 karakter olabilir.")

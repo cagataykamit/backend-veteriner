@@ -123,7 +123,7 @@ public sealed class ClinicsController : ControllerBase
         {
             return Result<IReadOnlyList<ClinicWorkingHourDto>>.Failure(
                     "Clinics.WorkingHours.Validation.InvalidRequestBody",
-                    "Istek govdesi bos veya hatali JSON.")
+                    "İstek okunamadı. Sayfayı yenileyip tekrar deneyin.")
                 .ToActionResult(this);
         }
 
@@ -171,7 +171,7 @@ public sealed class ClinicsController : ControllerBase
         {
             return Result<ClinicAppointmentSettingsDto>.Failure(
                     "Clinics.AppointmentSettings.Validation.InvalidRequestBody",
-                    "Istek govdesi bos veya hatali JSON.")
+                    "İstek okunamadı. Sayfayı yenileyip tekrar deneyin.")
                 .ToActionResult(this);
         }
 
@@ -221,7 +221,7 @@ public sealed class ClinicsController : ControllerBase
 
     /// <summary>
     /// Klinik KVKK aydınlatma metni şablonu (ADR-024). Açık rıza formu şablonuyla aynı sözleşme, izin ve sürüm kuralı;
-    /// kayıt yoksa taslak varsayılan aydınlatma metni döner (<c>isDefault=true</c>). Bkz. docs/KVKK_CONSENT_API_CONTRACT.md.
+    /// kayıt yoksa varsayılan aydınlatma metni döner (<c>isDefault=true</c>). Bkz. docs/KVKK_CONSENT_API_CONTRACT.md.
     /// </summary>
     /// <remarks>Okuma yetkisi composite "any-of": <c>Clinics.Read</c>, <c>Clinics.Update</c> veya <c>Clients.Read</c>.</remarks>
     [HttpGet("{id:guid}/kvkk-disclosure-template")]
@@ -286,7 +286,7 @@ public sealed class ClinicsController : ControllerBase
         {
             return Result<ClinicTaxpayerSettingsDto>.Failure(
                     "Clinics.TaxpayerSettings.Validation.InvalidRequestBody",
-                    "Istek govdesi bos veya hatali JSON.")
+                    "İstek okunamadı. Sayfayı yenileyip tekrar deneyin.")
                 .ToActionResult(this);
         }
 
@@ -326,7 +326,7 @@ public sealed class ClinicsController : ControllerBase
         {
             return Result<ClinicKvkkFormTemplateDto>.Failure(
                     "Clinics.KvkkFormTemplate.Validation.InvalidRequestBody",
-                    "Istek govdesi bos veya hatali JSON.")
+                    "İstek okunamadı. Sayfayı yenileyip tekrar deneyin.")
                 .ToActionResult(this);
         }
 
@@ -421,7 +421,7 @@ public sealed class ClinicsController : ControllerBase
             return problem!;
 
         if (body.Id is { } bid && bid != Guid.Empty && bid != wardId)
-            return Result.Failure("HospitalizationWards.RouteIdMismatch", "Route id ile body id uyusmuyor.").ToActionResult(this);
+            return Result.Failure("HospitalizationWards.RouteIdMismatch", "Adresteki kayıt ile gönderilen kayıt eşleşmiyor. Sayfayı yenileyip tekrar deneyin.").ToActionResult(this);
 
         var result = await _mediator.Send(new UpdateWardCommand(id, wardId, body.Name, body.SortOrder), ct);
         return result.ToActionResult(this);
@@ -504,7 +504,7 @@ public sealed class ClinicsController : ControllerBase
             return problem!;
 
         if (body.Id is { } bid && bid != Guid.Empty && bid != roomId)
-            return Result.Failure("HospitalizationRooms.RouteIdMismatch", "Route id ile body id uyusmuyor.").ToActionResult(this);
+            return Result.Failure("HospitalizationRooms.RouteIdMismatch", "Adresteki kayıt ile gönderilen kayıt eşleşmiyor. Sayfayı yenileyip tekrar deneyin.").ToActionResult(this);
 
         var result = await _mediator.Send(new UpdateRoomCommand(id, wardId, roomId, body.Name, body.SortOrder), ct);
         return result.ToActionResult(this);
@@ -586,7 +586,7 @@ public sealed class ClinicsController : ControllerBase
             return problem!;
 
         if (body.Id is { } bodyId && bodyId != Guid.Empty && bodyId != id)
-            return Result.Failure("Clinics.RouteIdMismatch", "Route id ile body id uyuşmuyor.").ToActionResult(this);
+            return Result.Failure("Clinics.RouteIdMismatch", "Adresteki kayıt ile gönderilen kayıt eşleşmiyor. Sayfayı yenileyip tekrar deneyin.").ToActionResult(this);
 
         var cmd = new UpdateClinicCommand(
             id,

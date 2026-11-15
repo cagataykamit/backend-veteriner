@@ -77,7 +77,7 @@ public sealed class CreateTreatmentCommandHandler : IRequestHandler<CreateTreatm
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
         if (effectiveClinicId == Guid.Empty)
-            return Result<Guid>.Failure("Treatments.Validation", "ClinicId is required.");
+            return Result<Guid>.Failure("Treatments.Validation", "Klinik seçimi zorunludur.");
 
         var clinicAccess = await TreatmentClinicWriteScope.EnsureWriteAccessAsync(
             _clinicScopeResolver, tenantId, effectiveClinicId, ct);
@@ -119,14 +119,14 @@ public sealed class CreateTreatmentCommandHandler : IRequestHandler<CreateTreatm
             {
                 return Result<Guid>.Failure(
                     "Treatments.ExaminationClinicMismatch",
-                    "Examination clinic does not match treatment clinic.");
+                    "Seçilen muayene bu kliniğe ait değil.");
             }
 
             if (exam.PetId != request.PetId)
             {
                 return Result<Guid>.Failure(
                     "Treatments.ExaminationPetMismatch",
-                    "Examination pet does not match treatment pet.");
+                    "Seçilen muayene bu hastaya ait değil.");
             }
         }
 

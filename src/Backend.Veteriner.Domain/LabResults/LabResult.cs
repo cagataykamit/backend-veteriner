@@ -129,11 +129,11 @@ public sealed class LabResult : AggregateRoot, IClinicScoped, ITenantOwned
         if (Status == LabResultStatus.Cancelled)
             return AlreadyCancelled();
         if (clinicId == Guid.Empty)
-            return Result.Failure("LabResults.Validation", "ClinicId is invalid.");
+            return Result.Failure("LabResults.Validation", "Geçerli bir klinik seçin.");
         if (petId == Guid.Empty)
-            return Result.Failure("LabResults.Validation", "PetId is invalid.");
+            return Result.Failure("LabResults.Validation", "Geçerli bir hasta seçin.");
         if (string.IsNullOrWhiteSpace(testName))
-            return Result.Failure("LabResults.Validation", "TestName is required.");
+            return Result.Failure("LabResults.Validation", "Test adı zorunludur.");
         var subject = RecordSubjectRule.EnsureUnchanged(ClinicId, PetId, clinicId, petId, "LabResults");
         if (!subject.IsSuccess)
             return subject;

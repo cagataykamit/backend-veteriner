@@ -6,14 +6,14 @@ namespace Backend.Veteriner.Domain.Clinics;
 
 /// <summary>
 /// Klinik başına yazdırılabilir KVKK şablon metni: açık rıza formu (ADR-021) veya aydınlatma metni (ADR-024).
-/// Tenant + Clinic + <see cref="Kind"/> benzersizdir. Metni klinik yazar (hukuk danışmanının onayladığı metin);
+/// Tenant + Clinic + <see cref="Kind"/> benzersizdir. Metni klinik yazar;
 /// yer tutucular istemcide doldurulur, sunucu ham metni saklar.
 /// </summary>
 public sealed class ClinicKvkkFormTemplate : ITenantOwned
 {
     public const int MaxTextLength = 20_000;
 
-    /// <summary>Kaydı olmayan klinikte geçerli taslak varsayılan metnin sürümü (ADR-032).</summary>
+    /// <summary>Kaydı olmayan klinikte geçerli varsayılan metnin sürümü (ADR-032).</summary>
     public const int DefaultTextVersion = 0;
 
     /// <summary><see cref="TextHash"/> uzunluğu (SHA-256, hex).</summary>
@@ -27,7 +27,7 @@ public sealed class ClinicKvkkFormTemplate : ITenantOwned
 
     /// <summary>
     /// Kaydedilen metnin sürümü (ADR-032): ilk kayıt 1, metin her değiştiğinde +1; aynı metin tekrar kaydedilirse değişmez.
-    /// Kaydı olmayan klinikte geçerli olan taslak varsayılan metin <see cref="DefaultTextVersion"/> sayılır.
+    /// Kaydı olmayan klinikte geçerli olan varsayılan metin <see cref="DefaultTextVersion"/> sayılır.
     /// </summary>
     public int TextVersion { get; private set; }
 

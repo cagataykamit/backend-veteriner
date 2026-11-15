@@ -260,6 +260,7 @@ public sealed class HbsAssistantIntegrationTests : IClassFixture<CustomWebApplic
             var client = await Http.PostAsJsonAsync("/api/v1/clients", new
             {
                 fullName = $"HBS Müşteri {Guid.NewGuid():N}"[..22],
+                phone = "05321112233",
                 invoicingIdentity = new { personType = "Individual", nationalId = Tckn },
             });
             var clientBody = await client.Content.ReadAsStringAsync();

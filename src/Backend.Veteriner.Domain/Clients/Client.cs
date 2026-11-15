@@ -6,7 +6,8 @@ namespace Backend.Veteriner.Domain.Clients;
 
 /// <summary>
 /// Kiracıya bağlı müşteri (hayvan sahibi).
-/// Telefon opsiyonel; doluysa <see cref="TurkishMobilePhone"/> ile 905XXXXXXXXX saklanır (Phone ve PhoneNormalized aynı).
+/// Telefon domain'de opsiyonel (eski ve içe aktarılmış kayıt); yeni kayıtta zorunluluk uygulama katmanındaki ClientPhoneRule'dadır.
+/// Doluysa <see cref="TurkishMobilePhone"/> ile 905XXXXXXXXX saklanır (Phone ve PhoneNormalized aynı).
 /// </summary>
 public sealed class Client : AggregateRoot, ITenantOwned, IChangeTracked
 {

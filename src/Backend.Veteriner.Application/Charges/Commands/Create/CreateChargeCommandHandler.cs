@@ -87,14 +87,14 @@ public sealed class CreateChargeCommandHandler : IRequestHandler<CreateChargeCom
         }
 
         if ((_clinicContext.ClinicId ?? request.ClinicId) is not { } clinicId)
-            return Fail("Charges.Validation", "ClinicId zorunludur (aktif klinik bağlamı yok).");
+            return Fail("Charges.Validation", "Önce çalıştığınız kliniği seçin.");
 
         var clinicAccess = await _clinicScopeResolver.ResolveAsync(tenantId, clinicId, ct);
         if (!clinicAccess.IsSuccess)
             return Result<ChargeCreateResultDto>.Failure(clinicAccess.Error);
 
         if (request.ClientId == Guid.Empty)
-            return Fail("Charges.Validation", "ClientId zorunludur.");
+            return Fail("Charges.Validation", "Müşteri seçimi zorunludur.");
 
         var client = await _clients.FirstOrDefaultAsync(new ClientByIdSpec(tenantId, request.ClientId), ct);
         if (client is null)

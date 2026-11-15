@@ -73,7 +73,7 @@ public sealed class TreatmentsController : ControllerBase
             return problem!;
 
         if (body.Id is { } bid && bid != Guid.Empty && bid != id)
-            return Result.Failure("Treatments.RouteIdMismatch", "Route id ile body id uyusmuyor.").ToActionResult(this);
+            return Result.Failure("Treatments.RouteIdMismatch", "Adresteki kayıt ile gönderilen kayıt eşleşmiyor. Sayfayı yenileyip tekrar deneyin.").ToActionResult(this);
 
         var cmd = new UpdateTreatmentCommand(
             id,

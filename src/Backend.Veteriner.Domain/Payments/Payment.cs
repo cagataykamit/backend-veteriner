@@ -145,17 +145,17 @@ public sealed class Payment : AggregateRoot, IClinicScoped, ITenantOwned
             return Result.Failure("Payments.AlreadyVoided", "İptal edilmiş ödeme güncellenemez.");
 
         if (clinicId == Guid.Empty)
-            return Result.Failure("Payments.Validation", "ClinicId gecersiz.");
+            return Result.Failure("Payments.Validation", "Geçerli bir klinik seçin.");
         if (clientId == Guid.Empty)
-            return Result.Failure("Payments.Validation", "ClientId gecersiz.");
+            return Result.Failure("Payments.Validation", "Geçerli bir müşteri seçin.");
         if (amount <= 0)
-            return Result.Failure("Payments.Validation", "Tutar sifirdan buyuk olmalidir.");
+            return Result.Failure("Payments.Validation", "Tutar sıfırdan büyük olmalıdır.");
         if (string.IsNullOrWhiteSpace(currency))
-            return Result.Failure("Payments.Validation", "Para birimi bos olamaz.");
+            return Result.Failure("Payments.Validation", "Para birimi zorunludur.");
 
         var c = currency.Trim().ToUpperInvariant();
         if (c.Length != 3)
-            return Result.Failure("Payments.Validation", "Para birimi ISO 4217 alpha-3 (3 harf) olmalidir.");
+            return Result.Failure("Payments.Validation", "Para birimi 3 harfli kod olmalıdır (ör. TRY).");
 
         if ((AllocatedAmount > 0 || CreditedAmount > 0) && IsCorrection(clinicId, clientId, amount, c))
         {

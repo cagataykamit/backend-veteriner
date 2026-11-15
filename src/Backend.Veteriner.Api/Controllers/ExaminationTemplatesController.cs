@@ -109,7 +109,7 @@ public sealed class ExaminationTemplatesController : ControllerBase
             return problem!;
 
         if (body.Id is { } bid && bid != Guid.Empty && bid != id)
-            return Result.Failure("ExaminationTemplates.RouteIdMismatch", "Route id ile body id uyuşmuyor.").ToActionResult(this);
+            return Result.Failure("ExaminationTemplates.RouteIdMismatch", "Adresteki kayıt ile gönderilen kayıt eşleşmiyor. Sayfayı yenileyip tekrar deneyin.").ToActionResult(this);
 
         var result = await _mediator.Send(
             new UpdateExaminationTemplateCommand(

@@ -105,7 +105,7 @@ public sealed class UpdateHospitalizationCommandHandler
             effectiveClinicId = existing.ClinicId;
 
         if (effectiveClinicId == Guid.Empty)
-            return Fail("Hospitalizations.Validation", "ClinicId is required.");
+            return Fail("Hospitalizations.Validation", "Klinik seçimi zorunludur.");
 
         var clinicAccess = await HospitalizationClinicWriteScope.EnsureEntityAndTargetWriteAccessAsync(
             _clinicScopeResolver, tenantId, existing.ClinicId, effectiveClinicId, ct);
@@ -132,7 +132,7 @@ public sealed class UpdateHospitalizationCommandHandler
         {
             return Fail(
                 "Hospitalizations.PlannedDischargeBeforeAdmission",
-                "Planned discharge must not be before admission.");
+                "Planlanan taburcu tarihi yatış tarihinden önce olamaz.");
         }
 
         var clinic = await _clinics.FirstOrDefaultAsync(
@@ -159,20 +159,20 @@ public sealed class UpdateHospitalizationCommandHandler
             {
                 return Fail(
                     "Hospitalizations.ExaminationClinicMismatch",
-                    "Examination clinic does not match hospitalization clinic.");
+                    "Seçilen muayene bu kliniğe ait değil.");
             }
 
             if (exam.PetId != request.PetId)
             {
                 return Fail(
                     "Hospitalizations.ExaminationPetMismatch",
-                    "Examination pet does not match hospitalization pet.");
+                    "Seçilen muayene bu hastaya ait değil.");
             }
         }
 
         // Taburcu edilmiş kayıt hiçbir alanı değiştirmez; kilit hatası yerine durum hatası dönmeli.
         if (existing.DischargedAtUtc.HasValue)
-            return Fail("Hospitalizations.AlreadyDischarged", "Discharged hospitalization cannot be updated.");
+            return Fail("Hospitalizations.AlreadyDischarged", "Taburcu edilmiş yatış değiştirilemez.");
 
         var locked = await ExaminationLinkedRecordLock.EnsureHospitalizationLinkEditableAsync(
             _examinations, tenantId, existing.ExaminationId, request.ExaminationId, ct);
@@ -186,7 +186,7 @@ public sealed class UpdateHospitalizationCommandHandler
         {
             return Fail(
                 "Hospitalizations.ActiveHospitalizationExists",
-                "An active hospitalization already exists for this pet at this clinic.");
+                "Bu hastanın bu klinikte devam eden bir yatışı zaten var.");
         }
 
         var visitHint = request.VisitId

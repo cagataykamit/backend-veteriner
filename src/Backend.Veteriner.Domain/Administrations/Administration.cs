@@ -101,9 +101,9 @@ public sealed class Administration : AggregateRoot, IClinicScoped, ITenantOwned
         if (clinicId == Guid.Empty)
             return Invalid("ClinicId geçersiz.");
         if (petId == Guid.Empty)
-            return Invalid("PetId zorunludur.");
+            return Invalid("Hasta seçimi zorunludur.");
         if (productId == Guid.Empty)
-            return Invalid("ProductId zorunludur.");
+            return Invalid("Ürün seçimi zorunludur.");
         if (examinationId == Guid.Empty || treatmentId == Guid.Empty || requestId == Guid.Empty || vaccinationId == Guid.Empty)
             return Invalid("ExaminationId, TreatmentId, RequestId ve VaccinationId verilirse geçerli bir kimlik olmalıdır.");
         if (createdByUserId == Guid.Empty)

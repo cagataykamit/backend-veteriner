@@ -125,7 +125,7 @@ public sealed class Charge : AggregateRoot, IClinicScoped, ITenantOwned
         if (clinicId == Guid.Empty)
             return Invalid("ClinicId geçersiz.");
         if (clientId == Guid.Empty)
-            return Invalid("ClientId zorunludur.");
+            return Invalid("Müşteri seçimi zorunludur.");
         if (petId == Guid.Empty || visitId == Guid.Empty || examinationId == Guid.Empty || requestId == Guid.Empty)
             return Invalid("PetId, VisitId, ExaminationId ve RequestId verilirse geçerli bir kimlik olmalıdır.");
         if (createdByUserId == Guid.Empty)

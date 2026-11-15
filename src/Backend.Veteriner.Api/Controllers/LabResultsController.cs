@@ -81,7 +81,7 @@ public sealed class LabResultsController : ControllerBase
             return problem!;
 
         if (body.Id is { } bid && bid != Guid.Empty && bid != id)
-            return Result.Failure("LabResults.RouteIdMismatch", "Route id ile body id uyusmuyor.").ToActionResult(this);
+            return Result.Failure("LabResults.RouteIdMismatch", "Adresteki kayıt ile gönderilen kayıt eşleşmiyor. Sayfayı yenileyip tekrar deneyin.").ToActionResult(this);
 
         var cmd = new UpdateLabResultCommand(
             id,

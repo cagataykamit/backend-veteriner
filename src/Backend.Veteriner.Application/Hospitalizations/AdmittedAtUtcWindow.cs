@@ -28,7 +28,7 @@ internal static class AdmittedAtUtcWindow
         {
             return Result.Failure(
                 "Hospitalizations.AdmittedAtTooFarInFuture",
-                "Admission time may be at most 2 years in the future.");
+                "Yatış zamanı en fazla 2 yıl ileride olabilir.");
         }
 
         return Result.Success();

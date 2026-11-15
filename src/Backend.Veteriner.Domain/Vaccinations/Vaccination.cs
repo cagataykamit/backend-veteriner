@@ -154,13 +154,13 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned, IC
         DateTime utcNow)
     {
         if (petId == Guid.Empty)
-            return Result.Failure("Vaccinations.Validation", "PetId gecersiz.");
+            return Result.Failure("Vaccinations.Validation", "Geçerli bir hasta seçin.");
         if (clinicId == Guid.Empty)
-            return Result.Failure("Vaccinations.Validation", "ClinicId gecersiz.");
+            return Result.Failure("Vaccinations.Validation", "Geçerli bir klinik seçin.");
         if (vaccineDefinitionId == Guid.Empty)
-            return Result.Failure("Vaccinations.Validation", "VaccineDefinitionId gecersiz.");
+            return Result.Failure("Vaccinations.Validation", "Geçerli bir aşı seçin.");
         if (string.IsNullOrWhiteSpace(vaccineNameSnapshot))
-            return Result.Failure("Vaccinations.Validation", "Asi adi snapshot bos olamaz.");
+            return Result.Failure("Vaccinations.Validation", "Aşı adı zorunludur.");
 
         var transition = EnsureStatusTransition(Status, status);
         if (!transition.IsSuccess)

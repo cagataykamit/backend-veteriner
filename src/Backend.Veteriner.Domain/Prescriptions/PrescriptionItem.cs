@@ -57,21 +57,21 @@ public sealed class PrescriptionItem
     internal static Result Validate(PrescriptionItemDraft draft)
     {
         if (string.IsNullOrWhiteSpace(draft.Name))
-            return Result.Failure("Prescriptions.Validation", "Item name is required.");
+            return Result.Failure("Prescriptions.Validation", "İlaç adı zorunludur.");
         if (draft.Name.Trim().Length > NameMaxLength)
-            return Result.Failure("Prescriptions.Validation", $"Item name must be at most {NameMaxLength} characters.");
+            return Result.Failure("Prescriptions.Validation", $"İlaç adı en fazla {NameMaxLength} karakter olabilir.");
         if (draft.ProductId == Guid.Empty)
-            return Result.Failure("Prescriptions.Validation", "Item ProductId is invalid.");
+            return Result.Failure("Prescriptions.Validation", "Geçerli bir ürün seçin.");
         if (TooLong(draft.Instructions, InstructionsMaxLength))
-            return Result.Failure("Prescriptions.Validation", $"Item instructions must be at most {InstructionsMaxLength} characters.");
+            return Result.Failure("Prescriptions.Validation", $"Kullanım talimatı en fazla {InstructionsMaxLength} karakter olabilir.");
         if (draft.Quantity is { } q && (q <= 0 || q > QuantityMax || decimal.Round(q, 3) != q))
-            return Result.Failure("Prescriptions.Validation", "Item quantity must be greater than 0, at most 100000, with up to 3 decimals.");
+            return Result.Failure("Prescriptions.Validation", "Miktar 0'dan büyük ve en fazla 100000 olmalı; en çok 3 ondalık basamak girilebilir.");
         if (TooLong(draft.Dose, DoseMaxLength))
-            return Result.Failure("Prescriptions.Validation", $"Item dose must be at most {DoseMaxLength} characters.");
+            return Result.Failure("Prescriptions.Validation", $"Doz en fazla {DoseMaxLength} karakter olabilir.");
         if (TooLong(draft.Unit, UnitMaxLength))
-            return Result.Failure("Prescriptions.Validation", $"Item unit must be at most {UnitMaxLength} characters.");
+            return Result.Failure("Prescriptions.Validation", $"Birim en fazla {UnitMaxLength} karakter olabilir.");
         if (TooLong(draft.LotNumber, LotNumberMaxLength))
-            return Result.Failure("Prescriptions.Validation", $"Item lot number must be at most {LotNumberMaxLength} characters.");
+            return Result.Failure("Prescriptions.Validation", $"Parti numarası en fazla {LotNumberMaxLength} karakter olabilir.");
 
         return Result.Success();
     }

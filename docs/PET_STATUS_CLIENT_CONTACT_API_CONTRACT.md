@@ -97,6 +97,19 @@ Müşteriye serbest metin **iç not** alanı eklenir (meslek, tercih, uyarı gib
 - Denetim kaydı not metnini yazmaz (serbest metin kişisel veri taşıyabilir); yalnız alanın dolu olduğu `"***"` olarak görünür.
 - Migration `AddProductTaxAndClientNotes` (`Clients.Notes nvarchar(4000) NULL`); yeni izin yok.
 
+### 2.2 Müşteri telefonu zorunlu (2026-11-15, kullanıcı dostu denetim H17)
+
+Kural tek yerde: `Application/Clients/ClientPhoneRule.cs`. Migration yok, yeni izin yok.
+
+| Uç | Kural | Hata |
+|---|---|---|
+| `POST /clients` (tam form) ve `POST /clients/quick-register` | `phone` **zorunlu** | `400` doğrulama; `errors.Phone` = "Telefon numarası gereklidir. Örnek: 0532 111 22 33" |
+| `PUT /clients/{id}` | Kayıtlı telefon varken `phone` boş gönderilemez; telefonu **hiç olmayan** (eski ya da içe aktarılmış) müşteri telefonsuz düzenlenebilir | `400` + `code` = `Clients.PhoneRequired`, aynı metin (alan hatası değil; istemci `phone` alanına bağlar) |
+| İçe aktarma (E-vet, Excel) | Telefon zorunlu **değil** (eski veride olmayabilir) | — |
+
+- Biçim kuralı değişmedi: Türkiye cep telefonu (`05XXXXXXXXX`, `5XXXXXXXXX`, `+90 5XX …`); sunucu `905XXXXXXXXX` saklar. Geçersiz biçim metni: "Telefon numarası geçerli değil. Türkiye cep telefonu girin, örnek: 0532 111 22 33". Ekranda "0532 111 22 33" biçimine çevirmek istemcinin işidir.
+- İstemci: yeni müşteri formunda telefon zorunlu işaretlenir. Düzenlemede, yüklenen müşterinin telefonu varsa zorunlu; yoksa isteğe bağlı kalır ("Telefon eklenmesi önerilir" ipucu gösterilebilir).
+
 ## 3) Müşteri bazlı ücret bekleyen kalemler
 
 `GET /api/v1/charge-suggestions` için yeni opsiyonel süzgeç **`clientId`** (bkz. `CHARGE_SUGGESTION_API_CONTRACT.md` §2):

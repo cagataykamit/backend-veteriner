@@ -227,7 +227,7 @@ public sealed class ApplyImportOwnerUnitCommandHandler
                 data.Address,
                 RemindersOptedOut: data.RemindersOptedOut ? true : null,
                 InvoicingIdentity: InvoicingIdentityOf(data),
-                Notes: data.Notes),
+                Notes: data.Notes) { FromImport = true },
             ct);
         if (!created.IsSuccess)
             return Fail(row, created.Error);
