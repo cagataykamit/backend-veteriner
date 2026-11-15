@@ -37,10 +37,39 @@ internal static class AppointmentSlotRules
         if (!slotAlignment.IsSuccess)
             return slotAlignment;
 
+        var conflicts = await EnsureNoConflictAsync(
+            appointments, assignment, allowClinicOverlap, tenantId, clinicId, petId, veterinarianUserId, null, startUtc, endUtc, null, ct);
+        if (!conflicts.IsSuccess)
+            return conflicts;
+
+        var hoursRows = await workingHours.ListAsync(new ClinicWorkingHoursByClinicSpec(tenantId, clinicId), ct);
+        return AppointmentWorkingHoursValidation.Validate(startUtc, durationMinutes, hoursRows);
+    }
+
+    /// <summary>
+    /// Yalnız çakışmalar: klinik (üst üste binmeye izin yoksa) → hayvan → hekim. İptali geri almada da kullanılır; orada slot hizası ve
+    /// çalışma saati yeniden denetlenmez (randevu bu kurallarla açılmıştı).
+    /// </summary>
+    /// <param name="keepVeterinarianUserId">Mevcut randevunun hekimi; hekim yetkisi kalkmış olsa da korunur.</param>
+    /// <param name="excludeAppointmentId">Denetlenen randevunun kendisi.</param>
+    public static async Task<Result> EnsureNoConflictAsync(
+        IReadRepository<Appointment> appointments,
+        AppointmentAssignment assignment,
+        bool allowClinicOverlap,
+        Guid tenantId,
+        Guid clinicId,
+        Guid petId,
+        Guid? veterinarianUserId,
+        Guid? keepVeterinarianUserId,
+        DateTime startUtc,
+        DateTime endUtc,
+        Guid? excludeAppointmentId,
+        CancellationToken ct)
+    {
         if (!allowClinicOverlap)
         {
             var clinicBusy = await appointments.FirstOrDefaultAsync(
-                new AppointmentOverlappingAtClinicSpec(tenantId, clinicId, startUtc, endUtc), ct);
+                new AppointmentOverlappingAtClinicSpec(tenantId, clinicId, startUtc, endUtc, excludeAppointmentId), ct);
             if (clinicBusy is not null)
             {
                 return Result.Failure(
@@ -50,7 +79,7 @@ internal static class AppointmentSlotRules
         }
 
         var petBusy = await appointments.FirstOrDefaultAsync(
-            new AppointmentOverlappingForPetSpec(tenantId, petId, startUtc, endUtc), ct);
+            new AppointmentOverlappingForPetSpec(tenantId, petId, startUtc, endUtc, excludeAppointmentId), ct);
         if (petBusy is not null)
         {
             return Result.Failure(
@@ -58,12 +87,7 @@ internal static class AppointmentSlotRules
                 "Bu zaman aralığında hayvanın başka bir planlı randevusu var.");
         }
 
-        var vetCheck = await assignment.EnsureVeterinarianAsync(
-            tenantId, clinicId, veterinarianUserId, null, startUtc, endUtc, null, ct);
-        if (!vetCheck.IsSuccess)
-            return vetCheck;
-
-        var hoursRows = await workingHours.ListAsync(new ClinicWorkingHoursByClinicSpec(tenantId, clinicId), ct);
-        return AppointmentWorkingHoursValidation.Validate(startUtc, durationMinutes, hoursRows);
+        return await assignment.EnsureVeterinarianAsync(
+            tenantId, clinicId, veterinarianUserId, keepVeterinarianUserId, startUtc, endUtc, excludeAppointmentId, ct);
     }
 }

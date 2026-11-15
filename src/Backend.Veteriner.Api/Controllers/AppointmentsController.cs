@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Appointments.Commands.Cancel;
 using Backend.Veteriner.Application.Appointments.Commands.Complete;
 using Backend.Veteriner.Application.Appointments.Commands.Create;
 using Backend.Veteriner.Application.Appointments.Commands.NoShow;
+using Backend.Veteriner.Application.Appointments.Commands.RevertCancellation;
 using Backend.Veteriner.Application.Appointments.Commands.RevertNoShow;
 using Backend.Veteriner.Application.Appointments.Commands.Reschedule;
 using Backend.Veteriner.Application.Appointments.Commands.Update;
@@ -165,10 +166,11 @@ public sealed class AppointmentsController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <summary>Planlı randevuyu iptal eder; yanıt "Geri al" süresini taşır (APPOINTMENT_CANCEL_UNDO_API_CONTRACT.md).</summary>
     [HttpPost("{id:guid}/cancel")]
     [Authorize(Policy = PermissionCatalog.Appointments.Cancel)]
     [Consumes("application/json")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(CancelAppointmentResultDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Cancel(
@@ -180,6 +182,23 @@ public sealed class AppointmentsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new CancelAppointmentCommand(id, body?.Reason), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>İptali kısa süre içinde geri alır (Cancelled → Scheduled, "Geri al"); audit'lidir.</summary>
+    [HttpPost("{id:guid}/cancel/revert")]
+    [Authorize(Policy = PermissionCatalog.Appointments.Cancel)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RevertCancellation([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new RevertAppointmentCancellationCommand(id), ct);
         return result.ToActionResult(this);
     }
 

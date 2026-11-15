@@ -163,7 +163,9 @@ public sealed class OpenWaitlistOfferTenantIdsSpec : Specification<WaitlistOffer
 
 /// <summary>
 /// Otomatik teklif adayı boşalan saatler: kliniklerde iptal edilmiş, saati <paramref name="earliestStartUtc"/>'ten sonra ve son
-/// <paramref name="changedSinceUtc"/>'ten beri değişmiş randevular (eski iptaller otomatik teklif açmaz).
+/// <paramref name="changedSinceUtc"/>'ten beri değişmiş randevular (eski iptaller otomatik teklif açmaz). İptal, geri alma süresi
+/// (<see cref="Appointment.CancellationUndoLimit"/>) dolmadan kesinleşmiş sayılmaz: <paramref name="settledBeforeUtc"/>'ten sonra
+/// değişenler dışlanır.
 /// </summary>
 public sealed class ReleasedAppointmentsSpec : Specification<Appointment>
 {
@@ -172,6 +174,7 @@ public sealed class ReleasedAppointmentsSpec : Specification<Appointment>
         IReadOnlyCollection<Guid> clinicIds,
         DateTime earliestStartUtc,
         DateTime changedSinceUtc,
+        DateTime settledBeforeUtc,
         int take)
     {
         var ids = clinicIds.ToArray();
@@ -180,7 +183,8 @@ public sealed class ReleasedAppointmentsSpec : Specification<Appointment>
                          && ids.Contains(a.ClinicId)
                          && a.Status == AppointmentStatus.Cancelled
                          && a.ScheduledAtUtc > earliestStartUtc
-                         && a.ChangedAtUtc >= changedSinceUtc)
+                         && a.ChangedAtUtc >= changedSinceUtc
+                         && a.ChangedAtUtc <= settledBeforeUtc)
             .OrderBy(a => a.ScheduledAtUtc)
             .Take(take);
     }
