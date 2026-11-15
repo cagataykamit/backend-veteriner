@@ -156,12 +156,61 @@ public sealed class Appointment : AggregateRoot, IClinicScoped, ITenantOwned, IC
         Status = AppointmentStatus.Cancelled;
         if (!string.IsNullOrWhiteSpace(cancellationReason))
         {
-            var line = $"İptal: {cancellationReason.Trim()}";
+            var line = $"{CancellationNotePrefix}{cancellationReason.Trim()}";
             Notes = string.IsNullOrWhiteSpace(Notes) ? line : $"{Notes}\n{line}";
         }
 
         AdvanceMutationSequence();
         return Result.Success();
+    }
+
+    /// <summary>İptalden sonra istemcinin "Geri al" gösterdiği süre (kullanıcı dostu denetim B2; kural tek yer).</summary>
+    public static readonly TimeSpan CancellationUndoWindow = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Sunucunun geri almayı kabul ettiği son an: pencere + ağ payı. Bekleme listesi de boşalan saati ancak bu süre geçince
+    /// kesinleşmiş sayar (otomatik teklif geri alınabilecek iptale gitmez).
+    /// </summary>
+    public static readonly TimeSpan CancellationUndoLimit = CancellationUndoWindow + TimeSpan.FromSeconds(5);
+
+    private const string CancellationNotePrefix = "İptal: ";
+
+    /// <summary>
+    /// İptali kısa süre içinde geri alır (<c>Cancelled → Scheduled</c>). İptal anı <see cref="ChangedAtUtc"/>'dir: iptal edilen randevu
+    /// başka bir işlemle değiştirilemez. İptalin eklediği "İptal: …" not satırı kaldırılır; iz denetim kaydındadır.
+    /// </summary>
+    public Result RevertCancellation(DateTime nowUtc)
+    {
+        if (Status != AppointmentStatus.Cancelled)
+        {
+            return Result.Failure(
+                "Appointments.InvalidStatusTransition",
+                "Yalnızca iptal edilmiş randevunun iptali geri alınabilir.");
+        }
+
+        if (NormalizeUtc(nowUtc) > NormalizeUtc(ChangedAtUtc) + CancellationUndoLimit)
+        {
+            return Result.Failure(
+                "Appointments.CancellationUndoExpired",
+                "Geri alma süresi doldu. Randevuyu yeniden oluşturun.");
+        }
+
+        Status = AppointmentStatus.Scheduled;
+        Notes = WithoutCancellationNote(Notes);
+        AdvanceMutationSequence();
+        return Result.Success();
+    }
+
+    private static string? WithoutCancellationNote(string? notes)
+    {
+        if (string.IsNullOrEmpty(notes))
+            return notes;
+
+        if (notes.StartsWith(CancellationNotePrefix, StringComparison.Ordinal))
+            return null;
+
+        var at = notes.LastIndexOf("\n" + CancellationNotePrefix, StringComparison.Ordinal);
+        return at < 0 ? notes : notes[..at];
     }
 
     /// <summary>Sahip bağlantıyla yanıt verebilir: randevu planlı ve saati gelmemiş (TIER-019; kural tek yer).</summary>
