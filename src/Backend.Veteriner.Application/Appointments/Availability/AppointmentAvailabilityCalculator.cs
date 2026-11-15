@@ -78,8 +78,9 @@ public static class AppointmentAvailabilityCalculator
     }
 
     /// <summary>
-    /// Aralık için kapasite: klinik üst üste binmeye kapalıysa klinikteki her randevu doldurur; uygun hekim yoksa klinik tek
-    /// kaynaktır; aksi halde boş uygun hekim sayısı hekimsiz çakışan randevu sayısından fazla olmalı.
+    /// Aralık için kapasite: uygun hekim yoksa klinik tek kaynaktır ve üst üste binmeye kapalıysa klinikteki her randevu doldurur;
+    /// uygun hekim varsa saat hekime atanır, çakışma hekim bazındadır (<see cref="AppointmentSlotRules.ClinicOverlapBlocks"/>) ve
+    /// boş uygun hekim sayısı hekimsiz çakışan randevu sayısından fazla olmalı.
     /// </summary>
     public static bool TryFindFreeVeterinarians(
         AvailabilityInput input,
@@ -91,7 +92,7 @@ public static class AppointmentAvailabilityCalculator
         var overlapping = input.Busy.Where(b => b.StartUtc < endUtc && startUtc < b.EndUtc).ToList();
         var sameClinic = overlapping.Where(b => b.ClinicId == input.ClinicId).ToList();
 
-        if (!input.AllowOverlap && sameClinic.Count > 0)
+        if (sameClinic.Count > 0 && AppointmentSlotRules.ClinicOverlapBlocks(input.AllowOverlap, hasVeterinarian: input.EligibleVeterinarianIds.Count > 0))
             return false;
 
         if (input.EligibleVeterinarianIds.Count == 0)
