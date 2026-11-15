@@ -504,22 +504,18 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// Virüs taraması: <c>FileScanning:Enabled</c> açıksa ClamAV (clamd TCP), kapalıysa her içeriği geçiren uygulama. Açıkken
-    /// clamd'ye ulaşılamazsa yükleme reddedilir (<c>UploadMalwareGuard</c>); API'nin açılışı clamd'yi beklemez.
+    /// Virüs taraması: <c>FileScanning:Enabled</c> açıksa ClamAV (clamd TCP), kapalıysa her içeriği geçiren uygulama. Seçim
+    /// ayardan çözümleme anında yapılır (sağlık kontrolü de aynı ayarı okur). Açıkken clamd'ye ulaşılamazsa yükleme reddedilir
+    /// (<c>UploadMalwareGuard</c>); API'nin açılışı clamd'yi beklemez.
     /// </summary>
     private static void AddFileScanning(IServiceCollection services, IConfiguration configuration)
     {
-        var section = configuration.GetSection(FileScanningOptions.SectionName);
-        services.Configure<FileScanningOptions>(section);
-        if (section.GetValue<bool>(nameof(FileScanningOptions.Enabled)))
-        {
-            services.AddSingleton<ClamAvFileScanner>();
-            services.AddSingleton<IFileMalwareScanner>(sp => sp.GetRequiredService<ClamAvFileScanner>());
-        }
-        else
-        {
-            services.AddSingleton<IFileMalwareScanner, NoMalwareScanner>();
-        }
+        services.Configure<FileScanningOptions>(configuration.GetSection(FileScanningOptions.SectionName));
+        services.AddSingleton<ClamAvFileScanner>();
+        services.AddSingleton<NoMalwareScanner>();
+        services.AddSingleton<IFileMalwareScanner>(sp => sp.GetRequiredService<IOptions<FileScanningOptions>>().Value.Enabled
+            ? sp.GetRequiredService<ClamAvFileScanner>()
+            : sp.GetRequiredService<NoMalwareScanner>());
     }
 
     /// <summary>

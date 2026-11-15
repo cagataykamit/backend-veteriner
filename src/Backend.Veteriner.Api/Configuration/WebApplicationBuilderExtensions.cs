@@ -157,18 +157,16 @@ public static class WebApplicationBuilderExtensions
         builder.Services.AddSingleton<OperationsMetrics>();
         builder.Services.AddSingleton<IErrorReporter, LoggingErrorReporter>();
 
-        var healthChecks = builder.Services.AddHealthChecks()
+        builder.Services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("sql")
             .AddCheck<QueryDatabaseHealthCheck>("query-sql")
             .AddCheck<OutboxHealthCheck>("outbox")
             .AddCheck<AppointmentProjectionHealthCheck>("appointment-projection")
             .AddCheck<ClientProjectionHealthCheck>("client-projection")
             .AddCheck<PetProjectionHealthCheck>("pet-projection")
-            .AddCheck<PaymentProjectionHealthCheck>("payment-projection");
-
-        // Virüs taraması açıkken clamd de hazır olma koşuludur: ulaşılamazsa yüklemeler reddedilir (Degraded → /health/ready 503).
-        if (builder.Configuration.GetValue<bool>("FileScanning:Enabled"))
-            healthChecks.AddCheck<ClamAvHealthCheck>("clamav", failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded);
+            .AddCheck<PaymentProjectionHealthCheck>("payment-projection")
+            // Virüs taraması açıkken clamd de hazır olma koşuludur: ulaşılamazsa yüklemeler reddedilir (Degraded → 503).
+            .AddCheck<ClamAvHealthCheck>("clamav", failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded);
 
         builder.Services.AddInfrastructure(builder.Configuration);
 
