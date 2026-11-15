@@ -38,7 +38,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    TenantId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    TrialTenantId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     EmailKey = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
                     TaxIdentityNumber = table.Column<string>(type: "varchar(11)", unicode: false, maxLength: 11, nullable: true),
                     CreatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false)
@@ -77,9 +77,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                 filter: "[TaxIdentityNumber] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
-                name: "IX_TrialSignupIdentities_TenantId",
+                name: "IX_TrialSignupIdentities_TrialTenantId",
                 table: "TrialSignupIdentities",
-                column: "TenantId");
+                column: "TrialTenantId");
         }
 
         /// <inheritdoc />

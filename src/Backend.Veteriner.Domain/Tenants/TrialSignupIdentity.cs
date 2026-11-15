@@ -12,7 +12,9 @@ public sealed class TrialSignupIdentity
     public const int EmailKeyMaxLength = 200;
 
     public Guid Id { get; private set; }
-    public Guid TenantId { get; private set; }
+
+    /// <summary>Denemeyi açan kiracı. Adı bilerek <c>TenantId</c> değil: satır kiracıya ait değildir, kiracı filtresine girmez (ADR-040).</summary>
+    public Guid TrialTenantId { get; private set; }
 
     /// <summary>Tek deneme anahtarı: küçük harf, kırpılmış, yerel kısımdaki <c>+etiket</c> atılmış (<see cref="ToEmailKey"/>).</summary>
     public string EmailKey { get; private set; } = default!;
@@ -37,7 +39,7 @@ public sealed class TrialSignupIdentity
         return new TrialSignupIdentity
         {
             Id = Guid.NewGuid(),
-            TenantId = tenantId,
+            TrialTenantId = tenantId,
             EmailKey = key,
             TaxIdentityNumber = tax,
             CreatedAtUtc = utcNow,

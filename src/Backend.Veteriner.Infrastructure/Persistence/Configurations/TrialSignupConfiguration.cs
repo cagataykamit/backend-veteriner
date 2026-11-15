@@ -35,7 +35,7 @@ public sealed class TrialSignupIdentityConfiguration : IEntityTypeConfiguration<
 
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).ValueGeneratedNever();
-        b.Property(x => x.TenantId).IsRequired();
+        b.Property(x => x.TrialTenantId).IsRequired();
         b.Property(x => x.EmailKey).IsRequired().HasMaxLength(TrialSignupIdentity.EmailKeyMaxLength);
         b.Property(x => x.TaxIdentityNumber).HasMaxLength(TurkishTaxIdentity.TaxpayerIdentityMaxLength).IsUnicode(false);
         b.Property(x => x.CreatedAtUtc).IsRequired();
@@ -43,6 +43,6 @@ public sealed class TrialSignupIdentityConfiguration : IEntityTypeConfiguration<
         // Tek deneme kuralı veritabanında da: yarışta ikinci kayıt düşer. Kiracı silinse de satır kalır (yabancı anahtar yok).
         b.HasIndex(x => x.EmailKey).IsUnique();
         b.HasIndex(x => x.TaxIdentityNumber).IsUnique().HasFilter("[TaxIdentityNumber] IS NOT NULL");
-        b.HasIndex(x => x.TenantId);
+        b.HasIndex(x => x.TrialTenantId);
     }
 }

@@ -7177,7 +7177,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .IsUnicode(false)
                         .HasColumnType("varchar(11)");
 
-                    b.Property<Guid>("TenantId")
+                    b.Property<Guid>("TrialTenantId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
@@ -7189,7 +7189,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("[TaxIdentityNumber] IS NOT NULL");
 
-                    b.HasIndex("TenantId");
+                    b.HasIndex("TrialTenantId");
 
                     b.ToTable("TrialSignupIdentities", (string)null);
                 });
