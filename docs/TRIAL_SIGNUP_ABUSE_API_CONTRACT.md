@@ -33,7 +33,7 @@ Sınırlar:
 { "taxIdentityNumberRequired": true, "turnstileSiteKey": "0x4AAAA..." }
 ```
 
-`turnstileSiteKey` boşsa (yerel geliştirme, sahte doğrulayıcı) istemci widget çizmez ve kod isteğini jetonsuz gönderir.
+`turnstileSiteKey` boşsa (anahtarlar girilmemiş) istemci widget çizmez ve kod isteğini jetonsuz gönderir.
 
 ### `POST /api/v1/public/owner-signup/email-code` — anonim
 
@@ -73,18 +73,18 @@ Kaynak: developers.cloudflare.com/turnstile (2026-11-15 okundu).
 | Uç | `action` | Koruma |
 |---|---|---|
 | `POST /public/owner-signup/email-code` | `signup-email-code` | Her zaman |
-| `POST /api/portal/v1/auth/code` | `portal-signin-code` | `Turnstile:ProtectPortalSignIn` (varsayılan açık) |
+| `POST /api/portal/v1/auth/code` | `portal-signin-code` | `Turnstile:EnforcePortal` (varsayılan açık) |
 | `POST /api/portal/v1/auth/password-reset` | `portal-password-reset` | aynı ayar |
-| `POST /api/portal/v1/booking/{code}/verification-code` | `booking-email-code` | Her zaman |
+| `POST /api/portal/v1/booking/{code}/verification-code` | `booking-email-code` | aynı ayar |
 
-Parola ile giriş uçlarında yoktur (kilitleme zaten var).
+Parola ile giriş uçlarında yoktur (kilitleme zaten var). İstek başlığına (Origin vb.) bakan istisna yoktur: sahte başlıkla aşılır. Hız sınırları doğrulama kapalıyken ya da anahtarsızken de çalışır.
 
 - Sunucu: `POST https://challenges.cloudflare.com/turnstile/v0/siteverify` (form: `secret`, `response`, `remoteip`, `idempotency_key`); `success`, `action` (eşleşmeli) ve `hostname` (`Turnstile:ExpectedHostname` ya da alt alan adı) denetlenir. Jeton tek kullanımlık, 300 sn geçerli; istemci her istekten sonra widget'ı yeniler.
-- Ayarlar: `Turnstile:SiteKey`, `Turnstile:SecretKey` (gizli; user-secrets / ortam değişkeni `Turnstile__SecretKey`), `Turnstile:ExpectedHostname` (üretim `vetinity.com`), `Turnstile:ProtectPortalSignIn`, `Turnstile:TimeoutSeconds` (5, 2–15).
-- Anahtarlar girilmemişse: Development ve IntegrationTests'te **sahte doğrulayıcı** (her isteği geçirir, site anahtarı vermez); diğer ortamlarda **yapılandırılmamış** → korunan uçlar **503 `HumanVerification.Unavailable`**. Yani üretimde Cloudflare anahtarları girilmeden **yeni deneme kaydı, portal kodla giriş/sıfırlama ve online randevu talebi durur**; doğrulamasız devam edilmez.
+- Ayarlar: `Turnstile:SiteKey`, `Turnstile:SecretKey` (gizli; user-secrets / ortam değişkeni `Turnstile__SecretKey`), `Turnstile:ExpectedHostname` (üretim `vetinity.com`), `Turnstile:EnforcePortal` (varsayılan `true`), `Turnstile:TimeoutSeconds` (5, 2–15).
+- Anahtarlar (`SiteKey` ve `SecretKey` birlikte) girilmemişse **her ortamda doğrulama atlanır**: site anahtarı boş döner, istemci widget çizmez, istekler geçer; başlangıçta bir kez günlüğe yazılır (üretimde uyarı). Hız sınırları, e-posta kodu ve tek deneme kuralları anahtardan bağımsız çalışır. Anahtarlar girilip API yeniden başlatılınca başka değişiklik olmadan devreye girer (ön yüz yeniden derlenmez).
 - Yanlış gizli anahtar ya da Cloudflare iç hatası `Unavailable` (yapılandırma sorunu, günlüğe hata); zaman aşımı/bağlantı hatası `Unavailable`; jeton geçersiz/kullanılmış/başka eylem ya da alan adı `Failed`.
-- `GET /api/portal/v1/human-verification` (anonim): `{ "turnstileSiteKey": "...", "portalSignInProtected": true }`.
-- İstemci: betik `https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit` (paketlenmez), `appearance: interaction-only`, `language: tr`. Panel ve portal ayrı bileşen kopyası taşır (portal panel kodunu içe almaz). Mağaza uygulamasında (Capacitor WebView) çalışması **denenmedi**; çalışmazsa `ProtectPortalSignIn=false`.
+- `GET /api/portal/v1/human-verification` (anonim): `{ "turnstileSiteKey": "...", "portalProtected": true }`.
+- İstemci: betik `https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit` (paketlenmez), `appearance: interaction-only`, `language: tr`. Panel ve portal ayrı bileşen kopyası taşır (portal panel kodunu içe almaz). Mağaza uygulamasında (Capacitor WebView) çalışması **denenmedi**; çalışmazsa `Turnstile:EnforcePortal=false` (üç portal ucu; deneme kaydı korunmaya devam eder) ve uygulama doğrulaması (Play Integrity / App Attest) ayrı iş (FE `docs/PORTAL_MOBIL_PAKET.md` §4.5).
 - CSP: SPA sayfalarında depoda CSP yok. Eklenirse `script-src` ve `frame-src` için `https://challenges.cloudflare.com` gerekir.
 
 ## 5) Hata kodları
@@ -92,7 +92,7 @@ Parola ile giriş uçlarında yoktur (kilitleme zaten var).
 | Durum | Kod | Mesaj (`detail`) | Uç |
 |---|---|---|---|
 | **400** | `HumanVerification.Failed` | Güvenlik doğrulaması tamamlanamadı. Sayfayı yenileyip yeniden deneyin. | korunan uçlar |
-| **503** | `HumanVerification.Unavailable` | Güvenlik doğrulaması şu an yapılamıyor. Lütfen biraz sonra yeniden deneyin. | korunan uçlar |
+| **503** | `HumanVerification.Unavailable` | Güvenlik doğrulaması şu an yapılamıyor. Lütfen biraz sonra yeniden deneyin. | korunan uçlar (anahtarlar girilmiş ama Cloudflare'e ulaşılamıyor ya da gizli anahtar yanlış) |
 | **409** | `SignupIdentity.DuplicateEmail` | Bu e-posta adresiyle daha önce deneme hesabı açılmış. | email-code, owner-signup |
 | **409** | `SignupIdentity.DuplicateTaxIdentity` | Bu vergi numarasıyla daha önce deneme hesabı açılmış. | owner-signup |
 | **400** | `SignupIdentity.Validation.TaxIdentityRequired` | Geçerli bir vergi numarası (10 hane) ya da TC kimlik numarası (11 hane) girin. | owner-signup (zorunluyken boş ya da geçersiz) |
@@ -114,7 +114,15 @@ Parola ile giriş uçlarında yoktur (kilitleme zaten var).
 
 `TrialSignupIdentities`: `Id`, `TrialTenantId` (bilerek `TenantId` değil: kiracı filtresine girmez, ADR-040), `EmailKey` (200, benzersiz), `TaxIdentityNumber` varchar(11, benzersiz filtreli), `CreatedAtUtc`.
 
-## 8) Testler
+## 8) Yayın
+
+- Migration: `20261115002059_AddTrialSignupEmailAndIdentity` — yalnız iki yeni tablo ve indeksleri; sütun silme, tür daraltma ya da mevcut veride değişiklik yok. Mevcut kiracılarda vergi numarası boş kalır; kurallar yalnız yeni deneme kaydında çalışır.
+- Seed: gerekmez (yeni izin yok).
+- Yeni ayarlar (hepsi isteğe bağlı): `Turnstile:SiteKey`, `Turnstile:SecretKey` (gizli), `Turnstile:ExpectedHostname` (üretim dosyasında `vetinity.com`), `Turnstile:EnforcePortal` (`true`), `Turnstile:TimeoutSeconds` (5), `TrialSignup:RequireTaxIdentityNumber` (`true`).
+- Hukuki: Gizlilik 1.1 ve Portal gizlilik 1.1; girişte kullanıcılar ve portal hesapları yeniden kabul eder (ADR-029).
+- Kayıt e-posta kodu outbox ile gider: SMTP ayarları ve outbox işleyicisi üretimde çalışıyor olmalı.
+
+## 9) Testler
 
 - Domain `TrialSignupDomainTests`; Application `TrialSignupServiceTests`, `PublicOwnerSignupCommandHandlerTests`, `PublicOwnerSignupCommandValidatorTests`, `PortalSignInHandlerTests`.
 - Entegrasyon `TrialSignupAbuseIntegrationTests` (ayarlar, uçtan uca, Turnstile 400/503, ikinci deneme 409, bekleme 429, jetonsuz/vergi nosuz 400, reddedilen kayıt jetonu tüketmez), `TurnstileHumanVerifierTests` (siteverify eşleme), `OwnerPortalIntegrationTests` (portal ve randevu kodu korunması, ayarla kapatma). Kaydı sınayan diğer testler `IntegrationTestTrialSignup` ile doğrulanmış satır ve yeni VKN alır.
