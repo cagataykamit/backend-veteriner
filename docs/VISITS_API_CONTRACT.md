@@ -84,7 +84,7 @@ Kurallar:
 
 - **Opsiyonel** (randevulu ve randevusuz gelişte). Randevu hekim alanı taşımadığı için randevudan varsayılan türetilmez; seçilmezse `null` kalır.
 - **Hekim tanımı:** kiracıdaki **aktif** kliniğe atanmış (`UserClinic`) ve `Veteriner` operasyon claim'ine sahip kullanıcı. Aynı kural hekim listesi, geliş doğrulaması ve görünen ad çözümünde kullanılır (tek yerde: `IClinicVeterinarianReader`).
-- **Seçim listesi:** `GET /api/v1/clinics/{clinicId}/veterinarians` (`Visits.Create`; atanmamış klinik → `403 Clinics.AccessDenied`). Yanıt: `[{ "userId": "guid", "name": "string?" }]`, ada göre sıralı.
+- **Seçim listesi:** `GET /api/v1/clinics/{clinicId}/veterinarians` (any-of `Visits.Create`, `Appointments.Read`, `Appointments.Create`, `Appointments.Reschedule`, `Clinics.Read`, `Clinics.Update`; atanmamış klinik → `403 Clinics.AccessDenied`). Yanıt: `[{ "userId": "guid", "name": "string?" }]`, ada göre sıralı.
 - **Doğrulama:** seçilen kullanıcı o klinikte aktif hekim değilse (rol yok, başka klinik, bilinmeyen kimlik) → `400 Visits.Validation`; geliş oluşmaz.
 - **Görünen ad:** kullanıcının kayıtlı adı (`PUT /api/v1/me/display-name`, gövde `{ "displayName": "string?" }`, en çok 120 karakter, boş değer adı temizler, `204`); yoksa e-postadan türetilen ad (örn. `ali.veli@…` → `ali.veli`). Aynı kural `GET /me/account-summary` `displayName` alanında da geçerlidir.
 

@@ -54,8 +54,9 @@ Pasif neden yeni randevuda 400; mevcut randevuda korunur. Hekim kliniğin aktif 
 
 **Müsaitlik kuralı (tek yer: `AppointmentAvailabilityCalculator`):** çalışma saatleri (mola hariç) ∩ nedenin uygun
 hekimlerinden en az biri boş − çakışan planlı randevular. Adım = nedenin süresi, klinik slot aralığının katına yukarı
-yuvarlanır ve açılıştan başlar (randevu oluşturma kuralı slot hizası ister). Klinik "üst üste binme" kapalıysa klinikteki
-her randevu saati doldurur. Hekimin başka klinikteki randevusu da onu meşgul eder; hekimsiz randevu bir kapasite tüketir.
+yuvarlanır ve açılıştan başlar (randevu oluşturma kuralı slot hizası ister). Klinik "üst üste binme" kapalıysa yalnız
+hekimsiz randevuda klinikteki her randevu saati doldurur; uygun hekim varsa saat boş hekime atanır ve çakışma hekim bazındadır
+(`AppointmentSlotRules.ClinicOverlapBlocks`, `APPOINTMENT_CALENDAR_API_CONTRACT.md` §2). Hekimin başka klinikteki randevusu da onu meşgul eder; hekimsiz randevu bir kapasite tüketir.
 Klinikte hekim yoksa klinik tek kaynaktır. **Bekleyen talepler saati bloke etmez.**
 
 ## 4. Personel talep kuyruğu — `/api/v1/appointment-requests` (`AppointmentRequests.Manage`)
