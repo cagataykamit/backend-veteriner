@@ -567,7 +567,7 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
     {
         public async Task<Guid> CreateClientAsync(object? invoicingIdentity)
         {
-            var response = await Http.PostAsJsonAsync("/api/v1/clients", new { fullName = $"Belge Müşteri {Guid.NewGuid():N}"[..24], invoicingIdentity });
+            var response = await Http.PostAsJsonAsync("/api/v1/clients", new { fullName = $"Belge Müşteri {Guid.NewGuid():N}"[..24], phone = "05321112233", invoicingIdentity });
             var body = await response.Content.ReadAsStringAsync();
             response.StatusCode.Should().Be(HttpStatusCode.Created, body);
             return JsonDocument.Parse(body).RootElement.GetProperty("id").GetGuid();

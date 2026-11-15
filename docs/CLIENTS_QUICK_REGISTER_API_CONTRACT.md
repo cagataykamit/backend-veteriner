@@ -37,7 +37,7 @@ Resepsiyon, randevusuz gelen yeni bir müşterinin sahibini ve hayvanını **tek
 | Alan | Zorunlu | Kural |
 |------|---------|-------|
 | `fullName` | Evet | Mevcut müşteri kuralı: 2-300 karakter |
-| `phone` | **Evet** | Türkiye cep telefonu (mevcut `TurkishMobilePhone` normalizasyonu: `05XXXXXXXXX`, `5XXXXXXXXX`, `+90 5XX…` → `905XXXXXXXXX`). Boş veya geçersiz → `400` |
+| `phone` | **Evet** | Türkiye cep telefonu (mevcut `TurkishMobilePhone` normalizasyonu: `05XXXXXXXXX`, `5XXXXXXXXX`, `+90 5XX…` → `905XXXXXXXXX`). Boş veya geçersiz → `400`. 2026-11-15'ten beri tam formda da zorunlu; kural `CreateClientCommand` doğrulayıcısında (`PET_STATUS_CLIENT_CONTACT_API_CONTRACT.md` §2.2) |
 | `petName` | Evet | Mevcut hayvan adı kuralı (1-200) |
 | `speciesId` | Evet | Aktif tür olmalı (`Pets.SpeciesNotFound`) |
 | `breedId`, `breed`, `gender`, `birthDate`, `microchipNumber`, `isNeutered` | Hayır | `CreatePetCommand` ile aynı kurallar (ırk türle uyumlu, doğum tarihi gelecekte olamaz, vb.) |

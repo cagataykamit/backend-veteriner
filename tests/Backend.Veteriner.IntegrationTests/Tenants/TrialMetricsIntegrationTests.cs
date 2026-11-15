@@ -71,14 +71,14 @@ public sealed class TrialMetricsIntegrationTests : IClassFixture<CustomWebApplic
 
         // Örnek klinikli kiracıda ilk anlamlı aksiyon: müşteri ekleme; ikinci müşteri ilk aksiyonu değiştirmez.
         var owner = await OwnerClientAsync(exampleEmail);
-        var first = await owner.PostAsJsonAsync("/api/v1/clients", new { fullName = "Aktivasyon Müşterisi" });
+        var first = await owner.PostAsJsonAsync("/api/v1/clients", new { fullName = "Aktivasyon Müşterisi", phone = "05321112233" });
         first.StatusCode.Should().Be(HttpStatusCode.Created, await first.Content.ReadAsStringAsync());
         var afterFirst = await ActivationAsync(exampleTenantId);
         afterFirst!.FirstActionKind.Should().Be(ActivationSignalKind.ClientCreated);
         afterFirst.FirstActionAtUtc.Should().NotBeNull();
         afterFirst.FirstActionUserId.Should().NotBeNull();
 
-        var second = await owner.PostAsJsonAsync("/api/v1/clients", new { fullName = "İkinci Müşteri" });
+        var second = await owner.PostAsJsonAsync("/api/v1/clients", new { fullName = "İkinci Müşteri", phone = "05321112233" });
         second.StatusCode.Should().Be(HttpStatusCode.Created);
         (await ActivationAsync(exampleTenantId))!.FirstActionAtUtc.Should().Be(afterFirst.FirstActionAtUtc);
 

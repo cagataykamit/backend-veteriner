@@ -116,6 +116,7 @@ public sealed class InvoicingIdentityIntegrationTests : IClassFixture<CustomWebA
         var invalid = await ctx.Http.PostAsJsonAsync("/api/v1/clients", new
         {
             fullName = "Geçersiz Vergi No",
+            phone = "05321112233",
             invoicingIdentity = new { personType = "Corporate", taxNumber = "12345678901" },
         });
         invalid.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -130,6 +131,7 @@ public sealed class InvoicingIdentityIntegrationTests : IClassFixture<CustomWebA
         var invalidTckn = await ctx.Http.PostAsJsonAsync("/api/v1/clients", new
         {
             fullName = "Geçersiz Kimlik",
+            phone = "05321112233",
             invoicingIdentity = new { personType = "Individual", nationalId = "12345678901" },
         });
         invalidTckn.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -138,6 +140,7 @@ public sealed class InvoicingIdentityIntegrationTests : IClassFixture<CustomWebA
         var inconsistent = await ctx.Http.PostAsJsonAsync("/api/v1/clients", new
         {
             fullName = "Tutarsız Kimlik",
+            phone = "05321112233",
             invoicingIdentity = new { personType = "Individual", taxNumber = Vkn },
         });
         inconsistent.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -327,6 +330,7 @@ public sealed class InvoicingIdentityIntegrationTests : IClassFixture<CustomWebA
             var response = await Http.PostAsJsonAsync("/api/v1/clients", new
             {
                 fullName = $"Fatura Müşteri {Guid.NewGuid():N}"[..24],
+                phone = "05321112233",
                 invoicingIdentity,
             });
             var body = await response.Content.ReadAsStringAsync();

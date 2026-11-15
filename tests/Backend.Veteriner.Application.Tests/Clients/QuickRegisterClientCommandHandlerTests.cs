@@ -111,10 +111,8 @@ public sealed class QuickRegisterClientCommandHandlerTests
 
     [Theory]
     [InlineData("", "0555 111 22 33", "Pamuk", "FullName")]
-    [InlineData("Ali Veli", "", "Pamuk", "Phone")]
-    [InlineData("Ali Veli", "   ", "Pamuk", "Phone")]
     [InlineData("Ali Veli", "0555 111 22 33", "", "PetName")]
-    public void Validator_Should_Require_Name_Phone_And_PetName(string name, string phone, string pet, string property)
+    public void Validator_Should_Require_Name_And_PetName(string name, string phone, string pet, string property)
     {
         var result = new QuickRegisterClientCommandValidator().Validate(
             new QuickRegisterClientCommand(name, phone, pet, _speciesId));

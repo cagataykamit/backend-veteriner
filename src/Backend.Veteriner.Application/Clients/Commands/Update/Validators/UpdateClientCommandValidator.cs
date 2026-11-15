@@ -28,7 +28,7 @@ public sealed class UpdateClientCommandValidator : AbstractValidator<UpdateClien
         RuleFor(x => x.Phone)
             .Must(p => string.IsNullOrWhiteSpace(p) || TurkishMobilePhone.TryNormalize(p, out _))
             .When(x => !string.IsNullOrWhiteSpace(x.Phone))
-            .WithMessage("Telefon numarası geçerli değil. Türkiye cep telefonu olarak 05XXXXXXXXX, 5XXXXXXXXX veya +90 5XX XXX XX XX biçiminde girin.");
+            .WithMessage(ClientPhoneRule.InvalidMessage);
 
         RuleFor(x => x.Address)
             .MaximumLength(500).WithMessage("Adres en fazla 500 karakter olabilir.")

@@ -192,12 +192,12 @@ public sealed class PetStatusAndClientContactIntegrationTests : IClassFixture<Cu
 
         var tooLong = await ctx.Http.PostAsJsonAsync("/api/v1/clients", new
         {
-            fullName = $"Not-{Guid.NewGuid():N}"[..12], notes = new string('n', Client.MaxNotesLength + 1),
+            fullName = $"Not-{Guid.NewGuid():N}"[..12], phone = "05321112233", notes = new string('n', Client.MaxNotesLength + 1),
         });
         tooLong.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await IntegrationTestProblemDetails.ReadCodeAsync(tooLong)).Should().Be("Clients.Validation");
 
-        var create = await ctx.Http.PostAsJsonAsync("/api/v1/clients", new { fullName = $"Not-{Guid.NewGuid():N}"[..12], notes = $" {note} " });
+        var create = await ctx.Http.PostAsJsonAsync("/api/v1/clients", new { fullName = $"Not-{Guid.NewGuid():N}"[..12], phone = "05321112233", notes = $" {note} " });
         create.StatusCode.Should().Be(HttpStatusCode.Created, await create.Content.ReadAsStringAsync());
         var clientId = (await create.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
 
