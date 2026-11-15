@@ -23,6 +23,12 @@ public sealed class ImportedClinicalRecord : IClinicScoped, ITenantOwned
     public const decimal MinTemperatureC = 25m;
     public const decimal MaxTemperatureC = 45m;
 
+    /// <summary>
+    /// Geliş kaydının türü: eski programda içeriği boş muayene satırı (tarih, hekim, hasta var). Hasta o gün gelmiştir; geçmişte
+    /// içeriksiz geliş olarak görünür. İçerik kuralının (<see cref="Content.HasContent"/>) tek istisnasıdır.
+    /// </summary>
+    public const string ArrivalRecordType = "Geliş";
+
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
     public Guid ClinicId { get; private set; }
@@ -104,8 +110,8 @@ public sealed class ImportedClinicalRecord : IClinicScoped, ITenantOwned
             VeterinarianName = Clean(content.VeterinarianName),
         };
 
-        if (!c.HasContent())
-            return Invalid("Klinik geçmiş kaydının en az bir içerik alanı ya da ölçümü (kilo, ateş) dolu olmalıdır.");
+        if (!c.HasContent() && c.RecordType != ArrivalRecordType)
+            return Invalid("Klinik geçmiş kaydının en az bir içerik alanı ya da ölçümü (kilo, ateş) dolu olmalıdır (geliş kaydı hariç).");
 
         if (TooLong(c.RecordType, MaxRecordTypeLength) || TooLong(c.Complaint, MaxComplaintLength)
             || TooLong(c.History, MaxHistoryLength) || TooLong(c.Findings, MaxFindingsLength)

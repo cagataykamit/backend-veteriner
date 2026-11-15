@@ -10,7 +10,7 @@ public sealed record ImportExistingPet(Guid Id, Guid ClientId, string Name, Guid
 
 public sealed record ImportExistingVaccination(Guid PetId, Guid VaccineDefinitionId, DateTime? AppliedAtUtc);
 
-/// <summary>Daha önce içe aktarılmış klinik geçmiş kaydı (mükerrer anahtarı için tarih + içerik).</summary>
+/// <summary>Daha önce içe aktarılmış klinik geçmiş kaydı (mükerrer anahtarı için tarih + içerik, hekim ve ölçümler).</summary>
 public sealed record ImportExistingClinicalRecord(
     Guid PetId,
     DateOnly RecordedOn,
@@ -21,7 +21,10 @@ public sealed record ImportExistingClinicalRecord(
     string? Treatment,
     string? Prescription,
     string? LabResults,
-    string? Notes);
+    string? Notes,
+    string? VeterinarianName = null,
+    decimal? WeightKg = null,
+    decimal? TemperatureC = null);
 
 /// <summary>Daha önce içe aktarılmış hesap hareketi (mükerrer anahtarı için).</summary>
 public sealed record ImportExistingAccountEntry(

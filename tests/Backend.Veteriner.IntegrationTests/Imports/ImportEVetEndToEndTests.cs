@@ -75,7 +75,10 @@ public sealed class ImportEVetEndToEndTests : IClassFixture<CustomWebApplication
             ("Muayene Listesi", [
                 ["Tarih", "Hasta Sahibi", "Hasta Adı", "Veteriner Hekim", "Ağırlık", "Semptom"],
                 ["2025-06-01T11:00:00", owner, "Pamuk", "Dr. A", "4.3", null],
-                ["2025-06-02T11:00:00", owner, "Duman", "Dr. A", "0", "Kusma"]]));
+                ["2025-06-02T11:00:00", owner, "Duman", "Dr. A", "0", "Kusma"],
+                // Boş muayeneler: o gün başka kaydı yok → geliş; aynı gün dolu muayene var → atlanır.
+                ["2025-08-01T10:00:00", owner, "Pamuk", "Dr. B", null, null],
+                ["2025-06-01T15:00:00", owner, "Pamuk", "Dr. B", null, null]]));
 
         var productList =
             ";;;;;;;;14.10.2026;;\n"
@@ -99,7 +102,7 @@ public sealed class ImportEVetEndToEndTests : IClassFixture<CustomWebApplication
 
         var batch = await GetJsonAsync(http, $"/api/v1/imports/batches/{id}");
         batch.GetProperty("status").GetString().Should().Be("Committed", batch.ToString());
-        foreach (var (table, created) in new[] { ("customers", 2), ("pets", 2), ("vaccinations", 2), ("clinicalRecords", 4), ("appointments", 1) })
+        foreach (var (table, created) in new[] { ("customers", 2), ("pets", 2), ("vaccinations", 2), ("clinicalRecords", 5), ("appointments", 1) })
             batch.GetProperty("summary").GetProperty(table).GetProperty("created").GetInt32().Should().Be(created, table);
 
         await using (var scope = _factory.Services.CreateSystemScope())
@@ -134,7 +137,7 @@ public sealed class ImportEVetEndToEndTests : IClassFixture<CustomWebApplication
             (await db.ImportedClinicalRecords.AsNoTracking().Where(r => r.ImportBatchId == id).Select(r => r.WeightKg).ToListAsync())
                 .Should().Contain(4.3m, "yalnız kilo taşıyan muayene aktarılır");
             var tasks = await db.ImportedClinicalRecords.AsNoTracking()
-                .Where(r => r.ImportBatchId == id && r.RecordType != "Muayene")
+                .Where(r => r.ImportBatchId == id && r.RecordType != "Muayene" && r.RecordType != ImportedClinicalRecord.ArrivalRecordType)
                 .Select(r => new { r.PetId, r.RecordType, r.Notes, r.VeterinarianName })
                 .ToListAsync();
             tasks.Should().BeEquivalentTo(new[]
@@ -142,6 +145,12 @@ public sealed class ImportEVetEndToEndTests : IClassFixture<CustomWebApplication
                 new { PetId = duman.Id, RecordType = (string?)"Kısırlaştırma", Notes = (string?)"E-vet görevi: Tamamlandı", VeterinarianName = (string?)"Dr. A" },
                 new { PetId = pamuk.Id, RecordType = (string?)"Kontrol Muayanesi", Notes = (string?)"E-vet görevi: Gelmedi", VeterinarianName = (string?)"Dr. A" },
             }, "geçmiş görevler eski program kaydı olur (ADR-048 eki)");
+            (await db.ImportedClinicalRecords.AsNoTracking()
+                    .Where(r => r.ImportBatchId == id && r.RecordType == ImportedClinicalRecord.ArrivalRecordType)
+                    .Select(r => new { r.PetId, r.RecordedOn, r.VeterinarianName })
+                    .ToListAsync())
+                .Should().BeEquivalentTo(new[] { new { PetId = pamuk.Id, RecordedOn = new DateOnly(2025, 8, 1), VeterinarianName = (string?)"Dr. B" } },
+                    "o gün başka kaydı olmayan boş muayene geliş olur; aynı gün muayenesi olan boş satır atlanır");
             (await db.Appointments.AsNoTracking().SingleAsync(a => a.ImportBatchId == id)).PetId.Should().Be(pamuk.Id);
         }
 
@@ -159,6 +168,38 @@ public sealed class ImportEVetEndToEndTests : IClassFixture<CustomWebApplication
             (await db.Products.CountAsync(p => p.TenantId == ctx.TenantId)).Should().Be(0, "KDV'li ürün değişmiş sayılmaz, geri alınır");
             (await db.ImportedClinicalRecords.CountAsync(r => r.ImportBatchId == id)).Should().Be(0);
         }
+    }
+
+    [Fact]
+    public async Task Ambiguous_Pet_Group_Should_Show_Its_Records_And_Bind_Records_Before_Birth_Automatically()
+    {
+        var ctx = await SeedAsync();
+        var http = ClientFor(ctx.Token);
+        var owner = $"Ayşe {ctx.Suffix}";
+        var bytes = Workbook(
+            ("Müşteri Listesi", [["Kayıt Tarihi", "Müşteriler", "Protokol No", "Durum"], ["2018-01-01", owner, "101", "Aktif"]]),
+            ("Hasta Listesi", [
+                ["Müşteriler", "Hastalar", "Protokol No", "Hasta Türü", "Doğum Tarihi", "Durum"],
+                [owner, "Boncuk", "301", ctx.SpeciesName, "2019-01-01", "Aktif"],
+                [owner, "Boncuk", "302", ctx.SpeciesName, "2024-01-01", "Aktif"]]),
+            ("Muayene Listesi", [
+                ["Tarih", "Hasta Sahibi", "Hasta Adı", "Veteriner Hekim", "Semptom"],
+                ["2023-05-01T11:00:00", owner, "Boncuk", "Dr. A", "Topallık"],
+                ["2025-06-01T11:00:00", owner, "Boncuk", "Dr. A", "Kusma ve ishal"]]));
+
+        var id = await UploadAsync(http, ctx, bytes);
+        await ImportValidationTestRunner.ValidateAsync(_factory.Services, http, id);
+        var preview = await GetJsonAsync(http, $"/api/v1/imports/batches/{id}/preview");
+
+        const string group = "Belirsiz: 301 / 302";
+        preview.GetProperty("unmappedValues").EnumerateArray()
+            .Where(u => u.GetProperty("kind").GetString() == "pet")
+            .Select(u => (u.GetProperty("source").GetString(), u.GetProperty("rowCount").GetInt32()))
+            .Should().Equal((group, 1));
+        var row = preview.GetProperty("petRows").EnumerateArray().Should().ContainSingle().Subject;
+        (row.GetProperty("reference").GetString(), row.GetProperty("table").GetString(), row.GetProperty("date").GetString(),
+                row.GetProperty("title").GetString(), row.GetProperty("summary").GetString())
+            .Should().Be((group, "clinicalRecords", "2025-06-01", "Muayene", "Kusma ve ishal"));
     }
 
     [Fact]

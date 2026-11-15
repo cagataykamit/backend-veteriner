@@ -565,6 +565,95 @@ public sealed class EVetBackupConverterTests
     }
 
     [Fact]
+    public void Ambiguous_Same_Named_Pets_Should_Resolve_By_Birth_Date_And_Vaccine_Species_And_Count_It()
+    {
+        object?[] header = ["Kayıt Tarihi", "Müşteriler", "Hastalar", "Protokol No", "Hasta Türü", "Doğum Tarihi", "Durum"];
+        var workbook = ImportTestFiles.Xlsx(
+            ("Müşteri Listesi", [CustomerHeader, [Registered, "Ayşe Yılmaz", 0d, 101, null, null, null, null, null, null, null, null, null, null, "Aktif"]]),
+            ("Hasta Listesi",
+            [
+                header,
+                // Aynı adlı kedi ve köpek; köpeğin E-vet kayıt tarihi yok, doğum tarihi var.
+                [new DateTime(2021, 3, 1), "Ayşe Yılmaz", "Boncuk", 811, "Kedi", new DateTime(2021, 2, 2), "Aktif"],
+                [null, "Ayşe Yılmaz", "Boncuk", 812, "Köpek", new DateTime(2023, 5, 5), "Aktif"],
+            ]),
+            ("Randevu Listesi",
+            [
+                TaskHeader,
+                // Köpek doğmadan önce: kediye.
+                ["Ayşe Yılmaz", "Boncuk", "Aşılama", new DateTime(2022, 4, 1, 10, 0, 0), "KUDUZ", "Dr. A", null, null, "Tamamlandı"],
+                // Aşının türü: köpek / kedi.
+                ["Ayşe Yılmaz", "Boncuk", "Aşılama", new DateTime(2024, 4, 1, 10, 0, 0), "KÖPEK KARMA", "Dr. A", null, null, "Tamamlandı"],
+                ["Ayşe Yılmaz", "Boncuk", "Aşılama", new DateTime(2024, 5, 1, 10, 0, 0), "Yıllık Kedi Karma", "Dr. A", null, null, "Tamamlandı"],
+                // İkisi de hayatta, aşı türsüz: sorulur.
+                ["Ayşe Yılmaz", "Boncuk", "Aşılama", new DateTime(2024, 6, 1, 10, 0, 0), "KUDUZ", "Dr. A", null, null, "Tamamlandı"],
+            ]),
+            ("Muayene Listesi",
+            [
+                ExaminationHeader,
+                [new DateTime(2022, 1, 10), "Ayşe Yılmaz", "Boncuk", "Dr. A", 4d, null, "Kusma", null, null, null, null, null],
+            ]));
+
+        var result = Read(new ImportFileSet(ImportTestFiles.XlsxFile(workbook), null, null, null));
+
+        Rows(result, ImportTable.Vaccinations).Select(v => v["HayvanNo"]).Should().Equal("811", "812", "811", "Belirsiz: 811 / 812");
+        Rows(result, ImportTable.ClinicalRecords).Select(r => r["HayvanNo"]).Should().Equal("811");
+        result.Warnings.Should().Contain(w => w.Message.StartsWith("Aynı sahipte aynı adlı birden çok hasta: 4 muayene / görev satırı")
+            && w.Message.Contains("1 satırın hangi hastaya ait olduğu aktarma ekranında sorulacak"));
+    }
+
+    [Fact]
+    public void Ambiguous_Same_Named_Pets_Should_Resolve_By_Vaccine_Report_Chip_Or_Species_And_By_Weight()
+    {
+        object?[] header = ["Kayıt Tarihi", "Müşteriler", "Hastalar", "Protokol No", "Hasta Türü", "Doğum Tarihi", "Çip No", "Ağırlık", "Durum"];
+        var workbook = ImportTestFiles.Xlsx(
+            ("Müşteri Listesi", [CustomerHeader, [Registered, "Ayşe Yılmaz", 0d, 101, null, null, null, null, null, null, null, null, null, null, "Aktif"]]),
+            ("Hasta Listesi",
+            [
+                header,
+                [new DateTime(2019, 1, 1), "Ayşe Yılmaz", "Boncuk", 811, "Kedi", new DateTime(2018, 6, 1), "985000000000811", 4d, "Aktif"],
+                [new DateTime(2020, 1, 1), "Ayşe Yılmaz", "Boncuk", 812, "Kedi", new DateTime(2019, 6, 1), "985000000000812", 4.5d, "Aktif"],
+                [new DateTime(2019, 1, 1), "Ayşe Yılmaz", "Boncuk", 813, "Köpek", new DateTime(2018, 2, 1), null, 30d, "Aktif"],
+            ]),
+            ("Randevu Listesi",
+            [
+                TaskHeader,
+                // Raporun çipi 812'yi, türü köpeği gösterir (aşı adı türsüz).
+                ["Ayşe Yılmaz", "Boncuk", "Aşılama", new DateTime(2024, 4, 1, 10, 0, 0), "KUDUZ", "Dr. A", null, null, "Tamamlandı"],
+                ["Ayşe Yılmaz", "Boncuk", "Aşılama", new DateTime(2024, 5, 1, 10, 0, 0), "KUDUZ", "Dr. A", null, null, "Tamamlandı"],
+                // Notta 3,230 kg: yetişkin 30 kg'lık köpek elenir; iki kedi kalır, sorulur.
+                ["Ayşe Yılmaz", "Boncuk", "Aşılama", new DateTime(2024, 6, 1, 10, 0, 0), "KUDUZ", "Dr. A", null, "3.230gr", "Tamamlandı"],
+            ]),
+            ("Muayene Listesi",
+            [
+                ExaminationHeader,
+                // 25 kg kedi olamaz.
+                [new DateTime(2024, 7, 1), "Ayşe Yılmaz", "Boncuk", "Dr. A", 25d, null, "Topallık", null, null, null, null, null],
+            ]));
+        const string report =
+            "#;Tarih;Hasta Sahibi;T.C.;Hasta;Tür;Çip No;Ürün;Seri No;S.K.T;Birim;Miktar;Fiyat;Toplam\n"
+            + "1;01.04.2024 10:05;Ayşe Yılmaz;;Boncuk;Kedi;985000000000812;Rabisin;S-1;;Doz;1,00;100,00;100,00\n"
+            + "2;01.05.2024 10:05;Ayşe Yılmaz;;Boncuk;Köpek;-;Rabisin;S-2;;Doz;1,00;100,00;100,00\n";
+
+        var result = Read(new ImportFileSet(ImportTestFiles.XlsxFile(workbook), null, null, null, EVetVaccineReport: Csv(report, "asi.csv")));
+
+        Rows(result, ImportTable.Vaccinations).Select(v => v["HayvanNo"]).Should().Equal("812", "813", "Belirsiz: 811 / 812 / 813");
+        Rows(result, ImportTable.ClinicalRecords).Select(r => r["HayvanNo"]).Should().Equal("813");
+    }
+
+    [Theory]
+    [InlineData("3.230gr", 3.23)]
+    [InlineData("Kilo: 3,230 gr", 3.23)]
+    [InlineData("850 gr", 0.85)]
+    [InlineData("12 kg", 12.0)]
+    [InlineData("4,5 Kg", 4.5)]
+    [InlineData("2 tablet 250 gr, kilo 3.230gr", null)]
+    [InlineData("0,5 gr", null)]
+    [InlineData("Karma aşı yapıldı", null)]
+    public void Note_Weight_Should_Be_Read_Only_When_Single_And_Plausible(string note, double? expected)
+        => EVetCells.NoteWeightKg(note).Should().Be(expected is { } kg ? (decimal)kg : null);
+
+    [Fact]
     public void Two_Active_Copies_With_Same_Birth_Date_And_No_Conflict_Should_Merge_Others_Stay_Ambiguous()
     {
         object?[] header = ["Kayıt Tarihi", "Müşteriler", "Hastalar", "Protokol No", "Hasta Türü", "Irk", "Renk", "Doğum Tarihi", "Durum"];

@@ -64,6 +64,27 @@ public sealed class ImportPreviewAggregatorTests
     }
 
     [Fact]
+    public void Pet_Rows_Should_Show_Vaccine_Or_Record_Type_With_A_Short_Summary_Per_Group()
+    {
+        const string group = "Belirsiz: 903 / 904";
+        var vaccination = ImportSourceRowJson.Serialize(["HayvanNo", "AsiAdi", "UygulamaTarihi"], [group, "KÖPEK KARMA", "2024-04-01"]);
+        var examination = ImportSourceRowJson.Serialize(
+            ["HayvanNo", "Tarih", "KayitTuru", "Sikayet", "Tani"],
+            [group, "2024-03-01", "Muayene", "İştahsızlık", "Gastrit şüphesi, diyet ve sıvı tedavisi önerildi kontrol"]);
+        var other = ImportSourceRowJson.Serialize(["HayvanNo", "Tarih", "KayitTuru"], ["Belirsiz: 1 / 2", "2024-01-01", "Muayene"]);
+        var later = Enumerable.Range(10, ImportPreviewAggregator.PetRowsPerGroup)
+            .Select(n => (ImportTable.ClinicalRecords, n, (string?)ImportSourceRowJson.Serialize(["HayvanNo", "Tarih", "KayitTuru"], [group, "2025-01-01", "Kontrol"])));
+
+        var rows = ImportPreviewAggregator.PetRows(
+            [(ImportTable.Vaccinations, 3, vaccination), (ImportTable.ClinicalRecords, 7, examination), (ImportTable.ClinicalRecords, 8, other), .. later],
+            new HashSet<string> { group });
+
+        rows.Should().HaveCount(ImportPreviewAggregator.PetRowsPerGroup, "grup başına ilk birkaç kayıt; başka grup alınmaz");
+        rows[0].Should().Be(new ImportPetRowDto(group, "clinicalRecords", 7, "2024-03-01", "Muayene", "Gastrit şüphesi, diyet ve sıvı tedavisi …"));
+        rows[1].Should().Be(new ImportPetRowDto(group, "vaccinations", 3, "2024-04-01", "KÖPEK KARMA", null));
+    }
+
+    [Fact]
     public void Not_Imported_Reasons_Should_Count_One_Reason_Per_Row_By_Table_And_Kind()
     {
         const ImportRowValidationStatus valid = ImportRowValidationStatus.Valid;

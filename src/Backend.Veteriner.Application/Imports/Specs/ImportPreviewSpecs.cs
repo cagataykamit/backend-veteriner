@@ -36,6 +36,24 @@ public sealed class ImportTableSourceRowsSpec : Specification<ImportBatchRow, Im
     }
 }
 
+/// <summary>Hazırlık satırı: tablo, satır numarası ve dosyadaki değerler.</summary>
+public sealed record ImportTableSourceRowInfo(ImportTable Table, int RowNumber, string? SourceJson);
+
+/// <summary>
+/// Belirsiz hasta grubuna düşen satırlar (sorununda <see cref="ImportRules.AmbiguousPetReferencePrefix"/> geçen): yalnız tablo,
+/// satır numarası ve <c>SourceJson</c>; sıra tablo, satır.
+/// </summary>
+public sealed class ImportAmbiguousPetRowsSpec : Specification<ImportBatchRow, ImportTableSourceRowInfo>
+{
+    public ImportAmbiguousPetRowsSpec(Guid batchId)
+    {
+        Query.AsNoTracking();
+        Query.Where(r => r.BatchId == batchId && r.IssuesJson != null && r.IssuesJson.Contains(ImportRules.AmbiguousPetReferencePrefix));
+        Query.OrderBy(r => r.Table).ThenBy(r => r.RowNumber);
+        Query.Select(r => new ImportTableSourceRowInfo(r.Table, r.RowNumber, r.SourceJson));
+    }
+}
+
 /// <summary>Önizleme toplulaştırması için: sorunu olan satırların <c>IssuesJson</c> değerleri (yalnız tek sütun).</summary>
 public sealed class ImportIssuesJsonSpec : Specification<ImportBatchRow, string?>
 {

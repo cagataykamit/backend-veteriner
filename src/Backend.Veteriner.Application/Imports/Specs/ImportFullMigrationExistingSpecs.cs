@@ -18,7 +18,8 @@ public sealed class ImportExistingClinicalRecordsSpec : Specification<ImportedCl
         Query.AsNoTracking();
         Query.Where(r => r.TenantId == tenantId && petSet.Contains(r.PetId));
         Query.Select(r => new ImportExistingClinicalRecord(
-            r.PetId, r.RecordedOn, r.Complaint, r.History, r.Findings, r.Diagnosis, r.Treatment, r.Prescription, r.LabResults, r.Notes));
+            r.PetId, r.RecordedOn, r.Complaint, r.History, r.Findings, r.Diagnosis, r.Treatment, r.Prescription, r.LabResults, r.Notes,
+            r.VeterinarianName, r.WeightKg, r.TemperatureC));
     }
 }
 

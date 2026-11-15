@@ -99,6 +99,37 @@ internal static class EVetCells
         return rounded <= 0 ? null : rounded.ToString("0.##", CultureInfo.InvariantCulture);
     }
 
+    /// <summary>
+    /// Not metnine yazılmış kilo (kg): <c>3.230gr</c>, <c>3,230 gr</c> (ayraçtan sonra üç hane: kilogram ve gram), <c>850 gr</c>,
+    /// <c>12 kg</c>, <c>4,5 Kg</c>. Metinlerde birden çok farklı değer (doz da olabilir) ya da makul aralık (50 g – 120 kg) dışı
+    /// değer varsa null: şüphede kilo okunmaz.
+    /// </summary>
+    public static decimal? NoteWeightKg(params string?[] texts)
+    {
+        var values = texts
+            .SelectMany(t => NoteWeight.Matches(t ?? string.Empty))
+            .Select(m =>
+            {
+                var whole = decimal.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture);
+                var fraction = m.Groups[2].Value;
+                var number = fraction.Length == 0 ? whole : decimal.Parse($"{whole}.{fraction}", CultureInfo.InvariantCulture);
+                var grams = m.Groups[3].Value.StartsWith('g') || m.Groups[3].Value.StartsWith('G');
+                return grams && fraction.Length != 3 ? number / 1000m : number;
+            })
+            .Distinct()
+            .ToList();
+        return values is [var kg] && kg is >= 0.05m and <= 120m ? Math.Round(kg, 2) : null;
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex NoteWeight = new(
+        @"(?<![\d.,])(\d{1,4})(?:[.,](\d{1,3}))?\s*(kg|gr|g)\b",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant,
+        TimeSpan.FromMilliseconds(100));
+
+    /// <summary>Ağırlık sayı olarak (kg, 2 ondalık); 0 ve okunamayan null.</summary>
+    public static decimal? WeightKg(string? value)
+        => TryNumber(value, out var number) && Math.Round(number, 2, MidpointRounding.AwayFromZero) is > 0 and var rounded ? rounded : null;
+
     /// <summary>Vücut sıcaklığı (<c>38.50000000</c>): 1 ondalık; 0 boş.</summary>
     public static string? Temperature(string? value)
     {
