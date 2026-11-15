@@ -1,8 +1,10 @@
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Common.Security;
 using Backend.Veteriner.Application.Users.Specs;
 using Backend.Veteriner.Domain.Tenants;
 using AwesomeAssertions;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Public;
@@ -140,11 +142,30 @@ public sealed class TrialSignupServiceTests
         var client = new Mock<IClientContext>();
         client.SetupGet(c => c.IpAddress).Returns("203.0.113.5");
 
-        var result = await new HumanVerificationGuard(verifier.Object, client.Object).EnsureHumanAsync("jeton", "eylem", CancellationToken.None);
+        var result = await new HumanVerificationGuard(verifier.Object, client.Object, Options.Create(new HumanVerificationOptions()))
+            .EnsureHumanAsync("jeton", "eylem", CancellationToken.None);
 
         if (expectedCode is null)
             result.IsSuccess.Should().BeTrue();
         else
             result.Error.Code.Should().Be(expectedCode);
+    }
+
+    [Theory]
+    [InlineData(HumanVerificationActions.PortalSignInCode, false)]
+    [InlineData(HumanVerificationActions.PortalPasswordReset, false)]
+    [InlineData(HumanVerificationActions.SignupEmailCode, true)]
+    [InlineData(HumanVerificationActions.OnlineBookingCode, true)]
+    public async Task HumanVerificationGuard_Should_Skip_Only_Portal_SignIn_When_Disabled(string action, bool stillRequired)
+    {
+        var verifier = new Mock<IHumanVerifier>();
+        verifier.SetupGet(v => v.IsConfigured).Returns(true);
+        verifier.Setup(v => v.VerifyAsync(It.IsAny<string?>(), It.IsAny<string?>(), action, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(HumanVerificationResult.Failed);
+        var guard = new HumanVerificationGuard(
+            verifier.Object, Mock.Of<IClientContext>(), Options.Create(new HumanVerificationOptions { ProtectPortalSignIn = false }));
+
+        guard.IsRequired(action).Should().Be(stillRequired);
+        (await guard.EnsureHumanAsync(null, action, CancellationToken.None)).IsSuccess.Should().Be(!stillRequired);
     }
 }
