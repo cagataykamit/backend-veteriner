@@ -12,9 +12,9 @@ using Microsoft.Extensions.Options;
 namespace Backend.Veteriner.Application.Files.Commands.Upload;
 
 /// <summary>
-/// Yükleme sırası (ASAMA6 R4): sahip ve kapsam → boyut → sayı sınırı → içerikten tür (magic bytes) → meta <c>Uploading</c>
-/// kaydı → içerik yazımı (özet ve sınır akışta) → tarama arayüzü → <c>Ready</c>. Yazma veya tarama başarısızsa içerik silinir,
-/// meta <c>Deleted</c> olur; süreç ortasında kalan kaydı bakım işi temizler.
+/// Yükleme sırası (ASAMA6 R4): sahip ve kapsam → boyut → sayı sınırı → içerikten tür (magic bytes) → virüs taraması → meta
+/// <c>Uploading</c> kaydı → içerik yazımı (özet ve sınır akışta) → <c>Ready</c>. Taramadan geçmeyen içerik hiçbir yere yazılmaz.
+/// Yazma başarısızsa içerik silinir, meta <c>Deleted</c> olur; süreç ortasında kalan kaydı bakım işi temizler.
 /// </summary>
 public sealed class UploadStoredFileCommandHandler : IRequestHandler<UploadStoredFileCommand, Result<StoredFileDto>>
 {
@@ -23,7 +23,7 @@ public sealed class UploadStoredFileCommandHandler : IRequestHandler<UploadStore
     private readonly IEnumerable<IStoredFileOwnerAccess> _ownerAccesses;
     private readonly IRepository<StoredFile> _files;
     private readonly IFileStorage _storage;
-    private readonly IFileMalwareScanner _scanner;
+    private readonly UploadMalwareGuard _malwareGuard;
     private readonly FileStorageOptions _options;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<UploadStoredFileCommandHandler> _logger;
@@ -35,7 +35,7 @@ public sealed class UploadStoredFileCommandHandler : IRequestHandler<UploadStore
         IEnumerable<IStoredFileOwnerAccess> ownerAccesses,
         IRepository<StoredFile> files,
         IFileStorage storage,
-        IFileMalwareScanner scanner,
+        UploadMalwareGuard malwareGuard,
         IOptions<FileStorageOptions> options,
         TimeProvider timeProvider,
         ILogger<UploadStoredFileCommandHandler> logger,
@@ -46,7 +46,7 @@ public sealed class UploadStoredFileCommandHandler : IRequestHandler<UploadStore
         _ownerAccesses = ownerAccesses;
         _files = files;
         _storage = storage;
-        _scanner = scanner;
+        _malwareGuard = malwareGuard;
         _options = options.Value;
         _timeProvider = timeProvider;
         _logger = logger;
@@ -95,6 +95,10 @@ public sealed class UploadStoredFileCommandHandler : IRequestHandler<UploadStore
                 "Yalnız JPEG, PNG, WebP görüntü ve PDF dosyası yüklenebilir.");
         }
 
+        var scan = await _malwareGuard.EnsureCleanAsync(request.Content, request, ct);
+        if (!scan.IsSuccess)
+            return Result<StoredFileDto>.Failure(scan.Error);
+
         var file = new StoredFile(
             tenantId, owner.Value, request.OwnerType, request.OwnerId, request.FileName, type, userId, Now);
         await _files.AddAsync(file, ct);
@@ -120,13 +124,6 @@ public sealed class UploadStoredFileCommandHandler : IRequestHandler<UploadStore
         {
             await DiscardAsync(file, userId);
             throw;
-        }
-
-        var scan = await _scanner.ScanAsync(file.StorageKey, ct);
-        if (!scan.IsSuccess)
-        {
-            await DiscardAsync(file, userId);
-            return Result<StoredFileDto>.Failure(scan.Error);
         }
 
         var ready = file.MarkReady(hashing.BytesRead, hashing.HashHex, Now);

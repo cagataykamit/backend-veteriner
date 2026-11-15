@@ -104,6 +104,7 @@ public static class ResultExtensions
             case "files.malwaredetected":
                 return (StatusCodes.Status422UnprocessableEntity, "https://httpstatuses.io/422");
             case "files.storageunavailable":
+            case "files.scanunavailable":
                 return (StatusCodes.Status503ServiceUnavailable, "https://httpstatuses.io/503");
             case "files.accessurlinvalid":
                 return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");

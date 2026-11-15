@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Auditing;
 using Backend.Veteriner.Application.Files;
 using Backend.Veteriner.Application.Files.Access;
 using Backend.Veteriner.Application.Files.Commands.Upload;
@@ -17,7 +18,7 @@ namespace Backend.Veteriner.Application.Tests.Files;
 
 /// <summary>
 /// Yükleme sırası ve güvenlik kuralları (IMAGING_API_CONTRACT.md §2/§5, ASAMA6 R2/R4): içerikten tür (sahte uzantı reddi),
-/// boyut sınırı (bildirilen ve akış sırasında), kayıt başına sayı, yazma/tarama hatasında temizlik.
+/// boyut sınırı (bildirilen ve akış sırasında), kayıt başına sayı, yazma hatasında temizlik, taramadan geçmeyen içeriğin hiç yazılmaması.
 /// </summary>
 public sealed class UploadStoredFileCommandHandlerTests
 {
@@ -53,7 +54,7 @@ public sealed class UploadStoredFileCommandHandlerTests
                 return f;
             });
         _files.Setup(r => r.UpdateAsync(It.IsAny<StoredFile>(), It.IsAny<CancellationToken>())).ReturnsAsync(1);
-        _scanner.Setup(s => s.ScanAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(Result.Success());
+        _scanner.Setup(s => s.ScanAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>())).ReturnsAsync(FileScanResult.Clean);
     }
 
     private UploadStoredFileCommandHandler CreateHandler(IFileStorage? storage = null)
@@ -63,7 +64,12 @@ public sealed class UploadStoredFileCommandHandlerTests
             [_owner.Object],
             _files.Object,
             storage ?? _storage,
-            _scanner.Object,
+            new UploadMalwareGuard(
+                _scanner.Object,
+                Mock.Of<IAuditLogWriter>(),
+                _client.Object,
+                TimeProvider.System,
+                NullLogger<UploadMalwareGuard>.Instance),
             Options.Create(_options),
             TimeProvider.System,
             NullLogger<UploadStoredFileCommandHandler>.Instance,
@@ -169,16 +175,47 @@ public sealed class UploadStoredFileCommandHandlerTests
     }
 
     [Fact]
-    public async Task Scanner_Rejection_Should_Delete_Content()
+    public async Task Infected_Content_Should_Be_Rejected_Before_Any_Write()
     {
-        _scanner.Setup(s => s.ScanAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Failure("Files.MalwareDetected", "zararlı"));
+        _scanner.Setup(s => s.ScanAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(FileScanResult.Infected("Eicar-Test-Signature"));
 
         var result = await CreateHandler().Handle(Command(Jpeg), CancellationToken.None);
 
         result.Error.Code.Should().Be("Files.MalwareDetected");
-        _added.Single().Status.Should().Be(StoredFileStatus.Deleted);
+        _added.Should().BeEmpty();
         _storage.Content.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Unreachable_Scanner_Should_Reject_Before_Any_Write()
+    {
+        _scanner.Setup(s => s.ScanAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(FileScanResult.Failed("clamd unreachable"));
+
+        var result = await CreateHandler().Handle(Command(Jpeg), CancellationToken.None);
+
+        result.Error.Code.Should().Be("Files.ScanUnavailable");
+        _added.Should().BeEmpty();
+        _storage.Content.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Clean_Content_Should_Be_Written_In_Full_After_Scan()
+    {
+        // Tarayıcı akışı sonuna kadar okur; koruyucu başa sarmazsa yazılan içerik eksik kalır.
+        _scanner.Setup(s => s.ScanAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
+            .Returns(async (Stream s, CancellationToken ct) =>
+            {
+                await s.CopyToAsync(Stream.Null, ct);
+                return FileScanResult.Clean;
+            });
+        var content = Jpeg.Concat(new byte[20]).ToArray();
+
+        var result = await CreateHandler().Handle(Command(content), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _storage.Content.Single().Value.Should().Equal(content);
     }
 
     [Fact]
