@@ -30,7 +30,7 @@ public sealed partial class ImportValidationEngine
     private ImportRowResult ProcessAppointment(ImportRowReader reader)
     {
         var issues = new List<ImportIssue>();
-        var (pet, petSkippedByUser) = ResolvePetLink(reader, issues);
+        var (pet, petSkip) = ResolvePetLink(reader, issues);
 
         // Başlangıç: tarih + saat (Saat sütunu veya tarih hücresindeki saat), İstanbul yerel → UTC.
         DateTime? scheduledAtUtc = null;
@@ -103,9 +103,9 @@ public sealed partial class ImportValidationEngine
         if (HasError(issues))
             return Finish(ImportTable.Appointments, reader.RowNumber, issues, normalized);
 
-        if (petSkippedByUser)
+        if (petSkip is { } skip)
         {
-            issues.Add(ImportRules.ParentSkipped.At());
+            issues.Add(skip);
             return Finish(ImportTable.Appointments, reader.RowNumber, issues, normalized, ImportRowAction.Skip);
         }
 

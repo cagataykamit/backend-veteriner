@@ -28,7 +28,7 @@ public sealed partial class ImportValidationEngine
     private ImportRowResult ProcessClinicalRecord(ImportRowReader reader)
     {
         var issues = new List<ImportIssue>();
-        var (pet, petSkippedByUser) = ResolvePetLink(reader, issues);
+        var (pet, petSkip) = ResolvePetLink(reader, issues);
 
         var recordedOn = ReadPastDate(reader, "Tarih", issues);
         if (recordedOn is { } date && pet?.BirthDate is { } birth && date < birth)
@@ -75,9 +75,9 @@ public sealed partial class ImportValidationEngine
         if (HasError(issues))
             return Finish(ImportTable.ClinicalRecords, reader.RowNumber, issues, normalized);
 
-        if (petSkippedByUser)
+        if (petSkip is { } skip)
         {
-            issues.Add(ImportRules.ParentSkipped.At());
+            issues.Add(skip);
             return Finish(ImportTable.ClinicalRecords, reader.RowNumber, issues, normalized, ImportRowAction.Skip);
         }
 

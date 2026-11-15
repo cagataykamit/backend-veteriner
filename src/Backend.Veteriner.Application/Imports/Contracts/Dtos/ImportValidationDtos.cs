@@ -18,7 +18,25 @@ public sealed record ImportPreviewDto(
     bool CanCommit,
     IReadOnlyList<string> Blockers,
     bool PayloadPurged,
-    IReadOnlyList<ImportNotImportedReasonDto> NotImportedReasons);
+    IReadOnlyList<ImportNotImportedReasonDto> NotImportedReasons,
+    IReadOnlyList<ImportPetCandidateDto> PetCandidates);
+
+/// <summary>
+/// Belirsiz hasta grubunun (<c>unmappedValues[kind=pet]</c>) adayı (bölüm 13.4): kullanıcı kayıtların hangisine ait olduğunu
+/// bu bilgilerle seçer. Değerler hazırlık satırındaki gibidir (dosyadaki yazım).
+/// </summary>
+public sealed record ImportPetCandidateDto(
+    string PetNo,
+    int RowNumber,
+    string? Name,
+    string? OwnerName,
+    string? Species,
+    string? Breed,
+    string? Color,
+    string? Gender,
+    string? BirthDate,
+    string? Status,
+    string? RegisteredOn);
 
 /// <summary>
 /// Tablo başına aktarılmayacak satırların nedeni (2026-11-14): <see cref="Kind"/> <c>Skipped</c> (bilerek atlanan: boş, tekrar,

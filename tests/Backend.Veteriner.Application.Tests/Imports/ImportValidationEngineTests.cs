@@ -957,6 +957,44 @@ public sealed class ImportValidationEngineTests
     }
 
     [Fact]
+    public void Ambiguous_Pet_Choice_Should_Link_Skip_Or_Merge()
+    {
+        const string ambiguous = "Belirsiz: H-1 / H-2";
+        var pets = Pets(
+            Pet(customerNo: "M-1", petNo: "H-1", name: "Pamuk", species: "Kedi"),
+            Pet(customerNo: "M-1", petNo: "H-2", name: "Pamuk (E-vet H-2)", species: "Kedi"));
+        var vaccinations = Vaccinations(Vaccination(petNo: ambiguous), Vaccination(petNo: "H-2", applied: "11.04.2024"));
+
+        ImportValidationOutput RunWith(params ImportPetChoice[] choices)
+        {
+            var mapping = Mapping(CustomerFields, PetFields, VaccinationFields);
+            return Run(
+                customers: Customers(Customer(no: "M-1")), pets: pets, vaccinations: vaccinations,
+                mapping: new ImportMappingDocument { Columns = mapping.Columns, PetChoices = [.. choices] });
+        }
+
+        // Seçim yok: hata (önizlemede engel).
+        Codes(Single(RunWith(), ImportTable.Vaccinations)).Should().Equal("Imports.PetNotFound");
+
+        // İkinci hasta seçildi: aşı ona bağlanır.
+        var linked = RunWith(new ImportPetChoice(ambiguous, "H-2"));
+        ((ImportNormalizedVaccination)Single(linked, ImportTable.Vaccinations).Normalized).PetKey.Should().Be("file:3");
+
+        // Atla: satır bilerek atlanır, hata sayılmaz.
+        var skipped = Single(RunWith(new ImportPetChoice(ambiguous, null)), ImportTable.Vaccinations);
+        skipped.Status.Should().Be(ImportRowValidationStatus.Valid);
+        skipped.Normalized.Action.Should().Be(ImportRowAction.Skip);
+        Codes(skipped).Should().Equal("Imports.AmbiguousPetSkipped");
+
+        // Tek hasta say (H-1): H-2 aktarılmaz, H-2'ye doğrudan bağlı aşı da H-1'e gider.
+        var merged = RunWith(new ImportPetChoice(ambiguous, "H-1", Merge: true));
+        Codes(Single(merged, ImportTable.Pets, 3)).Should().Equal("Imports.PetMergedByChoice");
+        Single(merged, ImportTable.Pets, 3).Normalized.Action.Should().Be(ImportRowAction.Skip);
+        merged.Rows.Where(r => r.Table == ImportTable.Vaccinations)
+            .Select(r => ((ImportNormalizedVaccination)r.Normalized).PetKey).Should().Equal("file:2", "file:2");
+    }
+
+    [Fact]
     public void Vaccination_Of_Invalid_Pet_Row_Should_Cascade_As_Pet_Row_Invalid()
     {
         var output = WithPet(

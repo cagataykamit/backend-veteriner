@@ -66,6 +66,12 @@ public sealed partial class ImportValidationEngine
 
     private readonly List<ImportRowResult> _results = new();
 
+    /// <summary>Belirsiz hasta grubu (<c>Belirsiz: a / b</c>) → kullanıcının seçimi (bölüm 13.4).</summary>
+    private readonly Dictionary<string, ImportPetChoice> _petChoices;
+
+    /// <summary>"Tek hasta say" seçiminde öbür adayın hasta no'su → seçilen hasta no.</summary>
+    private readonly Dictionary<string, string> _mergedPets;
+
     private ImportValidationEngine(ImportValidationInput input)
     {
         _input = input;
@@ -74,6 +80,12 @@ public sealed partial class ImportValidationEngine
         _vaccinesById = input.Catalogs.Vaccines.ToDictionary(e => e.Id);
         _today = OperationDayBounds.ToLocalDate(input.NowUtc);
         _onDuplicateClient = input.Options.OnDuplicateClient;
+        _petChoices = input.Mapping.PetChoices.ToDictionary(c => c.Reference, StringComparer.Ordinal);
+        _mergedPets = input.Mapping.PetChoices
+            .Where(c => c is { Merge: true, PetNo: not null })
+            .SelectMany(c => c.Candidates.Where(p => p != c.PetNo).Select(p => (Other: p, Target: c.PetNo!)))
+            .GroupBy(x => x.Other, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().Target, StringComparer.OrdinalIgnoreCase);
 
         IndexExistingData(input.Existing);
     }

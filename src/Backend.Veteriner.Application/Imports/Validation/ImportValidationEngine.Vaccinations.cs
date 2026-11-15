@@ -21,7 +21,7 @@ public sealed partial class ImportValidationEngine
     {
         var issues = new List<ImportIssue>();
 
-        var (pet, petSkippedByUser) = ResolvePetLink(reader, issues);
+        var (pet, petSkip) = ResolvePetLink(reader, issues);
 
         // Aşı tanımı (hastanın türüne göre)
         Guid? definitionId = null;
@@ -128,9 +128,9 @@ public sealed partial class ImportValidationEngine
             return Finish(ImportTable.Vaccinations, reader.RowNumber, issues, normalized);
 
         // Bilinçli atlama: hasta veya aşı değeri kullanıcı tarafından atlandı.
-        if (petSkippedByUser)
+        if (petSkip is { } skip)
         {
-            issues.Add(ImportRules.ParentSkipped.At());
+            issues.Add(skip);
             return Finish(ImportTable.Vaccinations, reader.RowNumber, issues, normalized, ImportRowAction.Skip);
         }
 
@@ -156,68 +156,78 @@ public sealed partial class ImportValidationEngine
     /// Hastaya bağlanan satırın (aşı, klinik geçmiş, randevu) hayvanını çözer: <c>HayvanNo</c> doluysa dosyadaki hasta; yoksa sahip + hayvan adı + tür ile
     /// dosyadaki sonra sahibin kiracıdaki hastaları.
     /// </summary>
-    private (PetRef? Pet, bool SkippedByUser) ResolvePetLink(ImportRowReader reader, List<ImportIssue> issues)
+    private (PetRef? Pet, ImportIssue? Skip) ResolvePetLink(ImportRowReader reader, List<ImportIssue> issues)
     {
         var reference = ImportValueParsers.NormalizeText(reader.Raw("HayvanNo"));
         if (reference is not null && PetReferenceUsable)
         {
+            // Kullanıcının belirsiz grup seçimi (bölüm 13.4): seçilen hasta ya da "atla"; tek hasta sayılanlar hedefe yönlenir.
+            if (_petChoices.TryGetValue(reference, out var choice))
+            {
+                if (choice.PetNo is null)
+                    return (null, ImportRules.AmbiguousPetSkipped.At("HayvanNo", value: reference));
+                reference = choice.PetNo;
+            }
+
+            reference = _mergedPets.GetValueOrDefault(reference) ?? reference;
+
             if (!_petByRef.TryGetValue(reference, out var node))
             {
                 issues.Add(ImportRules.PetNotFound.At("HayvanNo", reference.StartsWith(ImportRules.AmbiguousPetReferencePrefix, StringComparison.Ordinal)
                     ? $"Aynı sahipte aynı adlı birden çok hasta var (E-vet {reference[ImportRules.AmbiguousPetReferencePrefix.Length..]}); kaydın hangisine ait olduğu ayırt edilemedi."
                     : $"'{reference}' numaralı hasta dosyada bulunamadı.", reference));
-                return (null, false);
+                return (null, null);
             }
 
             if (node.SkippedByUser)
-                return (null, true);
+                return (null, ImportRules.ParentSkipped.At());
 
             if (node.Ref is null)
             {
                 issues.Add(ImportRules.PetRowInvalid.At("HayvanNo", $"Hasta aktarılmadı: {node.Reason} (Hastalar satır {node.Row})", reference));
-                return (null, false);
+                return (null, null);
             }
 
-            return (node.Ref, false);
+            return (node.Ref, null);
         }
 
         var owner = FindOwnerByNameAndPhone(reader, issues, ImportRules.PetNotFound);
         if (owner is null)
-            return (null, false);
+            return (null, null);
 
         var petName = ImportValueParsers.NormalizeText(reader.Raw("HayvanAdi"));
         if (petName is null)
         {
             issues.Add(ImportRules.PetNotFound.At("HayvanAdi", "Hasta adı boş; hasta bulunamadı."));
-            return (null, false);
+            return (null, null);
         }
 
         var rawSpecies = reader.Raw("Tur");
         if (rawSpecies is null)
-            return (FindPetWithoutSpecies(owner, PetNameKey(petName), petName, issues), false);
+            return (FindPetWithoutSpecies(owner, PetNameKey(petName), petName, issues), null);
 
         var species = _resolver.Resolve(ImportValueKind.Species, rawSpecies);
         if (species.Kind == ImportValueResolutionKind.Skipped)
-            return (null, true);
+            return (null, ImportRules.ParentSkipped.At());
 
         if (species.Kind != ImportValueResolutionKind.Resolved)
         {
             issues.Add(species.Kind == ImportValueResolutionKind.Unmapped
                 ? ImportRules.SpeciesUnmapped.At("Tur", value: rawSpecies)
                 : ImportRules.PetNotFound.At("Tur", "Hayvan türü boş; hasta bulunamadı."));
-            return (null, false);
+            return (null, null);
         }
 
         var speciesId = species.TargetId!.Value;
         var nameKey = PetNameKey(petName);
         if (_petByIdentity.TryGetValue((owner.Key, nameKey, speciesId), out var filePet))
-            return (filePet.Ref, false);
+            return (filePet.Ref, null);
 
         if (owner.ClientId is { } clientId && _dbPetByIdentity.TryGetValue((clientId, nameKey, speciesId), out var dbPet))
-            return (new PetRef($"db:{dbPet.Id}", dbPet.Id, dbPet.SpeciesId, dbPet.BirthDate, owner), false);
+            return (new PetRef($"db:{dbPet.Id}", dbPet.Id, dbPet.SpeciesId, dbPet.BirthDate, owner), null);
 
         issues.Add(ImportRules.PetNotFound.At("HayvanAdi", "Hasta dosyada veya sahibinin kayıtlı hastaları arasında bulunamadı.", petName));
-        return (null, false);
+        return (null, null);
     }
 
     /// <summary>

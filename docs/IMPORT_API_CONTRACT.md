@@ -977,7 +977,24 @@ Görev → hasta bağlantısı muayeneyle aynıdır (`Müşteriler`, `Hastalar` 
 
 Aşı serisi anahtarı (tek yer `ImportValueResolver.VaccineSeriesKey`): katlanmış addan baştaki/sondaki `yıllık`, sondaki doz numarası ve `N aylık`, baştaki `kedi`/`köpek` atılır (`YILLIK KEDİ KARMA` = `KEDİ KARMA 2` = `karma`; `İÇ PARAZİT 2 AYLIK` = `icparazit`). Değer çözücü (bölüm 5) aşı adında katalog/takma ad eşleşmesi bulamazsa aynı anahtarla bir kez daha dener; bu kural her profilde geçerlidir. Eşleşmeyen paketler (`İÇ+DIŞ PARAZİT`, `MANTAR`, ticari parazit ürünleri…) bölüm 5'teki değer eşlemesiyle kullanıcı tarafından eşlenir veya atlanır.
 
-### 13.4 Bilinen sınırlar
+### 13.4 Belirsiz hasta seçimi (2026-11-15)
+
+Dönüştürücü bir kaydı (aşı, klinik geçmiş, randevu) tek hastaya bağlayamazsa (`HayvanNo = Belirsiz: <a> / <b>`, bölüm 13.2) kullanıcıya sorulur. Gerçek yedekte birleştirme ve kurallardan sonra 18 grup kalır; bunların içinde dolu muayeneler de vardır.
+
+**Önizleme (§7.6), geriye uyumlu ekleme:**
+- `unmappedValues` içinde `kind = "pet"`, `source = "Belirsiz: a / b"`, `rowCount` (gruptaki satır sayısı), `blocking = true`. Seçilmeden aktarma başlamaz; `blockers` içinde `Imports.AmbiguousPet`.
+- Yeni alan `petCandidates[]`: gruplardaki adaylar `{ petNo, rowNumber, name, ownerName, species, breed, color, gender, birthDate, status, registeredOn }`. Değerler hazırlık satırındaki gibidir; `registeredOn` E-vet kayıt tarihidir (`gg.aa.yyyy`). Grup yoksa liste boştur ve hasta satırları okunmaz.
+
+**Seçim (`PUT .../mapping`), geriye uyumlu ekleme:**
+- Gövde alanı: `petChoices: [{ "reference": "Belirsiz: a / b", "petNo": "a" | null, "merge": false }]`.
+  - `petNo`: gruptaki satırların bağlanacağı aday.
+  - `null`: grubun satırları **atlanır** (`Imports.AmbiguousPetSkipped`, bilgi; hata sayılmaz).
+  - `merge = true`: adaylar **tek hastadır**. Öbür adayın hasta satırı aktarılmaz (`Imports.PetMergedByChoice`, bilgi); o adaya doğrudan bağlı aşı ve kayıtlar da seçilen hastaya gider.
+- Seçimler partide saklanır (eşleme belgesi `PetChoices`) ve yeniden doğrulamada uygulanır.
+- Doğrulama: `reference` belirsiz grup biçiminde olmalı, `petNo` gruptaki adaylardan biri, `merge` için `petNo` zorunlu, her grup bir kez. Aksi `400 Imports.PetChoiceInvalid`.
+- Kural tek yerde: `ImportValidationEngine.ResolvePetLink`.
+
+### 13.5 Bilinen sınırlar
 
 - Yedekte hesap hareketi yok; bakiye müşteri listesindeki `Bakiye` sütunundan gelir (ADR-048 T3). Rapor > Bakiyesi Olan Müşteriler yalnız karşılaştırma içindir, yüklenmez.
 - Hasta yaş grubu aktarılmaz (doğum tarihinden türer); müşterinin "sahiplenmek ister" işareti ve görevin `Bölüm` alanı aktarılmaz. Ücret ve ödeme geçmişi yedekte yoktur (yalnız müşterinin net bakiyesi); Aşı Bilgisi raporundaki aşı fiyatı tek başına ücret geçmişi sayılmadığı için aktarılmaz.

@@ -24,16 +24,54 @@ public static class ImportPreviewAggregator
         [ImportRules.ColorFreeText.Code] = (ImportValueKind.Color, false),
     };
 
+    /// <summary><c>unmappedValues</c> içinde belirsiz hasta grubunun türü (kaynak: <c>Belirsiz: a / b</c>; seçim <c>petChoices</c> ile).</summary>
+    public const string AmbiguousPetKind = "pet";
+
+    /// <summary>
+    /// Belirsiz grupların aday hastaları: hasta satırlarından istenen hasta no'larınınki (kanonik başlıklar). E-vet kayıt
+    /// tarihi hasta notundaki "Eski programa kayıt: gg.aa.yyyy" satırından okunur.
+    /// </summary>
+    public static IReadOnlyList<ImportPetCandidateDto> PetCandidates(
+        IEnumerable<(int RowNumber, string? SourceJson)> petRows, IReadOnlySet<string> petNos)
+    {
+        var result = new List<ImportPetCandidateDto>();
+        foreach (var (rowNumber, json) in petRows)
+        {
+            var values = ImportSourceRow.FromJson(rowNumber, json).Values;
+            string? V(string key) => values.TryGetValue(key, out var v) && !string.IsNullOrWhiteSpace(v) ? v.Trim() : null;
+            if (V("HayvanNo") is not { } petNo || !petNos.Contains(petNo))
+                continue;
+
+            var registered = RegisteredOn.Match(V("Not") ?? string.Empty);
+            result.Add(new ImportPetCandidateDto(
+                petNo, rowNumber, V("HayvanAdi"), V("SahipAdSoyad"), V("Tur"), V("Irk"), V("Renk"), V("Cinsiyet"), V("DogumTarihi"),
+                V("Durum"), registered.Success ? registered.Groups[1].Value : null));
+        }
+
+        return result.OrderBy(c => c.RowNumber).ToList();
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex RegisteredOn =
+        new(@"Eski programa kayıt: (\d{2}\.\d{2}\.\d{4})", System.Text.RegularExpressions.RegexOptions.Compiled, TimeSpan.FromMilliseconds(100));
+
     /// <summary>Eşlenemeyen değerler ile sorun kodu sayıları (her ikisi de satır başına bir kez sayar).</summary>
     public static (IReadOnlyList<ImportUnmappedValueDto> Unmapped, IReadOnlyList<ImportIssueCountDto> Counts) AggregateIssues(
         IEnumerable<string?> issuesJsonPerRow)
     {
         var unmapped = new Dictionary<(ImportValueKind Kind, string Key), (string Source, bool Blocking, int Rows)>();
         var counts = new Dictionary<string, (ImportIssueSeverity Severity, int Rows)>(StringComparer.Ordinal);
+        var ambiguousPets = new Dictionary<string, int>(StringComparer.Ordinal);
 
         foreach (var json in issuesJsonPerRow)
         {
             var issues = ImportIssueJson.Parse(json);
+            foreach (var reference in issues
+                         .Where(i => i.Code == ImportRules.PetNotFound.Code && ImportPetChoice.CandidatesOf(i.Value ?? string.Empty).Count > 1)
+                         .Select(i => i.Value!)
+                         .Distinct())
+            {
+                ambiguousPets[reference] = ambiguousPets.GetValueOrDefault(reference) + 1;
+            }
             foreach (var code in issues.Select(i => i.Code).Distinct())
             {
                 var severity = issues.First(i => i.Code == code).Severity;
@@ -61,6 +99,11 @@ public static class ImportPreviewAggregator
             .ThenByDescending(kv => kv.Value.Rows)
             .ThenBy(kv => kv.Value.Source, StringComparer.Ordinal)
             .Select(kv => new ImportUnmappedValueDto(ImportValueKinds.Key(kv.Key.Kind), kv.Value.Source, kv.Value.Rows, kv.Value.Blocking))
+            // Belirsiz hasta grubu (bölüm 13.4): kayıtların hangi hastaya ait olduğu seçilmeden aktarılmaz.
+            .Concat(ambiguousPets
+                .OrderByDescending(kv => kv.Value)
+                .ThenBy(kv => kv.Key, StringComparer.Ordinal)
+                .Select(kv => new ImportUnmappedValueDto(AmbiguousPetKind, kv.Key, kv.Value, Blocking: true)))
             .ToList();
 
         var countDtos = counts
@@ -209,8 +252,8 @@ public static class ImportPreviewAggregator
     public static IReadOnlyList<string> BlockingCodes(IReadOnlyList<ImportUnmappedValueDto> unmapped)
         => unmapped
             .Where(u => u is { Blocking: true, RowCount: > 0 })
-            .Select(u => u.Kind == ImportValueKinds.Key(ImportValueKind.Species)
-                ? ImportRules.SpeciesUnmapped.Code
+            .Select(u => u.Kind == ImportValueKinds.Key(ImportValueKind.Species) ? ImportRules.SpeciesUnmapped.Code
+                : u.Kind == AmbiguousPetKind ? ImportRules.AmbiguousPet.Code
                 : ImportRules.VaccineUnmapped.Code)
             .Distinct()
             .ToList();

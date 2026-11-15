@@ -121,9 +121,15 @@ public static class ImportRules
     public const string AmbiguousPetReferencePrefix = "Belirsiz: ";
 
     // Bağlantılar
+    public static readonly ImportRule AmbiguousPet = new("Imports.AmbiguousPet", ImportIssueSeverity.Error,
+        "Aynı sahipte aynı adlı birden çok hasta var; kayıtların hangisine ait olduğunu seçin (önizleme engeli).");
+    public static readonly ImportRule AmbiguousPetSkipped = new("Imports.AmbiguousPetSkipped", ImportIssueSeverity.Info,
+        "Aynı adlı hastalardan hangisine ait olduğu sorusunda \"atla\" seçildi; satır atlanacak.");
+    public static readonly ImportRule PetMergedByChoice = new("Imports.PetMergedByChoice", ImportIssueSeverity.Info,
+        "Seçiminizle aynı adlı öbür hastayla tek hasta sayıldı; bu kayıt ayrı aktarılmaz, aşı ve muayeneleri o hastaya bağlanır.");
     public static readonly ImportRule OwnerlessPetSkipped = new("Imports.OwnerlessPetSkipped", ImportIssueSeverity.Info,
         "Hastanın sahibi yok (eski programda müşteri kartı silinmiş) ve bağlı aşı, muayene ya da randevusu yok; atlanacak.");
-    public static readonly ImportRule OwnerNotFound =new("Imports.OwnerNotFound", ImportIssueSeverity.Error,
+    public static readonly ImportRule OwnerNotFound = new("Imports.OwnerNotFound", ImportIssueSeverity.Error,
         "Hastanın sahibi dosyada veya kayıtlı müşterilerde bulunamadı.");
     public static readonly ImportRule OwnerRowInvalid = new("Imports.OwnerRowInvalid", ImportIssueSeverity.Error,
         "Sahip müşteri aktarılamadığı için bu satır aktarılamaz.");
@@ -234,8 +240,9 @@ public static class ImportRules
     /// </summary>
     public static IReadOnlyList<ImportRule> SkipReasons { get; } =
     [
-        ValueSkipped, ParentSkipped, OwnerlessPetSkipped, ClinicalRecordEmpty, DuplicateInFile, DuplicateVaccination,
-        DuplicateClinicalRecord, DuplicateAccountEntry, DuplicateAppointment, PastAppointmentSkipped,
+        ValueSkipped, ParentSkipped, AmbiguousPetSkipped, PetMergedByChoice, OwnerlessPetSkipped, ClinicalRecordEmpty,
+        DuplicateInFile, DuplicateVaccination, DuplicateClinicalRecord, DuplicateAccountEntry, DuplicateAppointment,
+        PastAppointmentSkipped,
     ];
 }
 

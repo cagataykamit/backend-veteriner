@@ -74,7 +74,7 @@ public sealed class GetImportBatchPreviewQueryHandler : IRequestHandler<GetImpor
         {
             return Result<ImportPreviewDto>.Success(new ImportPreviewDto(
                 batch.ValidationId, batch.Status, summary, [], impact,
-                [], false, ImportCommitGate.FileBlockers(batch), PayloadPurged: true, NotImportedReasons: []));
+                [], false, ImportCommitGate.FileBlockers(batch), PayloadPurged: true, NotImportedReasons: [], PetCandidates: []));
         }
 
         var issueRows = await _rows.ListAsync(new ImportIssueRowsSpec(batch.Id), ct);
@@ -82,9 +82,25 @@ public sealed class GetImportBatchPreviewQueryHandler : IRequestHandler<GetImpor
         var reasons = ImportPreviewAggregator.NotImportedReasons(issueRows.Select(r => (r.Table, r.Status, r.IssuesJson)));
         var blockers = ImportCommitGate.Blockers(batch, unmapped);
         var canCommit = ImportCommitGate.CanCommit(batch, blockers);
+        var candidates = await PetCandidatesAsync(batch.Id, unmapped, ct);
 
         return Result<ImportPreviewDto>.Success(new ImportPreviewDto(
             batch.ValidationId, batch.Status, summary, unmapped, impact, issueCounts, canCommit, blockers, PayloadPurged: false,
-            NotImportedReasons: reasons));
+            NotImportedReasons: reasons, PetCandidates: candidates));
+    }
+
+    /// <summary>Belirsiz hasta gruplarının adayları; grup yoksa hasta satırları okunmaz.</summary>
+    private async Task<IReadOnlyList<ImportPetCandidateDto>> PetCandidatesAsync(
+        Guid batchId, IReadOnlyList<ImportUnmappedValueDto> unmapped, CancellationToken ct)
+    {
+        var petNos = unmapped
+            .Where(u => u.Kind == ImportPreviewAggregator.AmbiguousPetKind)
+            .SelectMany(u => Mapping.ImportPetChoice.CandidatesOf(u.Source))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (petNos.Count == 0)
+            return [];
+
+        var pets = await _rows.ListAsync(new ImportTableSourceRowsSpec(batchId, ImportTable.Pets), ct);
+        return ImportPreviewAggregator.PetCandidates(pets.Select(r => (r.RowNumber, r.SourceJson)), petNos);
     }
 }

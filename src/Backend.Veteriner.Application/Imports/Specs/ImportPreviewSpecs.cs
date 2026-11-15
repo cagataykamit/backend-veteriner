@@ -22,6 +22,20 @@ public sealed class ImportIssueRowsSpec : Specification<ImportBatchRow, ImportIs
     }
 }
 
+/// <summary>Bir tablonun hazırlık satırı: satır numarası ve dosyadaki değerler.</summary>
+public sealed record ImportSourceRowInfo(int RowNumber, string? SourceJson);
+
+/// <summary>Tablonun hazırlık satırları (yalnız satır numarası ve <c>SourceJson</c>; belirsiz hasta adayları için).</summary>
+public sealed class ImportTableSourceRowsSpec : Specification<ImportBatchRow, ImportSourceRowInfo>
+{
+    public ImportTableSourceRowsSpec(Guid batchId, ImportTable table)
+    {
+        Query.AsNoTracking();
+        Query.Where(r => r.BatchId == batchId && r.Table == table);
+        Query.Select(r => new ImportSourceRowInfo(r.RowNumber, r.SourceJson));
+    }
+}
+
 /// <summary>Önizleme toplulaştırması için: sorunu olan satırların <c>IssuesJson</c> değerleri (yalnız tek sütun).</summary>
 public sealed class ImportIssuesJsonSpec : Specification<ImportBatchRow, string?>
 {
