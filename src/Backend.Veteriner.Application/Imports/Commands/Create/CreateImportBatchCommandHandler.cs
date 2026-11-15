@@ -25,7 +25,7 @@ public sealed class CreateImportBatchCommandHandler
     private readonly IReadRepository<Tenant> _tenants;
     private readonly IReadRepository<ImportBatch> _batchesRead;
     private readonly IRepository<ImportBatch> _batchesWrite;
-    private readonly IRepository<ImportBatchRow> _rowsWrite;
+    private readonly IImportBatchRowBulkWriter _rowsWrite;
     private readonly ImportUploadReader _reader;
     private readonly ImportTableInfoLoader _tableInfo;
     private readonly TimeProvider _timeProvider;
@@ -39,7 +39,7 @@ public sealed class CreateImportBatchCommandHandler
         IReadRepository<Tenant> tenants,
         IReadRepository<ImportBatch> batchesRead,
         IRepository<ImportBatch> batchesWrite,
-        IRepository<ImportBatchRow> rowsWrite,
+        IImportBatchRowBulkWriter rowsWrite,
         ImportUploadReader reader,
         ImportTableInfoLoader tableInfo,
         TimeProvider timeProvider,
@@ -170,9 +170,9 @@ public sealed class CreateImportBatchCommandHandler
                 t.Table,
                 r.RowNumber,
                 ImportSourceRowJson.Serialize(t.Headers, r.Cells),
-                normalizedJson: null)));
-        await _rowsWrite.AddRangeAsync(rows, ct);
-        await _rowsWrite.SaveChangesAsync(ct);
+                normalizedJson: null)))
+            .ToList();
+        await _rowsWrite.InsertAsync(rows, ct);
 
         var headers = tables.ToDictionary(t => t.Table, t => t.Headers);
         var warnings = read.Value.Warnings

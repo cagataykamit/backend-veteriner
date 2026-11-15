@@ -20,7 +20,7 @@ public sealed class GetImportBatchRowsQueryValidator : AbstractValidator<GetImpo
         RuleFor(x => x.Status)
             .Must(s => ImportRowStatusFilter.TryParse(s, out _, out _))
             .When(x => x.Status is not null)
-            .WithMessage("status Valid, Warning, Error, Created, Matched, Skipped, Failed, RolledBack veya Kept olmalıdır.");
+            .WithMessage("status Valid, Warning, Error, WillSkip, Created, Matched, Skipped, Failed, RolledBack veya Kept olmalıdır.");
 
         // Katalog dışı kod LIKE koşuluna girmez.
         RuleFor(x => x.Code)
@@ -30,9 +30,17 @@ public sealed class GetImportBatchRowsQueryValidator : AbstractValidator<GetImpo
     }
 }
 
-/// <summary>Satır listesi <c>status</c> süzgeci: doğrulama veya uygulama durumu (tek yer).</summary>
+/// <summary>
+/// Satır listesi <c>status</c> filtresi: doğrulama veya uygulama durumu ya da <see cref="WillSkip"/> (doğrulamada bilerek
+/// atlanacak satırlar; tek yer).
+/// </summary>
 public static class ImportRowStatusFilter
 {
+    /// <summary>Doğrulamada bilerek atlanacak (hatasız, eylem <c>Skip</c>) satırlar; önizlemedeki "atlanacak" sayısı.</summary>
+    public const string WillSkip = "WillSkip";
+
+    public static bool IsWillSkip(string? value) => string.Equals(value, WillSkip, StringComparison.OrdinalIgnoreCase);
+
     public static bool TryParse(
         string? value,
         out ImportRowValidationStatus? validation,
@@ -42,6 +50,9 @@ public static class ImportRowStatusFilter
         apply = null;
         if (string.IsNullOrEmpty(value) || !char.IsLetter(value[0]))
             return false;
+
+        if (IsWillSkip(value))
+            return true;
 
         if (Enum.TryParse<ImportRowValidationStatus>(value, ignoreCase: true, out var v)
             && v != ImportRowValidationStatus.Pending && Enum.IsDefined(v))

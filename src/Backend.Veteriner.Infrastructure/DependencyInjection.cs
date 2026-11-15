@@ -80,6 +80,7 @@ using Backend.Veteriner.Infrastructure.Persistence.Repositories.Permissions;
 using Backend.Veteriner.Infrastructure.Persistence.Repositories.UserOperationClaims;
 using Backend.Veteriner.Infrastructure.Reminders;
 using Backend.Veteriner.Infrastructure.Waitlist;
+using Backend.Veteriner.Application.Imports;
 using Backend.Veteriner.Application.Imports.Commit;
 using Backend.Veteriner.Application.Imports.Rollback;
 using Backend.Veteriner.Infrastructure.Imports;
@@ -460,6 +461,7 @@ public static class DependencyInjection
 
         // Geri alma işi (ADR-019 K7; uygulama işiyle aynı ayarlar ve desen) ve bakım işi (K9: Expired + 30 gün temizlik).
         services.AddScoped<IImportRollbackDependencyReader, ImportRollbackDependencyReader>();
+        services.AddScoped<IImportBatchRowBulkWriter, ImportBatchRowBulkWriter>();
         services.AddSingleton(sp => new ImportRollbackProcessor(
             sp.GetRequiredService<IServiceScopeFactory>(),
             sp.GetRequiredService<IOptions<ImportCommitOptions>>(),

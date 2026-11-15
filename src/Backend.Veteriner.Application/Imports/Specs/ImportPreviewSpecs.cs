@@ -22,6 +22,20 @@ public sealed class ImportIssueRowsSpec : Specification<ImportBatchRow, ImportIs
     }
 }
 
+/// <summary>Bir tablonun hazırlık satırı: satır numarası ve dosyadaki değerler.</summary>
+public sealed record ImportSourceRowInfo(int RowNumber, string? SourceJson);
+
+/// <summary>Tablonun hazırlık satırları (yalnız satır numarası ve <c>SourceJson</c>; belirsiz hasta adayları için).</summary>
+public sealed class ImportTableSourceRowsSpec : Specification<ImportBatchRow, ImportSourceRowInfo>
+{
+    public ImportTableSourceRowsSpec(Guid batchId, ImportTable table)
+    {
+        Query.AsNoTracking();
+        Query.Where(r => r.BatchId == batchId && r.Table == table);
+        Query.Select(r => new ImportSourceRowInfo(r.RowNumber, r.SourceJson));
+    }
+}
+
 /// <summary>Önizleme toplulaştırması için: sorunu olan satırların <c>IssuesJson</c> değerleri (yalnız tek sütun).</summary>
 public sealed class ImportIssuesJsonSpec : Specification<ImportBatchRow, string?>
 {
@@ -110,7 +124,8 @@ public sealed class ImportBatchRowsFilteredSpec : Specification<ImportBatchRow>
         ImportRowApplyStatus? applyStatus,
         string? issueCodeFragment,
         int? page = null,
-        int? pageSize = null)
+        int? pageSize = null,
+        bool willSkip = false)
     {
         Query.AsNoTracking();
         Query.Where(r => r.BatchId == batchId);
@@ -121,6 +136,8 @@ public sealed class ImportBatchRowsFilteredSpec : Specification<ImportBatchRow>
             Query.Where(r => r.ValidationStatus == v);
         if (applyStatus is { } a)
             Query.Where(r => r.ApplyStatus == a);
+        if (willSkip)
+            WhereWillSkip(Query);
         if (issueCodeFragment is not null)
             Query.Where(r => r.IssuesJson != null && r.IssuesJson.Contains(issueCodeFragment));
 
@@ -130,6 +147,29 @@ public sealed class ImportBatchRowsFilteredSpec : Specification<ImportBatchRow>
                 .Skip((p - 1) * size)
                 .Take(size);
         }
+    }
+
+    /// <summary>Doğrulamada bilerek atlanacak satır: hatasız ve normalize eylemi <c>Skip</c> (önizleme "atlanacak" sayısı).</summary>
+    internal static void WhereWillSkip(ISpecificationBuilder<ImportBatchRow> query)
+        => query.Where(r => r.ValidationStatus != ImportRowValidationStatus.Error
+                            && r.NormalizedJson != null
+                            && r.NormalizedJson.Contains(SkipActionFragment));
+
+    /// <summary><c>NormalizedJson</c> içinde atlama eylemi (<c>ImportNormalizedJson</c>: camelCase, enum metin).</summary>
+    private const string SkipActionFragment = "\"action\":\"Skip\"";
+}
+
+/// <summary>Atlanacak satırlar raporu (§7.8 <c>rows=skipped</c>): bilerek atlanacak satırlar, isteğe bağlı neden koduyla.</summary>
+public sealed class ImportSkippedRowsSpec : Specification<ImportBatchRow>
+{
+    public ImportSkippedRowsSpec(Guid batchId, string? issueCodeFragment)
+    {
+        Query.AsNoTracking();
+        Query.Where(r => r.BatchId == batchId);
+        ImportBatchRowsFilteredSpec.WhereWillSkip(Query);
+        if (issueCodeFragment is not null)
+            Query.Where(r => r.IssuesJson != null && r.IssuesJson.Contains(issueCodeFragment));
+        Query.OrderBy(r => r.Table).ThenBy(r => r.RowNumber);
     }
 }
 

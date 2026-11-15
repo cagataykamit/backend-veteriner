@@ -72,10 +72,15 @@ public sealed class UpdateImportBatchMappingCommandHandler
         if (!valueMappings.IsSuccess)
             return Result<ImportBatchDto>.Failure(valueMappings.Error);
 
+        var petChoices = ValidatePetChoices(body.PetChoices);
+        if (!petChoices.IsSuccess)
+            return Result<ImportBatchDto>.Failure(petChoices.Error);
+
         var document = new ImportMappingDocument
         {
             Columns = columns.Value!,
             ValueMappings = valueMappings.Value!,
+            PetChoices = petChoices.Value!,
         };
         var options = new ImportOptionsDocument(body.Options?.OnDuplicateClient ?? ImportOptionsDocument.Match);
 
@@ -210,6 +215,38 @@ public sealed class UpdateImportBatchMappingCommandHandler
 
         return Result<List<ImportValueMapping>>.Success(result);
     }
+
+    /// <summary>
+    /// Belirsiz hasta grubu seçimleri (bölüm 13.4): başvuru <c>Belirsiz: a / b</c> biçiminde olmalı, seçilen hasta no gruptaki
+    /// adaylardan biri; "tek hasta say" için hasta no zorunlu; her grup bir kez.
+    /// </summary>
+    private static Result<List<ImportPetChoice>> ValidatePetChoices(IReadOnlyList<ImportPetChoiceRequest>? requested)
+    {
+        var result = new List<ImportPetChoice>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in requested ?? [])
+        {
+            var reference = item.Reference?.Trim() ?? string.Empty;
+            var candidates = ImportPetChoice.CandidatesOf(reference);
+            if (candidates.Count < 2)
+                return FailPets($"'{reference}' belirsiz hasta grubu değil.");
+            if (!seen.Add(reference))
+                return FailPets($"'{reference}' grubu için birden fazla seçim var.");
+
+            var petNo = string.IsNullOrWhiteSpace(item.PetNo) ? null : item.PetNo.Trim();
+            if (petNo is not null && !candidates.Contains(petNo, StringComparer.Ordinal))
+                return FailPets($"'{reference}' grubunda '{petNo}' numaralı hasta yok.");
+            if (item.Merge && petNo is null)
+                return FailPets($"'{reference}' grubunu tek hasta saymak için kayıtların bağlanacağı hastayı seçin.");
+
+            result.Add(new ImportPetChoice(reference, petNo, item.Merge));
+        }
+
+        return Result<List<ImportPetChoice>>.Success(result);
+    }
+
+    private static Result<List<ImportPetChoice>> FailPets(string message)
+        => Result<List<ImportPetChoice>>.Failure("Imports.PetChoiceInvalid", message);
 
     private static Result<Dictionary<string, Dictionary<string, string>>> FailColumns(string code, string message)
         => Result<Dictionary<string, Dictionary<string, string>>>.Failure(code, message);

@@ -58,6 +58,22 @@ public sealed class ImportErrorReportWriterTests
         wb.Worksheets.Select(s => s.Name).Should().Equal(ImportErrorReportWriter.NoErrorsSheetName);
     }
 
+    [Fact]
+    public void Skipped_Report_Should_Use_Reason_Columns_And_Status()
+    {
+        using var wb = Open(ImportErrorReportWriter.BuildXlsx(
+            [Row(ImportTable.ClinicalRecords, 7, Source(("Tarih", "01.02.2024")), ImportRules.ClinicalRecordEmpty.At())],
+            ImportReportKind.Skipped));
+
+        var sheet = wb.Worksheets.Single();
+        sheet.Row(1).Cells(1, 5).Select(c => c.GetString()).Should().Equal("Tarih", "SatirNo", "Durum", "NedenKodu", "Neden");
+        sheet.Cell(2, 3).GetString().Should().Be("Atlanacak");
+        sheet.Cell(2, 4).GetString().Should().Be("Imports.ClinicalRecordEmpty");
+
+        using var empty = Open(ImportErrorReportWriter.BuildXlsx([], ImportReportKind.Skipped));
+        empty.Worksheets.Single().Cell(2, 1).GetString().Should().Be("Atlanacak satır yok.");
+    }
+
     [Theory]
     [InlineData("=HYPERLINK(\"http://x\",\"t\")")]
     [InlineData("+90 532 123 45 67")]

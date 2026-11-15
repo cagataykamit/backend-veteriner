@@ -1,3 +1,5 @@
+using Backend.Veteriner.Application.Imports.Contracts.Dtos;
+using Backend.Veteriner.Application.Imports.Reading;
 using Backend.Veteriner.Application.Imports.Validation;
 using Backend.Veteriner.Domain.Imports;
 using AwesomeAssertions;
@@ -33,6 +35,32 @@ public sealed class ImportPreviewAggregatorTests
             ("breed", "Sokak", 1, false),
             ("vaccine", "Süper Aşı", 1, true),
             ("color", "Sarı", 1, false));
+    }
+
+    [Fact]
+    public void Ambiguous_Pet_Group_Should_Be_A_Blocking_Pet_Value_With_Candidates()
+    {
+        const string group = "Belirsiz: 903 / 904";
+        var (unmapped, _) = ImportPreviewAggregator.AggregateIssues(
+        [
+            Issues(ImportRules.PetNotFound.At("HayvanNo", "Aynı sahipte…", group)),
+            Issues(ImportRules.PetNotFound.At("HayvanNo", "Aynı sahipte…", group)),
+            Issues(ImportRules.PetNotFound.At("HayvanNo", "'H-9' numaralı hasta dosyada bulunamadı.", "H-9")),
+        ]);
+
+        unmapped.Should().ContainSingle().Which.Should().Be(new ImportUnmappedValueDto("pet", group, 2, true));
+        ImportPreviewAggregator.BlockingCodes(unmapped).Should().Equal("Imports.AmbiguousPet");
+
+        var candidates = ImportPreviewAggregator.PetCandidates(
+        [
+            (5, ImportSourceRowJson.Serialize(["HayvanNo", "HayvanAdi", "SahipAdSoyad", "Tur", "Not"], ["904", "Zeytin (E-vet 904)", "Ayşe Yılmaz", "Kedi", "Eski programa kayıt: 01.06.2023"])),
+            (4, ImportSourceRowJson.Serialize(["HayvanNo", "HayvanAdi", "Tur"], ["903", "Zeytin", "Kedi"])),
+            (6, ImportSourceRowJson.Serialize(["HayvanNo", "HayvanAdi"], ["905", "Başka"])),
+        ],
+            new HashSet<string> { "903", "904" });
+
+        candidates.Select(c => (c.PetNo, c.Name, c.RegisteredOn)).Should().Equal(("903", "Zeytin", null), ("904", "Zeytin (E-vet 904)", "01.06.2023"));
+        candidates[1].OwnerName.Should().Be("Ayşe Yılmaz");
     }
 
     [Fact]

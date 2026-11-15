@@ -225,6 +225,14 @@ public sealed partial class ImportValidationEngine
             owner?.Key, reference, name, speciesId, breedId, breedText, gender, birthDate, neutered,
             chip.Value, colorId, weight, passport, notes.Length == 0 ? null : notes, alertNote, deceased, deceasedOn, patternId);
 
+        // Kullanıcı bu hastayı aynı adlı öbür hastayla tek hasta saydı (bölüm 13.4): ayrı aktarılmaz; bağlı satırlar hedefe yönlenir.
+        if (reference is not null && _mergedPets.TryGetValue(reference, out var mergedInto))
+        {
+            issues.Clear();
+            issues.Add(ImportRules.PetMergedByChoice.At("HayvanNo", value: mergedInto));
+            return Complete(node, Finish(ImportTable.Pets, reader.RowNumber, issues, normalized, ImportRowAction.Skip));
+        }
+
         // Sahipsiz hasta: eski programda müşteri kartı silinmiş (sahip adı boş ya da "."). Bağlı aşı / klinik geçmiş / randevusu yoksa
         // aktarılacak bilgi yoktur: hata değil, bilerek atlanır. Geçmişi varsa sahip hatası kalır (kayıt kaybı görünür kalsın).
         if (owner is null && IsOwnerless(reader) && (reference is null || !HasLinkedRecords(reference)))

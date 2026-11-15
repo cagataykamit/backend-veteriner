@@ -10,9 +10,13 @@ namespace Backend.Veteriner.Application.Imports.Commands.UpdateMapping;
 public sealed record ImportMappingRequest(
     IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? Columns,
     IReadOnlyList<ImportValueMappingRequest>? ValueMappings,
-    ImportMappingOptionsRequest? Options);
+    ImportMappingOptionsRequest? Options,
+    IReadOnlyList<ImportPetChoiceRequest>? PetChoices = null);
 
 public sealed record ImportValueMappingRequest(string? Kind, string? Source, Guid? TargetId);
+
+/// <summary>Belirsiz hasta grubu seçimi (bölüm 13.4): <c>petNo</c> null ise grubun satırları atlanır.</summary>
+public sealed record ImportPetChoiceRequest(string? Reference, string? PetNo, bool Merge);
 
 public sealed record ImportMappingOptionsRequest(string? OnDuplicateClient);
 

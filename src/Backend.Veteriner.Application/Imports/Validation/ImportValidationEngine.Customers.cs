@@ -11,6 +11,23 @@ public sealed partial class ImportValidationEngine
     private const int MinClientNameLength = 2;
     private const int MaxAddressLength = 500;
 
+    /// <summary>Adı çok kısa ama bağlı kaydı olan müşterinin aktarıldığı ad (ardına müşteri no eklenir).</summary>
+    private const string ShortNamePlaceholder = "İsimsiz müşteri";
+
+    private HashSet<string>? _customerRefsWithRecords;
+
+    /// <summary>Hasta ya da hesap hareketi satırı bu müşteri numarasına bağlanıyor mu.</summary>
+    private bool HasLinkedCustomerRecords(string reference)
+    {
+        _customerRefsWithRecords ??= new[] { ImportTable.Pets, ImportTable.AccountEntries }
+            .Where(_input.Tables.ContainsKey)
+            .SelectMany(t => _input.Tables[t].Select(row => new ImportRowReader(_input.Mapping.ColumnsOf(t), row).Raw("MusteriNo")))
+            .Select(ImportValueParsers.NormalizeText)
+            .OfType<string>()
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return _customerRefsWithRecords.Contains(reference);
+    }
+
     /// <summary>Müşteri bağlantı noktası: dosyada yeni oluşacak (<c>file:satır</c>) veya mevcut kayıt (<c>db:id</c>).</summary>
     private sealed record OwnerRef(string Key, Guid? ClientId, bool HasEmail);
 
@@ -40,10 +57,17 @@ public sealed partial class ImportValidationEngine
 
         var reference = ImportValueParsers.NormalizeText(reader.Raw("MusteriNo"));
         var fullName = ImportValueParsers.NormalizeText(reader.Raw("AdSoyad"));
+        string? shortName = null;
         if (fullName is null)
+        {
             issues.Add(ImportRules.RequiredMissing.At("AdSoyad"));
+        }
         else if (fullName.Length < MinClientNameLength)
-            issues.Add(ImportRules.NameTooShort.At("AdSoyad"));
+        {
+            // Çok kısa ad (eski programda "." gibi): bağlı kaydı varsa yer tutucu adla aktarılır, yoksa atlanır (aşağıda).
+            shortName = fullName;
+            fullName = reference is null ? ShortNamePlaceholder : $"{ShortNamePlaceholder} ({reference})";
+        }
         else if (fullName.Length > MaxClientNameLength)
             issues.Add(ImportRules.FieldTooLong.At("AdSoyad", $"Ad soyad en fazla {MaxClientNameLength} karakter olabilir."));
 
@@ -71,6 +95,21 @@ public sealed partial class ImportValidationEngine
         var (openingBalance, balanceDate) = ReadOpeningBalance(reader, issues);
         var (nationalId, taxNumber, taxOffice) = ReadInvoicingIdentity(reader, issues);
         var remindersOptedOut = ReadClientInactive(reader, issues);
+
+        // Çok kısa adlı müşteri: bağlı hastası, hesap hareketi ya da bakiyesi yoksa büyük olasılıkla deneme kaydıdır, atlanır;
+        // varsa yer tutucu adla uyarıyla aktarılır ve dosyadaki ad notta kalır.
+        if (shortName is not null)
+        {
+            if ((reference is null || !HasLinkedCustomerRecords(reference)) && openingBalance is null or 0)
+            {
+                issues.Clear();
+                issues.Add(ImportRules.ShortNameCustomerSkipped.At("AdSoyad", value: shortName));
+                return Finish(ImportTable.Customers, reader.RowNumber, issues, new ImportNormalizedCustomer(reference, shortName, null, null, null), ImportRowAction.Skip);
+            }
+
+            issues.Add(ImportRules.ShortNameCustomerKept.At("AdSoyad", $"Ad çok kısa ('{shortName}'); '{fullName}' adıyla aktarılacak, kontrol edin.", shortName));
+            notes = string.Join('\n', new[] { notes, $"Dosyadaki ad: {shortName} (çok kısa, yer tutucu adla aktarıldı)" }.Where(s => s is not null));
+        }
 
         var node = new CustomerNode(reader.RowNumber);
         if (reference is not null)

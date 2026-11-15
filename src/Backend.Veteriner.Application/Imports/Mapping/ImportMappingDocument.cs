@@ -7,6 +7,22 @@ namespace Backend.Veteriner.Application.Imports.Mapping;
 public sealed record ImportValueMapping(string Kind, string Source, Guid? TargetId);
 
 /// <summary>
+/// Belirsiz hasta grubu seçimi (IMPORT_API_CONTRACT.md §13.4): <see cref="Reference"/> E-vet dönüştürücüsünün ayırt edemediği
+/// bağlantı (<c>Belirsiz: a / b</c>); <see cref="PetNo"/> kayıtların bağlanacağı aday (null: grubun satırları atlanır);
+/// <see cref="Merge"/> adaylar tek hastadır (öbür aday aktarılmaz, kayıtları seçilen hastaya bağlanır).
+/// </summary>
+public sealed record ImportPetChoice(string Reference, string? PetNo, bool Merge = false)
+{
+    /// <summary>Gruptaki adayların hasta no'ları.</summary>
+    public IReadOnlyList<string> Candidates => CandidatesOf(Reference);
+
+    public static IReadOnlyList<string> CandidatesOf(string reference)
+        => reference.StartsWith(Validation.ImportRules.AmbiguousPetReferencePrefix, StringComparison.Ordinal)
+            ? reference[Validation.ImportRules.AmbiguousPetReferencePrefix.Length..].Split(" / ")
+            : [];
+}
+
+/// <summary>
 /// Parti <c>MappingJson</c> içeriği: tablo anahtarı → (kanonik alan → kaynak sütun adı) ve değer eşlemeleri.
 /// Seçenekler ayrı sütundadır (<see cref="ImportOptionsDocument"/>). Okuma/yazma tek yerdedir.
 /// </summary>
@@ -16,6 +32,7 @@ public sealed class ImportMappingDocument
 
     public Dictionary<string, Dictionary<string, string>> Columns { get; init; } = new(StringComparer.Ordinal);
     public List<ImportValueMapping> ValueMappings { get; init; } = [];
+    public List<ImportPetChoice> PetChoices { get; init; } = [];
 
     public static ImportMappingDocument Empty => new();
 

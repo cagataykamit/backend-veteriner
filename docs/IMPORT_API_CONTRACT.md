@@ -321,7 +321,9 @@ Kural kodları, önem dereceleri ve varsayılan mesajlar kodda **tek yerde** tan
 | Kod | Önem | Kural |
 |-----|------|-------|
 | `Imports.RequiredMissing` | Error | Zorunlu alan boş (`AdSoyad`, `HayvanAdi`, `Tur`, `AsiAdi`, `UygulamaTarihi`). |
-| `Imports.NameTooShort` | Error | Müşteri adı < 2 karakter (kırpılmış, art arda boşluk teke inmiş). |
+| `Imports.NameTooShort` | Error | Artık üretilmez (2026-11-15; eski partilerde kalır). Kısa ad iki kurala ayrıldı (aşağıda). |
+| `Imports.ShortNameCustomerSkipped` | Info | Müşteri adı < 2 karakter (kırpılmış, eski programda `.` gibi). Bu `MusteriNo`'ya bağlı hasta ya da hesap hareketi satırı yok, açık bakiye de yok: büyük olasılıkla deneme kaydıdır, satır **atlanır**. |
+| `Imports.ShortNameCustomerKept` | Warning | Müşteri adı < 2 karakter ama bağlı kaydı ya da bakiyesi var: `İsimsiz müşteri (<MusteriNo>)` adıyla aktarılır; notuna `Dosyadaki ad: <ad> (çok kısa, yer tutucu adla aktarıldı)` eklenir; kontrol edilmesi önerilir. |
 | `Imports.FieldTooLong` | Error | Ad > 300 (müşteri) / 200 (hayvan), e-posta > 320 hariç (bkz. EmailInvalid), adres > 500, ırk serbest metni > 150, karne > 50, hasta notu > 2000 (Renk satırıyla birlikte), aşı notu > 4000. |
 | `Imports.PhoneInvalid` | Warning | Telefon cep standardına uymuyor (sabit hat, yabancı, eksik hane); telefon boş aktarılır `[K5]`, `value` özgün numara. Sahip telefonu (hasta/aşı tablosu) geçersizse sahip yalnız ad ile aranır (aşağıda). |
 | `Imports.EmailInvalid` | Warning | E-posta mevcut müşteri kuralıyla (FluentValidation `EmailAddress`, ≤ 320) geçersiz; boş aktarılır, `value` özgün. |
@@ -413,6 +415,11 @@ Yanıt gövdesi (B1 alanlarına ek): `tables[]` ve yalnız yükleme yanıtında 
 **B1 davranışı (uygulandı):** Dosya alanları henüz yoktur; yalnız `requestId` (zorunlu), `name` (≤ 100, boşluk kırpılır, boşsa null) ve `clinicId` (opsiyonel) okunur. `clinicId` verilirse kiracıya ait ve çağıranın erişebildiği klinik olmalı (`404 Clinics.NotFound` / `403 Clinics.AccessDenied`) ve aktif klinik bağlamıyla çelişmemeli (`400 Imports.ClinicContextMismatch`). Pasif kiracı `403 Tenants.TenantInactive`; abonelik yazma koruması mevcut kodlarla. Aynı `requestId` + aynı `name`/`clinicId` → `200` aynı parti; farklı `name` veya `clinicId` → `409 Imports.RequestIdConflict` (B2'de içerik özeti de karşılaştırmaya girer). Kiracıda 5 açık taslak varsa `409 Imports.TooManyOpenDrafts`. Yanıt gövdesi bölüm 7.5'teki parti nesnesidir (`tables[]` B2'de eklenir).
 
 Aynı kiracıda **aynı içerik özetli** ve durumu `Discarded/Expired/RolledBack/CommitFailed` **olmayan** parti varsa `409 Imports.DuplicateFile` + `extensions.batchId` (aynı dosya iki kez yüklenip çift kayıt oluşmasın; geri alınmış partinin dosyası yeniden yüklenebilir).
+
+**İstemci ayrılırsa (2026-11-15):** Dosyalar sunucuya ulaştıktan sonra parti, istemci bağlantıyı kesse de (sayfa yenilendi, sekme kapandı) oluşturulur; okuma ve yazma yarıda kesilmez.
+- Kullanıcı partiyi listede bulur. Aynı dosyanın yeniden yüklenmesi `409 Imports.DuplicateFile` + `extensions.batchId` ile o partiye yönlenir; ekran "Bu dosya zaten yüklendi" bağlantısını gösterir.
+- Hazırlık satırları toplu yazılır (`IImportBatchRowBulkWriter`, `SqlBulkCopy`, komutun transaction'ında). Gerçek E-vet yedeğinde (~52 bin satır) yükleme yerelde 51 sn → ~15 sn (okuma ve dönüştürme ~8 sn, yazma ~6 sn).
+- Yanıt şekli değişmedi.
 
 `201 Created` (`Location` → `GET /imports/batches/{id}`):
 
@@ -529,7 +536,7 @@ Durum geçişi domain'dedir (`Uploaded|Mapped|Validated|ValidationFailed` → `M
 - `issueCounts`: sorun kodu + önem başına etkilenen satır sayısı (aynı satırda aynı kod bir kez), `rowCount` azalan.
 - `notImportedReasons` (2026-11-14, geriye uyumlu ekleme): tablo başına aktarılmayacak satırların nedeni. `kind = Skipped` bilerek atlanan hatasız satırdır, `kind = Error` hatalı satırdır. Satır başına **bir** neden sayılır:
   - Hatalı satırda ilk hata kodu.
-  - Atlanan satırda ilk atlama kuralı. Atlama kuralları ve öncelik sırası tek yerde tutulur (`ImportRules.SkipReasons`): `ValueSkipped`, `ParentSkipped`, `OwnerlessPetSkipped`, `ClinicalRecordEmpty`, `DuplicateInFile`, `DuplicateVaccination`, `DuplicateClinicalRecord`, `DuplicateAccountEntry`, `DuplicateAppointment`, `PastAppointmentSkipped`.
+  - Atlanan satırda ilk atlama kuralı. Atlama kuralları ve öncelik sırası tek yerde tutulur (`ImportRules.SkipReasons`): `ValueSkipped`, `ParentSkipped`, `AmbiguousPetSkipped`, `PetMergedByChoice`, `OwnerlessPetSkipped`, `ShortNameCustomerSkipped`, `ClinicalRecordEmpty`, `DuplicateInFile`, `DuplicateVaccination`, `DuplicateClinicalRecord`, `DuplicateAccountEntry`, `DuplicateAppointment`, `PastAppointmentSkipped`.
 
   Bu yüzden bir tablonun `Error` toplamı `summary.<tablo>.error` değerine, `Skipped` toplamı `willSkip` değerine eşittir. Sıra: tablo (doğrulama sırası), önce `Skipped`, sonra `rowCount` azalan. Satır verisi temizlenmiş partide boştur. Ekran her tablo kartında "Atlanacak" ve "Hatalı" sayılarını bu nedenlerle açıklar.
 - `canCommit`: durum `Validated`, `validationId` dolu, `blockers` boş ve `willCreate` toplamı > 0.
@@ -537,7 +544,7 @@ Durum geçişi domain'dedir (`Uploaded|Mapped|Validated|ValidationFailed` → `M
 - Satır verisi temizlenmişse (`payloadPurgedAtUtc` dolu) `summary` korunur; `unmappedValues`, `issueCounts` boş, `payloadPurged = true`, `canCommit = false`, `blockers` yalnız dosya düzeyi. `reminderImpact` uygulanmış partide (B4) satır verisi gerektirmediği için gerçek kayıtlardan hesaplanmaya devam eder; uygulanmamış (`Expired`) partide sıfırdır.
 
 ### 7.7 `GET /imports/batches/{id}/rows`
-`Imports.Read`; durum kuralı bölüm 7.6 ile aynı. Sorgu: `table=customers|pets|vaccinations` (verilmezse üç tablo: müşteri, hasta, aşı sırasıyla), `status=Valid|Warning|Error` (doğrulama durumu; uygulama sonrası `Created|Matched|Skipped|Failed|RolledBack|Kept` uygulama durumunu süzer), `code=<kural kodu>` (satırın sorunlarından birinin kodu), `page` (varsayılan 1), `pageSize` (varsayılan 50, 1–200). Sıralama: tablo, `rowNumber`. Yanıt `{ items, page, pageSize, totalItems, totalPages }`; öğe:
+`Imports.Read`; durum kuralı bölüm 7.6 ile aynı. Sorgu: `table=customers|pets|vaccinations` (verilmezse üç tablo: müşteri, hasta, aşı sırasıyla), `status=Valid|Warning|Error` (doğrulama durumu; uygulama sonrası `Created|Matched|Skipped|Failed|RolledBack|Kept` uygulama durumunu süzer; **`WillSkip`** (2026-11-15) doğrulamada bilerek atlanacak satırlar: hatasız ve eylemi `Skip`; önizlemedeki "atlanacak" sayısı, `code` ile tek nedene daralır), `code=<kural kodu>` (satırın sorunlarından birinin kodu), `page` (varsayılan 1), `pageSize` (varsayılan 50, 1–200). Sıralama: tablo, `rowNumber`. Yanıt `{ items, page, pageSize, totalItems, totalPages }`; öğe:
 
 ```json
 { "table": "pets", "rowNumber": 12,
@@ -549,7 +556,10 @@ Durum geçişi domain'dedir (`Uploaded|Mapped|Validated|ValidationFailed` → `M
 ```
 `values` normalize edilmiş alanlardır (bölüm 6.4; tablo başına küçük camelCase nesne), `source` özgün satırdır (başlık → metin). Geçersiz `table`/`status`/sayfa parametresi `400 Validation.FluentValidation`. Kişisel veri içerdiğinden `Cache-Control: no-store`; temizlenmiş partide `410 Imports.PayloadPurged`.
 
-### 7.8 `GET /imports/batches/{id}/errors?format=xlsx|csv`
+### 7.8 `GET /imports/batches/{id}/errors?format=xlsx|csv[&rows=errors|skipped][&code=]`
+
+**Atlananlar raporu (2026-11-15):** `rows=skipped` bilerek atlanacak satırları (§7.7 `WillSkip`) aynı biçimde indirir; `code=<kural kodu>` tek nedene daraltır. Ek sütunlar `SatirNo`, `Durum` (`Atlanacak`), `NedenKodu`, `Neden` (satırı atlatan kural, `ImportRules.SkipReasons`); dosya adı `vetinity-iceaktar-atlananlar.xlsx|csv`; satır yoksa tek `Atlanansiz` sayfası. Varsayılan `rows=errors` (aşağıdaki hata raporu, değişmedi); geçersiz `rows`/`code` `400`. Audit hedefine `rows` eklenir.
+
 `Imports.Read`; durum kuralı bölüm 7.6 ile aynı; `format` zorunlu değil, varsayılan `xlsx` (geçersizse `400`). Hata raporu indirme: yalnız doğrulama durumu `Error` (veya uygulama durumu `Failed`) satırlar; her tablo için bölüm 4.3'teki **kanonik başlıklar değil, özgün kaynak sütunlar** (dosyadaki başlık sırasıyla, özgün değerlerle) ve ek sütunlar `SatirNo`, `Durum`, `HataKodu`, `Aciklama` (Türkçe; satırın birden çok hatası `;` ile ayrılır, `HataKodu`/`Aciklama` aynı sırada). XLSX'te tablo başına bir sayfa (`Musteriler`, `Hastalar`, `Asilar`; yalnız hatalı satırı olanlar; hata yoksa tek `Hatasiz` sayfası), CSV'de tablolar farklı başlık taşıdığından tek dosya sabit sütunlarla yazılır (UTF-8 BOM'lu, `;` ayırıcılı): `Tablo`, `SatirNo`, `Durum`, `HataKodu`, `Aciklama`, `Kaynak` (özgün satır `başlık=değer` çiftleri, `|` ile ayrılmış); düzeltilip yeniden yüklenecek rapor için XLSX önerilir. Düzeltilen dosya aynı şablonla **yeni parti** olarak yüklenebilir; daha önce oluşan kayıtlar `Matched`/`DuplicateVaccination` olacağından çift kayıt oluşmaz. Formül enjeksiyonu: `= + - @` (ve sekme/CR) ile başlayan **tüm** hücre değerlerinin başına `'` eklenir (`ImportCellSafety.ForExport`; başlık hücreleri dahil). XLSX'te bu `'`, Excel'in metin öneki (`quotePrefix`) olarak yazılır (hücre metindir, formül değildir, değer görünürde değişmez); CSV'de görünür `'` olarak yazılır. `Content-Disposition` dosya adı `vetinity-iceaktar-hatalar.xlsx|csv`; `Cache-Control: no-store`; temizlenmiş partide `410 Imports.PayloadPurged`. İndirme audit'e yazılır (`ImportBatch.ErrorReport`, hedef `ImportBatchId`; satır verisi yok).
 
 ### 7.9 `POST /imports/batches/{id}/commit`
@@ -940,8 +950,8 @@ Pilot klinik E-vet SMART'tan geliyor. E-vet'in en zengin dışa aktarması **Gen
 - **Sahibi değişen hayvan (2026-11-14):** E-vet sahip değişiminde eski sahibin kartındaki kaydı `Durum = Ölü` (çoğunlukla `Ölüm Zamanı` boş) bırakır ve yeni sahipte **aynı protokol numarasıyla** yeni kayıt açar. Dışa aktarmada (yedek, raporlar) "sahibi değişti" işareti yoktur; E-vet bunu yalnız ekranında gösterir (gerçek yedekte 79 tekrar protokolün 61'i bu desen). Aynı hayvanın kayıtları (kural tek yerde: `EVetBackupConverter.MergeSameAnimals`, sırayla uygulanır, zincir A → B → A dahil):
   1. **Aynı protokol + tür:** diğer kayıtlar ölüm tarihsiz ölü/pasif olmalı (ölüm tarihi olan gerçek vefattır, birleşmez).
   2. **Aynı mikroçip (en az 9 hane) + tür:** mikroçip hayvana özgüdür; ölüm tarihine bakılmaz (yanlışlıkla vefat girilmiş kopya da birleşir).
-  3. **Kopya:** aynı sahipte aynı ad + tür + doğum tarihi (yanlışlıkla açılıp vefat girilmiş kopya).
-  - Hedef grubun **tek aktif** kaydıdır; aktif kayıt yoksa en son açılan kayıt; iki aktif kayıt varsa birleştirilmez. Türü farklı grup birleşmez.
+  3. **Kopya:** aynı sahipte aynı ad + tür + **birebir aynı doğum tarihi**; ırk, renk, cinsiyet ve mikroçip çelişmez (aynı ya da biri boş). Yanlışlıkla ikinci kez açılmış kayıttır; vefat girilmiş kopya da, ikisi de aktif kopya da birleşir (2026-11-15: aynı adlı iki aktif kopyanın geçmişi "belirsiz" diye düşüyordu). Yalnız boş alanlara dayanan birleştirme yapılmaz; doğum tarihi boş ya da herhangi bir alanı çelişen kayıtlar ayrı kalır ve kayıtları doğrulama ekranında kullanıcıya sorulur (bölüm 13.4).
+  - Hedef grubun **tek aktif** kaydıdır; aktif kayıt yoksa en son açılan kayıt. (1) ve (2)'de iki aktif kayıt varsa birleştirilmez; (3)'te en son açılan aktif kayıt hedeftir. Türü farklı grup birleşmez.
   - Birleşen kayıt hasta tablosuna yazılmaz; muayene ve görevleri hedefe bağlanır (eski sahip adıyla yazılmış olsalar da; aşı serisi de birleşir). Böylece aynı sahipte aynı adlı iki kayıttan doğan "Belirsiz" bağlantı da çözülür.
   - Hedefin notuna her birleşen kayıt için `E-vet'te önceki sahip kaydı: müşteri no <no>, hasta no <protokol>, kayıt: gg.aa.yyyy` (sahip bağlanamadıysa adı; aynı sahipteyse `E-vet'te aynı hayvanın eski kaydı, …`) ve eski kaydın bilgi/açıklaması (`Önceki kayıttaki not: …`) eklenir. Eski müşteri kaydı aynen aktarılır.
   - Hedef ölü görünüp vefat tarihi yoksa (aktif kaydı olmayan grup: hayvan son sahibinden de ayrılmış) vefat olarak gelmez; pasif hasta gibi aktarılır (gelecek iş yazılmaz), notuna nedeni yazılır.
@@ -972,7 +982,24 @@ Görev → hasta bağlantısı muayeneyle aynıdır (`Müşteriler`, `Hastalar` 
 
 Aşı serisi anahtarı (tek yer `ImportValueResolver.VaccineSeriesKey`): katlanmış addan baştaki/sondaki `yıllık`, sondaki doz numarası ve `N aylık`, baştaki `kedi`/`köpek` atılır (`YILLIK KEDİ KARMA` = `KEDİ KARMA 2` = `karma`; `İÇ PARAZİT 2 AYLIK` = `icparazit`). Değer çözücü (bölüm 5) aşı adında katalog/takma ad eşleşmesi bulamazsa aynı anahtarla bir kez daha dener; bu kural her profilde geçerlidir. Eşleşmeyen paketler (`İÇ+DIŞ PARAZİT`, `MANTAR`, ticari parazit ürünleri…) bölüm 5'teki değer eşlemesiyle kullanıcı tarafından eşlenir veya atlanır.
 
-### 13.4 Bilinen sınırlar
+### 13.4 Belirsiz hasta seçimi (2026-11-15)
+
+Dönüştürücü bir kaydı (aşı, klinik geçmiş, randevu) tek hastaya bağlayamazsa (`HayvanNo = Belirsiz: <a> / <b>`, bölüm 13.2) kullanıcıya sorulur. Gerçek yedekte birleştirme ve kurallardan sonra 18 grup kalır; bunların içinde dolu muayeneler de vardır.
+
+**Önizleme (§7.6), geriye uyumlu ekleme:**
+- `unmappedValues` içinde `kind = "pet"`, `source = "Belirsiz: a / b"`, `rowCount` (gruptaki satır sayısı), `blocking = true`. Seçilmeden aktarma başlamaz; `blockers` içinde `Imports.AmbiguousPet`.
+- Yeni alan `petCandidates[]`: gruplardaki adaylar `{ petNo, rowNumber, name, ownerName, species, breed, color, gender, birthDate, status, registeredOn }`. Değerler hazırlık satırındaki gibidir; `registeredOn` E-vet kayıt tarihidir (`gg.aa.yyyy`). Grup yoksa liste boştur ve hasta satırları okunmaz.
+
+**Seçim (`PUT .../mapping`), geriye uyumlu ekleme:**
+- Gövde alanı: `petChoices: [{ "reference": "Belirsiz: a / b", "petNo": "a" | null, "merge": false }]`.
+  - `petNo`: gruptaki satırların bağlanacağı aday.
+  - `null`: grubun satırları **atlanır** (`Imports.AmbiguousPetSkipped`, bilgi; hata sayılmaz).
+  - `merge = true`: adaylar **tek hastadır**. Öbür adayın hasta satırı aktarılmaz (`Imports.PetMergedByChoice`, bilgi); o adaya doğrudan bağlı aşı ve kayıtlar da seçilen hastaya gider.
+- Seçimler partide saklanır (eşleme belgesi `PetChoices`) ve yeniden doğrulamada uygulanır.
+- Doğrulama: `reference` belirsiz grup biçiminde olmalı, `petNo` gruptaki adaylardan biri, `merge` için `petNo` zorunlu, her grup bir kez. Aksi `400 Imports.PetChoiceInvalid`.
+- Kural tek yerde: `ImportValidationEngine.ResolvePetLink`.
+
+### 13.5 Bilinen sınırlar
 
 - Yedekte hesap hareketi yok; bakiye müşteri listesindeki `Bakiye` sütunundan gelir (ADR-048 T3). Rapor > Bakiyesi Olan Müşteriler yalnız karşılaştırma içindir, yüklenmez.
 - Hasta yaş grubu aktarılmaz (doğum tarihinden türer); müşterinin "sahiplenmek ister" işareti ve görevin `Bölüm` alanı aktarılmaz. Ücret ve ödeme geçmişi yedekte yoktur (yalnız müşterinin net bakiyesi); Aşı Bilgisi raporundaki aşı fiyatı tek başına ücret geçmişi sayılmadığı için aktarılmaz.

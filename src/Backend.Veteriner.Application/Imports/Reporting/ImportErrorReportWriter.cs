@@ -15,6 +15,13 @@ public sealed record ImportErrorReportRow(
     IReadOnlyDictionary<string, string?> Source,
     IReadOnlyList<ImportIssue> Errors);
 
+/// <summary>Rapor türü (§7.8): hatalı satırlar ya da bilerek atlanacak satırlar (<c>rows=skipped</c>); başlık ve metinler.</summary>
+public sealed record ImportReportKind(string Status, string CodeHeader, string MessageHeader, string EmptySheet, string EmptyMessage)
+{
+    public static readonly ImportReportKind Errors = new("Hata", "HataKodu", "Aciklama", ImportErrorReportWriter.NoErrorsSheetName, "Hatalı satır yok.");
+    public static readonly ImportReportKind Skipped = new("Atlanacak", "NedenKodu", "Neden", "Atlanansiz", "Atlanacak satır yok.");
+}
+
 /// <summary>
 /// Hata raporu dosyası (IMPORT_API_CONTRACT.md §7.8): orijinal satır + <c>SatirNo, Durum, HataKodu, Aciklama</c>.
 /// Dışarı yazılan <b>her</b> metin hücresi <see cref="ImportCellSafety.ForExport"/>'tan geçer (formül enjeksiyonu).
@@ -27,19 +34,19 @@ public static class ImportErrorReportWriter
     public const string CsvFileName = "vetinity-iceaktar-hatalar.csv";
     public const string NoErrorsSheetName = "Hatasiz";
 
-    private const string StatusText = "Hata";
-    private static readonly string[] ExtraHeaders = ["SatirNo", "Durum", "HataKodu", "Aciklama"];
-    private static readonly string[] CsvHeaders = ["Tablo", "SatirNo", "Durum", "HataKodu", "Aciklama", "Kaynak"];
+    public const string SkippedXlsxFileName = "vetinity-iceaktar-atlananlar.xlsx";
+    public const string SkippedCsvFileName = "vetinity-iceaktar-atlananlar.csv";
 
-    public static byte[] BuildXlsx(IReadOnlyList<ImportErrorReportRow> rows)
+    public static byte[] BuildXlsx(IReadOnlyList<ImportErrorReportRow> rows, ImportReportKind? kind = null)
     {
+        kind ??= ImportReportKind.Errors;
         using var workbook = new XLWorkbook();
 
         if (rows.Count == 0)
         {
-            var empty = workbook.Worksheets.Add(NoErrorsSheetName);
+            var empty = workbook.Worksheets.Add(kind.EmptySheet);
             WriteHeader(empty, ["Mesaj"]);
-            empty.Cell(2, 1).Value = "Hatalı satır yok.";
+            empty.Cell(2, 1).Value = kind.EmptyMessage;
         }
 
         foreach (var group in rows.GroupBy(r => r.Table).OrderBy(g => g.Key))
@@ -50,7 +57,7 @@ public static class ImportErrorReportWriter
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
 
-            WriteHeader(sheet, [.. sourceHeaders, .. ExtraHeaders]);
+            WriteHeader(sheet, [.. sourceHeaders, "SatirNo", "Durum", kind.CodeHeader, kind.MessageHeader]);
 
             var line = 2;
             foreach (var row in group)
@@ -63,7 +70,7 @@ public static class ImportErrorReportWriter
 
                 var extra = sourceHeaders.Count;
                 sheet.Cell(line, extra + 1).Value = row.RowNumber;
-                sheet.Cell(line, extra + 2).Value = StatusText;
+                sheet.Cell(line, extra + 2).Value = kind.Status;
                 sheet.Cell(line, extra + 3).Value = ImportCellSafety.ForExport(Codes(row));
                 sheet.Cell(line, extra + 4).Value = ImportCellSafety.ForExport(Messages(row));
                 line++;
@@ -78,10 +85,11 @@ public static class ImportErrorReportWriter
     }
 
     /// <summary>UTF-8 BOM'lu, <c>;</c> ayırıcılı; tablolar farklı başlık taşıdığından sabit sütunlar (Kaynak = başlık=değer çiftleri).</summary>
-    public static byte[] BuildCsv(IReadOnlyList<ImportErrorReportRow> rows)
+    public static byte[] BuildCsv(IReadOnlyList<ImportErrorReportRow> rows, ImportReportKind? kind = null)
     {
+        kind ??= ImportReportKind.Errors;
         var sb = new StringBuilder();
-        sb.AppendCsvLine(string.Join(';', CsvHeaders));
+        sb.AppendCsvLine(string.Join(';', new[] { "Tablo", "SatirNo", "Durum", kind.CodeHeader, kind.MessageHeader, "Kaynak" }));
 
         foreach (var row in rows.OrderBy(r => r.Table).ThenBy(r => r.RowNumber))
         {
@@ -90,7 +98,7 @@ public static class ImportErrorReportWriter
             [
                 ImportCanonicalNames.Display(row.Table),
                 row.RowNumber.ToString(CultureInfo.InvariantCulture),
-                StatusText,
+                kind.Status,
                 Codes(row),
                 Messages(row),
                 source,

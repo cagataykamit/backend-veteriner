@@ -35,6 +35,10 @@ public static class ImportRules
     // Zorunluluk / uzunluk
     public static readonly ImportRule RequiredMissing = new("Imports.RequiredMissing", ImportIssueSeverity.Error, "Zorunlu alan boş.");
     public static readonly ImportRule NameTooShort = new("Imports.NameTooShort", ImportIssueSeverity.Error, "Ad soyad en az 2 karakter olmalıdır.");
+    public static readonly ImportRule ShortNameCustomerKept = new("Imports.ShortNameCustomerKept", ImportIssueSeverity.Warning,
+        "Ad çok kısa; bağlı kaydı olduğu için yer tutucu adla aktarılacak, kontrol edin.");
+    public static readonly ImportRule ShortNameCustomerSkipped = new("Imports.ShortNameCustomerSkipped", ImportIssueSeverity.Info,
+        "Adı çok kısa ve bağlı kaydı (hasta, hesap hareketi, bakiye) olmayan müşteri (büyük olasılıkla deneme kaydı); atlanacak.");
     public static readonly ImportRule FieldTooLong = new("Imports.FieldTooLong", ImportIssueSeverity.Error, "Değer izin verilen uzunluğu aşıyor.");
 
     // Telefon / e-posta (K5)
@@ -121,9 +125,15 @@ public static class ImportRules
     public const string AmbiguousPetReferencePrefix = "Belirsiz: ";
 
     // Bağlantılar
+    public static readonly ImportRule AmbiguousPet = new("Imports.AmbiguousPet", ImportIssueSeverity.Error,
+        "Aynı sahipte aynı adlı birden çok hasta var; kayıtların hangisine ait olduğunu seçin (önizleme engeli).");
+    public static readonly ImportRule AmbiguousPetSkipped = new("Imports.AmbiguousPetSkipped", ImportIssueSeverity.Info,
+        "Aynı adlı hastalardan hangisine ait olduğu sorusunda \"atla\" seçildi; satır atlanacak.");
+    public static readonly ImportRule PetMergedByChoice = new("Imports.PetMergedByChoice", ImportIssueSeverity.Info,
+        "Seçiminizle aynı adlı öbür hastayla tek hasta sayıldı; bu kayıt ayrı aktarılmaz, aşı ve muayeneleri o hastaya bağlanır.");
     public static readonly ImportRule OwnerlessPetSkipped = new("Imports.OwnerlessPetSkipped", ImportIssueSeverity.Info,
         "Hastanın sahibi yok (eski programda müşteri kartı silinmiş) ve bağlı aşı, muayene ya da randevusu yok; atlanacak.");
-    public static readonly ImportRule OwnerNotFound =new("Imports.OwnerNotFound", ImportIssueSeverity.Error,
+    public static readonly ImportRule OwnerNotFound = new("Imports.OwnerNotFound", ImportIssueSeverity.Error,
         "Hastanın sahibi dosyada veya kayıtlı müşterilerde bulunamadı.");
     public static readonly ImportRule OwnerRowInvalid = new("Imports.OwnerRowInvalid", ImportIssueSeverity.Error,
         "Sahip müşteri aktarılamadığı için bu satır aktarılamaz.");
@@ -234,8 +244,9 @@ public static class ImportRules
     /// </summary>
     public static IReadOnlyList<ImportRule> SkipReasons { get; } =
     [
-        ValueSkipped, ParentSkipped, OwnerlessPetSkipped, ClinicalRecordEmpty, DuplicateInFile, DuplicateVaccination,
-        DuplicateClinicalRecord, DuplicateAccountEntry, DuplicateAppointment, PastAppointmentSkipped,
+        ValueSkipped, ParentSkipped, AmbiguousPetSkipped, PetMergedByChoice, OwnerlessPetSkipped, ShortNameCustomerSkipped, ClinicalRecordEmpty,
+        DuplicateInFile, DuplicateVaccination, DuplicateClinicalRecord, DuplicateAccountEntry, DuplicateAppointment,
+        PastAppointmentSkipped,
     ];
 }
 

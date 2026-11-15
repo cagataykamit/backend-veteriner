@@ -102,10 +102,12 @@ public sealed class ImportsController : ControllerBase
             await ReadAsync(form.EVetPatientReportFile, ct),
             await ReadAsync(form.EVetVaccineReportFile, ct));
 
+        // Dosyalar alındıktan sonra parti, istemci ayrılsa da (sayfa yenilendi, sekme kapandı) oluşturulur: okuma ve yazma
+        // yarıda kesilmez; kullanıcı partiyi listede bulur, aynı dosyanın yeniden yüklenmesi o partiye yönlenir (409).
         var result = await _mediator.Send(
             new CreateImportBatchCommand(
                 form.RequestId ?? Guid.Empty, form.Name, form.ClinicId, files, form.Encoding, form.Delimiter, form.SourceProfile),
-            ct);
+            CancellationToken.None);
         if (!result.IsSuccess)
             return result.ToActionResult(this);
 
@@ -296,12 +298,13 @@ public sealed class ImportsController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status410Gone)]
-    public async Task<IActionResult> GetErrors([FromRoute] Guid id, [FromQuery] string? format, CancellationToken ct)
+    public async Task<IActionResult> GetErrors(
+        [FromRoute] Guid id, [FromQuery] string? format, [FromQuery] string? rows, [FromQuery] string? code, CancellationToken ct)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new GetImportBatchErrorsQuery(id, format), ct);
+        var result = await _mediator.Send(new GetImportBatchErrorsQuery(id, format, rows, code), ct);
         if (!result.IsSuccess)
             return result.ToActionResult(this);
 
