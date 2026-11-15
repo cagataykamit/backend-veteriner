@@ -414,6 +414,11 @@ Yanıt gövdesi (B1 alanlarına ek): `tables[]` ve yalnız yükleme yanıtında 
 
 Aynı kiracıda **aynı içerik özetli** ve durumu `Discarded/Expired/RolledBack/CommitFailed` **olmayan** parti varsa `409 Imports.DuplicateFile` + `extensions.batchId` (aynı dosya iki kez yüklenip çift kayıt oluşmasın; geri alınmış partinin dosyası yeniden yüklenebilir).
 
+**İstemci ayrılırsa (2026-11-15):** Dosyalar sunucuya ulaştıktan sonra parti, istemci bağlantıyı kesse de (sayfa yenilendi, sekme kapandı) oluşturulur; okuma ve yazma yarıda kesilmez.
+- Kullanıcı partiyi listede bulur. Aynı dosyanın yeniden yüklenmesi `409 Imports.DuplicateFile` + `extensions.batchId` ile o partiye yönlenir; ekran "Bu dosya zaten yüklendi" bağlantısını gösterir.
+- Hazırlık satırları toplu yazılır (`IImportBatchRowBulkWriter`, `SqlBulkCopy`, komutun transaction'ında). Gerçek E-vet yedeğinde (~52 bin satır) yükleme yerelde 51 sn → ~15 sn (okuma ve dönüştürme ~8 sn, yazma ~6 sn).
+- Yanıt şekli değişmedi.
+
 `201 Created` (`Location` → `GET /imports/batches/{id}`):
 
 ```json
