@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Backend.Veteriner.Api.Common;
 using Backend.Veteriner.Api.Common.Extensions;
+using Backend.Veteriner.Application.Common.Security;
 using Backend.Veteriner.Application.LegalAcceptances;
 using Backend.Veteriner.Application.LegalAcceptances.Queries.GetCurrentVersions;
 using Backend.Veteriner.Application.OwnerPortal;
@@ -71,7 +72,18 @@ public sealed class PortalAuthController : ControllerBase
         return result.ToActionResult(this);
     }
 
-    /// <summary>Giriş kodu ister; yanıt her durumda 204.</summary>
+    /// <summary>
+    /// İnsan doğrulaması ayarları: Turnstile site anahtarı ve portal giriş/sıfırlama kodunun korunup korunmadığı
+    /// (TRIAL_SIGNUP_ABUSE_API_CONTRACT.md §4).
+    /// </summary>
+    [AllowAnonymous]
+    [EnableRateLimiting("portal-auth")]
+    [HttpGet("human-verification")]
+    [ProducesResponseType(typeof(HumanVerificationSettingsDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetHumanVerificationSettings(CancellationToken ct)
+        => Ok(await _mediator.Send(new GetHumanVerificationSettingsQuery(), ct));
+
+    /// <summary>Giriş kodu ister; insan doğrulaması geçmezse 400, yapılamıyorsa 503; aksi halde yanıt her durumda 204.</summary>
     [AllowAnonymous]
     [EnableRateLimiting("portal-auth")]
     [HttpPost("auth/code")]
@@ -80,7 +92,7 @@ public sealed class PortalAuthController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> RequestSignInCode([FromBody] PortalEmailBody body, CancellationToken ct)
     {
-        var result = await _mediator.Send(new RequestPortalCodeCommand(body.Email ?? string.Empty, OwnerPortalCodePurpose.SignIn), ct);
+        var result = await _mediator.Send(new RequestPortalCodeCommand(body.Email ?? string.Empty, OwnerPortalCodePurpose.SignIn, body.TurnstileToken), ct);
         return result.ToActionResult(this);
     }
 
@@ -112,7 +124,7 @@ public sealed class PortalAuthController : ControllerBase
         return result.ToActionResult(this);
     }
 
-    /// <summary>Parola sıfırlama kodu ister; yanıt her durumda 204.</summary>
+    /// <summary>Parola sıfırlama kodu ister; insan doğrulaması geçmezse 400, yapılamıyorsa 503; aksi halde yanıt her durumda 204.</summary>
     [AllowAnonymous]
     [EnableRateLimiting("portal-auth")]
     [HttpPost("auth/password-reset")]
@@ -121,7 +133,7 @@ public sealed class PortalAuthController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> RequestPasswordReset([FromBody] PortalEmailBody body, CancellationToken ct)
     {
-        var result = await _mediator.Send(new RequestPortalCodeCommand(body.Email ?? string.Empty, OwnerPortalCodePurpose.PasswordReset), ct);
+        var result = await _mediator.Send(new RequestPortalCodeCommand(body.Email ?? string.Empty, OwnerPortalCodePurpose.PasswordReset, body.TurnstileToken), ct);
         return result.ToActionResult(this);
     }
 

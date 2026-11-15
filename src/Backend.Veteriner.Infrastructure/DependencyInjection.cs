@@ -271,6 +271,7 @@ public static class DependencyInjection
         // Gizli anahtar ve jeton içerdiği için varsayılan HttpClient günlükleri kapalı.
         services.Configure<TurnstileOptions>(configuration.GetSection(TurnstileOptions.SectionName));
         services.Configure<TrialSignupOptions>(configuration.GetSection(TrialSignupOptions.SectionName));
+        services.Configure<HumanVerificationOptions>(configuration.GetSection(HumanVerificationOptions.SectionName));
         services.AddHttpClient(TurnstileHumanVerifier.HttpClientName, (sp, client) =>
                 client.Timeout = TimeSpan.FromSeconds(Math.Clamp(sp.GetRequiredService<IOptions<TurnstileOptions>>().Value.TimeoutSeconds, 2, 15)))
             .RemoveAllLoggers();

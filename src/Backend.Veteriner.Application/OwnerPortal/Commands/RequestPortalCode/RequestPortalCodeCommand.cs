@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Security;
 using Backend.Veteriner.Application.OwnerPortal.Sessions;
 using Backend.Veteriner.Application.OwnerPortal.Specs;
 using Backend.Veteriner.Domain.OwnerPortal;
@@ -10,9 +11,10 @@ namespace Backend.Veteriner.Application.OwnerPortal.Commands.RequestPortalCode;
 /// <summary>
 /// Giriş (<see cref="OwnerPortalCodePurpose.SignIn"/>) veya parola sıfırlama (<see cref="OwnerPortalCodePurpose.PasswordReset"/>)
 /// kodu ister. Hesap var/yok, kilitli ya da bekleme süresinde olsun yanıt her zaman başarıdır (numaralandırma yok); kod yalnız
-/// aktif ve kilitsiz hesaba gider.
+/// aktif ve kilitsiz hesaba gider. Önce insan doğrulaması (Turnstile; <c>Turnstile:ProtectPortalSignIn</c>): geçmezse hata döner, hesap
+/// bilgisi sızmaz.
 /// </summary>
-public sealed record RequestPortalCodeCommand(string Email, OwnerPortalCodePurpose Purpose)
+public sealed record RequestPortalCodeCommand(string Email, OwnerPortalCodePurpose Purpose, string? TurnstileToken = null)
     : IRequest<Result>, IAuditableRequest, IIgnoreTenantWriteSubscriptionGuard
 {
     public string AuditAction => Purpose == OwnerPortalCodePurpose.PasswordReset
@@ -26,20 +28,30 @@ public sealed class RequestPortalCodeCommandHandler : IRequestHandler<RequestPor
 {
     private readonly IReadRepository<OwnerAccount> _accounts;
     private readonly OwnerPortalCodeService _codes;
+    private readonly HumanVerificationGuard _human;
     private readonly TimeProvider _timeProvider;
 
     public RequestPortalCodeCommandHandler(
         IReadRepository<OwnerAccount> accounts,
         OwnerPortalCodeService codes,
+        HumanVerificationGuard human,
         TimeProvider timeProvider)
     {
         _accounts = accounts;
         _codes = codes;
+        _human = human;
         _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result> Handle(RequestPortalCodeCommand request, CancellationToken ct)
     {
+        var action = request.Purpose == OwnerPortalCodePurpose.PasswordReset
+            ? HumanVerificationActions.PortalPasswordReset
+            : HumanVerificationActions.PortalSignInCode;
+        var human = await _human.EnsureHumanAsync(request.TurnstileToken, action, ct);
+        if (!human.IsSuccess)
+            return human;
+
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var email = OwnerAccount.NormalizeEmail(request.Email);
         var account = email is null ? null : await _accounts.FirstOrDefaultAsync(new OwnerAccountByEmailSpec(email), ct);
