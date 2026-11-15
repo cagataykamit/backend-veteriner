@@ -9,6 +9,8 @@ using Backend.Veteriner.Application.LegalAcceptances.Queries.GetCurrentVersions;
 using Backend.Veteriner.Application.Public.Commands.AcceptInvite;
 using Backend.Veteriner.Application.Public.Commands.OwnerSignup;
 using Backend.Veteriner.Application.Public.Commands.SignupAndAcceptInvite;
+using Backend.Veteriner.Application.Public.Commands.SignupEmailCode;
+using Backend.Veteriner.Application.Public.Queries.OwnerSignupSettings;
 using Backend.Veteriner.Application.Public.Contracts.Dtos;
 using Backend.Veteriner.Application.Public.Queries.InviteDetail;
 using Backend.Veteriner.Application.Public.Queries.SubscriptionPlans;
@@ -61,11 +63,50 @@ public sealed class PublicController : ControllerBase
             body.Password,
             body.AcceptedLegalDocuments,
             body.DiscountCode,
-            body.StartWithExampleClinic);
+            body.StartWithExampleClinic,
+            body.EmailVerificationToken,
+            body.TaxIdentityNumber);
 
         var result = await _mediator.Send(command, ct);
         return result.ToActionResult(this);
     }
+
+    /// <summary>Kayıt formunun sunucu ayarları: vergi numarası zorunluluğu ve Cloudflare Turnstile site anahtarı (TRIAL-001).</summary>
+    [AllowAnonymous]
+    [HttpGet("owner-signup/settings")]
+    [ProducesResponseType(typeof(OwnerSignupSettingsDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetOwnerSignupSettings(CancellationToken ct)
+        => Ok(await _mediator.Send(new GetOwnerSignupSettingsQuery(), ct));
+
+    /// <summary>
+    /// Deneme kaydı için e-postaya 6 haneli doğrulama kodu gönderir (TRIAL-001). Önce insan doğrulaması (Turnstile): geçmezse 400,
+    /// yapılamıyorsa 503. Adresle daha önce deneme açılmışsa 409; bekleme ve günlük sınırda 429.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPost("owner-signup/email-code")]
+    [EnableRateLimiting(RateLimitingExtensions.SignupEmailCodePolicy)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(SignupEmailCodeSentDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> RequestSignupEmailCode([FromBody] SignupEmailCodeBody? body, CancellationToken ct)
+        => (await _mediator.Send(new RequestSignupEmailCodeCommand(body?.Email ?? string.Empty, body?.TurnstileToken), ct))
+            .ToActionResult(this);
+
+    /// <summary>E-postaya gelen kodu doğrular; başarıda kayıtta kullanılacak jeton döner. Hatalı ya da süresi dolmuş kodda 400.</summary>
+    [AllowAnonymous]
+    [HttpPost("owner-signup/email-code/verify")]
+    [EnableRateLimiting(RateLimitingExtensions.SignupEmailVerifyPolicy)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(SignupEmailVerifiedDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> VerifySignupEmailCode([FromBody] SignupEmailVerifyBody? body, CancellationToken ct)
+        => (await _mediator.Send(
+                new VerifySignupEmailCodeCommand(body?.Email ?? string.Empty, body?.OneTimeCode ?? string.Empty), ct))
+            .ToActionResult(this);
 
     /// <summary>
     /// Satış ortağı kodu doğrulama (ADR-037): her zaman 200; geçersiz her durumda aynı gövde, ortak bilgisi yok. IP bazlı hız sınırlı.

@@ -16,10 +16,12 @@ public static class LegalDocumentCatalog
         new Dictionary<LegalDocumentType, string>
         {
             [LegalDocumentType.Terms] = "1.0",
-            [LegalDocumentType.Privacy] = "1.0",
+            // 1.1 (2026-11-15): deneme kaydı e-posta kodu, vergi numarasıyla tek deneme ve Cloudflare Turnstile (TRIAL-001).
+            [LegalDocumentType.Privacy] = "1.1",
             [LegalDocumentType.DataProcessing] = "1.0",
             [LegalDocumentType.PortalTerms] = "1.0",
-            [LegalDocumentType.PortalPrivacy] = "1.0",
+            // 1.1 (2026-11-15): portal giriş ve online randevu kodunda Cloudflare Turnstile.
+            [LegalDocumentType.PortalPrivacy] = "1.1",
         };
 
     public static string CurrentVersion(LegalDocumentType documentType) => CurrentVersions[documentType];

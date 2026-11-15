@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Public.Commands.OwnerSignup;
 using Backend.Veteriner.Application.Public.Commands.OwnerSignup.Validators;
+using Backend.Veteriner.Application.Public.TrialSignup;
 using Backend.Veteriner.Application.Tests.Common.Validation;
 using AwesomeAssertions;
 
@@ -10,7 +11,8 @@ public sealed class PublicOwnerSignupCommandValidatorTests
     private readonly PublicOwnerSignupCommandValidator _validator = new();
 
     private static PublicOwnerSignupCommand CreateCommand(string password) =>
-        new("Basic", "Tenant A", "Clinic A", "Istanbul", "owner@example.com", password);
+        new("Basic", "Tenant A", "Clinic A", "Istanbul", "owner@example.com", password,
+            EmailVerificationToken: "jeton", TaxIdentityNumber: "1234567890");
 
     [Fact]
     public void Validate_Should_Fail_When_Password_IsTooShort()
@@ -73,5 +75,25 @@ public sealed class PublicOwnerSignupCommandValidatorTests
         var result = _validator.Validate(CreateCommand(StrongPasswordValidatorTestData.ValidPassword));
 
         result.IsValid.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("1234567891")]
+    [InlineData("10000000147")]
+    [InlineData("12345")]
+    public void Validate_Should_Fail_When_TaxIdentityNumber_Fails_Checksum(string tax)
+        => _validator.Validate(CreateCommand(StrongPasswordValidatorTestData.ValidPassword) with { TaxIdentityNumber = tax })
+            .Errors.Should().Contain(e =>
+                e.PropertyName == nameof(PublicOwnerSignupCommand.TaxIdentityNumber)
+                && e.ErrorMessage == TrialSignupErrors.InvalidTaxIdentityMessage);
+
+    [Fact]
+    public void Validate_Should_Leave_Empty_TaxIdentityNumber_To_Setting_And_Require_Email_Token()
+    {
+        var result = _validator.Validate(
+            CreateCommand(StrongPasswordValidatorTestData.ValidPassword) with { TaxIdentityNumber = null, EmailVerificationToken = " " });
+
+        result.Errors.Should().NotContain(e => e.PropertyName == nameof(PublicOwnerSignupCommand.TaxIdentityNumber));
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(PublicOwnerSignupCommand.EmailVerificationToken));
     }
 }

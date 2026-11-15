@@ -17,6 +17,9 @@ public sealed class PortalInviteAcceptBody
 public sealed class PortalEmailBody
 {
     public string? Email { get; init; }
+
+    /// <summary>Cloudflare Turnstile jetonu (giriş kodu: <c>portal-signin-code</c>, sıfırlama: <c>portal-password-reset</c>).</summary>
+    public string? TurnstileToken { get; init; }
 }
 
 public sealed class PortalCodeSignInBody

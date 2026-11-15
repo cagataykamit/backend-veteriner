@@ -12,7 +12,12 @@ namespace Backend.Veteriner.Application.Public.Commands.OwnerSignup;
 /// Onboarding seçimi (ADR-002, TRIAL-002): <c>true</c> ise kayıtla aynı işlemde yeni kliniğe Örnek Veteriner Kliniği
 /// verisi yüklenir; yükleme başarısızsa kayıt da geri alınır. Varsayılan boş klinik.
 /// </param>
-/// <remarks>Kullanıcı, kiracı, abonelik, klinik, üyelikler, kabuller ve (istenirse) örnek klinik verisi tek veritabanı işleminde yazılır; hata durumunda hiçbiri kalmaz.</remarks>
+/// <param name="EmailVerificationToken">E-posta kodu doğrulamasından dönen jeton (TRIAL-001); kayıtla aynı işlemde kullanılır.</param>
+/// <param name="TaxIdentityNumber">VKN (10 hane) ya da TCKN (11 hane); bir numarayla tek deneme. Zorunluluğu <c>TrialSignup:RequireTaxIdentityNumber</c>.</param>
+/// <remarks>
+/// Kullanıcı, kiracı, abonelik, klinik, üyelikler, kabuller, tek deneme kaydı, fatura profili (vergi numarası) ve (istenirse) örnek
+/// klinik verisi tek veritabanı işleminde yazılır; hata durumunda hiçbiri kalmaz ve e-posta jetonu kullanılmamış kalır.
+/// </remarks>
 public sealed record PublicOwnerSignupCommand(
     string PlanCode,
     string TenantName,
@@ -22,4 +27,11 @@ public sealed record PublicOwnerSignupCommand(
     string Password,
     IReadOnlyList<LegalDocumentAcceptanceInput>? AcceptedLegalDocuments = null,
     string? DiscountCode = null,
-    bool StartWithExampleClinic = false) : IRequest<Result<PublicOwnerSignupResultDto>>, ITransactionalRollbackOnFailureRequest;
+    bool StartWithExampleClinic = false,
+    string? EmailVerificationToken = null,
+    string? TaxIdentityNumber = null)
+    : IRequest<Result<PublicOwnerSignupResultDto>>, ITransactionalRollbackOnFailureRequest, IAuditableRequest
+{
+    public string AuditAction => "Public.OwnerSignup";
+    public string? AuditTarget => null;
+}

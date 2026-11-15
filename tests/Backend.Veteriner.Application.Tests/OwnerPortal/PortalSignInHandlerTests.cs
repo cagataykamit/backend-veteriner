@@ -1,10 +1,13 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.Common.Security;
 using Backend.Veteriner.Application.OwnerPortal.Commands.PortalCodeSignIn;
 using Backend.Veteriner.Application.OwnerPortal.Commands.PortalPasswordSignIn;
 using Backend.Veteriner.Application.OwnerPortal.Commands.RequestPortalCode;
 using Backend.Veteriner.Domain.OwnerPortal;
 using AwesomeAssertions;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.OwnerPortal;
@@ -35,7 +38,15 @@ public sealed class PortalSignInHandlerTests
         return _account;
     }
 
-    private RequestPortalCodeCommandHandler RequestHandler() => new(_accounts.Object, _f.CodeService(), _f.Clock);
+    private RequestPortalCodeCommandHandler RequestHandler(HumanVerificationResult human = HumanVerificationResult.Passed)
+    {
+        var verifier = new Mock<IHumanVerifier>();
+        verifier.SetupGet(v => v.IsConfigured).Returns(true);
+        verifier.Setup(v => v.VerifyAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(human);
+        var guard = new HumanVerificationGuard(verifier.Object, Mock.Of<IClientContext>(), Options.Create(new HumanVerificationOptions()));
+        return new(_accounts.Object, _f.CodeService(), guard, _f.Clock);
+    }
 
     private PortalCodeSignInCommandHandler CodeHandler() =>
         new(_accounts.Object, _f.CodeService(), _f.SessionIssuer(), _f.Uow.Object, _f.Clock);
@@ -76,6 +87,19 @@ public sealed class PortalSignInHandlerTests
         await RequestHandler().Handle(new RequestPortalCodeCommand("ayse@example.com", OwnerPortalCodePurpose.SignIn), CancellationToken.None);
 
         _f.AddedCodes.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task RequestCode_Should_Fail_And_Send_Nothing_When_Human_Check_Fails()
+    {
+        GivenAccount();
+
+        var result = await RequestHandler(HumanVerificationResult.Failed)
+            .Handle(new RequestPortalCodeCommand("ayse@example.com", OwnerPortalCodePurpose.SignIn, "bot"), CancellationToken.None);
+
+        result.Error.Code.Should().Be("HumanVerification.Failed");
+        _f.AddedCodes.Should().BeEmpty();
+        _f.Email.Verify(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()), Times.Never);
     }
 
     [Fact]

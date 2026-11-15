@@ -205,6 +205,7 @@ public sealed class LegalAcceptanceEndpointIntegrationTests : IClassFixture<Cust
     {
         var suffix = Guid.NewGuid().ToString("N")[..10];
         var email = $"legal-owner-{suffix}@example.com";
+        var trialSignup = await IntegrationTestTrialSignup.CreateVerifiedAsync(_factory.Services, email);
         object Body(object[]? documents) => new
         {
             planCode = "Basic",
@@ -213,6 +214,8 @@ public sealed class LegalAcceptanceEndpointIntegrationTests : IClassFixture<Cust
             clinicCity = "Ankara",
             email,
             password = "Abc12345!",
+            emailVerificationToken = trialSignup.Token,
+            taxIdentityNumber = trialSignup.TaxNumber,
             acceptedLegalDocuments = documents,
         };
 

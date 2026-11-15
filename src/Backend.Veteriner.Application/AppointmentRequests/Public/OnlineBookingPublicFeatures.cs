@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Appointments.Availability;
 using Backend.Veteriner.Application.Clinics.OnlineBooking;
 using Backend.Veteriner.Application.ClinicSites;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Security;
 using Backend.Veteriner.Domain.AppointmentRequests;
 using Backend.Veteriner.Domain.Shared;
 using FluentValidation;
@@ -24,9 +25,9 @@ public sealed record GetOnlineBookingAvailabilityQuery(string BookingCode, Guid?
 
 /// <summary>
 /// E-posta doğrulama kodu ister. Bekleme süresindeyse yeni kod gitmez; yanıt yine 204 (numaralandırma yok). Kapalı/geçersiz
-/// bağlantıda 404.
+/// bağlantıda 404. Önce insan doğrulaması (Turnstile; <c>Turnstile:EnforcePortal</c>): geçmezse 400, yapılamıyorsa 503.
 /// </summary>
-public sealed record RequestOnlineBookingCodeCommand(string BookingCode, string Email)
+public sealed record RequestOnlineBookingCodeCommand(string BookingCode, string Email, string? TurnstileToken = null)
     : IRequest<Result>, IAuditableRequest
 {
     public string AuditAction => "OnlineBooking.CodeRequest";
@@ -166,20 +167,27 @@ public sealed class RequestOnlineBookingCodeCommandHandler : IRequestHandler<Req
 {
     private readonly OnlineBookingClinicResolver _resolver;
     private readonly AppointmentRequestVerificationService _verification;
+    private readonly HumanVerificationGuard _human;
     private readonly TimeProvider _timeProvider;
 
     public RequestOnlineBookingCodeCommandHandler(
         OnlineBookingClinicResolver resolver,
         AppointmentRequestVerificationService verification,
+        HumanVerificationGuard human,
         TimeProvider timeProvider)
     {
         _resolver = resolver;
         _verification = verification;
+        _human = human;
         _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result> Handle(RequestOnlineBookingCodeCommand request, CancellationToken ct)
     {
+        var human = await _human.EnsureHumanAsync(request.TurnstileToken, HumanVerificationActions.OnlineBookingCode, ct);
+        if (!human.IsSuccess)
+            return human;
+
         var scope = await _resolver.ResolveByCodeAsync(request.BookingCode, ct);
         if (!scope.IsSuccess)
             return Result.Failure(scope.Error);

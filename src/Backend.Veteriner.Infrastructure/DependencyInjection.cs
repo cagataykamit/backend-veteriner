@@ -26,6 +26,7 @@ using Backend.Veteriner.Application.Common.Outbox;                              
 using Backend.Veteriner.Application.Outbox;                                      // IOutboxAdminRepository
 using Backend.Veteriner.Application.Common.Auditing;                            // IAuditLogWriter, IAuditContext
 using Backend.Veteriner.Infrastructure.Caching;                                  // PermissionReader
+using Backend.Veteriner.Infrastructure.Security.Turnstile;
 using Backend.Veteriner.Infrastructure.Mailing;                                   // MailKitEmailSender, TransactionalEmailSender, SmtpOptions
 using Backend.Veteriner.Infrastructure.Outbox;                                    // EfOutbox, OutboxProcessor, OutboxOptions, OutboxBuffer, OutboxSaveChangesInterceptor
 using Backend.Veteriner.Infrastructure.Projections.Appointments;
@@ -265,6 +266,18 @@ public static class DependencyInjection
         services.AddSingleton<IValidateOptions<SmtpOptions>, SmtpOptionsValidator>();
         services.AddScoped<IEmailSenderImmediate, MailKitEmailSender>(); // SMTP ile gönderir
         services.AddScoped<IEmailSender, TransactionalEmailSender>();    // Outbox'a yazar
+
+        // ===== İnsan doğrulaması (Cloudflare Turnstile) =====
+        // Gizli anahtar ve jeton içerdiği için varsayılan HttpClient günlükleri kapalı.
+        services.Configure<TurnstileOptions>(configuration.GetSection(TurnstileOptions.SectionName));
+        services.Configure<TrialSignupOptions>(configuration.GetSection(TrialSignupOptions.SectionName));
+        services.Configure<HumanVerificationOptions>(configuration.GetSection(HumanVerificationOptions.SectionName));
+        services.AddHttpClient(TurnstileHumanVerifier.HttpClientName, (sp, client) =>
+                client.Timeout = TimeSpan.FromSeconds(Math.Clamp(sp.GetRequiredService<IOptions<TurnstileOptions>>().Value.TimeoutSeconds, 2, 15)))
+            .RemoveAllLoggers();
+        services.AddScoped<TurnstileHumanVerifier>();
+        services.AddScoped<IHumanVerifier>(HumanVerifierSelector.Select);
+        services.AddHostedService<TurnstileConfigurationReporter>();
 
         // ===== Permissions cache/reader =====
         services.AddMemoryCache();

@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Auth.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.LegalAcceptances;
 using Backend.Veteriner.Application.Public.Contracts.Dtos;
+using Backend.Veteriner.Application.Public.TrialSignup;
 using Backend.Veteriner.Application.SalesPartners;
 using Backend.Veteriner.Application.SalesPartners.Contracts;
 using Backend.Veteriner.Application.Tenants;
@@ -48,6 +49,9 @@ public sealed class PublicOwnerSignupCommandHandler
     private readonly TimeProvider _timeProvider;
     private readonly IRepository<CashRegister> _cashRegistersWrite;
     private readonly IRepository<CashMovementCategory> _cashCategoriesWrite;
+    private readonly SignupEmailVerificationService _emailVerification;
+    private readonly TrialSignupIdentityService _trialIdentities;
+    private readonly IRepository<TenantBillingProfile> _billingProfilesWrite;
 
     public PublicOwnerSignupCommandHandler(
         IReadRepository<User> usersRead,
@@ -70,6 +74,9 @@ public sealed class PublicOwnerSignupCommandHandler
         TimeProvider timeProvider,
         IRepository<CashRegister> cashRegistersWrite,
         IRepository<CashMovementCategory> cashCategoriesWrite,
+        SignupEmailVerificationService emailVerification,
+        TrialSignupIdentityService trialIdentities,
+        IRepository<TenantBillingProfile> billingProfilesWrite,
         ILogger<PublicOwnerSignupCommandHandler>? logger = null)
     {
         _usersRead = usersRead;
@@ -93,6 +100,9 @@ public sealed class PublicOwnerSignupCommandHandler
         _timeProvider = timeProvider;
         _cashRegistersWrite = cashRegistersWrite;
         _cashCategoriesWrite = cashCategoriesWrite;
+        _emailVerification = emailVerification;
+        _trialIdentities = trialIdentities;
+        _billingProfilesWrite = billingProfilesWrite;
     }
 
     public async ValueTask<Result<PublicOwnerSignupResultDto>> Handle(PublicOwnerSignupCommand request, CancellationToken ct)
@@ -159,11 +169,27 @@ public sealed class PublicOwnerSignupCommandHandler
             return Result<PublicOwnerSignupResultDto>.Failure(legalCheck.Error);
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+
+        // Kötüye kullanım önlemleri (TRIAL-001): doğrulanmış e-posta; bir e-posta ve bir vergi numarasıyla tek deneme.
+        var emailAvailable = await _trialIdentities.EnsureEmailAvailableAsync(email, ct);
+        if (!emailAvailable.IsSuccess)
+            return Result<PublicOwnerSignupResultDto>.Failure(emailAvailable.Error);
+        var taxIdentity = await _trialIdentities.NormalizeAvailableTaxIdentityAsync(request.TaxIdentityNumber, ct);
+        if (!taxIdentity.IsSuccess)
+            return Result<PublicOwnerSignupResultDto>.Failure(taxIdentity.Error);
+        var emailVerification = await _emailVerification.FindForSignupAsync(
+            SignupEmailVerification.NormalizeEmail(email)!, request.EmailVerificationToken, utcNow, ct);
+        MarkStep("trialSignupChecks");
+        if (!emailVerification.IsSuccess)
+            return Result<PublicOwnerSignupResultDto>.Failure(emailVerification.Error);
+
         var user = new User(email, _hasher.Hash(request.Password), utcNow);
         MarkStep("hashAndCreateUser");
         var roleResult = user.AddRole("Admin", utcNow);
         if (!roleResult.IsSuccess)
             return Result<PublicOwnerSignupResultDto>.Failure(roleResult.Error);
+        user.ConfirmEmail(utcNow);
+        emailVerification.Value!.MarkUsed(utcNow);
 
         var tenant = new Tenant(tenantName, utcNow);
 
@@ -202,6 +228,10 @@ public sealed class PublicOwnerSignupCommandHandler
             LegalDocumentCatalog.CreateAcceptances(user.Id, tenant.Id, requiredLegalDocuments, utcNow), ct);
         if (redemption is not null)
             await _redemptionsWrite.AddAsync(redemption, ct);
+        await _trialIdentities.AddAsync(tenant.Id, email, taxIdentity.Value, utcNow, ct);
+        // Ücretli plana geçişte fatura bu numarayla kesilir; profilin diğer alanlarını yönetici sonra doldurur.
+        if (taxIdentity.Value is { } taxNumber)
+            await _billingProfilesWrite.AddAsync(TenantBillingProfile.CreateWithTaxNumber(tenant.Id, taxNumber, utcNow), ct);
         MarkStep("stageEntities");
 
         await _uow.SaveChangesAsync(ct);

@@ -260,6 +260,7 @@ public sealed class ExampleClinicIntegrationTests : IClassFixture<CustomWebAppli
             .Select(kv => (object)new { documentType = kv.Key.ToString(), version = kv.Value })
             .ToArray();
 
+        var trialSignup = await IntegrationTestTrialSignup.CreateVerifiedAsync(_factory.Services, email);
         var response = await _factory.CreateClient().PostAsJsonAsync("/api/v1/public/owner-signup", new
         {
             planCode = "Basic",
@@ -268,6 +269,8 @@ public sealed class ExampleClinicIntegrationTests : IClassFixture<CustomWebAppli
             clinicCity = "İstanbul",
             email,
             password = "Abc12345!",
+            emailVerificationToken = trialSignup.Token,
+            taxIdentityNumber = trialSignup.TaxNumber,
             acceptedLegalDocuments = documents,
             startWithExampleClinic,
         });

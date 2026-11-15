@@ -66,14 +66,18 @@ public sealed class PortalOnlineBookingController : ControllerBase
         CancellationToken ct)
         => (await _mediator.Send(new GetOnlineBookingAvailabilityQuery(bookingCode, reasonId, from, days ?? 7), ct)).ToActionResult(this);
 
-    /// <summary>E-posta doğrulama kodu ister; yanıt 204 (bekleme süresinde yeni kod gitmez).</summary>
+    /// <summary>
+    /// E-posta doğrulama kodu ister; yanıt 204 (bekleme süresinde yeni kod gitmez). Önce insan doğrulaması: geçmezse 400
+    /// <c>HumanVerification.Failed</c>, yapılamıyorsa 503.
+    /// </summary>
     [HttpPost("verification-code")]
     [Consumes("application/json")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> RequestCode([FromRoute] string bookingCode, [FromBody] OnlineBookingCodeBody body, CancellationToken ct)
-        => (await _mediator.Send(new RequestOnlineBookingCodeCommand(bookingCode, body.Email ?? string.Empty), ct)).ToActionResult(this);
+        => (await _mediator.Send(new RequestOnlineBookingCodeCommand(bookingCode, body.Email ?? string.Empty, body.TurnstileToken), ct)).ToActionResult(this);
 
     /// <summary>Doğrulanmış e-postayla talep oluşturur; talep kesin randevu değildir.</summary>
     [HttpPost("requests")]
@@ -194,6 +198,9 @@ public sealed class PortalAppointmentRequestsController : ControllerBase
 public sealed class OnlineBookingCodeBody
 {
     public string? Email { get; init; }
+
+    /// <summary>Cloudflare Turnstile jetonu (<c>action</c> = <c>booking-email-code</c>).</summary>
+    public string? TurnstileToken { get; init; }
 }
 
 public sealed class OnlineBookingRequestBody

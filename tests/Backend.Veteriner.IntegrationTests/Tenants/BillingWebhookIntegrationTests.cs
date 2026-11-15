@@ -194,14 +194,18 @@ public sealed class BillingWebhookIntegrationTests : IClassFixture<CustomWebAppl
     private async Task<Guid> SignupTenantAsync()
     {
         var suffix = Guid.NewGuid().ToString("N")[..10];
+        var signupEmail = $"webhook-owner-{suffix}@example.com";
+        var trialSignup = await IntegrationTestTrialSignup.CreateVerifiedAsync(_factory.Services, signupEmail);
         var response = await _client.PostAsJsonAsync("/api/v1/public/owner-signup", new
         {
             planCode = "Basic",
             tenantName = $"Webhook Kiracı {suffix}",
             clinicName = "Webhook Klinik",
             clinicCity = "Ankara",
-            email = $"webhook-owner-{suffix}@example.com",
+            email = signupEmail,
             password = "Abc12345!",
+            emailVerificationToken = trialSignup.Token,
+            taxIdentityNumber = trialSignup.TaxNumber,
             acceptedLegalDocuments = LegalDocumentCatalog.CurrentVersions
                 .Select(kv => new { documentType = kv.Key.ToString(), version = kv.Value })
                 .ToArray()

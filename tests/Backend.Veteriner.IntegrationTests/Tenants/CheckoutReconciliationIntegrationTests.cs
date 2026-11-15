@@ -166,14 +166,18 @@ public sealed class CheckoutReconciliationIntegrationTests : IClassFixture<Custo
             .Select(kv => (object)new { documentType = kv.Key.ToString(), version = kv.Value })
             .ToArray();
 
+        var signupEmail = $"uzlastirma-{suffix}@example.com";
+        var trialSignup = await IntegrationTestTrialSignup.CreateVerifiedAsync(app.Services, signupEmail);
         var signup = await app.CreateClient().PostAsJsonAsync("/api/v1/public/owner-signup", new
         {
             planCode = "Basic",
             tenantName = $"Uzlaştırma Kiracı {suffix}",
             clinicName = "Uzlaştırma Klinik",
             clinicCity = "İzmir",
-            email = $"uzlastirma-{suffix}@example.com",
+            email = signupEmail,
             password = "Abc12345!",
+            emailVerificationToken = trialSignup.Token,
+            taxIdentityNumber = trialSignup.TaxNumber,
             acceptedLegalDocuments = documents,
         });
         signup.StatusCode.Should().Be(HttpStatusCode.OK, await signup.Content.ReadAsStringAsync());
