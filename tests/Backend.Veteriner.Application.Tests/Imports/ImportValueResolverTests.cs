@@ -270,6 +270,15 @@ public sealed class ImportValueResolverTests
         => ImportValueResolver.VaccineSeriesKey(name).Should().Be(expected);
 
     [Theory]
+    [InlineData("YILLIK KEDİ KARMA", "kedi")]
+    [InlineData("Köpek Kuduz", "kopek")]
+    [InlineData("KUDUZ", null)]
+    [InlineData("Kedi köpek iç parazit", null)]
+    [InlineData(null, null)]
+    public void Vaccine_Species_Should_Come_From_The_Vaccine_Name(string? name, string? expected)
+        => ImportValueResolver.VaccineSpecies(name).Should().Be(expected);
+
+    [Theory]
     [InlineData("YILLIK KEDİ KARMA")]
     [InlineData("KÖPEK KARMA 2")]
     [InlineData("Karma Aşısı")]

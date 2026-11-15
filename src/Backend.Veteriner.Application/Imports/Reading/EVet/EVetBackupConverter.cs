@@ -114,6 +114,15 @@ internal static class EVetBackupConverter
 
         Add(output, new ImportSourceTable(ImportTable.ClinicalRecords, ClinicalHeaders, clinicalRows));
 
+        if (state.PetsByPair is { AutoResolved: > 0 } or { Unresolved: > 0 })
+        {
+            var (resolved, unresolved) = (state.PetsByPair.AutoResolved, state.PetsByPair.Unresolved);
+            warnings.Add(new ImportReadWarning(WarningCode, ImportTable.Pets,
+                $"Aynı sahipte aynı adlı birden çok hasta: {resolved} muayene / görev satırı tarihten (doğum, E-vet kaydı, vefat), aşının "
+                + "türünden ya da tek aktif kayıttan doğru hastaya kendiliğinden bağlandı"
+                + (unresolved > 0 ? $"; {unresolved} satırın hangi hastaya ait olduğu aktarma ekranında sorulacak." : ".")));
+        }
+
         foreach (var table in output)
         {
             if (table.Rows.Count > limits.MaxRowsPerTable)
@@ -230,7 +239,7 @@ internal static class EVetBackupConverter
         var (renamed, merged) = SeparateSameNamedPets(entries.Where(e => e.MergedInto is null).ToList());
         foreach (var entry in entries)
         {
-            state.PetsByPair.Append(entry.Pair, new PetCandidate(entry.TargetKey, entry.Root.Status == "aktif", entry.Registered, entry.Died));
+            state.PetsByPair.Append(entry.Pair, new PetCandidate(entry.TargetKey, entry.Root.Status == "aktif", entry.Identity.Species, entry.Birth, entry.Registered, entry.Died));
             if (entry.MergedInto is null && entry.Key is not null && entry.Status is "olu" or "pasif")
                 state.InactivePets.Add(entry.Key);
         }
@@ -584,7 +593,7 @@ internal static class EVetBackupConverter
                 early++;
             }
 
-            var petProtocol = state.PetsByPair.Resolve(EVetCells.PairKey(ownerName, petName), start.Value);
+            var petProtocol = state.PetsByPair.Resolve(EVetCells.PairKey(ownerName, petName), start.Value, ImportValueResolver.VaccineSpecies(vaccine));
             var petKey = petProtocol ?? EVetCells.PairKey(ownerName, petName);
 
             if (vaccine is not null && status == "tamamlandi")
@@ -919,19 +928,29 @@ internal static class EVetBackupConverter
         public string? TargetKey => MergedInto is not null ? Root.DuplicateOf ?? Root.Key : DuplicateOf ?? Key;
     }
 
-    /// <summary>Sahip + hasta adı çiftinin adayı (yaşam bilgisiyle; <paramref name="Active"/>: aktarılan kaydı E-vet'te aktif).</summary>
-    private sealed record PetCandidate(string? Key, bool Active, DateTime? Registered, DateTime? Died);
+    /// <summary>
+    /// Sahip + hasta adı çiftinin adayı: katlanmış tür ve yaşam bilgisiyle (<paramref name="Active"/>: aktarılan kaydı E-vet'te aktif).
+    /// </summary>
+    private sealed record PetCandidate(string? Key, bool Active, string Species, DateTime? Birth, DateTime? Registered, DateTime? Died);
 
     /// <summary>
     /// Sahip + hasta adı → hasta anahtarı (aynı hayvanın kayıtları önce birleşir, <see cref="MergeSameAnimals"/>; adaylar birleşen
-    /// kökün anahtarını taşır). Tek aday varsa o; birden çoksa (1) kaydın tarihinde kayıtlı ve hayatta olan tek aday; (2) o tarihte
-    /// hayatta olanlardan (kimse yoksa hepsinden) yalnız biri aktifse o: yanlışlıkla açılıp vefat girilmiş kopyanın kaydı aktif hastaya
-    /// bağlanır. Yaşam aralığı önce gelir: ölmüş eski hayvanın kendi dönemindeki kaydı yeni hayvana yazılmasın. Ayırt edilemezse
-    /// "Belirsiz: …" anahtarı döner: doğrulama satırı hasta bulunamadı hatasıyla raporlar, yanlış hastaya yazmaz.
+    /// kökün anahtarını taşır). Tek aday varsa o; birden çoksa adaylar sırayla daraltılır (kimseyi bırakmayan adım atlanır):
+    /// (1) yaşam aralığı: kaydın tarihi doğumundan ya da E-vet kaydından önce, vefatından sonra olan aday elenir; (2) tür: kedi/köpek
+    /// aşısı öbür türdeki adayı eler; (3) kalanlardan yalnız biri aktifse o: yanlışlıkla açılıp vefat girilmiş kopyanın kaydı aktif
+    /// hastaya bağlanır. Yaşam aralığı önce gelir: ölmüş eski hayvanın kendi dönemindeki kaydı yeni hayvana yazılmasın. Ayırt
+    /// edilemezse "Belirsiz: …" anahtarı döner: doğrulama satırı hasta bulunamadı hatasıyla raporlar, yanlış hastaya yazmaz; aktarma
+    /// ekranı hangi hastaya ait olduğunu sorar.
     /// </summary>
     private sealed class PetIndex
     {
         private readonly Dictionary<string, List<PetCandidate>> _items = new(StringComparer.Ordinal);
+
+        /// <summary>Birden çok adaylı çiftte kendiliğinden bağlanan satır sayısı (bilgi notu).</summary>
+        public int AutoResolved { get; private set; }
+
+        /// <summary>Ayırt edilemeyen ("Belirsiz: …") satır sayısı.</summary>
+        public int Unresolved { get; private set; }
 
         public void Append(string pair, PetCandidate candidate)
         {
@@ -940,8 +959,11 @@ internal static class EVetBackupConverter
             list.Add(candidate);
         }
 
-        /// <summary>Çift yoksa null (doğrulama ad kuralıyla arar).</summary>
-        public string? Resolve(string pair, DateTime? on)
+        /// <summary>
+        /// Çift yoksa null (doğrulama ad kuralıyla arar). <paramref name="species"/>: kaydın ait olabileceği katlanmış tür (kedi/köpek
+        /// aşısı; bilinmiyorsa null).
+        /// </summary>
+        public string? Resolve(string pair, DateTime? on, string? species = null)
         {
             if (!_items.TryGetValue(pair, out var list))
                 return null;
@@ -950,16 +972,33 @@ internal static class EVetBackupConverter
             if (keys.Count == 1)
                 return keys[0];
 
-            var alive = on is { } date
-                ? list.Where(c => (c.Registered is null || c.Registered.Value.Date <= date.Date) && (c.Died is null || c.Died.Value.Date >= date.Date)).ToList()
-                : [];
-            if (alive.Select(c => c.Key).Distinct().ToList() is [var onlyAlive])
-                return onlyAlive;
+            var pool = list;
+            if (on is { } date)
+                pool = Narrow(pool, c => !Before(date, c.Birth) && !Before(date, c.Registered) && !Before(c.Died, date));
+            if (species is not null)
+                pool = Narrow(pool, c => c.Species == species);
 
-            if ((alive.Count > 0 ? alive : list).Where(c => c.Active).Select(c => c.Key).Distinct().ToList() is [var onlyActive])
-                return onlyActive;
+            if (TrySingle(pool, out var key) || TrySingle(pool.Where(c => c.Active), out key))
+            {
+                AutoResolved++;
+                return key;
+            }
 
+            Unresolved++;
             return ImportRules.AmbiguousPetReferencePrefix + string.Join(" / ", keys.Select(k => k ?? "?"));
+        }
+
+        /// <summary>Gün olarak <paramref name="date"/> &lt; <paramref name="start"/> (bilinmeyen tarih elemez).</summary>
+        private static bool Before(DateTime? date, DateTime? start) => date is { } d && start is { } s && d.Date < s.Date;
+
+        private static List<PetCandidate> Narrow(List<PetCandidate> pool, Func<PetCandidate, bool> keep)
+            => pool.Where(keep).ToList() is { Count: > 0 } kept ? kept : pool;
+
+        private static bool TrySingle(IEnumerable<PetCandidate> candidates, out string? key)
+        {
+            var keys = candidates.Select(c => c.Key).Distinct().ToList();
+            key = keys.Count == 1 ? keys[0] : null;
+            return keys.Count == 1;
         }
     }
 

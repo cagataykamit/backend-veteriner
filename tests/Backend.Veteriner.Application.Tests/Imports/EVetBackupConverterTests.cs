@@ -565,6 +565,44 @@ public sealed class EVetBackupConverterTests
     }
 
     [Fact]
+    public void Ambiguous_Same_Named_Pets_Should_Resolve_By_Birth_Date_And_Vaccine_Species_And_Count_It()
+    {
+        object?[] header = ["Kayıt Tarihi", "Müşteriler", "Hastalar", "Protokol No", "Hasta Türü", "Doğum Tarihi", "Durum"];
+        var workbook = ImportTestFiles.Xlsx(
+            ("Müşteri Listesi", [CustomerHeader, [Registered, "Ayşe Yılmaz", 0d, 101, null, null, null, null, null, null, null, null, null, null, "Aktif"]]),
+            ("Hasta Listesi",
+            [
+                header,
+                // Aynı adlı kedi ve köpek; köpeğin E-vet kayıt tarihi yok, doğum tarihi var.
+                [new DateTime(2021, 3, 1), "Ayşe Yılmaz", "Boncuk", 811, "Kedi", new DateTime(2021, 2, 2), "Aktif"],
+                [null, "Ayşe Yılmaz", "Boncuk", 812, "Köpek", new DateTime(2023, 5, 5), "Aktif"],
+            ]),
+            ("Randevu Listesi",
+            [
+                TaskHeader,
+                // Köpek doğmadan önce: kediye.
+                ["Ayşe Yılmaz", "Boncuk", "Aşılama", new DateTime(2022, 4, 1, 10, 0, 0), "KUDUZ", "Dr. A", null, null, "Tamamlandı"],
+                // Aşının türü: köpek / kedi.
+                ["Ayşe Yılmaz", "Boncuk", "Aşılama", new DateTime(2024, 4, 1, 10, 0, 0), "KÖPEK KARMA", "Dr. A", null, null, "Tamamlandı"],
+                ["Ayşe Yılmaz", "Boncuk", "Aşılama", new DateTime(2024, 5, 1, 10, 0, 0), "Yıllık Kedi Karma", "Dr. A", null, null, "Tamamlandı"],
+                // İkisi de hayatta, aşı türsüz: sorulur.
+                ["Ayşe Yılmaz", "Boncuk", "Aşılama", new DateTime(2024, 6, 1, 10, 0, 0), "KUDUZ", "Dr. A", null, null, "Tamamlandı"],
+            ]),
+            ("Muayene Listesi",
+            [
+                ExaminationHeader,
+                [new DateTime(2022, 1, 10), "Ayşe Yılmaz", "Boncuk", "Dr. A", 4d, null, "Kusma", null, null, null, null, null],
+            ]));
+
+        var result = Read(new ImportFileSet(ImportTestFiles.XlsxFile(workbook), null, null, null));
+
+        Rows(result, ImportTable.Vaccinations).Select(v => v["HayvanNo"]).Should().Equal("811", "812", "811", "Belirsiz: 811 / 812");
+        Rows(result, ImportTable.ClinicalRecords).Select(r => r["HayvanNo"]).Should().Equal("811");
+        result.Warnings.Should().Contain(w => w.Message.StartsWith("Aynı sahipte aynı adlı birden çok hasta: 4 muayene / görev satırı")
+            && w.Message.Contains("1 satırın hangi hastaya ait olduğu aktarma ekranında sorulacak"));
+    }
+
+    [Fact]
     public void Two_Active_Copies_With_Same_Birth_Date_And_No_Conflict_Should_Merge_Others_Stay_Ambiguous()
     {
         object?[] header = ["Kayıt Tarihi", "Müşteriler", "Hastalar", "Protokol No", "Hasta Türü", "Irk", "Renk", "Doğum Tarihi", "Durum"];
