@@ -37,6 +37,19 @@ namespace Backend.Veteriner.Api.Auth
                         PermissionCatalog.Appointments.Reschedule,
                     })));
 
+                // Composite (any-of) policy: klinik hekim listesi. Geliş açan, takvimi gören ve randevu planlayan aynı listeyi okur
+                // (takvimde hekim sütunları, randevu formunda hekim seçimi).
+                options.AddPolicy(AuthorizationPolicyNames.ClinicsVeterinariansRead, p =>
+                    p.Requirements.Add(new PermissionAnyOfRequirement(new[]
+                    {
+                        PermissionCatalog.Visits.Create,
+                        PermissionCatalog.Appointments.Read,
+                        PermissionCatalog.Clinics.Read,
+                        PermissionCatalog.Clinics.Update,
+                        PermissionCatalog.Appointments.Create,
+                        PermissionCatalog.Appointments.Reschedule,
+                    })));
+
                 // Composite (any-of) policy: KVKK şablonları okuma (açık rıza ADR-021, aydınlatma ADR-024). Formu müşteri kartından
                 // yazdıran (Clients.Read) ve metni Ayarlar'da düzenleyen kullanıcı aynı metni okur.
                 options.AddPolicy(AuthorizationPolicyNames.ClinicsKvkkFormRead, p =>

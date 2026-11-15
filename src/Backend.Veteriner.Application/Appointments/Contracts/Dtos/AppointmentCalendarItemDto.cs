@@ -2,6 +2,8 @@ using Backend.Veteriner.Domain.Appointments;
 
 namespace Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 
+/// <param name="VeterinarianUserId">Randevunun hekimi; hekimsiz randevuda boş (takvimde "Hekim seçilmedi" sütunu).</param>
+/// <param name="VeterinarianName">Hekimin görünen adı; ad bulunamazsa boş.</param>
 public sealed record AppointmentCalendarItemDto(
     Guid Id,
     Guid ClinicId,
@@ -13,4 +15,6 @@ public sealed record AppointmentCalendarItemDto(
     AppointmentStatus Status,
     AppointmentType AppointmentType,
     string PetName,
-    string ClientName);
+    string ClientName,
+    Guid? VeterinarianUserId = null,
+    string? VeterinarianName = null);
