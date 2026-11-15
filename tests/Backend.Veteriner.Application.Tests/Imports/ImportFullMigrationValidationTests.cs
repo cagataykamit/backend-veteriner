@@ -219,6 +219,25 @@ public sealed class ImportFullMigrationValidationTests
     }
 
     [Fact]
+    public void Weight_Only_Records_On_The_Same_Day_Should_Differ_By_Weight_Temperature_And_Veterinarian()
+    {
+        // HayvanNo, Tarih, KayitTuru, Sikayet, Tani, Tedavi, Recete, Not, Hekim, Kilo, Ates
+        var output = WithOwnerAndPet(ImportTable.ClinicalRecords,
+        [
+            ["H-1", "12.05.2024", null, null, null, null, null, null, "Dr. A", "4,2"],
+            ["H-1", "12.05.2024", null, null, null, null, null, null, "Dr. A", "4,5"],
+            ["H-1", "12.05.2024", null, null, null, null, null, null, "Dr. B", "4,5"],
+            ["H-1", "12.05.2024", null, null, null, null, null, null, "Dr. B", "4,5", "38,6"],
+            ["H-1", "12.05.2024", null, null, null, null, null, null, "dr. b ", "4,50"],
+        ]);
+
+        Enumerable.Range(2, 4).Select(n => Row(output, ImportTable.ClinicalRecords, n).Normalized.Action)
+            .Should().AllBeEquivalentTo(ImportRowAction.Create);
+        Row(output, ImportTable.ClinicalRecords, 6).Normalized.Action.Should().Be(ImportRowAction.Skip);
+        Codes(Row(output, ImportTable.ClinicalRecords, 6)).Should().Contain(ImportRules.DuplicateClinicalRecord.Code);
+    }
+
+    [Fact]
     public void Clinical_Record_Already_Imported_For_An_Existing_Pet_Should_Be_Skipped()
     {
         var clientId = Guid.NewGuid();
@@ -247,7 +266,7 @@ public sealed class ImportFullMigrationValidationTests
         var row = Row(output, ImportTable.ClinicalRecords);
         ((ImportNormalizedClinicalRecord)row.Normalized).PetKey.Should().Be($"db:{petId}");
         row.Normalized.Action.Should().Be(ImportRowAction.Skip);
-        Codes(row).Should().Contain(ImportRules.DuplicateClinicalRecord.Code);
+        Codes(row).Should().Contain(ImportRules.ClinicalRecordImportedBefore.Code);
     }
 
     // ================================================================ Hesap hareketi (T4)

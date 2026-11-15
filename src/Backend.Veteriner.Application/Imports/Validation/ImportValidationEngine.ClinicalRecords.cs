@@ -1,3 +1,4 @@
+using System.Globalization;
 using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Domain.Imports;
 
@@ -21,9 +22,14 @@ public sealed partial class ImportValidationEngine
     private readonly HashSet<(string PetKey, DateOnly Date, string Content)> _fileClinicalRecords = new();
     private readonly HashSet<(Guid PetId, DateOnly Date, string Content)> _dbClinicalRecords = new();
 
-    /// <summary>Mükerrer kayıt anahtarı: içerik alanlarının katlanmış birleşimi (yazım/boşluk farkı yok sayılır).</summary>
-    internal static string ClinicalContentKey(IEnumerable<string?> parts)
-        => string.Join('|', parts.Select(p => ImportTextFolding.Fold(p)));
+    /// <summary>
+    /// Mükerrer kayıt anahtarı: içerik alanları ve hekim (katlanmış; yazım/boşluk farkı yok sayılır), kilo ve ateş (saklanan
+    /// hassasiyetle; kilo 0 ölçüm değildir). Yalnız kilo taşıyan iki kayıt kilo farklıysa ayrı kayıttır.
+    /// </summary>
+    internal static string ClinicalRecordKey(IEnumerable<string?> texts, string? veterinarian, decimal? weightKg, decimal? temperatureC)
+        => string.Join('|', texts.Append(veterinarian).Select(p => ImportTextFolding.Fold(p))
+            .Append(weightKg > 0 ? Math.Round(weightKg.Value, 2).ToString("0.##", CultureInfo.InvariantCulture) : string.Empty)
+            .Append(temperatureC is { } t ? Math.Round(t, 1).ToString("0.#", CultureInfo.InvariantCulture) : string.Empty));
 
     private ImportRowResult ProcessClinicalRecord(ImportRowReader reader)
     {
@@ -81,10 +87,15 @@ public sealed partial class ImportValidationEngine
             return Finish(ImportTable.ClinicalRecords, reader.RowNumber, issues, normalized, ImportRowAction.Skip);
         }
 
-        // Mükerrer: aynı hasta + aynı tarih + aynı içerik (dosyada veya daha önce içe aktarılmış).
-        var contentKey = ClinicalContentKey(content);
-        var existsInDb = pet!.PetId is { } petId && _dbClinicalRecords.Contains((petId, recordedOn!.Value, contentKey));
-        if (existsInDb || !_fileClinicalRecords.Add((pet.Key, recordedOn!.Value, contentKey)))
+        // Mükerrer: aynı hasta + aynı tarih + aynı içerik, hekim ve ölçüm; neden ayrı: daha önce içe aktarılmış ya da dosyada tekrar.
+        var contentKey = ClinicalRecordKey(content, veterinarian, weight, temperature);
+        if (pet!.PetId is { } petId && _dbClinicalRecords.Contains((petId, recordedOn!.Value, contentKey)))
+        {
+            issues.Add(ImportRules.ClinicalRecordImportedBefore.At());
+            return Finish(ImportTable.ClinicalRecords, reader.RowNumber, issues, normalized, ImportRowAction.Skip);
+        }
+
+        if (!_fileClinicalRecords.Add((pet.Key, recordedOn!.Value, contentKey)))
         {
             issues.Add(ImportRules.DuplicateClinicalRecord.At());
             return Finish(ImportTable.ClinicalRecords, reader.RowNumber, issues, normalized, ImportRowAction.Skip);

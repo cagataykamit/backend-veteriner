@@ -199,11 +199,11 @@ public sealed partial class ImportValidationEngine
         // Tam geçiş tabloları (ADR-048).
         foreach (var record in existing.ClinicalRecords)
         {
-            _dbClinicalRecords.Add((record.PetId, record.RecordedOn, ClinicalContentKey(
+            _dbClinicalRecords.Add((record.PetId, record.RecordedOn, ClinicalRecordKey(
             [
                 record.Complaint, record.History, record.Findings, record.Diagnosis, record.Treatment, record.Prescription,
                 record.LabResults, record.Notes,
-            ])));
+            ], record.VeterinarianName, record.WeightKg, record.TemperatureC)));
         }
 
         foreach (var entry in existing.AccountEntries)

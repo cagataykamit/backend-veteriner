@@ -169,8 +169,11 @@ public static class ImportRules
         "Klinik kaydın içeriği boş (şikâyet, anamnez, bulgular, tanı, tedavi, reçete, lab sonucu, not, kilo ve ateş yok); aktarılacak bilgi olmadığı için satır atlanacak.");
     public static readonly ImportRule TemperatureInvalid = new("Imports.TemperatureInvalid", ImportIssueSeverity.Warning,
         "Ateş geçersiz (25-45 °C arasında bir sayı olmalı); boş aktarılacak.");
+    // Mükerrer klinik kayıt (aynı hasta, gün, içerik, hekim, kilo ve ateş): dosya içinde tekrar ya da önceki aktarmada gelmiş.
     public static readonly ImportRule DuplicateClinicalRecord = new("Imports.DuplicateClinicalRecord", ImportIssueSeverity.Info,
-        "Aynı hasta, aynı tarih ve aynı içerikte kayıt zaten var; bu satır atlanacak.");
+        "Dosyada aynı satır iki kez var; biri aktarılıyor.");
+    public static readonly ImportRule ClinicalRecordImportedBefore = new("Imports.ClinicalRecordImportedBefore", ImportIssueSeverity.Info,
+        "Bu kayıt daha önceki bir aktarmada geldi; tekrar eklenmiyor.");
 
     // Hesap hareketleri (ADR-048 T4)
     public static readonly ImportRule EntryKindUnrecognized = new("Imports.EntryKindUnrecognized", ImportIssueSeverity.Error,
@@ -245,7 +248,7 @@ public static class ImportRules
     public static IReadOnlyList<ImportRule> SkipReasons { get; } =
     [
         ValueSkipped, ParentSkipped, AmbiguousPetSkipped, PetMergedByChoice, OwnerlessPetSkipped, ShortNameCustomerSkipped, ClinicalRecordEmpty,
-        DuplicateInFile, DuplicateVaccination, DuplicateClinicalRecord, DuplicateAccountEntry, DuplicateAppointment,
+        DuplicateInFile, DuplicateVaccination, DuplicateClinicalRecord, ClinicalRecordImportedBefore, DuplicateAccountEntry, DuplicateAppointment,
         PastAppointmentSkipped,
     ];
 }
