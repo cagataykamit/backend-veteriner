@@ -56,11 +56,12 @@ public sealed class GetImportBatchRowsQueryHandler
         ImportTable? table = ImportCanonicalNames.TryParseKey(request.Table, out var parsedTable) ? parsedTable : null;
         ImportRowStatusFilter.TryParse(request.Status, out var validation, out var apply);
         var codeFragment = request.Code is null ? null : ImportIssueJson.CodeFragment(request.Code);
+        var willSkip = ImportRowStatusFilter.IsWillSkip(request.Status);
 
         var total = await _rows.CountAsync(
-            new ImportBatchRowsFilteredSpec(batch.Id, table, validation, apply, codeFragment), ct);
+            new ImportBatchRowsFilteredSpec(batch.Id, table, validation, apply, codeFragment, willSkip: willSkip), ct);
         var rows = await _rows.ListAsync(
-            new ImportBatchRowsFilteredSpec(batch.Id, table, validation, apply, codeFragment, request.Page, request.PageSize), ct);
+            new ImportBatchRowsFilteredSpec(batch.Id, table, validation, apply, codeFragment, request.Page, request.PageSize, willSkip), ct);
 
         return Result<PagedResult<ImportRowDto>>.Success(
             PagedResult<ImportRowDto>.Create(rows.Select(ToDto).ToList(), total, request.Page, request.PageSize));

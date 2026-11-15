@@ -50,17 +50,31 @@ public sealed class GetImportBatchErrorsQueryHandler : IRequestHandler<GetImport
         if (!access.IsSuccess)
             return Result<ImportTemplateFileDto>.Failure(access.Error);
 
-        var rows = (await _rows.ListAsync(new ImportErrorRowsSpec(batch.Id), ct))
+        // Hata raporu: hata önemindeki sorunlar; atlananlar raporu: satırı atlatan kural (neden).
+        var skipCodes = ImportRules.SkipReasons.Select(r => r.Code).ToHashSet(StringComparer.Ordinal);
+        var source = request.Skipped
+            ? new ImportSkippedRowsSpec(batch.Id, request.Code is null ? null : ImportIssueJson.CodeFragment(request.Code))
+            : (Ardalis.Specification.ISpecification<ImportBatchRow>)new ImportErrorRowsSpec(batch.Id);
+        var rows = (await _rows.ListAsync(source, ct))
             .Select(r => new ImportErrorReportRow(
                 r.Table,
                 r.RowNumber,
                 ImportSourceJson.Parse(r.SourceJson),
-                ImportIssueJson.Parse(r.IssuesJson).Where(i => i.Severity == ImportIssueSeverity.Error).ToList()))
+                ImportIssueJson.Parse(r.IssuesJson)
+                    .Where(i => request.Skipped ? skipCodes.Contains(i.Code) : i.Severity == ImportIssueSeverity.Error)
+                    .ToList()))
             .ToList();
 
+        var kind = request.Skipped ? ImportReportKind.Skipped : ImportReportKind.Errors;
         var file = request.Format == GetImportBatchErrorsQuery.Csv
-            ? new ImportTemplateFileDto(ImportErrorReportWriter.BuildCsv(rows), ImportErrorReportWriter.CsvContentType, ImportErrorReportWriter.CsvFileName)
-            : new ImportTemplateFileDto(ImportErrorReportWriter.BuildXlsx(rows), ImportErrorReportWriter.XlsxContentType, ImportErrorReportWriter.XlsxFileName);
+            ? new ImportTemplateFileDto(
+                ImportErrorReportWriter.BuildCsv(rows, kind),
+                ImportErrorReportWriter.CsvContentType,
+                request.Skipped ? ImportErrorReportWriter.SkippedCsvFileName : ImportErrorReportWriter.CsvFileName)
+            : new ImportTemplateFileDto(
+                ImportErrorReportWriter.BuildXlsx(rows, kind),
+                ImportErrorReportWriter.XlsxContentType,
+                request.Skipped ? ImportErrorReportWriter.SkippedXlsxFileName : ImportErrorReportWriter.XlsxFileName);
         return Result<ImportTemplateFileDto>.Success(file);
     }
 }

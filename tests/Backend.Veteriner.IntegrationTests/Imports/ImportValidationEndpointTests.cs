@@ -203,6 +203,13 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         created.GetProperty("values").GetProperty("action").GetString().Should().Be("Create");
         created.GetProperty("validation").GetProperty("action").GetString().Should().Be("Create");
 
+        // Atlanacak (bilerek atlanan) satırlar: dosyada tekrar eden 2 satır + kayıtlı aşının tekrarı; neden koduyla daralır.
+        var willSkip = await GetJsonAsync(client, $"/api/v1/imports/batches/{id}/rows?status=WillSkip");
+        willSkip.GetProperty("totalItems").GetInt32().Should().Be(3);
+        willSkip.GetProperty("items").EnumerateArray().Should().OnlyContain(r => r.GetProperty("validation").GetProperty("action").GetString() == "Skip");
+        var skipByCode = await GetJsonAsync(client, $"/api/v1/imports/batches/{id}/rows?status=WillSkip&code=Imports.DuplicateVaccination");
+        skipByCode.GetProperty("items").EnumerateArray().Single().GetProperty("table").GetString().Should().Be("vaccinations");
+
         var page = await GetJsonAsync(client, $"/api/v1/imports/batches/{id}/rows?table=vaccinations&page=2&pageSize=4");
         page.GetProperty("items").GetArrayLength().Should().Be(2);
         page.GetProperty("totalPages").GetInt32().Should().Be(2);
@@ -295,6 +302,33 @@ public sealed class ImportValidationEndpointTests : IClassFixture<CustomWebAppli
         text.Should().Contain("Imports.SpeciesUnmapped").And.Contain("Imports.VaccineUnmapped");
         // Kaynak sütunu başlık=değer ile başlar; formül karakteriyle başlayan başlık hücresi ' ile korunur, değer çiftleri metindir.
         text.Should().NotContain(";=").And.NotContain(";+").And.NotContain(";@");
+    }
+
+    [Fact]
+    public async Task Skipped_Rows_Report_Should_List_Rows_With_Reason_And_Filter_By_Code()
+    {
+        var ctx = await SeedAsync();
+        var cat = await SeedCatalogAsync(ctx.TenantId);
+        var client = ClientFor(ctx.Token);
+        var id = await UploadMainScenarioAsync(client, ctx, cat);
+        await MapIdentityAsync(client, id);
+        await ValidateAsync(client, id);
+
+        var response = await client.GetAsync($"/api/v1/imports/batches/{id}/errors?format=csv&rows=skipped");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentDisposition!.FileNameStar.Should().Be("vetinity-iceaktar-atlananlar.csv");
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        var lines = Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3).Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+        lines[0].Should().Be("Tablo;SatirNo;Durum;NedenKodu;Neden;Kaynak");
+        lines.Skip(1).Should().HaveCount(3).And.OnlyContain(l => l.Contains(";Atlanacak;"));
+
+        var byCode = await client.GetAsync($"/api/v1/imports/batches/{id}/errors?format=csv&rows=skipped&code=Imports.DuplicateVaccination");
+        var codeBytes = await byCode.Content.ReadAsByteArrayAsync();
+        Encoding.UTF8.GetString(codeBytes, 3, codeBytes.Length - 3).Split("\r\n", StringSplitOptions.RemoveEmptyEntries)
+            .Should().HaveCount(2);
+
+        (await client.GetAsync($"/api/v1/imports/batches/{id}/errors?rows=bogus")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]
