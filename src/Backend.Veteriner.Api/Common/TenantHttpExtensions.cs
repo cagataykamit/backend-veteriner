@@ -47,8 +47,8 @@ public static class TenantHttpExtensions
         {
             return controller.Problem(
                 statusCode: StatusCodes.Status403Forbidden,
-                title: "Tenant uyuşmazlığı",
-                detail: "Çözümlenmiş kiracı ile istek gövdesindeki tenantId eşleşmiyor.");
+                title: "Hesap uyuşmazlığı",
+                detail: "Bu istek oturum açtığınız klinik hesabına ait değil. Sayfayı yenileyin; sorun sürerse yeniden giriş yapın.");
         }
 
         return null;

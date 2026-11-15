@@ -53,9 +53,9 @@ public sealed class TenantContextMiddleware
         var problem = new ProblemDetails
         {
             Status = StatusCodes.Status403Forbidden,
-            Title = "Tenant uyuşmazlığı",
+            Title = "Hesap uyuşmazlığı",
             Type = "https://httpstatuses.io/403",
-            Detail = "JWT tenant_id ile sorgu tenantId farklı; güvenlik için istek reddedildi.",
+            Detail = "Bu istek oturum açtığınız klinik hesabına ait değil. Sayfayı yenileyin; sorun sürerse yeniden giriş yapın.",
             Instance = context.Request.Path
         };
         problem.Extensions["traceId"] = traceId;
