@@ -1,6 +1,5 @@
 using Backend.Veteriner.Application.Public.Commands.OwnerSignup;
 using Backend.Veteriner.Application.Public.Commands.OwnerSignup.Validators;
-using Backend.Veteriner.Application.Public.PhoneVerification;
 using Backend.Veteriner.Application.Tests.Common.Validation;
 using AwesomeAssertions;
 
@@ -11,8 +10,7 @@ public sealed class PublicOwnerSignupCommandValidatorTests
     private readonly PublicOwnerSignupCommandValidator _validator = new();
 
     private static PublicOwnerSignupCommand CreateCommand(string password) =>
-        new("Basic", "Tenant A", "Clinic A", "Istanbul", "owner@example.com", password,
-            MobilePhone: "0532 123 45 67", PhoneVerificationToken: "jeton");
+        new("Basic", "Tenant A", "Clinic A", "Istanbul", "owner@example.com", password);
 
     [Fact]
     public void Validate_Should_Fail_When_Password_IsTooShort()
@@ -75,28 +73,5 @@ public sealed class PublicOwnerSignupCommandValidatorTests
         var result = _validator.Validate(CreateCommand(StrongPasswordValidatorTestData.ValidPassword));
 
         result.IsValid.Should().BeTrue();
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("0212 123 45 67")]
-    [InlineData("12345")]
-    public void Validate_Should_Fail_When_MobilePhone_Missing_Or_Not_Turkish_Mobile(string? phone)
-    {
-        var command = CreateCommand(StrongPasswordValidatorTestData.ValidPassword) with { MobilePhone = phone };
-
-        _validator.Validate(command).Errors.Should().Contain(e =>
-            e.PropertyName == nameof(PublicOwnerSignupCommand.MobilePhone)
-            && e.ErrorMessage == SignupPhoneErrors.InvalidPhoneMessage);
-    }
-
-    [Fact]
-    public void Validate_Should_Fail_When_PhoneVerificationToken_Missing()
-    {
-        var command = CreateCommand(StrongPasswordValidatorTestData.ValidPassword) with { PhoneVerificationToken = " " };
-
-        _validator.Validate(command).Errors.Should().Contain(e =>
-            e.PropertyName == nameof(PublicOwnerSignupCommand.PhoneVerificationToken));
     }
 }

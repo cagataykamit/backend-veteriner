@@ -137,7 +137,6 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<MarketingOptOutLink> MarketingOptOutLinks => Set<MarketingOptOutLink>();
     public DbSet<AppointmentRequest> AppointmentRequests => Set<AppointmentRequest>();
     public DbSet<AppointmentRequestEmailVerification> AppointmentRequestEmailVerifications => Set<AppointmentRequestEmailVerification>();
-    public DbSet<SignupPhoneVerification> SignupPhoneVerifications => Set<SignupPhoneVerification>();
     public DbSet<ClinicAppointmentRequestEmailTemplate> ClinicAppointmentRequestEmailTemplates => Set<ClinicAppointmentRequestEmailTemplate>();
     public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
     public DbSet<Examination> Examinations => Set<Examination>();
@@ -231,13 +230,6 @@ public class AppDbContext : TenantIsolatedDbContext
                 .IsRequired();
 
             e.Property(x => x.LockedUntilUtc);
-
-            // Deneme kaydında doğrulanan cep telefonu (TRIAL-001); benzersizlik doğrulama tablosundadır.
-            e.Property(x => x.PhoneNumber)
-                .HasMaxLength(User.PhoneNumberLength)
-                .IsUnicode(false);
-
-            e.Property(x => x.PhoneVerifiedAtUtc);
 
             e.HasIndex(x => x.Email)
                 .IsUnique();

@@ -39,13 +39,6 @@ public class User : AggregateRoot
 
     public DateTime? LockedUntilUtc { get; private set; }
 
-    public const int PhoneNumberLength = 12;
-
-    /// <summary>Doğrulanmış cep telefonu (905XXXXXXXXX); deneme kaydında SMS koduyla doğrulanır (TRIAL-001).</summary>
-    public string? PhoneNumber { get; private set; }
-
-    public DateTime? PhoneVerifiedAtUtc { get; private set; }
-
     public IReadOnlyCollection<UserRole> Roles => _roles.AsReadOnly();
     public IReadOnlyCollection<RefreshToken> RefreshTokens => _refreshTokens.AsReadOnly();
 
@@ -71,18 +64,6 @@ public class User : AggregateRoot
         DisplayName = normalized;
         UpdatedAtUtc = utcNow;
         return Result.Success();
-    }
-
-    /// <param name="normalizedPhone">Doğrulama satırındaki numara (905XXXXXXXXX).</param>
-    /// <param name="verifiedAtUtc">Kodun doğrulandığı an.</param>
-    public void SetVerifiedPhone(string normalizedPhone, DateTime verifiedAtUtc, DateTime utcNow)
-    {
-        if (string.IsNullOrWhiteSpace(normalizedPhone) || normalizedPhone.Length != PhoneNumberLength)
-            throw new ArgumentException("Telefon 905XXXXXXXXX biçiminde olmalıdır.", nameof(normalizedPhone));
-
-        PhoneNumber = normalizedPhone;
-        PhoneVerifiedAtUtc = verifiedAtUtc;
-        UpdatedAtUtc = utcNow;
     }
 
     public void ConfirmEmail(DateTime utcNow)

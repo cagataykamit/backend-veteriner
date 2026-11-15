@@ -30,7 +30,6 @@ using Backend.Veteriner.Application.OwnerPortal.Invites;
 using Backend.Veteriner.Application.OwnerPortal.MarketingOptOut;
 using Backend.Veteriner.Application.OwnerPortal.Sessions;
 using Backend.Veteriner.Application.Pets.Timeline;
-using Backend.Veteriner.Application.Public.PhoneVerification;
 using Backend.Veteriner.Application.Reminders.Marketing;
 using Backend.Veteriner.Application.Reports.Registers;
 using Backend.Veteriner.Application.Sales;
@@ -108,7 +107,6 @@ public static class DependencyInjection
         services.AddScoped<OwnerPushDelivery>();
         services.AddScoped<AppointmentRequestEmailComposer>();
         services.AddScoped<AppointmentRequestVerificationService>();
-        services.AddScoped<SignupPhoneVerificationService>();
         services.AddScoped<AppointmentRequestIntake>();
         services.AddScoped<OnlineBookingBrandReader>();
         services.AddScoped<StaffAppointmentRequestAccess>();

@@ -9,7 +9,6 @@ using Backend.Veteriner.Application.LegalAcceptances.Queries.GetCurrentVersions;
 using Backend.Veteriner.Application.Public.Commands.AcceptInvite;
 using Backend.Veteriner.Application.Public.Commands.OwnerSignup;
 using Backend.Veteriner.Application.Public.Commands.SignupAndAcceptInvite;
-using Backend.Veteriner.Application.Public.Commands.SignupPhoneCode;
 using Backend.Veteriner.Application.Public.Contracts.Dtos;
 using Backend.Veteriner.Application.Public.Queries.InviteDetail;
 using Backend.Veteriner.Application.Public.Queries.SubscriptionPlans;
@@ -62,42 +61,11 @@ public sealed class PublicController : ControllerBase
             body.Password,
             body.AcceptedLegalDocuments,
             body.DiscountCode,
-            body.StartWithExampleClinic,
-            body.MobilePhone,
-            body.PhoneVerificationToken);
+            body.StartWithExampleClinic);
 
         var result = await _mediator.Send(command, ct);
         return result.ToActionResult(this);
     }
-
-    /// <summary>
-    /// Deneme kaydı için cep telefonuna 6 haneli doğrulama kodu gönderir (TRIAL-001). Bekleme ve günlük sınırda 429, SMS sağlayıcısı
-    /// yapılandırılmamış ya da gönderim başarısızsa 503, numarayla daha önce deneme açılmışsa 409.
-    /// </summary>
-    [AllowAnonymous]
-    [HttpPost("owner-signup/phone-code")]
-    [EnableRateLimiting(RateLimitingExtensions.SignupPhoneCodePolicy)]
-    [Consumes("application/json")]
-    [ProducesResponseType(typeof(SignupPhoneCodeSentDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
-    public async Task<IActionResult> RequestSignupPhoneCode([FromBody] SignupPhoneCodeBody? body, CancellationToken ct)
-        => (await _mediator.Send(new RequestSignupPhoneCodeCommand(body?.MobilePhone ?? string.Empty), ct)).ToActionResult(this);
-
-    /// <summary>Telefona gelen kodu doğrular; başarıda kayıtta kullanılacak jeton döner. Hatalı ya da süresi dolmuş kodda 400.</summary>
-    [AllowAnonymous]
-    [HttpPost("owner-signup/phone-code/verify")]
-    [EnableRateLimiting(RateLimitingExtensions.SignupPhoneVerifyPolicy)]
-    [Consumes("application/json")]
-    [ProducesResponseType(typeof(SignupPhoneVerifiedDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
-    public async Task<IActionResult> VerifySignupPhoneCode([FromBody] SignupPhoneVerifyBody? body, CancellationToken ct)
-        => (await _mediator.Send(
-                new VerifySignupPhoneCodeCommand(body?.MobilePhone ?? string.Empty, body?.OneTimeCode ?? string.Empty), ct))
-            .ToActionResult(this);
 
     /// <summary>
     /// Satış ortağı kodu doğrulama (ADR-037): her zaman 200; geçersiz her durumda aynı gövde, ortak bilgisi yok. IP bazlı hız sınırlı.
