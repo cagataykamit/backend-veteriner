@@ -87,6 +87,40 @@ public sealed class WaitlistIntegrationTests : IClassFixture<CustomWebApplicatio
     }
 
     [Fact]
+    public async Task Cancellation_Within_Undo_Window_Should_Not_Auto_Offer_And_Undo_Should_Restore()
+    {
+        var ctx = await SeedAsync(SubscriptionPlanCode.Pro);
+        await ctx.AddEntryAsync("geri-al@example.com", "Tarcin");
+        var source = await ctx.BookAndCancelAsync(Slot(), settled: false);
+
+        await RunProcessorAsync();
+
+        (await OffersAsync(source)).Should().BeEmpty("geri alma süresi dolmadan iptal kesinleşmiş sayılmaz");
+
+        var revert = await ctx.Http.PostAsync($"/api/v1/appointments/{source}/cancel/revert", null);
+        revert.StatusCode.Should().Be(HttpStatusCode.NoContent, await revert.Content.ReadAsStringAsync());
+        await using var scope = _factory.Services.CreateSystemScope();
+        var status = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Appointments
+            .Where(a => a.Id == source).Select(a => a.Status).SingleAsync();
+        status.Should().Be(AppointmentStatus.Scheduled);
+    }
+
+    [Fact]
+    public async Task Undo_Should_Be_Blocked_When_Released_Slot_Was_Offered()
+    {
+        var ctx = await SeedAsync(SubscriptionPlanCode.Pro);
+        var entry = await ctx.AddEntryAsync("teklif@example.com", "Lokum");
+        var source = await ctx.BookAndCancelAsync(Slot(), settled: false);
+        var manual = await ctx.Http.PostAsJsonAsync($"{Url}/{entry}/offers", new { sourceAppointmentId = source });
+        manual.IsSuccessStatusCode.Should().BeTrue(await manual.Content.ReadAsStringAsync());
+
+        var revert = await ctx.Http.PostAsync($"/api/v1/appointments/{source}/cancel/revert", null);
+
+        revert.StatusCode.Should().Be(HttpStatusCode.Conflict, await revert.Content.ReadAsStringAsync());
+        (await IntegrationTestProblemDetails.ReadCodeAsync(revert)).Should().Be("Appointments.CancellationUndoBlocked");
+    }
+
+    [Fact]
     public async Task Expired_And_Declined_Offers_Should_Move_To_Next_Entry()
     {
         var ctx = await SeedAsync(SubscriptionPlanCode.Pro);
@@ -465,8 +499,11 @@ public sealed class WaitlistIntegrationTests : IClassFixture<CustomWebApplicatio
         public Task<HttpResponseMessage> PostAppointmentAsync(Guid petId, DateTime scheduledAtUtc)
             => Http.PostAsJsonAsync("/api/v1/appointments", new { clinicId = ClinicId, petId, scheduledAtUtc, appointmentType = 0, durationMinutes = 30 });
 
-        /// <summary>Saati dolu bir randevu açar ve panelden iptal eder: saat boşalır.</summary>
-        public async Task<Guid> BookAndCancelAsync(DateTime slot)
+        /// <summary>
+        /// Saati dolu bir randevu açar ve panelden iptal eder: saat boşalır. <paramref name="settled"/> ise iptal anı geri alma süresinin
+        /// öncesine çekilir (işleyici geri alınabilecek iptale teklif açmaz).
+        /// </summary>
+        public async Task<Guid> BookAndCancelAsync(DateTime slot, bool settled = true)
         {
             var (_, petId) = await SeedClientWithPetAsync($"iptal-{Guid.NewGuid():N}@example.com", "Iptal");
             var created = await PostAppointmentAsync(petId, slot);
@@ -474,7 +511,17 @@ public sealed class WaitlistIntegrationTests : IClassFixture<CustomWebApplicatio
             var id = await ReadIdAsync(created);
             var cancel = await Http.PostAsJsonAsync($"/api/v1/appointments/{id}/cancel", new { reason = "Sahip gelemiyor" });
             cancel.IsSuccessStatusCode.Should().BeTrue(await cancel.Content.ReadAsStringAsync());
+            if (settled)
+                await SettleCancellationAsync(id);
             return id;
+        }
+
+        private async Task SettleCancellationAsync(Guid appointmentId)
+        {
+            await using var scope = Factory.Services.CreateSystemScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var settledAt = DateTime.UtcNow - Appointment.CancellationUndoLimit - TimeSpan.FromSeconds(1);
+            await db.Appointments.Where(a => a.Id == appointmentId).ExecuteUpdateAsync(s => s.SetProperty(a => a.ChangedAtUtc, settledAt));
         }
 
         private static async Task<Guid> ReadIdAsync(HttpResponseMessage response)

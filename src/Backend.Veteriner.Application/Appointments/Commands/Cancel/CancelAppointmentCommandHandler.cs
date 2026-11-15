@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Appointments.Access;
+using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
@@ -10,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.Appointments.Commands.Cancel;
 
-public sealed class CancelAppointmentCommandHandler : IRequestHandler<CancelAppointmentCommand, Result>
+public sealed class CancelAppointmentCommandHandler : IRequestHandler<CancelAppointmentCommand, Result<CancelAppointmentResultDto>>
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClinicContext _clinicContext;
@@ -41,11 +42,11 @@ public sealed class CancelAppointmentCommandHandler : IRequestHandler<CancelAppo
         _timeProvider = timeProvider;
     }
 
-    public async ValueTask<Result> Handle(CancelAppointmentCommand request, CancellationToken ct)
+    public async ValueTask<Result<CancelAppointmentResultDto>> Handle(CancelAppointmentCommand request, CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {
-            return Result.Failure(
+            return Result<CancelAppointmentResultDto>.Failure(
                 "Tenants.ContextMissing",
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
@@ -54,20 +55,20 @@ public sealed class CancelAppointmentCommandHandler : IRequestHandler<CancelAppo
             new AppointmentByIdSpec(tenantId, request.AppointmentId), ct);
 
         if (appointment is null)
-            return Result.Failure("Appointments.NotFound", "Randevu bulunamadı veya kiracıya ait değil.");
+            return Result<CancelAppointmentResultDto>.Failure("Appointments.NotFound", "Randevu bulunamadı veya kiracıya ait değil.");
         if (_clinicContext.ClinicId is { } clinicId && appointment.ClinicId != clinicId)
-            return Result.Failure("Appointments.NotFound", "Randevu bulunamadı veya kiracıya ait değil.");
+            return Result<CancelAppointmentResultDto>.Failure("Appointments.NotFound", "Randevu bulunamadı veya kiracıya ait değil.");
 
         var clinicAccess = await AppointmentClinicWriteScope.EnsureWriteAccessAsync(
             _clinicScopeResolver, tenantId, appointment.ClinicId, ct);
         if (!clinicAccess.IsSuccess)
-            return clinicAccess;
+            return Result<CancelAppointmentResultDto>.Failure(clinicAccess.Error);
 
         var previous = await _snapshotFactory.CreateAsync(appointment, ct);
 
         var domain = appointment.Cancel(request.Reason);
         if (!domain.IsSuccess)
-            return Result.Failure(domain.Error);
+            return Result<CancelAppointmentResultDto>.Failure(domain.Error);
 
         var current = _snapshotFactory.CreateScalarsFromPrevious(appointment, previous);
         await _eventOutbox.EnqueueAsync(
@@ -86,11 +87,12 @@ public sealed class CancelAppointmentCommandHandler : IRequestHandler<CancelAppo
         }
         catch (DbUpdateConcurrencyException)
         {
-            return Result.Failure(
+            return Result<CancelAppointmentResultDto>.Failure(
                 "Appointments.ConcurrencyConflict",
                 "Randevu eşzamanlı olarak güncellendi; işlem tekrarlanmalı.");
         }
 
-        return Result.Success();
+        return Result<CancelAppointmentResultDto>.Success(
+            new CancelAppointmentResultDto((int)Appointment.CancellationUndoWindow.TotalSeconds));
     }
 }

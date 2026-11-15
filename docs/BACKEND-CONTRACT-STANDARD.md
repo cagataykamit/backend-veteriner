@@ -907,7 +907,8 @@ FluentValidation → `400` `ValidationProblemDetails`.
 | `PUT` | `/api/v1/appointments/{id}` | `Appointments.Reschedule` | `204 NoContent` |
 | `GET` | `/api/v1/appointments/{id}` | `Appointments.Read` | `AppointmentDetailDto` |
 | `GET` | `/api/v1/appointments` | `Appointments.Read` | `PagedResult<AppointmentListItemDto>` |
-| `POST` | `/api/v1/appointments/{id}/cancel` | `Appointments.Cancel` | `204 NoContent` |
+| `POST` | `/api/v1/appointments/{id}/cancel` | `Appointments.Cancel` | `200 OK` `{ undoWindowSeconds }` (bkz. `APPOINTMENT_CANCEL_UNDO_API_CONTRACT.md`) |
+| `POST` | `/api/v1/appointments/{id}/cancel/revert` | `Appointments.Cancel` | `204 NoContent`; iptalden sonra kısa süre ("Geri al") |
 | `POST` | `/api/v1/appointments/{id}/complete` | `Appointments.Complete` | `204 NoContent` |
 | `POST` | `/api/v1/appointments/{id}/reschedule` | `Appointments.Reschedule` | `204 NoContent` |
 | `POST` | `/api/v1/appointments/{id}/no-show` | `Appointments.NoShow` | `204 NoContent` (bkz. `APPOINTMENT_NOSHOW_API_CONTRACT.md`) |

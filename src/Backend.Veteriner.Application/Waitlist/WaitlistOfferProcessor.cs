@@ -141,7 +141,9 @@ public sealed class WaitlistOfferProcessor
 
         var earliestStart = utcNow + WaitlistOffer.CloseBeforeStart + WaitlistOffer.MinimumWindow;
         var released = await _appointments.ListAsync(
-            new ReleasedAppointmentsSpec(tenantId, clinics.Keys.ToArray(), earliestStart, utcNow - ReleasedLookback, BatchSize), ct);
+            new ReleasedAppointmentsSpec(
+                tenantId, clinics.Keys.ToArray(), earliestStart, utcNow - ReleasedLookback, utcNow - Appointment.CancellationUndoLimit, BatchSize),
+            ct);
         if (released.Count == 0)
             return;
 
