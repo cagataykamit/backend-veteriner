@@ -152,14 +152,31 @@ public sealed class ImportValidationEngineTests
     }
 
     [Theory]
-    [InlineData("A", "Imports.NameTooShort")]
-    [InlineData("  B  ", "Imports.NameTooShort")]
-    public void Customer_Short_Name_Should_Be_Error(string name, string code)
+    [InlineData("A")]
+    [InlineData("  B  ")]
+    public void Customer_Short_Name_Without_Linked_Records_Should_Be_Skipped(string name)
     {
-        var r = Single(Run(Customers(Customer(name: name))), ImportTable.Customers);
+        var r = Single(Run(Customers(Customer(no: "M-1", name: name))), ImportTable.Customers);
 
-        r.Status.Should().Be(ImportRowValidationStatus.Error);
-        Codes(r).Should().Contain(code);
+        r.Status.Should().Be(ImportRowValidationStatus.Valid);
+        r.Normalized.Action.Should().Be(ImportRowAction.Skip);
+        Codes(r).Should().Equal("Imports.ShortNameCustomerSkipped");
+    }
+
+    [Fact]
+    public void Customer_Short_Name_With_Pet_Should_Be_Kept_Under_Placeholder_Name_With_Warning()
+    {
+        var output = Run(
+            customers: Customers(Customer(no: "M-1", name: ".")),
+            pets: Pets(Pet(customerNo: "M-1", owner: ".", petNo: "H-1")));
+
+        var customer = Single(output, ImportTable.Customers);
+        customer.Status.Should().Be(ImportRowValidationStatus.Warning);
+        Codes(customer).Should().Equal("Imports.ShortNameCustomerKept");
+        var normalized = (ImportNormalizedCustomer)customer.Normalized;
+        normalized.FullName.Should().Be("İsimsiz müşteri (M-1)");
+        normalized.Notes.Should().Be("Dosyadaki ad: . (çok kısa, yer tutucu adla aktarıldı)");
+        Single(output, ImportTable.Pets).Normalized.Action.Should().Be(ImportRowAction.Create);
     }
 
     [Fact]

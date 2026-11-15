@@ -35,6 +35,10 @@ public static class ImportRules
     // Zorunluluk / uzunluk
     public static readonly ImportRule RequiredMissing = new("Imports.RequiredMissing", ImportIssueSeverity.Error, "Zorunlu alan boş.");
     public static readonly ImportRule NameTooShort = new("Imports.NameTooShort", ImportIssueSeverity.Error, "Ad soyad en az 2 karakter olmalıdır.");
+    public static readonly ImportRule ShortNameCustomerKept = new("Imports.ShortNameCustomerKept", ImportIssueSeverity.Warning,
+        "Ad çok kısa; bağlı kaydı olduğu için yer tutucu adla aktarılacak, kontrol edin.");
+    public static readonly ImportRule ShortNameCustomerSkipped = new("Imports.ShortNameCustomerSkipped", ImportIssueSeverity.Info,
+        "Adı çok kısa ve bağlı kaydı (hasta, hesap hareketi, bakiye) olmayan müşteri (büyük olasılıkla deneme kaydı); atlanacak.");
     public static readonly ImportRule FieldTooLong = new("Imports.FieldTooLong", ImportIssueSeverity.Error, "Değer izin verilen uzunluğu aşıyor.");
 
     // Telefon / e-posta (K5)
@@ -240,7 +244,7 @@ public static class ImportRules
     /// </summary>
     public static IReadOnlyList<ImportRule> SkipReasons { get; } =
     [
-        ValueSkipped, ParentSkipped, AmbiguousPetSkipped, PetMergedByChoice, OwnerlessPetSkipped, ClinicalRecordEmpty,
+        ValueSkipped, ParentSkipped, AmbiguousPetSkipped, PetMergedByChoice, OwnerlessPetSkipped, ShortNameCustomerSkipped, ClinicalRecordEmpty,
         DuplicateInFile, DuplicateVaccination, DuplicateClinicalRecord, DuplicateAccountEntry, DuplicateAppointment,
         PastAppointmentSkipped,
     ];

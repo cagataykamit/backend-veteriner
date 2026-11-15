@@ -321,7 +321,9 @@ Kural kodları, önem dereceleri ve varsayılan mesajlar kodda **tek yerde** tan
 | Kod | Önem | Kural |
 |-----|------|-------|
 | `Imports.RequiredMissing` | Error | Zorunlu alan boş (`AdSoyad`, `HayvanAdi`, `Tur`, `AsiAdi`, `UygulamaTarihi`). |
-| `Imports.NameTooShort` | Error | Müşteri adı < 2 karakter (kırpılmış, art arda boşluk teke inmiş). |
+| `Imports.NameTooShort` | Error | Artık üretilmez (2026-11-15; eski partilerde kalır). Kısa ad iki kurala ayrıldı (aşağıda). |
+| `Imports.ShortNameCustomerSkipped` | Info | Müşteri adı < 2 karakter (kırpılmış, eski programda `.` gibi). Bu `MusteriNo`'ya bağlı hasta ya da hesap hareketi satırı yok, açık bakiye de yok: büyük olasılıkla deneme kaydıdır, satır **atlanır**. |
+| `Imports.ShortNameCustomerKept` | Warning | Müşteri adı < 2 karakter ama bağlı kaydı ya da bakiyesi var: `İsimsiz müşteri (<MusteriNo>)` adıyla aktarılır; notuna `Dosyadaki ad: <ad> (çok kısa, yer tutucu adla aktarıldı)` eklenir; kontrol edilmesi önerilir. |
 | `Imports.FieldTooLong` | Error | Ad > 300 (müşteri) / 200 (hayvan), e-posta > 320 hariç (bkz. EmailInvalid), adres > 500, ırk serbest metni > 150, karne > 50, hasta notu > 2000 (Renk satırıyla birlikte), aşı notu > 4000. |
 | `Imports.PhoneInvalid` | Warning | Telefon cep standardına uymuyor (sabit hat, yabancı, eksik hane); telefon boş aktarılır `[K5]`, `value` özgün numara. Sahip telefonu (hasta/aşı tablosu) geçersizse sahip yalnız ad ile aranır (aşağıda). |
 | `Imports.EmailInvalid` | Warning | E-posta mevcut müşteri kuralıyla (FluentValidation `EmailAddress`, ≤ 320) geçersiz; boş aktarılır, `value` özgün. |
@@ -534,7 +536,7 @@ Durum geçişi domain'dedir (`Uploaded|Mapped|Validated|ValidationFailed` → `M
 - `issueCounts`: sorun kodu + önem başına etkilenen satır sayısı (aynı satırda aynı kod bir kez), `rowCount` azalan.
 - `notImportedReasons` (2026-11-14, geriye uyumlu ekleme): tablo başına aktarılmayacak satırların nedeni. `kind = Skipped` bilerek atlanan hatasız satırdır, `kind = Error` hatalı satırdır. Satır başına **bir** neden sayılır:
   - Hatalı satırda ilk hata kodu.
-  - Atlanan satırda ilk atlama kuralı. Atlama kuralları ve öncelik sırası tek yerde tutulur (`ImportRules.SkipReasons`): `ValueSkipped`, `ParentSkipped`, `OwnerlessPetSkipped`, `ClinicalRecordEmpty`, `DuplicateInFile`, `DuplicateVaccination`, `DuplicateClinicalRecord`, `DuplicateAccountEntry`, `DuplicateAppointment`, `PastAppointmentSkipped`.
+  - Atlanan satırda ilk atlama kuralı. Atlama kuralları ve öncelik sırası tek yerde tutulur (`ImportRules.SkipReasons`): `ValueSkipped`, `ParentSkipped`, `AmbiguousPetSkipped`, `PetMergedByChoice`, `OwnerlessPetSkipped`, `ShortNameCustomerSkipped`, `ClinicalRecordEmpty`, `DuplicateInFile`, `DuplicateVaccination`, `DuplicateClinicalRecord`, `DuplicateAccountEntry`, `DuplicateAppointment`, `PastAppointmentSkipped`.
 
   Bu yüzden bir tablonun `Error` toplamı `summary.<tablo>.error` değerine, `Skipped` toplamı `willSkip` değerine eşittir. Sıra: tablo (doğrulama sırası), önce `Skipped`, sonra `rowCount` azalan. Satır verisi temizlenmiş partide boştur. Ekran her tablo kartında "Atlanacak" ve "Hatalı" sayılarını bu nedenlerle açıklar.
 - `canCommit`: durum `Validated`, `validationId` dolu, `blockers` boş ve `willCreate` toplamı > 0.
