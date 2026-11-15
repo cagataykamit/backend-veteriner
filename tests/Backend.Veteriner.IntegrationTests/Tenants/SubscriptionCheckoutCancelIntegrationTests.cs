@@ -94,6 +94,7 @@ public sealed class SubscriptionCheckoutCancelIntegrationTests : IClassFixture<C
             .Select(kv => (object)new { documentType = kv.Key.ToString(), version = kv.Value })
             .ToArray();
 
+        var trialSignup = await IntegrationTestTrialSignup.CreateVerifiedAsync(app.Services, email);
         var signup = await app.CreateClient().PostAsJsonAsync("/api/v1/public/owner-signup", new
         {
             planCode = "Basic",
@@ -102,6 +103,8 @@ public sealed class SubscriptionCheckoutCancelIntegrationTests : IClassFixture<C
             clinicCity = "İzmir",
             email,
             password = "Abc12345!",
+            emailVerificationToken = trialSignup.Token,
+            taxIdentityNumber = trialSignup.TaxNumber,
             acceptedLegalDocuments = documents,
         });
         signup.StatusCode.Should().Be(HttpStatusCode.OK, await signup.Content.ReadAsStringAsync());

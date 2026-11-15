@@ -43,6 +43,10 @@ public sealed class PublicOwnerSignupCommandHandlerTests
     private readonly Mock<IReadRepository<DiscountRedemption>> _redemptionsRead = new();
     private readonly Mock<IRepository<DiscountRedemption>> _redemptionsWrite = new();
     private readonly Mock<IExampleClinicLoader> _exampleClinic = new();
+    private readonly Mock<IRepository<TenantBillingProfile>> _billingProfilesWrite = new();
+    private readonly TrialSignupTestSupport _trial = new();
+
+    public PublicOwnerSignupCommandHandlerTests() => _trial.AddVerified(DateTime.UtcNow);
 
     private PublicOwnerSignupCommandHandler CreateHandler()
         => new(
@@ -66,13 +70,16 @@ public sealed class PublicOwnerSignupCommandHandlerTests
             TimeProvider.System,
             _cashRegistersWrite.Object,
             _cashCategoriesWrite.Object,
+            _trial.CreateEmailService(),
+            _trial.CreateIdentityService(),
+            _billingProfilesWrite.Object,
             _logger.Object);
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_PlanCodeInvalid()
     {
         var handler = CreateHandler();
-        var command = new PublicOwnerSignupCommand("gold", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!");
+        var command = Signup("gold", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!");
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -85,7 +92,7 @@ public sealed class PublicOwnerSignupCommandHandlerTests
     public async Task Handle_Should_ReturnFailure_When_DuplicateEmail()
     {
         var handler = CreateHandler();
-        var command = new PublicOwnerSignupCommand("Basic", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!");
+        var command = Signup("Basic", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!");
 
         _usersRead.Setup(r => r.AnyAsync(It.IsAny<UserExistsByEmailSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
@@ -107,7 +114,7 @@ public sealed class PublicOwnerSignupCommandHandlerTests
             .ReturnsAsync((Guid tenantId, Guid clinicId, Guid _, CancellationToken _) =>
                 summary = new ExampleClinicLoadSummaryDto(tenantId, clinicId, 12, 20, 40, 25, 15, 8, 6, 60, 40, 10, 30));
 
-        var command = new PublicOwnerSignupCommand(
+        var command = Signup(
             "Basic", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", AllCurrentDocuments(), null, StartWithExampleClinic: true);
         var result = await CreateHandler().Handle(command, CancellationToken.None);
 
@@ -128,7 +135,7 @@ public sealed class PublicOwnerSignupCommandHandlerTests
         SetupHappyPathLookups();
         _hasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed");
 
-        var command = new PublicOwnerSignupCommand("Basic", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", AllCurrentDocuments());
+        var command = Signup("Basic", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", AllCurrentDocuments());
         var result = await CreateHandler().Handle(command, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -142,7 +149,7 @@ public sealed class PublicOwnerSignupCommandHandlerTests
     public async Task Handle_Should_CreateOwnerTenantClinicMembershipsAndSubscription_When_Successful()
     {
         var handler = CreateHandler();
-        var command = new PublicOwnerSignupCommand("Pro", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", AllCurrentDocuments());
+        var command = Signup("Pro", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", AllCurrentDocuments());
         var adminClaim = new OperationClaim("Admin");
 
         _usersRead.Setup(r => r.AnyAsync(It.IsAny<UserExistsByEmailSpec>(), It.IsAny<CancellationToken>()))
@@ -188,7 +195,7 @@ public sealed class PublicOwnerSignupCommandHandlerTests
         SetupHappyPathLookups();
         var handler = CreateHandler();
         var documents = AllCurrentDocuments().Where(d => d.DocumentType != LegalDocumentType.DataProcessing).ToArray();
-        var command = new PublicOwnerSignupCommand("Pro", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", documents);
+        var command = Signup("Pro", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", documents);
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -206,7 +213,7 @@ public sealed class PublicOwnerSignupCommandHandlerTests
         var documents = AllCurrentDocuments()
             .Select(d => d.DocumentType == LegalDocumentType.Terms ? d with { Version = "0.0" } : d)
             .ToArray();
-        var command = new PublicOwnerSignupCommand("Pro", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", documents);
+        var command = Signup("Pro", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", documents);
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -226,7 +233,7 @@ public sealed class PublicOwnerSignupCommandHandlerTests
             .Callback<DiscountRedemption, CancellationToken>((r, _) => written = r)
             .ReturnsAsync((DiscountRedemption r, CancellationToken _) => r);
 
-        var command = new PublicOwnerSignupCommand("Pro", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", AllCurrentDocuments(), " ışık10 ");
+        var command = Signup("Pro", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", AllCurrentDocuments(), " ışık10 ");
         var result = await CreateHandler().Handle(command, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -245,8 +252,9 @@ public sealed class PublicOwnerSignupCommandHandlerTests
         SetupHappyPathLookups();
         SetupCode(partnerEmail: "ortak@example.com");
         _hasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed");
+        _trial.AddVerified(DateTime.UtcNow, email.ToLowerInvariant());
 
-        var command = new PublicOwnerSignupCommand("Pro", "Tenant A", "Clinic A", "Istanbul", email, "Abc12345!", AllCurrentDocuments(), rawCode);
+        var command = Signup("Pro", "Tenant A", "Clinic A", "Istanbul", email, "Abc12345!", AllCurrentDocuments(), rawCode);
         var result = await CreateHandler().Handle(command, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
@@ -276,6 +284,95 @@ public sealed class PublicOwnerSignupCommandHandlerTests
         _operationClaimsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<OperationClaimByNameSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new OperationClaim("Admin"));
     }
+
+    [Fact]
+    public async Task Handle_Should_Register_Trial_Identity_Billing_Profile_And_Confirm_Email()
+    {
+        SetupHappyPathLookups();
+        _hasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed");
+        User? owner = null;
+        _usersWrite.Setup(r => r.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .Callback<User, CancellationToken>((u, _) => owner = u)
+            .ReturnsAsync((User u, CancellationToken _) => u);
+        TenantBillingProfile? profile = null;
+        _billingProfilesWrite.Setup(r => r.AddAsync(It.IsAny<TenantBillingProfile>(), It.IsAny<CancellationToken>()))
+            .Callback<TenantBillingProfile, CancellationToken>((p, _) => profile = p)
+            .ReturnsAsync((TenantBillingProfile p, CancellationToken _) => p);
+
+        var result = await CreateHandler().Handle(
+            Signup("Basic", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", AllCurrentDocuments()),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        owner!.EmailConfirmed.Should().BeTrue();
+        var identity = _trial.Identities.Single();
+        identity.TrialTenantId.Should().Be(result.Value!.TenantId);
+        identity.EmailKey.Should().Be("owner@a.com");
+        identity.TaxIdentityNumber.Should().Be(TrialSignupTestSupport.ValidVkn);
+        profile!.TaxNumber.Should().Be(TrialSignupTestSupport.ValidVkn);
+        _trial.Verifications.Single().UsedAtUtc.Should().NotBeNull();
+    }
+
+    [Theory]
+    [InlineData("baska-jeton")]
+    [InlineData(null)]
+    public async Task Handle_Should_Return_VerificationRequired_And_Create_Nothing_When_Email_Token_Does_Not_Match(string? token)
+    {
+        SetupHappyPathLookups();
+
+        var command = Signup("Basic", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", AllCurrentDocuments())
+            with { EmailVerificationToken = token };
+        var result = await CreateHandler().Handle(command, CancellationToken.None);
+
+        result.Error.Code.Should().Be("SignupEmail.VerificationRequired");
+        _usersWrite.Verify(r => r.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
+        _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+        _trial.Verifications.Single().UsedAtUtc.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_Should_Reject_Second_Trial_With_Same_Tax_Number()
+    {
+        SetupHappyPathLookups();
+        _trial.Identities.Add(TrialSignupIdentity.Create(Guid.NewGuid(), "ilk@a.com", TrialSignupTestSupport.ValidVkn, DateTime.UtcNow));
+
+        var result = await CreateHandler().Handle(
+            Signup("Basic", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", AllCurrentDocuments()),
+            CancellationToken.None);
+
+        result.Error.Code.Should().Be("SignupIdentity.DuplicateTaxIdentity");
+        _tenantsWrite.Verify(r => r.AddAsync(It.IsAny<Tenant>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Create_No_Billing_Profile_When_Tax_Number_Optional_And_Empty()
+    {
+        SetupHappyPathLookups();
+        _hasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed");
+        _trial.Options = new() { RequireTaxIdentityNumber = false };
+
+        var result = await CreateHandler().Handle(
+            Signup("Basic", "Tenant A", "Clinic A", "Istanbul", "owner@a.com", "Abc12345!", AllCurrentDocuments()) with { TaxIdentityNumber = null },
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _trial.Identities.Single().TaxIdentityNumber.Should().BeNull();
+        _billingProfilesWrite.Verify(r => r.AddAsync(It.IsAny<TenantBillingProfile>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>Doğrulanmış e-posta jetonu ve geçerli VKN ile kayıt komutu (TRIAL-001); diğer alanlar kayıt komutuyla aynı.</summary>
+    private static PublicOwnerSignupCommand Signup(
+        string planCode,
+        string tenantName,
+        string clinicName,
+        string clinicCity,
+        string email,
+        string password,
+        IReadOnlyList<LegalDocumentAcceptanceInput>? AcceptedLegalDocuments = null,
+        string? DiscountCode = null,
+        bool StartWithExampleClinic = false)
+        => new(planCode, tenantName, clinicName, clinicCity, email, password, AcceptedLegalDocuments, DiscountCode, StartWithExampleClinic,
+            TrialSignupTestSupport.Token, TrialSignupTestSupport.ValidVkn);
 
     private static LegalDocumentAcceptanceInput[] AllCurrentDocuments() =>
         LegalDocumentCatalog.CurrentVersions
