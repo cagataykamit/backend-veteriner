@@ -133,36 +133,26 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
 
             // Faz 4B-7: conflict kontrolleri working-hours kontrolünden önce çalışmalı.
             // Aksi halde working-hours, asıl conflict hatasını gölgeleyebilir (ör. ClinicClosed → ClinicTimeConflict).
-            if (!allowClinicOverlap)
-            {
-                var clinicBusy = await _appointmentsRead.FirstOrDefaultAsync(
-                    new AppointmentOverlappingAtClinicSpec(tenantId, clinicId, scheduledUtc, endUtc, appointment.Id), ct);
-                if (clinicBusy is not null)
-                {
-                    return Result.Failure(
-                        "Appointments.ClinicTimeConflict",
-                        "Bu zaman aralığında klinikte başka bir planlı randevu var.");
-                }
-            }
-
-            var petBusy = await _appointmentsRead.FirstOrDefaultAsync(
-                new AppointmentOverlappingForPetSpec(tenantId, request.PetId, scheduledUtc, endUtc, appointment.Id), ct);
-            if (petBusy is not null)
-            {
-                return Result.Failure(
-                    "Appointments.PetTimeConflict",
-                    "Bu zaman aralığında hayvanın başka bir planlı randevusu var.");
-            }
-
             var reasonResult = await _assignment.ResolveReasonAsync(
                 tenantId, clinicId, request.ReasonId, appointment.ReasonId, ct);
             if (!reasonResult.IsSuccess)
                 return Result.Failure(reasonResult.Error);
 
-            var vetCheck = await _assignment.EnsureVeterinarianAsync(
-                tenantId, clinicId, request.VeterinarianUserId, appointment.VeterinarianUserId, scheduledUtc, endUtc, appointment.Id, ct);
-            if (!vetCheck.IsSuccess)
-                return vetCheck;
+            var conflicts = await AppointmentSlotRules.EnsureNoConflictAsync(
+                _appointmentsRead,
+                _assignment,
+                allowClinicOverlap,
+                tenantId,
+                clinicId,
+                request.PetId,
+                request.VeterinarianUserId,
+                appointment.VeterinarianUserId,
+                scheduledUtc,
+                endUtc,
+                appointment.Id,
+                ct);
+            if (!conflicts.IsSuccess)
+                return conflicts;
 
             var hoursRows = await _clinicWorkingHoursRead.ListAsync(
                 new ClinicWorkingHoursByClinicSpec(tenantId, clinicId), ct);

@@ -102,46 +102,21 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
         var allowClinicOverlap = appointmentSettingsRow?.AllowOverlappingAppointments
             ?? ClinicAppointmentSettingsDefaults.Build().AllowOverlappingAppointments;
 
-        if (!allowClinicOverlap)
-        {
-            var clinicBusy = await _appointmentsRead.FirstOrDefaultAsync(
-                new AppointmentOverlappingAtClinicSpec(
-                    tenantId,
-                    appointment.ClinicId,
-                    scheduledUtc,
-                    endUtc,
-                    appointment.Id),
-                ct);
-            if (clinicBusy is not null)
-            {
-                return Result.Failure(
-                    "Appointments.ClinicTimeConflict",
-                    "Bu zaman aralığında klinikte başka bir planlı randevu var.");
-            }
-        }
-
-        var petBusy = await _appointmentsRead.FirstOrDefaultAsync(
-            new AppointmentOverlappingForPetSpec(
-                tenantId,
-                appointment.PetId,
-                scheduledUtc,
-                endUtc,
-                appointment.Id),
+        var conflicts = await AppointmentSlotRules.EnsureNoConflictAsync(
+            _appointmentsRead,
+            _assignment,
+            allowClinicOverlap,
+            tenantId,
+            appointment.ClinicId,
+            appointment.PetId,
+            appointment.VeterinarianUserId,
+            appointment.VeterinarianUserId,
+            scheduledUtc,
+            endUtc,
+            appointment.Id,
             ct);
-        if (petBusy is not null)
-        {
-            return Result.Failure(
-                "Appointments.PetTimeConflict",
-                "Bu zaman aralığında hayvanın başka bir planlı randevusu var.");
-        }
-
-        if (appointment.VeterinarianUserId is { } vetId)
-        {
-            var vetFree = await _assignment.EnsureVeterinarianFreeAsync(
-                tenantId, vetId, scheduledUtc, endUtc, appointment.Id, ct);
-            if (!vetFree.IsSuccess)
-                return vetFree;
-        }
+        if (!conflicts.IsSuccess)
+            return conflicts;
 
         var hoursRows = await _clinicWorkingHoursRead.ListAsync(
             new ClinicWorkingHoursByClinicSpec(tenantId, appointment.ClinicId), ct);

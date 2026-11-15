@@ -96,14 +96,21 @@ public sealed class AppointmentAvailabilityCalculatorTests
     }
 
     [Fact]
-    public void Clinic_Without_Overlap_Should_Block_Slot_For_Any_Same_Clinic_Appointment()
+    public void Clinic_Without_Overlap_Should_Block_Only_When_Booking_Has_No_Veterinarian()
     {
         var at = Local(Monday, 11);
-        Slots(Input(allowOverlap: false, busy: [new BusyInterval(ClinicId, VetA, at.AddMinutes(15), at.AddMinutes(45))]))
+
+        // Klinikte hekim yok: saat hekimsiz randevuya gider, klinikteki her randevu doldurur.
+        Slots(Input(allowOverlap: false, vets: [], busy: [new BusyInterval(ClinicId, null, at.AddMinutes(15), at.AddMinutes(45))]))
             .Should().NotContain(s => s.StartUtc == at || s.StartUtc == at.AddMinutes(30));
 
         Slots(Input(allowOverlap: false, vets: [], busy: [new BusyInterval(Guid.NewGuid(), null, at, at.AddMinutes(30))]))
             .Should().Contain(s => s.StartUtc == at, "başka kliniğin hekimsiz randevusu bu kliniği etkilemez");
+
+        // Hekim varsa saat boş hekime atanır: aynı saatte farklı hekimin randevusu çakışma değildir.
+        Slots(Input(allowOverlap: false, busy: [new BusyInterval(ClinicId, VetA, at, at.AddMinutes(30))]))
+            .Single(s => s.StartUtc == at)
+            .FreeVeterinarianIds.Should().Equal(VetB);
     }
 
     [Fact]

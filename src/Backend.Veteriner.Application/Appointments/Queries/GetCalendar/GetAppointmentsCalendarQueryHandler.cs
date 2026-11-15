@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Appointments.ReadModels;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -28,6 +29,7 @@ public sealed class GetAppointmentsCalendarQueryHandler
     private readonly IReadRepository<Client> _clients;
     private readonly IAppointmentReadModelReader _readModelReader;
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
+    private readonly IClinicVeterinarianReader _veterinarians;
 
     public GetAppointmentsCalendarQueryHandler(
         ITenantContext tenantContext,
@@ -37,7 +39,8 @@ public sealed class GetAppointmentsCalendarQueryHandler
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients,
         IAppointmentReadModelReader readModelReader,
-        IOptions<QueryReadModelsOptions> queryReadModelsOptions)
+        IOptions<QueryReadModelsOptions> queryReadModelsOptions,
+        IClinicVeterinarianReader veterinarians)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -47,6 +50,7 @@ public sealed class GetAppointmentsCalendarQueryHandler
         _clients = clients;
         _readModelReader = readModelReader;
         _queryReadModelsOptions = queryReadModelsOptions.Value;
+        _veterinarians = veterinarians;
     }
 
     public async ValueTask<Result<IReadOnlyList<AppointmentCalendarItemDto>>> Handle(GetAppointmentsCalendarQuery request, CancellationToken ct)
@@ -110,7 +114,7 @@ public sealed class GetAppointmentsCalendarQueryHandler
                     request.Status),
                 ct);
 
-            return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Success(items);
+            return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Success(await WithVeterinariansFromCommandDbAsync(tenantId, items, ct));
         }
 
         return await HandleFromCommandDbAsync(
@@ -171,10 +175,43 @@ public sealed class GetAppointmentsCalendarQueryHandler
                 r.Status,
                 r.AppointmentType,
                 pet?.Name ?? string.Empty,
-                clientName);
+                clientName,
+                r.VeterinarianUserId);
         }).ToList();
 
-        return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Success(items);
+        return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Success(await WithVeterinarianNamesAsync(items, ct));
+    }
+
+    /// <summary>Okuma modeli hekim taşımaz: hekim kimlikleri komut veritabanından tamamlanır (Query DB şeması değişmez).</summary>
+    private async Task<IReadOnlyList<AppointmentCalendarItemDto>> WithVeterinariansFromCommandDbAsync(
+        Guid tenantId,
+        IReadOnlyList<AppointmentCalendarItemDto> items,
+        CancellationToken ct)
+    {
+        if (items.Count == 0)
+            return items;
+
+        var vetByAppointment = (await _appointments.ListAsync(
+                new AppointmentVeterinariansByIdsSpec(tenantId, items.Select(i => i.Id).ToArray()), ct))
+            .ToDictionary(r => r.AppointmentId, r => r.VeterinarianUserId);
+
+        return await WithVeterinarianNamesAsync(
+            items.Select(i => i with { VeterinarianUserId = vetByAppointment.TryGetValue(i.Id, out var v) ? v : null }).ToList(),
+            ct);
+    }
+
+    private async Task<IReadOnlyList<AppointmentCalendarItemDto>> WithVeterinarianNamesAsync(
+        IReadOnlyList<AppointmentCalendarItemDto> items,
+        CancellationToken ct)
+    {
+        var vetIds = items.Where(i => i.VeterinarianUserId is not null).Select(i => i.VeterinarianUserId!.Value).Distinct().ToArray();
+        if (vetIds.Length == 0)
+            return items;
+
+        var names = await _veterinarians.GetNamesAsync(vetIds, ct);
+        return items
+            .Select(i => i.VeterinarianUserId is { } v && names.TryGetValue(v, out var name) ? i with { VeterinarianName = name } : i)
+            .ToList();
     }
 
     private static DateTime NormalizeToUtc(DateTime value)

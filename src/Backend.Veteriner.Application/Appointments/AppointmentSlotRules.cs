@@ -10,7 +10,7 @@ namespace Backend.Veteriner.Application.Appointments;
 
 /// <summary>
 /// Planlı randevunun saatte yer alabilmesi — tek yer: klinik içi oluşturma ve bekleme listesi teklifinin kabulü (TIER-018) kullanır.
-/// Sıra korunur: slot hizası → klinik çakışması (üst üste binmeye izin yoksa) → hayvan çakışması → hekim (kliniğin aktif hekimi ve
+/// Sıra korunur: slot hizası → klinik çakışması (hekimsiz randevuda, üst üste binmeye izin yoksa) → hayvan çakışması → hekim (kliniğin aktif hekimi ve
 /// boş) → çalışma saati. Çakışma denetimleri çalışma saatinden önce çalışır; aksi halde asıl çakışma hatası gölgelenir (Faz 4B-7).
 /// </summary>
 internal static class AppointmentSlotRules
@@ -47,8 +47,16 @@ internal static class AppointmentSlotRules
     }
 
     /// <summary>
-    /// Yalnız çakışmalar: klinik (üst üste binmeye izin yoksa) → hayvan → hekim. İptali geri almada da kullanılır; orada slot hizası ve
-    /// çalışma saati yeniden denetlenmez (randevu bu kurallarla açılmıştı).
+    /// Klinik çakışması kuralı (kural tek yer): yalnız hekimsiz randevuda ve klinik üst üste binmeye kapalıysa klinikteki her planlı
+    /// randevu saati doldurur. Hekimi atanmış randevuda çakışma hekim bazındadır; aynı saatte farklı hekimlerin randevusu çakışmaz
+    /// (takvimde hekim sütunları, 2026-11-16 kararı). Müsaitlik hesabı da bu kuralı kullanır.
+    /// </summary>
+    public static bool ClinicOverlapBlocks(bool allowClinicOverlap, bool hasVeterinarian)
+        => !allowClinicOverlap && !hasVeterinarian;
+
+    /// <summary>
+    /// Yalnız çakışmalar: klinik (<see cref="ClinicOverlapBlocks"/>) → hayvan → hekim. Oluşturma, düzenleme, yeniden zamanlama, teklif
+    /// kabulü ve iptali geri alma kullanır; geri almada slot hizası ve çalışma saati yeniden denetlenmez (randevu bu kurallarla açılmıştı).
     /// </summary>
     /// <param name="keepVeterinarianUserId">Mevcut randevunun hekimi; hekim yetkisi kalkmış olsa da korunur.</param>
     /// <param name="excludeAppointmentId">Denetlenen randevunun kendisi.</param>
@@ -66,7 +74,7 @@ internal static class AppointmentSlotRules
         Guid? excludeAppointmentId,
         CancellationToken ct)
     {
-        if (!allowClinicOverlap)
+        if (ClinicOverlapBlocks(allowClinicOverlap, veterinarianUserId is not null))
         {
             var clinicBusy = await appointments.FirstOrDefaultAsync(
                 new AppointmentOverlappingAtClinicSpec(tenantId, clinicId, startUtc, endUtc, excludeAppointmentId), ct);

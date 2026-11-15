@@ -10,7 +10,8 @@ public sealed record AppointmentCalendarRow(
     DateTime ScheduledAtUtc,
     int DurationMinutes,
     AppointmentStatus Status,
-    AppointmentType AppointmentType);
+    AppointmentType AppointmentType,
+    Guid? VeterinarianUserId);
 
 public sealed class AppointmentsCalendarSpec : Specification<Appointment, AppointmentCalendarRow>
 {
@@ -39,6 +40,21 @@ public sealed class AppointmentsCalendarSpec : Specification<Appointment, Appoin
             a.ScheduledAtUtc,
             a.DurationMinutes,
             a.Status,
-            a.AppointmentType));
+            a.AppointmentType,
+            a.VeterinarianUserId));
     }
 }
+
+/// <summary>Randevuların hekimi (takvimde okuma modeli yolu hekim taşımaz; komut veritabanından tamamlanır).</summary>
+public sealed class AppointmentVeterinariansByIdsSpec : Specification<Appointment, AppointmentVeterinarianRow>
+{
+    public AppointmentVeterinariansByIdsSpec(Guid tenantId, IReadOnlyCollection<Guid> appointmentIds)
+    {
+        var ids = appointmentIds.ToArray();
+        Query.AsNoTracking();
+        Query.Where(a => a.TenantId == tenantId && ids.Contains(a.Id) && a.VeterinarianUserId != null);
+        Query.Select(a => new AppointmentVeterinarianRow(a.Id, a.VeterinarianUserId!.Value));
+    }
+}
+
+public sealed record AppointmentVeterinarianRow(Guid AppointmentId, Guid VeterinarianUserId);

@@ -8,6 +8,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tests.TestHelpers;
+using Backend.Veteriner.Application.Tests.Visits;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
@@ -26,6 +27,7 @@ public sealed class GetAppointmentsCalendarQueryHandlerTests
     private readonly Mock<IReadRepository<Client>> _clients = new();
     private readonly Mock<IAppointmentReadModelReader> _readModelReader = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
+    private static readonly Guid VetId = Guid.NewGuid();
 
     private GetAppointmentsCalendarQueryHandler CreateHandler(
         bool appointmentsQueryEnabled = false,
@@ -38,7 +40,8 @@ public sealed class GetAppointmentsCalendarQueryHandlerTests
             _pets.Object,
             _clients.Object,
             _readModelReader.Object,
-            Options.Create(new QueryReadModelsOptions { AppointmentsEnabled = appointmentsQueryEnabled }));
+            Options.Create(new QueryReadModelsOptions { AppointmentsEnabled = appointmentsQueryEnabled }),
+            VeterinarianReaderMock.Create(new Dictionary<Guid, string?> { [VetId] = "Dr. Ayşe" }).Object);
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()
@@ -165,8 +168,8 @@ public sealed class GetAppointmentsCalendarQueryHandlerTests
 
         var rows = new List<AppointmentCalendarRow>
         {
-            new(Guid.NewGuid(), clinicId, petId, DateTime.UtcNow.AddHours(1), 30, AppointmentStatus.Scheduled, AppointmentType.Consultation),
-            new(Guid.NewGuid(), clinicId, petId, DateTime.UtcNow.AddHours(2), 30, AppointmentStatus.Cancelled, AppointmentType.Other),
+            new(Guid.NewGuid(), clinicId, petId, DateTime.UtcNow.AddHours(1), 30, AppointmentStatus.Scheduled, AppointmentType.Consultation, VetId),
+            new(Guid.NewGuid(), clinicId, petId, DateTime.UtcNow.AddHours(2), 30, AppointmentStatus.Cancelled, AppointmentType.Other, null),
         };
         _appointments.Setup(r => r.ListAsync(It.IsAny<AppointmentsCalendarSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(rows);
@@ -186,6 +189,10 @@ public sealed class GetAppointmentsCalendarQueryHandlerTests
         result.Value[0].ClientId.Should().Be(clientId);
         result.Value[0].DurationMinutes.Should().Be(30);
         result.Value[0].ScheduledEndUtc.Should().Be(rows[0].ScheduledAtUtc.AddMinutes(30));
+        result.Value[0].VeterinarianUserId.Should().Be(VetId);
+        result.Value[0].VeterinarianName.Should().Be("Dr. Ayşe");
+        result.Value[1].VeterinarianUserId.Should().BeNull();
+        result.Value[1].VeterinarianName.Should().BeNull();
     }
 
     [Fact]

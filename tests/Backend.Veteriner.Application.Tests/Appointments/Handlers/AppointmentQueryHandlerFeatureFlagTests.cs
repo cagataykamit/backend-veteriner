@@ -171,5 +171,6 @@ public sealed class AppointmentQueryHandlerFeatureFlagTests
             _pets.Object,
             _clients.Object,
             _readModelReader.Object,
-            Options.Create(new QueryReadModelsOptions { AppointmentsEnabled = enabled }));
+            Options.Create(new QueryReadModelsOptions { AppointmentsEnabled = enabled }),
+            Backend.Veteriner.Application.Tests.Visits.VeterinarianReaderMock.Create().Object);
 }

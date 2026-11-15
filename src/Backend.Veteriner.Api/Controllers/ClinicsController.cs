@@ -338,11 +338,11 @@ public sealed class ClinicsController : ControllerBase
     }
 
     /// <summary>
-    /// Geliş açarken sorumlu hekim seçimi: kliniğe atanmış, aktif ve <c>Veteriner</c> rolündeki kullanıcılar.
+    /// Klinik hekimleri (geliş açarken sorumlu hekim, takvimde hekim sütunları, randevuda hekim): kliniğe atanmış, aktif ve <c>Veteriner</c> rolündeki kullanıcılar.
     /// Geliş doğrulaması (<c>responsibleVeterinarianUserId</c>) aynı kuralı kullanır.
     /// </summary>
     [HttpGet("{id:guid}/veterinarians")]
-    [Authorize(Policy = PermissionCatalog.Visits.Create)]
+    [Authorize(Policy = AuthorizationPolicyNames.ClinicsVeterinariansRead)]
     [ProducesResponseType(typeof(IReadOnlyList<ClinicVeterinarianDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
