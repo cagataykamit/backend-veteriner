@@ -153,7 +153,7 @@ public sealed class InvoicingIdentityIntegrationTests : IClassFixture<CustomWebA
         var ctx = await SeedAsync(EditorPermissions);
         var clientId = await ctx.CreateClientAsync(new { personType = "Individual", nationalId = Tckn, billingProvince = "İzmir" });
 
-        (await ctx.Http.PutAsJsonAsync($"/api/v1/clients/{clientId}", new { fullName = "Adı Değişti" }))
+        (await ctx.Http.PutAsJsonAsync($"/api/v1/clients/{clientId}", new { fullName = "Adı Değişti", phone = "05321112233" }))
             .StatusCode.Should().Be(HttpStatusCode.NoContent);
         var kept = await ctx.Http.GetFromJsonAsync<JsonElement>($"/api/v1/clients/{clientId}/invoicing-identity");
         kept.GetProperty("nationalId").GetString().Should().Be(Tckn);
@@ -162,6 +162,7 @@ public sealed class InvoicingIdentityIntegrationTests : IClassFixture<CustomWebA
         var replaced = await ctx.Http.PutAsJsonAsync($"/api/v1/clients/{clientId}", new
         {
             fullName = "Adı Değişti",
+            phone = "05321112233",
             invoicingIdentity = new { personType = "Corporate", taxNumber = Vkn, legalName = "Örnek Ltd." },
         });
         replaced.StatusCode.Should().Be(HttpStatusCode.NoContent, await replaced.Content.ReadAsStringAsync());
