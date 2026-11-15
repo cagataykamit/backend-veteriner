@@ -202,6 +202,12 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        // İptali geri alma (APPOINTMENT_CANCEL_UNDO_API_CONTRACT.md): süre doldu ya da boşalan saat teklif edildi (durum çakışması).
+        if (normalized is "appointments.cancellationundoexpired" or "appointments.cancellationundoblocked")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
         // Ödeme tahsisi: açık tutar aşımı, tahsisli kaydın kilitli alanları/iptali ve zaten iptal edilmiş kayıt (durum çakışması).
         if (normalized.Contains("exceedsoutstanding") || normalized.Contains("updateblockedbyallocation")
             || normalized.Contains("voidblockedbyallocation") || normalized.Contains("correctionbelowallocated")
