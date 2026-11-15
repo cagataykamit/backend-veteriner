@@ -41,6 +41,7 @@ Sıra ve hatalar:
 | Bu arada saate başka randevu girdi | 409 | `Appointments.ClinicTimeConflict` (üst üste binmeye izin yoksa), `Appointments.PetTimeConflict`, `Appointments.VeterinarianTimeConflict` |
 | Eşzamanlı değişiklik | 409 | `Appointments.ConcurrencyConflict` |
 
+- Çakışma denetimi oluşturmayla aynı yerdedir: `AppointmentSlotRules.EnsureNoConflictAsync` (klinik → hayvan → hekim). Klinik çakışması kuralı değişirse geri alma da kendiliğinden uyar.
 - Slot hizası ve çalışma saati yeniden denetlenmez: randevu bu kurallarla zaten açılmıştı, 10 sn içinde ayar değişikliği geri almayı engellememeli.
 - Audit: `Appointment.CancelRevert`.
 - Olay: `appointment.updated.v1` (tam anlık görüntü, `status = Scheduled`); okuma projeksiyonu ve Bugün sayaçları buradan güncellenir.
