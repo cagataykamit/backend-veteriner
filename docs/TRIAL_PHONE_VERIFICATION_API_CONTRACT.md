@@ -126,7 +126,8 @@ Eski API'ler (`/sms/send/otp` XML, `/sms/rest/v2/otp`) kullanılmadı; Netgsm re
 
 - `IAuditableRequest`: `Public.OwnerSignup.PhoneCodeRequest`, `Public.OwnerSignup.PhoneVerify`, `Public.OwnerSignup` (kaydın kendisi, yeni). `targetId` maskeli numara (`90532*****67`); yükte `mobilePhone` maskeli, `oneTimeCode`, `password`, `phoneVerificationToken` `***`.
 - Günlükte numara her zaman maskeli; kod ve jeton yazılmaz (sahte sağlayıcıda metin yalnız Development).
-- Saklama: doğrulama satırları (numara, özetler, zamanlar) numara başına tek deneme kuralı için tutulur. Kullanılmamış satırların temizliği **yapılmadı** (ayrı iş; saklama politikasıyla birlikte).
+- Gizlilik Politikası 1.1 (2026-11-15): telefon doğrulaması amacı, işlenen veri ve saklama eklendi; `LegalDocumentCatalog` Privacy sürümü 1.1, mevcut kullanıcılardan girişte yeniden kabul istenir (ADR-029).
+- Saklama: doğrulama satırları (numara, özetler, zamanlar) numara başına tek deneme kuralı için tutulur. Saklama süresi ve kullanılmamış satırların temizliği **belirlenmedi / yapılmadı** (ayrı iş; saklama politikasıyla birlikte).
 
 ## 8) Kalıcılık
 
