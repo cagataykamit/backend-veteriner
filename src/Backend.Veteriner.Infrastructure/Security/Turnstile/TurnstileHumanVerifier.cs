@@ -116,8 +116,8 @@ public sealed class TurnstileHumanVerifier : IHumanVerifier
 }
 
 /// <summary>
-/// Yerel geliştirme ve testlerde (Development, IntegrationTests) anahtar girilmemişse kullanılan sahte doğrulayıcı: her isteği geçirir,
-/// site anahtarı vermez (istemci widget çizmez). Üretimde seçilmez.
+/// Anahtarlar girilmemişse (her ortam) kullanılan doğrulayıcı: insan doğrulamasını atlar, site anahtarı vermez (istemci widget
+/// çizmez). Hız sınırları ve e-posta kodu kuralları ayrıca çalışır.
 /// </summary>
 public sealed class PassThroughHumanVerifier : IHumanVerifier
 {
@@ -127,15 +127,4 @@ public sealed class PassThroughHumanVerifier : IHumanVerifier
 
     public Task<HumanVerificationResult> VerifyAsync(string? token, string? remoteIp, string action, CancellationToken ct)
         => Task.FromResult(HumanVerificationResult.Passed);
-}
-
-/// <summary>Anahtarlar girilmemiş (üretim): korunan uçlar açık hatayla durur.</summary>
-public sealed class UnconfiguredHumanVerifier : IHumanVerifier
-{
-    public bool IsConfigured => false;
-
-    public string? SiteKey => null;
-
-    public Task<HumanVerificationResult> VerifyAsync(string? token, string? remoteIp, string action, CancellationToken ct)
-        => Task.FromResult(HumanVerificationResult.Unavailable);
 }

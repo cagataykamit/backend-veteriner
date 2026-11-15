@@ -25,7 +25,7 @@ public sealed record GetOnlineBookingAvailabilityQuery(string BookingCode, Guid?
 
 /// <summary>
 /// E-posta doğrulama kodu ister. Bekleme süresindeyse yeni kod gitmez; yanıt yine 204 (numaralandırma yok). Kapalı/geçersiz
-/// bağlantıda 404. Önce insan doğrulaması (Turnstile): geçmezse 400, yapılamıyorsa 503.
+/// bağlantıda 404. Önce insan doğrulaması (Turnstile; <c>Turnstile:EnforcePortal</c>): geçmezse 400, yapılamıyorsa 503.
 /// </summary>
 public sealed record RequestOnlineBookingCodeCommand(string BookingCode, string Email, string? TurnstileToken = null)
     : IRequest<Result>, IAuditableRequest

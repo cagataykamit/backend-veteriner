@@ -4,8 +4,8 @@ using Mediator;
 namespace Backend.Veteriner.Application.Common.Security;
 
 /// <param name="TurnstileSiteKey">Cloudflare Turnstile site anahtarı; boşsa widget çizilmez (yerel geliştirme).</param>
-/// <param name="PortalSignInProtected">Portal giriş ve parola sıfırlama kodu isteği insan doğrulaması istiyor mu.</param>
-public sealed record HumanVerificationSettingsDto(string? TurnstileSiteKey, bool PortalSignInProtected);
+/// <param name="PortalProtected">Portal giriş, parola sıfırlama ve online randevu kodu isteği insan doğrulaması istiyor mu.</param>
+public sealed record HumanVerificationSettingsDto(string? TurnstileSiteKey, bool PortalProtected);
 
 /// <summary>Portal ve online randevu sayfası için insan doğrulaması ayarları (site anahtarı koddan değil sunucudan).</summary>
 public sealed record GetHumanVerificationSettingsQuery : IRequest<HumanVerificationSettingsDto>;

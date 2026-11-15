@@ -13,7 +13,7 @@ namespace Backend.IntegrationTests.OwnerPortal;
 
 /// <summary>
 /// Turnstile ile korunan portal uçları (TRIAL_SIGNUP_ABUSE_API_CONTRACT.md §4): giriş kodu, parola sıfırlama kodu ve online randevu
-/// e-posta kodu. Yalnız "insan-jetonu" geçen sahte doğrulayıcıyla sınanır; portal girişi ayarla kapatılabilir.
+/// e-posta kodu. Yalnız "insan-jetonu" geçen sahte doğrulayıcıyla sınanır; üçü <c>Turnstile:EnforcePortal</c> ile kapatılabilir.
 /// </summary>
 public sealed partial class OwnerPortalIntegrationTests
 {
@@ -26,7 +26,7 @@ public sealed partial class OwnerPortalIntegrationTests
             .Content.ReadFromJsonAsync<JsonElement>();
 
         body.GetProperty("turnstileSiteKey").GetString().Should().Be(StrictHumanVerifier.Key);
-        body.GetProperty("portalSignInProtected").GetBoolean().Should().BeTrue();
+        body.GetProperty("portalProtected").GetBoolean().Should().BeTrue();
     }
 
     [Theory]
@@ -47,18 +47,20 @@ public sealed partial class OwnerPortalIntegrationTests
     }
 
     [Fact]
-    public async Task Online_Booking_Code_Request_Should_Require_Human_Check_Even_When_Portal_Disabled()
+    public async Task Online_Booking_Code_Request_Should_Require_Human_Check_Unless_Portal_Disabled()
     {
         var staff = await SeedStaffAsync(OnlineStaffPermissions);
         var code = await EnableBookingAsync(staff);
         var url = $"/api/portal/v1/booking/{code}/verification-code";
-        var client = HumanCheckedClient(protectPortal: false);
+        var client = HumanCheckedClient(protectPortal: true);
 
         var rejected = await client.PostAsJsonAsync(url, new { email = UniqueEmail() });
         rejected.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await IntegrationTestProblemDetails.ReadCodeAsync(rejected)).Should().Be("HumanVerification.Failed");
 
         (await client.PostAsJsonAsync(url, new { email = UniqueEmail(), turnstileToken = HumanToken }))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await HumanCheckedClient(protectPortal: false).PostAsJsonAsync(url, new { email = UniqueEmail() }))
             .StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
@@ -67,7 +69,7 @@ public sealed partial class OwnerPortalIntegrationTests
         {
             b.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Turnstile:ProtectPortalSignIn"] = protectPortal ? "true" : "false",
+                ["Turnstile:EnforcePortal"] = protectPortal ? "true" : "false",
             }));
             b.ConfigureServices(s =>
             {

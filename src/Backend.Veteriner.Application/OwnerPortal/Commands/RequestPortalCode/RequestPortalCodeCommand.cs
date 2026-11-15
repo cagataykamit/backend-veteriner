@@ -11,7 +11,7 @@ namespace Backend.Veteriner.Application.OwnerPortal.Commands.RequestPortalCode;
 /// <summary>
 /// Giriş (<see cref="OwnerPortalCodePurpose.SignIn"/>) veya parola sıfırlama (<see cref="OwnerPortalCodePurpose.PasswordReset"/>)
 /// kodu ister. Hesap var/yok, kilitli ya da bekleme süresinde olsun yanıt her zaman başarıdır (numaralandırma yok); kod yalnız
-/// aktif ve kilitsiz hesaba gider. Önce insan doğrulaması (Turnstile; <c>Turnstile:ProtectPortalSignIn</c>): geçmezse hata döner, hesap
+/// aktif ve kilitsiz hesaba gider. Önce insan doğrulaması (Turnstile; <c>Turnstile:EnforcePortal</c>): geçmezse hata döner, hesap
 /// bilgisi sızmaz.
 /// </summary>
 public sealed record RequestPortalCodeCommand(string Email, OwnerPortalCodePurpose Purpose, string? TurnstileToken = null)

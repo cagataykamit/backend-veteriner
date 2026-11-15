@@ -155,15 +155,15 @@ public sealed class TrialSignupServiceTests
     [InlineData(HumanVerificationActions.PortalSignInCode, false)]
     [InlineData(HumanVerificationActions.PortalPasswordReset, false)]
     [InlineData(HumanVerificationActions.SignupEmailCode, true)]
-    [InlineData(HumanVerificationActions.OnlineBookingCode, true)]
-    public async Task HumanVerificationGuard_Should_Skip_Only_Portal_SignIn_When_Disabled(string action, bool stillRequired)
+    [InlineData(HumanVerificationActions.OnlineBookingCode, false)]
+    public async Task HumanVerificationGuard_Should_Skip_Only_Portal_Actions_When_Disabled(string action, bool stillRequired)
     {
         var verifier = new Mock<IHumanVerifier>();
         verifier.SetupGet(v => v.IsConfigured).Returns(true);
         verifier.Setup(v => v.VerifyAsync(It.IsAny<string?>(), It.IsAny<string?>(), action, It.IsAny<CancellationToken>()))
             .ReturnsAsync(HumanVerificationResult.Failed);
         var guard = new HumanVerificationGuard(
-            verifier.Object, Mock.Of<IClientContext>(), Options.Create(new HumanVerificationOptions { ProtectPortalSignIn = false }));
+            verifier.Object, Mock.Of<IClientContext>(), Options.Create(new HumanVerificationOptions { EnforcePortal = false }));
 
         guard.IsRequired(action).Should().Be(stillRequired);
         (await guard.EnsureHumanAsync(null, action, CancellationToken.None)).IsSuccess.Should().Be(!stillRequired);

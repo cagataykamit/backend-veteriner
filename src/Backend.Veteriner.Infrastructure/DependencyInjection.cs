@@ -277,6 +277,7 @@ public static class DependencyInjection
             .RemoveAllLoggers();
         services.AddScoped<TurnstileHumanVerifier>();
         services.AddScoped<IHumanVerifier>(HumanVerifierSelector.Select);
+        services.AddHostedService<TurnstileConfigurationReporter>();
 
         // ===== Permissions cache/reader =====
         services.AddMemoryCache();

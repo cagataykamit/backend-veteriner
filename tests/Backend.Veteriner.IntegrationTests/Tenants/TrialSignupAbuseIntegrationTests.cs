@@ -7,7 +7,6 @@ using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.LegalAcceptances;
 using Backend.Veteriner.Infrastructure.Persistence;
-using Backend.Veteriner.Infrastructure.Security.Turnstile;
 using AwesomeAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -18,7 +17,7 @@ namespace Backend.IntegrationTests.Tenants;
 
 /// <summary>
 /// TRIAL-001 deneme kaydı kötüye kullanım önlemleri uçtan uca (HTTP + LocalDB): ayarlar, Turnstile, e-posta kodu, tek e-posta ve
-/// tek vergi numarası kuralı, bekleme, jetonsuz kayıt, doğrulayıcı yokken 503 ve denetimde maskeli vergi numarası. E-posta ve
+/// tek vergi numarası kuralı, bekleme, jetonsuz kayıt, Cloudflare'e ulaşılamazken 503 ve denetimde maskeli vergi numarası. E-posta ve
 /// Turnstile yakalayan sahtelerle sınanır. Bkz. docs/TRIAL_SIGNUP_ABUSE_API_CONTRACT.md.
 /// </summary>
 [Collection("pilot-smoke-api")]
@@ -98,15 +97,15 @@ public sealed partial class TrialSignupAbuseIntegrationTests : IClassFixture<Cus
     }
 
     [Fact]
-    public async Task Unconfigured_Human_Verifier_Should_Return_503()
+    public async Task Unreachable_Human_Verifier_Should_Return_503()
     {
-        var unconfigured = _factory.WithWebHostBuilder(b => b.ConfigureServices(s =>
+        var unreachable = _factory.WithWebHostBuilder(b => b.ConfigureServices(s =>
         {
             s.RemoveAll<IHumanVerifier>();
-            s.AddSingleton<IHumanVerifier>(new UnconfiguredHumanVerifier());
+            s.AddSingleton<IHumanVerifier>(new UnreachableHumanVerifier());
         }));
 
-        var response = await unconfigured.CreateClient().PostAsJsonAsync(CodeUrl, new { email = NewEmail(), turnstileToken = HumanToken });
+        var response = await unreachable.CreateClient().PostAsJsonAsync(CodeUrl, new { email = NewEmail(), turnstileToken = HumanToken });
 
         response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
         (await IntegrationTestProblemDetails.ReadCodeAsync(response)).Should().Be("HumanVerification.Unavailable");
@@ -217,6 +216,16 @@ public sealed partial class TrialSignupAbuseIntegrationTests : IClassFixture<Cus
             => Task.FromResult(token == HumanToken && action == HumanVerificationActions.SignupEmailCode
                 ? HumanVerificationResult.Passed
                 : HumanVerificationResult.Failed);
+    }
+
+    /// <summary>Cloudflare'e ulaşılamıyor (zaman aşımı, yanlış gizli anahtar).</summary>
+    private sealed class UnreachableHumanVerifier : IHumanVerifier
+    {
+        public bool IsConfigured => true;
+        public string? SiteKey => FakeHumanVerifier.Key;
+
+        public Task<HumanVerificationResult> VerifyAsync(string? token, string? remoteIp, string action, CancellationToken ct)
+            => Task.FromResult(HumanVerificationResult.Unavailable);
     }
 
     private sealed record SentEmail(string To, string Body);

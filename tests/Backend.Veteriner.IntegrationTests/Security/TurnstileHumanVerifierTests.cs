@@ -3,6 +3,7 @@ using System.Text;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Infrastructure.Security.Turnstile;
 using AwesomeAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -44,6 +45,30 @@ public sealed class TurnstileHumanVerifierTests
 
         (await Create(new StubHandler(HttpStatusCode.BadGateway, ""), null).VerifyAsync("jeton", null, Action, CancellationToken.None))
             .Should().Be(HumanVerificationResult.Unavailable);
+    }
+
+    [Theory]
+    [InlineData(null, null, false)]
+    [InlineData("site", null, false)]
+    [InlineData(null, "gizli", false)]
+    [InlineData("site", "gizli", true)]
+    public async Task Selector_Should_Skip_Verification_Until_Both_Keys_Are_Set(string? siteKey, string? secretKey, bool real)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddHttpClient();
+        services.AddSingleton(Options.Create(new TurnstileOptions { SiteKey = siteKey, SecretKey = secretKey }));
+        services.AddScoped<TurnstileHumanVerifier>();
+        await using var provider = services.BuildServiceProvider();
+
+        var verifier = HumanVerifierSelector.Select(provider);
+
+        verifier.Should().BeOfType(real ? typeof(TurnstileHumanVerifier) : typeof(PassThroughHumanVerifier));
+        if (!real)
+        {
+            verifier.SiteKey.Should().BeNull("anahtar yokken istemci widget çizmez");
+            (await verifier.VerifyAsync(null, null, Action, CancellationToken.None)).Should().Be(HumanVerificationResult.Passed);
+        }
     }
 
     private static TurnstileHumanVerifier Create(StubHandler handler, string? expectedHostname)
