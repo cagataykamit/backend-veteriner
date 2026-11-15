@@ -565,6 +565,35 @@ public sealed class EVetBackupConverterTests
     }
 
     [Fact]
+    public void Two_Active_Copies_With_Same_Birth_Date_And_No_Conflict_Should_Merge_Others_Stay_Ambiguous()
+    {
+        object?[] header = ["Kayıt Tarihi", "Müşteriler", "Hastalar", "Protokol No", "Hasta Türü", "Irk", "Renk", "Doğum Tarihi", "Durum"];
+        var workbook = ImportTestFiles.Xlsx(
+            ("Müşteri Listesi", [CustomerHeader, [Registered, "Ayşe Yılmaz", 0d, 101, null, null, null, null, null, null, null, null, null, null, "Aktif"]]),
+            ("Hasta Listesi",
+            [
+                header,
+                // Kopya: doğum tarihi aynı, renk birinde boş.
+                [new DateTime(2023, 3, 1), "Ayşe Yılmaz", "Duman", 901, "Kedi", "Tekir", "Gri", new DateTime(2020, 4, 4), "Aktif"],
+                [new DateTime(2023, 6, 1), "Ayşe Yılmaz", "Duman", 902, "Kedi", "Tekir", null, new DateTime(2020, 4, 4), "Aktif"],
+                // Renkleri çelişiyor: birleşmez, belirsiz kalır.
+                [new DateTime(2023, 3, 1), "Ayşe Yılmaz", "Zeytin", 903, "Kedi", null, "Siyah", new DateTime(2021, 1, 5), "Aktif"],
+                [new DateTime(2023, 6, 1), "Ayşe Yılmaz", "Zeytin", 904, "Kedi", null, "Beyaz", new DateTime(2021, 1, 5), "Aktif"],
+            ]),
+            ("Muayene Listesi",
+            [
+                ExaminationHeader,
+                [new DateTime(2024, 6, 1), "Ayşe Yılmaz", "Duman", "Dr. A", 4d, null, "Topallık", null, null, null, null, null],
+                [new DateTime(2024, 6, 1), "Ayşe Yılmaz", "Zeytin", "Dr. A", 4d, null, "Kusma", null, null, null, null, null],
+            ]));
+
+        var result = Read(new ImportFileSet(ImportTestFiles.XlsxFile(workbook), null, null, null));
+
+        Rows(result, ImportTable.Pets).Select(p => p["HayvanNo"]).Should().Equal("902", "903", "904");
+        Rows(result, ImportTable.ClinicalRecords).Select(r => r["HayvanNo"]).Should().Equal("902", "Belirsiz: 903 / 904");
+    }
+
+    [Fact]
     public void Group_Without_Active_Record_Should_Merge_Into_Latest_And_Same_Owner_Copy_Into_Active()
     {
         object?[] header = ["Kayıt Tarihi", "Müşteriler", "Hastalar", "Protokol No", "Çip No", "Hasta Türü", "Doğum Tarihi", "Ölüm Zamanı", "Durum"];

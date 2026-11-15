@@ -405,13 +405,18 @@ internal static class EVetBackupConverter
     /// (1) <b>sahip değişimi:</b> E-vet eski sahipteki kaydı ölü (ölüm tarihi boş) bırakır, yeni sahipte aynı protokolle kayıt açar;
     /// dışa aktarmada "sahibi değişti" işareti yoktur. Aynı protokol + tür, eski kayıt ölüm tarihsiz ölü/pasif.
     /// (2) <b>mikroçip:</b> aynı mikroçip + tür tek hayvandır (zincir ve geri dönüş dahil: A → B → A).
-    /// (3) <b>kopya:</b> aynı sahipte aynı ad + tür + doğum tarihi (yanlışlıkla açılıp vefat girilmiş kopya).
-    /// Hedef grubun tek aktif kaydıdır; aktif yoksa en son açılan kayıt; iki aktif varsa birleştirilmez. Birleşen kayıt aktarılmaz,
-    /// geçmişi hedefe bağlanır (<see cref="PetEntry.Root"/>). Döner: kurala göre birleşen kayıt sayısı.
+    /// (3) <b>kopya:</b> aynı sahipte aynı ad + tür + doğum tarihi; ırk, renk, cinsiyet ve mikroçip çelişmez (aynı ya da biri
+    /// boş). Yanlışlıkla ikinci kez açılmış kayıt; ikisi de aktif olabilir (2026-11-15: aynı adlı iki aktif kopyanın geçmişi
+    /// "belirsiz" diye düşüyordu). Doğum tarihi birebir aynı olmalı: yalnız boş alanlara dayanan birleştirme yapılmaz.
+    /// Hedef grubun tek aktif kaydıdır; aktif yoksa en son açılan kayıt; (1) ve (2)'de iki aktif varsa birleştirilmez, (3)'te en
+    /// son açılan aktif kayıt hedeftir. Birleşen kayıt aktarılmaz, geçmişi hedefe bağlanır (<see cref="PetEntry.Root"/>).
+    /// Döner: kurala göre birleşen kayıt sayısı.
     /// </summary>
     private static (int ByProtocol, int ByChip, int ByCopy) MergeSameAnimals(List<PetEntry> entries)
     {
-        static int Merge(IEnumerable<IEnumerable<PetEntry>> groups, Func<PetEntry, bool> canBeFormer)
+        static PetEntry Latest(IEnumerable<PetEntry> e) => e.OrderBy(x => x.Registered ?? DateTime.MinValue).ThenBy(x => x.Row.RowNumber).Last();
+
+        static int Merge(IEnumerable<IEnumerable<PetEntry>> groups, Func<PetEntry, bool> canBeFormer, bool copies = false)
         {
             var count = 0;
             foreach (var group in groups)
@@ -419,19 +424,21 @@ internal static class EVetBackupConverter
                 var roots = group.Select(e => e.Root).Distinct().ToList();
                 if (roots.Count < 2 || roots.Select(e => e.Identity.Species).Distinct().Count() != 1)
                     continue;
+                if (copies && !Compatible(roots))
+                    continue;
 
                 var active = roots.Where(e => e.Status == "aktif").ToList();
                 var target = active.Count switch
                 {
                     1 => active[0],
-                    0 => roots.OrderBy(e => e.Registered ?? DateTime.MinValue).ThenBy(e => e.Row.RowNumber).Last(),
-                    _ => null,
+                    0 => Latest(roots),
+                    _ => copies ? Latest(active) : null,
                 };
                 if (target is null)
                     continue;
 
                 var formers = roots.Where(e => e != target).ToList();
-                if (!formers.All(e => e.Status is "olu" or "pasif" && canBeFormer(e)))
+                if (!copies && !formers.All(e => e.Status is "olu" or "pasif" && canBeFormer(e)))
                     continue;
 
                 foreach (var former in formers)
@@ -450,9 +457,16 @@ internal static class EVetBackupConverter
             _ => true);
         var byCopy = Merge(
             entries.Where(e => e.Name is not null && e.Birth is not null).GroupBy(e => (e.Identity, e.Birth!.Value.Date)).Where(g => g.Count() > 1),
-            _ => true);
+            _ => true,
+            copies: true);
         return (byProtocol, byChip, byCopy);
     }
+
+    /// <summary>Kopya sayılacak kayıtlarda ırk, renk, cinsiyet ve mikroçip çelişmez: her alanda dolu değerler tek.</summary>
+    private static bool Compatible(IReadOnlyList<PetEntry> roots)
+        => Enumerable.Range(0, roots[0].Looks.Length)
+               .All(i => roots.Select(e => e.Looks[i]).Where(v => v.Length > 0).Distinct().Count() <= 1)
+           && roots.Select(e => e.Chip).OfType<string>().Distinct().Count() <= 1;
 
     /// <summary>E-vet cinsiyet hücresi kısırlığı da taşır (<c>Kısırlaştırılmış Dişi</c>, <c>Kısır</c>, <c>Bilinmiyor</c>).</summary>
     private static (string? Gender, bool Neutered) SplitGender(string? value)
@@ -861,7 +875,8 @@ internal static class EVetBackupConverter
             Died = EVetCells.ParseDateTime(sheet[row, "Ölüm Zamanı"]);
             Chip = ChipKey(sheet[row, "Çip No"]);
             Birth = EVetCells.ParseDateTime(sheet[row, "Doğum Tarihi"]);
-            Traits =string.Join('|', EVetCells.Date(sheet[row, "Doğum Tarihi"]), sheet[row, "Cinsiyet"], sheet[row, "Renk"], Status);
+            Looks = [ImportTextFolding.Fold(sheet[row, "Irk"]), ImportTextFolding.Fold(sheet[row, "Renk"]), ImportTextFolding.Fold(sheet[row, "Cinsiyet"])];
+            Traits = string.Join('|', EVetCells.Date(sheet[row, "Doğum Tarihi"]), sheet[row, "Cinsiyet"], sheet[row, "Renk"], Status);
         }
 
         public ImportSourceRow Row { get; }
@@ -887,6 +902,9 @@ internal static class EVetBackupConverter
         public string? Chip { get; }
 
         public DateTime? Birth { get; }
+
+        /// <summary>Kopya karşılaştırması için katlanmış ırk, renk, cinsiyet (boş: bilinmiyor).</summary>
+        public string[] Looks { get; }
 
         /// <summary>Aynı hayvanın tekrar kaydıysa ilk kaydın anahtarı (doğrulamada ilk satırla birleşir).</summary>
         public string? DuplicateOf { get; set; }
