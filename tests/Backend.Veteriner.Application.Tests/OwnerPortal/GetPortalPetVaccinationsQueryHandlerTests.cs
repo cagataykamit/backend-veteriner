@@ -19,7 +19,7 @@ namespace Backend.Veteriner.Application.Tests.OwnerPortal;
 
 /// <summary>
 /// Portal aşı ucu: ADR-028 gün bazlı gecikme (İstanbul günü, <c>VaccinationDueRule</c>), vefat eden hayvanda yaklaşan/gecikmiş
-/// liste yok, iptal ve uygulanan kayıt geçmişte, sahiplik dışı hayvan <c>Portal.Pets.NotFound</c>.
+/// liste yok, uygulanan kayıt geçmişte (iptal edileni spec düşürür: <c>PortalVaccinationsForPetSpecTests</c>), sahiplik dışı hayvan <c>Portal.Pets.NotFound</c>.
 /// </summary>
 public sealed class GetPortalPetVaccinationsQueryHandlerTests
 {
@@ -130,20 +130,17 @@ public sealed class GetPortalPetVaccinationsQueryHandlerTests
     }
 
     [Fact]
-    public async Task History_Should_Contain_Applied_And_Cancelled_Newest_First()
+    public async Task History_Should_Contain_Applied_Newest_First()
     {
         GivenPet();
         var olderApplied = Guid.NewGuid();
-        var cancelled = Guid.NewGuid();
         var newerApplied = Guid.NewGuid();
         _rows.Add(new PortalVaccinationRow(olderApplied, "Kuduz", VaccinationStatus.Applied, new DateTime(2026, 1, 1, 8, 0, 0, DateTimeKind.Utc), null, OwnerPortalTestFixture.Now));
-        _rows.Add(new PortalVaccinationRow(cancelled, "Karma", VaccinationStatus.Cancelled, null, new DateTime(2026, 5, 1, 8, 0, 0, DateTimeKind.Utc), OwnerPortalTestFixture.Now));
         _rows.Add(new PortalVaccinationRow(newerApplied, "Karma", VaccinationStatus.Applied, new DateTime(2026, 9, 1, 8, 0, 0, DateTimeKind.Utc), null, OwnerPortalTestFixture.Now));
 
         var result = await SendAsync(OwnerPortalTestFixture.Now);
 
-        result.Value!.History.Select(h => h.VaccinationId).Should().Equal(newerApplied, cancelled, olderApplied);
-        result.Value.History.Single(h => h.VaccinationId == cancelled).Status.Should().Be(VaccinationStatus.Cancelled);
+        result.Value!.History.Select(h => h.VaccinationId).Should().Equal(newerApplied, olderApplied);
         result.Value.Upcoming.Should().BeEmpty();
     }
 

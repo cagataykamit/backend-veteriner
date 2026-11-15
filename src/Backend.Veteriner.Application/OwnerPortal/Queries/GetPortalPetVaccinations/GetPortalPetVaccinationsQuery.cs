@@ -11,7 +11,7 @@ using Mediator;
 namespace Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalPetVaccinations;
 
 /// <summary>
-/// Hayvanın aşı geçmişi (uygulanan + iptal) ve planlı aşıları (docs/PORTAL_API_CONTRACT.md §6.3). Gecikme ADR-028
+/// Hayvanın aşı geçmişi (uygulanan; iptal edilen gösterilmez, <see cref="PortalVaccinationsForPetSpec"/>) ve planlı aşıları (docs/PORTAL_API_CONTRACT.md §6.3). Gecikme ADR-028
 /// <see cref="VaccinationDueRule"/>; vefat eden hayvanın planlı aşısı ne gecikmiş ne yaklaşan sayılır (<see cref="Pet.ReceivesCare"/>).
 /// </summary>
 public sealed record GetPortalPetVaccinationsQuery(Guid OwnerAccountId, Guid LinkId, Guid PetId)

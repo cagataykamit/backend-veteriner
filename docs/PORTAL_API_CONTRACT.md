@@ -283,7 +283,7 @@ Ortak kurallar:
 - Enum alanları metin. Tarih-saat alanları (`…Utc`) UTC'dir; veritabanından okunduğu için personel API'leriyle aynı biçimde **`Z` soneki olmadan** döner (ör. `2026-10-19T05:48:39.0565737`), istemci UTC kabul eder. Takvim tarihi `yyyy-MM-dd`, saat `HH:mm:ss`. Tutarlar sayı, iki ondalık.
 - Örnek yanıtlar entegrasyon testindeki gerçek yanıtlardan alınmıştır (kimlikler kısaltıldı).
 - **Vefat:** vefat eden hayvan listede `status: "Deceased"` ile görünür; aşı geçmişi döner, **yaklaşan/gecikmiş aşı listesi boştur** (ADR-028 kuralı: vefat eden hastanın aşısı ne gecikmiş ne yaklaşan sayılır; `Pet.ReceivesCare`, ADR-020 S5 / ADR-025).
-- İptal edilmiş randevu ve aşı listeden düşmez, `status: "Cancelled"` ile gelir.
+- İptal edilmiş randevu listeden düşmez, `status: "Cancelled"` ile gelir. **İptal edilmiş aşı portalda hiç dönmez** (kullanıcı kararı 2026-11-16, ADR-043 açık sorusu; kural tek yerde `PortalVaccinationsForPetSpec`); panel davranışı değişmedi.
 
 | Uç | Denetim eylemi | Sayfalama |
 |---|---|---|
@@ -340,7 +340,6 @@ Detay: liste öğesi + `isNeutered` (bool), `colorName` (katalog rengi veya `nul
 ```json
 {
   "history": [
-    { "vaccinationId": "5f324f82-…", "vaccineName": "Lösemi", "status": "Cancelled", "appliedAtUtc": null, "dueAtUtc": "2026-10-06T05:48:39.0565737" },
     { "vaccinationId": "5f292872-…", "vaccineName": "Karma", "status": "Applied", "appliedAtUtc": "2026-09-16T05:48:39.0565737", "dueAtUtc": null }
   ],
   "upcoming": [
@@ -350,7 +349,7 @@ Detay: liste öğesi + `isNeutered` (bool), `colorName` (katalog rengi veya `nul
 }
 ```
 
-- `history`: `Applied` ve `Cancelled` kayıtlar; en yeni önce (uygulama tarihi, yoksa vade, yoksa oluşturma zamanı).
+- `history`: `Applied` kayıtlar (iptal edilen aşı dönmez); en yeni önce (uygulama tarihi, yoksa vade, yoksa oluşturma zamanı).
 - `upcoming`: `Scheduled` kayıtlar, vadeye göre artan (vadesiz planlı kayıt sonda, `dueAtUtc: null`, `isOverdue: false`).
 - `isOverdue`: **ADR-028 gün bazlı tanım, tek kural `VaccinationDueRule`**: vade, İstanbul gününün başından (UTC) önceyse gecikmiş; bugün vadesi olan aşı saati geçse de gecikmiş değildir.
 - Vefat eden hayvanda `upcoming` boş (ortak kurallar).

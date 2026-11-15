@@ -214,7 +214,7 @@ public sealed partial class OwnerPortalIntegrationTests
         upcoming[0].GetProperty("isOverdue").GetBoolean().Should().BeTrue();
         upcoming[1].GetProperty("isOverdue").GetBoolean().Should().BeFalse();
         vacc.GetProperty("history").EnumerateArray().Select(h => h.GetProperty("status").GetString())
-            .Should().BeEquivalentTo(["Applied", "Cancelled"]);
+            .Should().Equal(["Applied"], "iptal edilmiş aşı portalda hiç görünmez (2026-11-16)");
 
         var (deceasedVacc, _) = await GetOkAsync($"/api/portal/v1/links/{link}/pets/{f.DeceasedPetId}/vaccinations", token);
         deceasedVacc.GetProperty("upcoming").GetArrayLength().Should().Be(0, "vefat eden hastada gecikmiş/yaklaşan aşı yok (ADR-028)");
