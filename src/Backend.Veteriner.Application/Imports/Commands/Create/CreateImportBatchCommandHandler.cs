@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Files;
 using Backend.Veteriner.Application.Imports.Access;
 using Backend.Veteriner.Application.Imports.Contracts.Dtos;
 using Backend.Veteriner.Application.Imports.Mapping;
@@ -30,6 +31,7 @@ public sealed class CreateImportBatchCommandHandler
     private readonly ImportTableInfoLoader _tableInfo;
     private readonly TimeProvider _timeProvider;
     private readonly ITrialLimitPolicy _trialLimitPolicy;
+    private readonly UploadMalwareGuard _malwareGuard;
 
     public CreateImportBatchCommandHandler(
         ITenantContext tenantContext,
@@ -43,7 +45,8 @@ public sealed class CreateImportBatchCommandHandler
         ImportUploadReader reader,
         ImportTableInfoLoader tableInfo,
         TimeProvider timeProvider,
-        ITrialLimitPolicy trialLimitPolicy)
+        ITrialLimitPolicy trialLimitPolicy,
+        UploadMalwareGuard malwareGuard)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -57,6 +60,7 @@ public sealed class CreateImportBatchCommandHandler
         _tableInfo = tableInfo;
         _timeProvider = timeProvider;
         _trialLimitPolicy = trialLimitPolicy;
+        _malwareGuard = malwareGuard;
     }
 
     public async ValueTask<Result<ImportBatchCreateResultDto>> Handle(CreateImportBatchCommand request, CancellationToken ct)
@@ -97,6 +101,14 @@ public sealed class CreateImportBatchCommandHandler
             return Result<ImportBatchCreateResultDto>.Failure(prepared.Error);
 
         var upload = prepared.Value!;
+
+        // Virüs taraması ucuz denetimlerden sonra, ayrıştırmadan ve partiyi yazmadan önce.
+        foreach (var file in request.Files.AllFiles)
+        {
+            var scan = await _malwareGuard.EnsureCleanAsync(file.Content, request, ct);
+            if (!scan.IsSuccess)
+                return Result<ImportBatchCreateResultDto>.Failure(scan.Error);
+        }
 
         var existing = await _batchesRead.FirstOrDefaultAsync(new ImportBatchByRequestIdSpec(tenantId, request.RequestId), ct);
         if (existing is not null)

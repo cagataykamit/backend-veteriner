@@ -38,6 +38,10 @@ public sealed record ImportFileSet(
         }
     }
 
+    /// <summary>Verilen tüm dosyalar (virüs taraması).</summary>
+    public IEnumerable<ImportUploadedFile> AllFiles
+        => new[] { Workbook }.Concat(CsvFiles.Select(x => x.File)).Concat(EVetReports.Select(x => x.File)).OfType<ImportUploadedFile>();
+
     /// <summary>Verilen CSV dosyaları, tablo sırasıyla.</summary>
     public IEnumerable<(ImportTable Table, ImportUploadedFile File)> CsvFiles
         => ImportTables.All.Select(t => (Table: t, File: Csv(t))).Where(x => x.File is not null).Select(x => (x.Table, x.File!));

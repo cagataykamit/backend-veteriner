@@ -147,6 +147,7 @@ Tür dosya adından ya da bildirilen içerik türünden değil **içeriğin imza
 | Site başına 100 görsel | 409 `Files.LimitReached` |
 | Deneme kotası (kiracının toplam depolaması; site görselleri de sayılır) | 422 `Trial.*` (TRIAL_LIMITS_API_CONTRACT.md) |
 | Depo erişilemiyor | 503 `Files.StorageUnavailable` |
+| Virüslü / taranamıyor | 422 `Files.MalwareDetected` / 503 `Files.ScanUnavailable` (IMAGING_API_CONTRACT.md, Virüs taraması) |
 
 `GET /images/{imageId}/content`: Bearer ile içerik; yayınlanmamış görseli de açar, `Cache-Control: private, no-store`. Önizlemede
 motor `site-image:` başvurusunu bu uçtan okur.

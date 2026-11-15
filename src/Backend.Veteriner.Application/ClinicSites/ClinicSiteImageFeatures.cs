@@ -66,7 +66,7 @@ public sealed class UploadClinicSiteImageCommandHandler : IRequestHandler<Upload
     private readonly IReadRepository<ClinicSite> _sites;
     private readonly IRepository<ClinicSiteImage> _images;
     private readonly IFileStorage _storage;
-    private readonly IFileMalwareScanner _scanner;
+    private readonly UploadMalwareGuard _malwareGuard;
     private readonly ITrialQuotaGuard _trialQuota;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<UploadClinicSiteImageCommandHandler> _logger;
@@ -77,7 +77,7 @@ public sealed class UploadClinicSiteImageCommandHandler : IRequestHandler<Upload
         IReadRepository<ClinicSite> sites,
         IRepository<ClinicSiteImage> images,
         IFileStorage storage,
-        IFileMalwareScanner scanner,
+        UploadMalwareGuard malwareGuard,
         ITrialQuotaGuard trialQuota,
         TimeProvider timeProvider,
         ILogger<UploadClinicSiteImageCommandHandler> logger)
@@ -87,7 +87,7 @@ public sealed class UploadClinicSiteImageCommandHandler : IRequestHandler<Upload
         _sites = sites;
         _images = images;
         _storage = storage;
-        _scanner = scanner;
+        _malwareGuard = malwareGuard;
         _trialQuota = trialQuota;
         _timeProvider = timeProvider;
         _logger = logger;
@@ -121,6 +121,10 @@ public sealed class UploadClinicSiteImageCommandHandler : IRequestHandler<Upload
         if (type is null)
             return Fail("Files.UnsupportedType", "Yalnız JPEG, PNG ve WebP görsel yüklenebilir.");
 
+        var scan = await _malwareGuard.EnsureCleanAsync(request.Content, request, ct);
+        if (!scan.IsSuccess)
+            return Result<ClinicSiteImageDto>.Failure(scan.Error);
+
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var imageId = Guid.NewGuid();
         var storageKey = StoredFile.BuildStorageKey(tenantId, request.ClinicId, utcNow, imageId);
@@ -139,13 +143,6 @@ public sealed class UploadClinicSiteImageCommandHandler : IRequestHandler<Upload
         {
             _logger.LogError("Site image write failed. ImageId={ImageId} Exception={ExceptionType}", imageId, ex.GetType().FullName);
             return Fail("Files.StorageUnavailable", "Dosya deposu şu anda kullanılamıyor; daha sonra tekrar deneyin.");
-        }
-
-        var scan = await _scanner.ScanAsync(storageKey, ct);
-        if (!scan.IsSuccess)
-        {
-            await DiscardAsync(storageKey);
-            return Result<ClinicSiteImageDto>.Failure(scan.Error);
         }
 
         var image = ClinicSiteImage.Create(

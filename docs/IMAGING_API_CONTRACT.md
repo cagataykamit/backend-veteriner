@@ -31,7 +31,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-007 (Görüntüleme modülü, k
 | Statik sunum yok | Dosyalar hiçbir zaman statik URL ile sunulmaz; yalnız aşağıdaki yetkili akış ucu veya kısa ömürlü imzalı URL. |
 | Yanıt başlıkları | `Content-Type` sabit (yukarıda), `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`, `X-Frame-Options: DENY` (genel API başlıkları), `Content-Disposition: inline` (gösterim) veya `attachment` (`?download=true`), ad RFC 6266 `filename*` ile kodlanır. Önbellek: `Cache-Control: private, no-store`. |
 | PDF | Gösterim için istemci PDF'i Bearer ile akış ucundan blob olarak alır ve tarayıcının PDF görüntüleyicisinde açar; API sayfası çerçeveye gömülemez (`frame-ancestors 'none'`). |
-| Virüs taraması | **v1'de uygulama yok.** `IFileMalwareScanner` arayüzü yazma sonrası, `Ready` öncesi çağrılır; v1 kaydı tarama yapmayan uygulamadır (her dosyayı geçirir). Gerçek tarayıcı (ör. ClamAV) ürün/maliyet kararıdır (D8: yükleyen yalnız klinik personeli). Tarayıcı reddederse içerik silinir, meta `Deleted`, yanıt 422 `Files.MalwareDetected`. |
+| Virüs taraması | Her yükleme (görüntüleme ve lab dosyası, klinik sitesi görseli, içe aktarma dosyası) **kaydedilmeden önce** taranır; kural tek yerde (`UploadMalwareGuard`). `FileScanning:Enabled=true` iken ClamAV (clamd INSTREAM, `FileScanning:Clamd:Host/Port/TimeoutSeconds/MaxFileSizeMb`); kapalıyken (yerel, test varsayılanı) her içerik geçer. Virüslü: 422 `Files.MalwareDetected` "Dosyada zararlı içerik bulundu; yüklenmedi.", imza adıyla denetim kaydı (`Action=Files.MalwareDetected`). Tarayıcıya ulaşılamıyor ya da içerik tarama sınırını aşıyor: 503 `Files.ScanUnavailable` "Dosya şu an taranamıyor; biraz sonra tekrar deneyin." (taranmamış dosya kabul edilmez). İki durumda da hiçbir şey yazılmaz. `/health/ready` içinde `clamav` girdisi: tarama açık ve clamd yanıtsızsa Degraded (503). |
 | Depolama yeri | `FileStorage:RootPath` (yapılandırma). Boşsa yükleme/indirme 503 `Files.StorageUnavailable` döner (uygulamanın diğer bölümleri çalışır). Göreli yol uygulama dizinine göre çözülür; geliştirmede repo dışı mutlak bir klasör verilir (ör. `C:\VetinityData\files`). Yedekleme bu sözleşmenin dışındadır (kullanıcı işi). |
 
 ## 3) Yetkiler
@@ -142,7 +142,7 @@ Yanıt 201, `StoredFileDto`:
 }
 ```
 
-`kind`: `Image` | `Pdf`. Hatalar: 400 `Files.Validation` (dosya yok/boş), 413 `Files.TooLarge`, 415 `Files.UnsupportedType`, 409 `Files.LimitReached`, 422 `Files.MalwareDetected`, 503 `Files.StorageUnavailable`.
+`kind`: `Image` | `Pdf`. Hatalar: 400 `Files.Validation` (dosya yok/boş), 413 `Files.TooLarge`, 415 `Files.UnsupportedType`, 409 `Files.LimitReached`, 422 `Files.MalwareDetected`, 503 `Files.StorageUnavailable`, 503 `Files.ScanUnavailable` (§ Virüs taraması).
 
 ### Akış — `GET /{owner}/{id}/files/{fileId}/content[?download=true]`
 

@@ -164,7 +164,9 @@ public static class WebApplicationBuilderExtensions
             .AddCheck<AppointmentProjectionHealthCheck>("appointment-projection")
             .AddCheck<ClientProjectionHealthCheck>("client-projection")
             .AddCheck<PetProjectionHealthCheck>("pet-projection")
-            .AddCheck<PaymentProjectionHealthCheck>("payment-projection");
+            .AddCheck<PaymentProjectionHealthCheck>("payment-projection")
+            // Virüs taraması açıkken clamd de hazır olma koşuludur: ulaşılamazsa yüklemeler reddedilir (Degraded → 503).
+            .AddCheck<ClamAvHealthCheck>("clamav", failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded);
 
         builder.Services.AddInfrastructure(builder.Configuration);
 

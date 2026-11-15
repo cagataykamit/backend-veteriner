@@ -659,6 +659,8 @@ Uygulama (arka plan): müşteri → hasta → aşı sırası; **sahip bazlı** i
 |------|-----|-------|
 | 400 | `Validation.FluentValidation` | İstek biçimi (eksik `requestId`, geçersiz sayfa vb.) |
 | 400 | `Imports.UnsupportedFile` / `Imports.FileTooLarge` / `Imports.TooManyRows` / `Imports.EmptyFile` | Dosya düzeyi |
+| 422 | `Files.MalwareDetected` | Dosyalardan birinde zararlı içerik bulundu ("Dosyada zararlı içerik bulundu; yüklenmedi."); parti oluşmaz. Tarama dosya düzeyi denetimlerden sonra, ayrıştırmadan önce yapılır (`IMAGING_API_CONTRACT.md`, Virüs taraması) |
+| 503 | `Files.ScanUnavailable` | Virüs taraması açık ama tarayıcıya ulaşılamıyor ("Dosya şu an taranamıyor; biraz sonra tekrar deneyin."); parti oluşmaz, istemci daha sonra aynı `requestId` ile yeniden dener |
 | 400 | `Imports.MappingIncomplete` / `Imports.MappingUnknownColumn` / `Imports.MappingSourceReused` / `Imports.ValueMappingTargetInvalid` | Eşleme |
 | 400 | `Imports.ClinicRequired` | Aşı tablosu var, `clinicId` yok |
 | 404 | `Imports.BatchNotFound` | Parti yok veya başka kiracıya ait |
