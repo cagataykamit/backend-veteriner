@@ -243,7 +243,7 @@ public sealed class SetClientKvkkConsentCommandHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value!.KvkkConsentTemplateVersion.Should().Be(ClinicKvkkFormTemplate.DefaultTextVersion);
         result.Value.KvkkConsentTemplateHash.Should().Be(
-            ClinicKvkkFormTemplate.ComputeTextHash(ClinicKvkkFormTemplateDefaults.TextFor(ClinicKvkkFormKind.Consent)));
+            ClinicKvkkFormTemplate.ComputeTextHash(ClinicKvkkFormTemplateDefaults.TextFor(ClinicKvkkFormKind.Consent, new Clinic(_tenantId, "Merkez", "Izmir"))));
     }
 
     [Fact]

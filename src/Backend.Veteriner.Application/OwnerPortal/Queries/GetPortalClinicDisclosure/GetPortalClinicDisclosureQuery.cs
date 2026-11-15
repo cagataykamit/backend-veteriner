@@ -15,8 +15,8 @@ using Mediator;
 namespace Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalClinicDisclosure;
 
 /// <summary>
-/// Bağın kliniğinin KVKK aydınlatma metni (ADR-021/024; klinik paneli <c>kvkk-disclosure-template</c> kaydı, yoksa taslak
-/// varsayılan). Yer tutucular sunucuda doldurulur; tarih İstanbul günüdür.
+/// Bağın kliniğinin KVKK aydınlatma metni (ADR-021/024; klinik paneli <c>kvkk-disclosure-template</c> kaydı, yoksa
+/// varsayılan; iletişim bilgileri klinik kaydından). Yer tutucular sunucuda doldurulur; tarih İstanbul günüdür.
 /// </summary>
 public sealed record GetPortalClinicDisclosureQuery(Guid OwnerAccountId, Guid LinkId) : IRequest<Result<PortalClinicDisclosureDto>>;
 
@@ -61,7 +61,7 @@ public sealed class GetPortalClinicDisclosureQueryHandler
 
         var template = await _templates.FirstOrDefaultAsync(
             new ClinicKvkkFormTemplateByClinicSpec(scope.TenantId, scope.ClinicId, ClinicKvkkFormKind.Disclosure), ct);
-        var rawText = template?.Text ?? ClinicKvkkFormTemplateDefaults.TextFor(ClinicKvkkFormKind.Disclosure);
+        var rawText = template?.Text ?? ClinicKvkkFormTemplateDefaults.TextFor(ClinicKvkkFormKind.Disclosure, clinic);
         var today = OperationDayBounds.ToLocalDate(_timeProvider.GetUtcNow().UtcDateTime);
 
         var text = rawText

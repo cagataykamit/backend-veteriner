@@ -221,7 +221,7 @@ public sealed class ClinicsController : ControllerBase
 
     /// <summary>
     /// Klinik KVKK aydınlatma metni şablonu (ADR-024). Açık rıza formu şablonuyla aynı sözleşme, izin ve sürüm kuralı;
-    /// kayıt yoksa taslak varsayılan aydınlatma metni döner (<c>isDefault=true</c>). Bkz. docs/KVKK_CONSENT_API_CONTRACT.md.
+    /// kayıt yoksa varsayılan aydınlatma metni döner (<c>isDefault=true</c>). Bkz. docs/KVKK_CONSENT_API_CONTRACT.md.
     /// </summary>
     /// <remarks>Okuma yetkisi composite "any-of": <c>Clinics.Read</c>, <c>Clinics.Update</c> veya <c>Clients.Read</c>.</remarks>
     [HttpGet("{id:guid}/kvkk-disclosure-template")]

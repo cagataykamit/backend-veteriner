@@ -32,6 +32,7 @@ public sealed class ClinicKvkkFormTemplateHandlerTests
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<ClinicKvkkFormTemplate>> _templatesRead = new();
     private readonly Mock<IRepository<ClinicKvkkFormTemplate>> _templates = new();
+    private Clinic _clinic = null!;
 
     public ClinicKvkkFormTemplateHandlerTests()
     {
@@ -41,10 +42,15 @@ public sealed class ClinicKvkkFormTemplateHandlerTests
         _assignmentGuard
             .Setup(x => x.MustApplyAssignedClinicScopeAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
-        var clinic = new Clinic(_tenantId, "K", "Istanbul");
+        UseClinic(new Clinic(_tenantId, "K", "Istanbul"));
+    }
+
+    private void UseClinic(Clinic clinic)
+    {
         typeof(Clinic).GetProperty(nameof(Clinic.Id))!.SetValue(clinic, _clinicId);
         _clinics.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(clinic);
+        _clinic = clinic;
     }
 
     private void ReturnTemplate(ClinicKvkkFormTemplate? row)
@@ -75,11 +81,45 @@ public sealed class ClinicKvkkFormTemplateHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value!.IsDefault.Should().BeTrue();
         result.Value.RowVersion.Should().BeNull();
-        result.Value.Text.Should().Be(ClinicKvkkFormTemplateDefaults.Text);
-        result.Value.Text.Should().StartWith("Bu metin hukuk danışmanınızca onaylanmış açık rıza metniyle");
-        result.Value.Text.Should().Contain("{{clinicName}} — KİŞİSEL VERİLERİN İŞLENMESİNE İLİŞKİN AÇIK RIZA BEYANI");
+        result.Value.Text.Should().Be(ClinicKvkkFormTemplateDefaults.TextFor(Consent, _clinic));
+        result.Value.Text.Should().StartWith("{{clinicName}} — KİŞİSEL VERİLERİN İŞLENMESİNE İLİŞKİN AÇIK RIZA BEYANI");
+        result.Value.Text.Should().NotContain("hukuk danışman").And.NotContain("[")
+            .And.Contain("Rızamı dilediğim zaman Kliniğe bildirerek geri alabilirim.");
         result.Value.Placeholders.Should().Equal("{{clinicName}}", "{{clientName}}", "{{date}}");
         result.Value.MaxLength.Should().Be(ClinicKvkkFormTemplate.MaxTextLength);
+        result.Value.MissingClinicDetails.Should().Equal("address", "email");
+    }
+
+    [Fact]
+    public async Task Get_Should_Fill_Clinic_Contact_Into_Default_Disclosure()
+    {
+        UseClinic(new Clinic(_tenantId, "K", "Istanbul", phone: "0212 111 22 33", email: "k@ornek.com", address: "Moda Cad. 1 Kadıköy"));
+        ReturnTemplate(null);
+
+        var result = await CreateQueryHandler().Handle(new GetClinicKvkkFormTemplateQuery(_clinicId, Disclosure), CancellationToken.None);
+
+        result.Value!.Text.Should()
+            .Contain("Veri sorumlusu {{clinicName}}'dır (Adres: Moda Cad. 1 Kadıköy; Telefon: 0212 111 22 33; E-posta: k@ornek.com).")
+            .And.Contain("talebinizi yazılı olarak Moda Cad. 1 Kadıköy adresine elden veya noter aracılığıyla ya da k@ornek.com adresine e-postayla iletebilirsiniz.")
+            .And.NotContain("[");
+        result.Value.MissingClinicDetails.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Get_Should_Drop_Empty_Clinic_Contact_From_Default_Texts()
+    {
+        UseClinic(new Clinic(_tenantId, "K", "Istanbul", phone: "0212 111 22 33"));
+        ReturnTemplate(null);
+
+        var disclosure = await CreateQueryHandler().Handle(new GetClinicKvkkFormTemplateQuery(_clinicId, Disclosure), CancellationToken.None);
+        var consent = await CreateQueryHandler().Handle(new GetClinicKvkkFormTemplateQuery(_clinicId, Consent), CancellationToken.None);
+
+        disclosure.Value!.Text.Should()
+            .Contain("Veri sorumlusu {{clinicName}}'dır (Telefon: 0212 111 22 33).")
+            .And.Contain("talebinizi yazılı olarak veri sorumlusuna iletebilirsiniz.")
+            .And.NotContain("Adres:").And.NotContain("E-posta:");
+        disclosure.Value.MissingClinicDetails.Should().Equal("address", "email");
+        consent.Value!.MissingClinicDetails.Should().Equal("address", "email");
     }
 
     [Fact]
@@ -92,10 +132,12 @@ public sealed class ClinicKvkkFormTemplateHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value!.IsDefault.Should().BeTrue();
         result.Value.RowVersion.Should().BeNull();
-        result.Value.Text.Should().Be(ClinicKvkkFormTemplateDefaults.DisclosureText);
-        result.Value.Text.Should().StartWith("Bu metin hukuk danışmanınızca onaylanmış aydınlatma metniyle");
-        result.Value.Text.Should().Contain("{{clinicName}} — KİŞİSEL VERİLERİN İŞLENMESİNE İLİŞKİN AYDINLATMA METNİ")
-            .And.Contain("{{date}}").And.Contain("{{clientName}}").And.NotContain("**");
+        result.Value.Text.Should().Be(ClinicKvkkFormTemplateDefaults.TextFor(Disclosure, _clinic));
+        result.Value.Text.Should().StartWith("{{clinicName}} — KİŞİSEL VERİLERİN İŞLENMESİNE İLİŞKİN AYDINLATMA METNİ");
+        result.Value.Text.Should().Contain("{{date}}").And.Contain("{{clientName}}").And.NotContain("**")
+            .And.NotContain("hukuk danışman").And.NotContain("[")
+            .And.Contain("Veri sorumlusu {{clinicName}}'dır.");
+        result.Value.MissingClinicDetails.Should().Equal("address", "phone", "email");
         result.Value.Text.Length.Should().BeLessThan(ClinicKvkkFormTemplate.MaxTextLength);
         result.Value.Placeholders.Should().Equal("{{clinicName}}", "{{clientName}}", "{{date}}");
         _templatesRead.Verify(x => x.FirstOrDefaultAsync(
@@ -113,6 +155,7 @@ public sealed class ClinicKvkkFormTemplateHandlerTests
 
         result.Value!.IsDefault.Should().BeFalse();
         result.Value.Text.Should().Be("Klinik metni");
+        result.Value.MissingClinicDetails.Should().BeEmpty();
     }
 
     [Fact]

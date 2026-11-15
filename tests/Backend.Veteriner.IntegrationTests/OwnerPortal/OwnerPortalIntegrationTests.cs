@@ -195,7 +195,7 @@ public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWe
         var disclosure = await SendAsync(HttpMethod.Get, $"/api/portal/v1/links/{linkId}/clinic-disclosure", access);
         disclosure.StatusCode.Should().Be(HttpStatusCode.OK);
         var disclosureJson = await disclosure.Content.ReadFromJsonAsync<JsonElement>();
-        disclosureJson.GetProperty("text").GetString().Should().NotContain("{{clinicName}}");
+        disclosureJson.GetProperty("text").GetString().Should().NotContain("{{clinicName}}").And.NotContain("[klinik");
         (await SendAsync(HttpMethod.Post, $"/api/portal/v1/links/{linkId}/clinic-disclosure/acknowledge", access))
             .StatusCode.Should().Be(HttpStatusCode.NoContent);
         var legalAfter = await (await SendAsync(HttpMethod.Get, "/api/portal/v1/me/legal-acceptances", access)).Content.ReadFromJsonAsync<JsonElement>();

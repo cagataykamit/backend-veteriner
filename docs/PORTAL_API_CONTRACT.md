@@ -211,7 +211,7 @@ Personel belgeleri (`Terms`, `Privacy`, `DataProcessing`) ve personel uçları d
 
 `POST /api/portal/v1/me/legal-acceptances` — `{ "documents": [ … ] }`. Personel ucuyla aynı kurallar: bekleyen her belge için yeni satır; gerekmeyen/güncel olanlar yok sayılır; eksik → 400 `LegalAcceptances.Required`; eski sürüm → 409 `LegalAcceptances.VersionOutdated`. Yanıt 200, GET ile aynı şekil.
 
-`GET /api/portal/v1/links/{linkId}/clinic-disclosure` — kliniğin aydınlatma metni (mevcut `kvkk-disclosure-template` kaydı; yoksa taslak varsayılan):
+`GET /api/portal/v1/links/{linkId}/clinic-disclosure` — kliniğin aydınlatma metni (mevcut `kvkk-disclosure-template` kaydı; yoksa adres/telefon/e-postası klinik kaydından doldurulmuş varsayılan, bkz. `KVKK_CONSENT_API_CONTRACT.md` §2b):
 
 ```json
 { "linkId": "…", "clinicId": "…", "clinicName": "Merkez", "text": "…", "isDefault": true, "acknowledgedAtUtc": null }
