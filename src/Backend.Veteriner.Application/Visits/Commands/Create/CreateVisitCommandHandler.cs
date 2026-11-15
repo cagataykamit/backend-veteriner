@@ -137,7 +137,7 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
             {
                 return Result<VisitCreateResultDto>.Failure(
                     "Visits.Validation",
-                    "AppointmentId yoksa ClinicId ve PetId zorunludur.");
+                    "Randevu seçilmediyse klinik ve hasta seçimi zorunludur.");
             }
 
             clinicId = resolvedClinicId;

@@ -137,7 +137,7 @@ public sealed class Examination : AggregateRoot, IClinicScoped, ITenantOwned
             return Result.Failure("Examinations.Finalized", "Kesinleşmiş muayene düzenlenemez; ek not ekleyin.");
 
         if (string.IsNullOrWhiteSpace(update.VisitReason))
-            return Result.Failure("Examinations.Validation", "VisitReason bos olamaz.");
+            return Result.Failure("Examinations.Validation", "Geliş nedeni zorunludur.");
 
         if (update.ClearVitals && update.HasVitalInput)
         {
@@ -290,7 +290,7 @@ public sealed class Examination : AggregateRoot, IClinicScoped, ITenantOwned
         DateTime? vitalsMeasuredAtUtc)
     {
         if (weightKg is <= 0)
-            return Result.Failure("Examinations.Validation", "WeightKg sıfırdan büyük olmalıdır.");
+            return Result.Failure("Examinations.Validation", "Kilo sıfırdan büyük olmalıdır.");
         if (temperatureC is <= 0)
             return Result.Failure("Examinations.Validation", "TemperatureC sıfırdan büyük olmalıdır.");
         if (heartRateBpm is <= 0)

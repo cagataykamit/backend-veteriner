@@ -66,7 +66,7 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
         if (tenant is null)
             return Result.Failure("Tenants.NotFound", "Tenant bulunamadı.");
         if (!tenant.IsActive)
-            return Result.Failure("Tenants.TenantInactive", "Pasif kiraci icin hayvan kaydi guncellenemez.");
+            return Result.Failure("Tenants.TenantInactive", "Hesap pasif olduğu için hasta kaydı güncellenemez.");
 
         var pet = await _petsRead.FirstOrDefaultAsync(new PetByIdSpec(tenantId, request.Id), ct);
         if (pet is null)
@@ -92,7 +92,7 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
             if (breed.SpeciesId != request.SpeciesId)
                 return Result.Failure(
                     "Pets.BreedSpeciesMismatch",
-                    "Secilen irk, secilen tur ile uyusmuyor.");
+                    "Seçilen ırk, seçilen türe ait değil.");
             breedRef = breed;
         }
 
@@ -104,13 +104,13 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         if (request.BirthDate.HasValue && request.BirthDate.Value > DateOnly.FromDateTime(utcNow))
-            return Result.Failure("Pets.BirthDateInFuture", "Dogum tarihi gelecekte olamaz.");
+            return Result.Failure("Pets.BirthDateInFuture", "Doğum tarihi gelecekte olamaz.");
 
         var nameKey = Pet.NormalizeNameForDuplicateCheck(request.Name);
         var duplicate = await _petsRead.FirstOrDefaultAsync(
             new PetByClientNameAndSpeciesIdExcludingIdSpec(request.ClientId, nameKey, request.SpeciesId, request.Id), ct);
         if (duplicate is not null)
-            return Result.Failure("Pets.DuplicatePet", "Bu musteri icin ayni isim ve turde bir hayvan kaydi zaten var.");
+            return Result.Failure("Pets.DuplicatePet", "Bu müşterinin aynı ad ve türde bir hastası zaten var.");
 
         var alerts = pet.ApplyAlerts(request.AlertFlags, request.AlertNote);
         if (!alerts.IsSuccess)

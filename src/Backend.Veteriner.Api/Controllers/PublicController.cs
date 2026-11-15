@@ -50,7 +50,7 @@ public sealed class PublicController : ControllerBase
         {
             return Result<PublicOwnerSignupResultDto>.Failure(
                     "PublicOwnerSignup.Validation.InvalidRequestBody",
-                    "Istek govdesi bos veya hatali JSON.")
+                    "İstek okunamadı. Sayfayı yenileyip tekrar deneyin.")
                 .ToActionResult(this);
         }
 
@@ -135,7 +135,7 @@ public sealed class PublicController : ControllerBase
         {
             return Result.Failure(
                     "DemoRequests.Validation.InvalidRequestBody",
-                    "Istek govdesi bos veya hatali JSON.")
+                    "İstek okunamadı. Sayfayı yenileyip tekrar deneyin.")
                 .ToActionResult(this);
         }
 

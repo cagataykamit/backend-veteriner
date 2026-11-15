@@ -74,7 +74,7 @@ public sealed class ApplyExaminationTemplateCommandHandler
     {
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
         {
-            return Fail(new Error("Examinations.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır."));
+            return Fail(new Error("Examinations.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin."));
         }
 
         var loaded = await ExaminationWriteAccess.LoadAsync(

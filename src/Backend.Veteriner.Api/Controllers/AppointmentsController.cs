@@ -85,7 +85,7 @@ public sealed class AppointmentsController : ControllerBase
 
         // Route id kaynak-of-truth: body id opsiyonel olabilir.
         if (cmd.Id != Guid.Empty && id != cmd.Id)
-            return Result.Failure("Appointments.RouteIdMismatch", "Route id ile body id uyuşmuyor.").ToActionResult(this);
+            return Result.Failure("Appointments.RouteIdMismatch", "Adresteki kayıt ile gönderilen kayıt eşleşmiyor. Sayfayı yenileyip tekrar deneyin.").ToActionResult(this);
 
         cmd = cmd with { Id = id };
 

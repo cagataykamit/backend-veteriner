@@ -81,7 +81,7 @@ public sealed class SetClientKvkkConsentCommandHandler
             return Result<ClientKvkkConsentDto>.Failure("Clients.WalkInReadOnly", "Peşin müşteri sistem kaydıdır; düzenlenemez.");
 
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
-            return Result<ClientKvkkConsentDto>.Failure("Clients.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+            return Result<ClientKvkkConsentDto>.Failure("Clients.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 
         var consentText = request.Status == KvkkConsentStatus.None
             ? null

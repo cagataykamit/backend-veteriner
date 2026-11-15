@@ -171,7 +171,7 @@ public sealed class CreateExaminationCommandHandler : IRequestHandler<CreateExam
             {
                 return Result<ExaminationWriteResultDto>.Failure(
                     "Examinations.Validation",
-                    "AppointmentId yoksa ClinicId ve PetId zorunludur.");
+                    "Randevu seçilmediyse klinik ve hasta seçimi zorunludur.");
             }
 
             clinicId = resolvedCid;

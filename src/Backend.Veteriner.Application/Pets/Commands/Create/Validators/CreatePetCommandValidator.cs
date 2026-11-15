@@ -28,6 +28,6 @@ public sealed class CreatePetCommandValidator : AbstractValidator<CreatePetComma
             .WithMessage("Doğum tarihi gelecekte olamaz.");
         RuleFor(x => x.Weight)
             .GreaterThanOrEqualTo(0).When(x => x.Weight.HasValue)
-            .WithMessage("Weight negatif olamaz.");
+            .WithMessage("Kilo negatif olamaz.");
     }
 }

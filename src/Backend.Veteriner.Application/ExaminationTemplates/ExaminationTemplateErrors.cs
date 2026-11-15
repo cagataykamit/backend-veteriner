@@ -20,7 +20,7 @@ internal static class ExaminationTemplateErrors
         new("ExaminationTemplates.ConcurrencyConflict", "Şablon başka biri tarafından değiştirildi; yenileyip tekrar deneyin.");
 
     public static readonly Error InvalidRowVersion =
-        new("ExaminationTemplates.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+        new("ExaminationTemplates.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 
     public static readonly Error Inactive =
         new("ExaminationTemplates.Inactive", "Pasif şablon uygulanamaz.");

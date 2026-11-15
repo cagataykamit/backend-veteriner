@@ -61,7 +61,7 @@ public sealed class BreedsController : ControllerBase
         // Frontend çoğu zaman body'de id göndermeyebilir; route id kaynak-of-truth.
         // Body'de id gönderildiyse ve route ile uyuşmuyorsa açıklayıcı hata dön.
         if (cmd.Id != Guid.Empty && id != cmd.Id)
-            return Result.Failure("Breeds.RouteIdMismatch", "Route id ile body id uyuşmuyor.").ToActionResult(this);
+            return Result.Failure("Breeds.RouteIdMismatch", "Adresteki kayıt ile gönderilen kayıt eşleşmiyor. Sayfayı yenileyip tekrar deneyin.").ToActionResult(this);
 
         cmd = cmd with { Id = id };
 

@@ -10,15 +10,15 @@ public sealed class UpdateExaminationCommandValidator : AbstractValidator<Update
 
         RuleFor(x => x.ClinicId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("ClinicId gecersiz.");
+            .WithMessage("Geçerli bir klinik seçin.");
 
         RuleFor(x => x.PetId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("PetId gecersiz.");
+            .WithMessage("Geçerli bir hasta seçin.");
 
         RuleFor(x => x.AppointmentId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("AppointmentId gecersiz.");
+            .WithMessage("Geçerli bir randevu seçin.");
 
         RuleFor(x => x.ExaminedAtUtc).NotEqual(default(DateTime));
 
@@ -63,6 +63,6 @@ public sealed class UpdateExaminationCommandValidator : AbstractValidator<Update
 
         RuleFor(x => x.RowVersion)
             .NotEmpty()
-            .WithMessage("RowVersion zorunludur.");
+            .WithMessage("Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
     }
 }

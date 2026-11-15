@@ -44,14 +44,14 @@ public sealed class SetPetStatusCommandHandler : IRequestHandler<SetPetStatusCom
         if (tenant is null)
             return Result<PetStatusDto>.Failure("Tenants.NotFound", "Tenant bulunamadı.");
         if (!tenant.IsActive)
-            return Result<PetStatusDto>.Failure("Tenants.TenantInactive", "Pasif kiraci icin hayvan kaydi guncellenemez.");
+            return Result<PetStatusDto>.Failure("Tenants.TenantInactive", "Hesap pasif olduğu için hasta kaydı güncellenemez.");
 
         var pet = await _pets.FirstOrDefaultAsync(new PetForUpdateByIdSpec(tenantId, request.Id), ct);
         if (pet is null)
             return Result<PetStatusDto>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
-            return Result<PetStatusDto>.Failure("Pets.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+            return Result<PetStatusDto>.Failure("Pets.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 
         var today = OperationDayBounds.ToLocalDate(_timeProvider.GetUtcNow().UtcDateTime);
         var change = pet.SetStatus(request.Status, request.DeceasedOn, today);

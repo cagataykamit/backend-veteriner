@@ -119,7 +119,7 @@ public sealed class ClientsController : ControllerBase
             return problem!;
 
         if (cmd.Id != Guid.Empty && id != cmd.Id)
-            return Result.Failure("Clients.RouteIdMismatch", "Route id ile body id uyuşmuyor.").ToActionResult(this);
+            return Result.Failure("Clients.RouteIdMismatch", "Adresteki kayıt ile gönderilen kayıt eşleşmiyor. Sayfayı yenileyip tekrar deneyin.").ToActionResult(this);
 
         cmd = cmd with { Id = id };
 

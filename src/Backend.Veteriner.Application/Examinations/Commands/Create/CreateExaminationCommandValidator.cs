@@ -8,11 +8,11 @@ public sealed class CreateExaminationCommandValidator : AbstractValidator<Create
     {
         RuleFor(x => x.ClinicId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("ClinicId gecersiz.");
+            .WithMessage("Geçerli bir klinik seçin.");
 
         RuleFor(x => x.PetId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("PetId gecersiz.");
+            .WithMessage("Geçerli bir hasta seçin.");
 
         RuleFor(x => x)
             .Must(x =>
@@ -23,11 +23,11 @@ public sealed class CreateExaminationCommandValidator : AbstractValidator<Create
 
         RuleFor(x => x.VisitId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("VisitId gecersiz.");
+            .WithMessage("Geçerli bir geliş seçin.");
 
         RuleFor(x => x.AppointmentId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("AppointmentId gecersiz.");
+            .WithMessage("Geçerli bir randevu seçin.");
 
         RuleFor(x => x.ExaminedAtUtc).NotEqual(default(DateTime));
 

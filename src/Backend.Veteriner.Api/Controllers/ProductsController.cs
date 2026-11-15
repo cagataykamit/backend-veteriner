@@ -172,7 +172,7 @@ public sealed class ProductsController : ControllerBase
             return problem!;
 
         if (cmd.Id != Guid.Empty && cmd.Id != id)
-            return Result.Failure("Products.RouteIdMismatch", "Route id ile body id uyuşmuyor.").ToActionResult(this);
+            return Result.Failure("Products.RouteIdMismatch", "Adresteki kayıt ile gönderilen kayıt eşleşmiyor. Sayfayı yenileyip tekrar deneyin.").ToActionResult(this);
 
         var result = await _mediator.Send(cmd with { Id = id }, ct);
         return result.ToActionResult(this);

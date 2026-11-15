@@ -9,24 +9,24 @@ public sealed class CreateVisitCommandValidator : AbstractValidator<CreateVisitC
     {
         RuleFor(x => x.ClinicId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("ClinicId gecersiz.");
+            .WithMessage("Geçerli bir klinik seçin.");
 
         RuleFor(x => x.PetId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("PetId gecersiz.");
+            .WithMessage("Geçerli bir hasta seçin.");
 
         RuleFor(x => x.AppointmentId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("AppointmentId gecersiz.");
+            .WithMessage("Geçerli bir randevu seçin.");
 
         RuleFor(x => x.ResponsibleVeterinarianUserId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("ResponsibleVeterinarianUserId gecersiz.");
+            .WithMessage("Geçerli bir sorumlu hekim seçin.");
 
         RuleFor(x => x.ArrivalReason).MaximumLength(Visit.MaxArrivalReasonLength);
 
         RuleFor(x => x.PreparedExaminationTemplateId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("PreparedExaminationTemplateId gecersiz.");
+            .WithMessage("Geçerli bir muayene şablonu seçin.");
     }
 }

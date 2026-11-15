@@ -180,9 +180,9 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
         if (tenantId == Guid.Empty)
             return Invalid("TenantId geçersiz.");
         if (clinicId == Guid.Empty)
-            return Invalid("ClinicId verilirse geçerli bir kimlik olmalıdır.");
+            return Invalid("Geçerli bir klinik seçin.");
         if (requestId == Guid.Empty)
-            return Invalid("RequestId zorunludur.");
+            return Invalid("İstek kimliği eksik. Sayfayı yenileyip tekrar deneyin.");
         if (createdByUserId == Guid.Empty)
             return Invalid("Oluşturan kullanıcı geçersiz.");
         if (!Enum.IsDefined(sourceProfile))

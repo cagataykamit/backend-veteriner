@@ -220,7 +220,7 @@ public sealed class UpdatePrescriptionCommandHandler : IRequestHandler<UpdatePre
         }
 
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
-            return Result.Failure("Prescriptions.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+            return Result.Failure("Prescriptions.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 
         var update = p.UpdateDetails(
             effectiveClinicId,

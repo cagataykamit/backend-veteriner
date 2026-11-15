@@ -8,6 +8,6 @@ public sealed class RefreshCommandValidator : AbstractValidator<RefreshCommand>
     {
         RuleFor(x => x.RefreshToken)
             .NotEmpty()
-            .WithMessage("Refresh token zorunludur.");
+            .WithMessage("Oturum yenilenemedi. Lütfen yeniden giriş yapın.");
     }
 }

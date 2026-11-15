@@ -119,7 +119,7 @@ public sealed class CreateAdministrationCommandHandler
         }
 
         if ((_clinicContext.ClinicId ?? request.ClinicId) is not { } clinicId)
-            return Fail("Administrations.Validation", "ClinicId zorunludur (aktif klinik bağlamı yok).");
+            return Fail("Administrations.Validation", "Önce çalıştığınız kliniği seçin.");
 
         var clinicAccess = await _clinicScopeResolver.ResolveAsync(tenantId, clinicId, ct);
         if (!clinicAccess.IsSuccess)

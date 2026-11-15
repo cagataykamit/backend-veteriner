@@ -80,7 +80,7 @@ public sealed class CancelLabResultCommandHandler
             return Result<LabResultWriteResultDto>.Failure(clinicAccess.Error);
 
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
-            return Fail("LabResults.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+            return Fail("LabResults.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var cancelled = existing.Cancel(userId, request.Reason, utcNow);

@@ -109,7 +109,7 @@ public sealed class UpdateLabResultCommandHandler
         }
 
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
-            return Fail("LabResults.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+            return Fail("LabResults.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 
         DateTime? resultUtc = null;
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;

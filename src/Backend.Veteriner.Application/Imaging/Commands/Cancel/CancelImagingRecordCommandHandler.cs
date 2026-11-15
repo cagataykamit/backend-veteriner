@@ -62,7 +62,7 @@ public sealed class CancelImagingRecordCommandHandler
             return Result<ImagingRecordWriteResultDto>.Failure(scope.Error);
 
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
-            return Fail("ImagingRecords.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+            return Fail("ImagingRecords.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var cancelled = existing.Cancel(userId, request.Reason, now);

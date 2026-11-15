@@ -20,7 +20,7 @@ internal static class ClinicalTermErrors
         new("ClinicalTerms.ConcurrencyConflict", "Kayıt başka biri tarafından değiştirildi; listeyi yenileyip tekrar deneyin.");
 
     public static readonly Error InvalidRowVersion =
-        new("ClinicalTerms.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+        new("ClinicalTerms.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 
     public static bool IsDuplicateNameViolation(DbUpdateException ex)
     {

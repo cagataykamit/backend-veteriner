@@ -79,7 +79,7 @@ public sealed class TenantsController : ControllerBase
         {
             return Result<CreateTenantInviteResultDto>.Failure(
                     "Invites.Validation.InvalidRequestBody",
-                    "Istek govdesi bos veya hatali JSON.")
+                    "İstek okunamadı. Sayfayı yenileyip tekrar deneyin.")
                 .ToActionResult(this);
         }
 
@@ -417,7 +417,7 @@ public sealed class TenantsController : ControllerBase
         {
             return Result<TenantDetailDto>.Failure(
                     "Tenants.Settings.Validation.InvalidRequestBody",
-                    "Istek govdesi bos veya hatali JSON.")
+                    "İstek okunamadı. Sayfayı yenileyip tekrar deneyin.")
                 .ToActionResult(this);
         }
 
@@ -529,7 +529,7 @@ public sealed class TenantsController : ControllerBase
         {
             return Result<PendingSubscriptionPlanChangeDto>.Failure(
                     "Subscriptions.PlanChange.Validation.InvalidRequestBody",
-                    "Istek govdesi bos veya hatali JSON.")
+                    "İstek okunamadı. Sayfayı yenileyip tekrar deneyin.")
                 .ToActionResult(this);
         }
 
@@ -574,7 +574,7 @@ public sealed class TenantsController : ControllerBase
         {
             return Result<SubscriptionCheckoutSessionDto>.Failure(
                     "Subscriptions.Checkout.Validation.InvalidRequestBody",
-                    "Istek govdesi bos veya hatali JSON.")
+                    "İstek okunamadı. Sayfayı yenileyip tekrar deneyin.")
                 .ToActionResult(this);
         }
 

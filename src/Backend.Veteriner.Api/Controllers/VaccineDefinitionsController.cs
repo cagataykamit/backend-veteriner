@@ -103,7 +103,7 @@ public sealed class VaccineDefinitionsController : ControllerBase
             return problem!;
 
         if (cmd.Id != Guid.Empty && cmd.Id != id)
-            return Result.Failure("VaccineDefinitions.RouteIdMismatch", "Route id ile body id uyusmuyor.").ToActionResult(this);
+            return Result.Failure("VaccineDefinitions.RouteIdMismatch", "Adresteki kayıt ile gönderilen kayıt eşleşmiyor. Sayfayı yenileyip tekrar deneyin.").ToActionResult(this);
 
         var result = await _mediator.Send(cmd with { Id = id }, ct);
         return result.ToActionResult(this);

@@ -76,7 +76,7 @@ public sealed class CancelHospitalizationCommandHandler
             return Result<HospitalizationWriteResultDto>.Failure(clinicAccess.Error);
 
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
-            return Fail("Hospitalizations.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+            return Fail("Hospitalizations.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 
         var cancelled = row.Cancel(userId, request.Reason, _timeProvider.GetUtcNow().UtcDateTime);
         if (!cancelled.IsSuccess)

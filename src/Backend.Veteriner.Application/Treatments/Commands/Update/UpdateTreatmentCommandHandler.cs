@@ -155,7 +155,7 @@ public sealed class UpdateTreatmentCommandHandler : IRequestHandler<UpdateTreatm
             return locked;
 
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
-            return Result.Failure("Treatments.Validation", "RowVersion zorunludur ve geçerli Base64 (8 bayt) olmalıdır.");
+            return Result.Failure("Treatments.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 
         var update = t.UpdateDetails(
             effectiveClinicId,
