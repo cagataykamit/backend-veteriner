@@ -1,4 +1,5 @@
 using System.Globalization;
+using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Domain.Imports;
 
@@ -21,6 +22,64 @@ public sealed partial class ImportValidationEngine
 
     private readonly HashSet<(string PetKey, DateOnly Date, string Content)> _fileClinicalRecords = new();
     private readonly HashSet<(Guid PetId, DateOnly Date, string Content)> _dbClinicalRecords = new();
+
+    /// <summary>Geliş kaydı olacak boş muayene satırları (sonuç sırası, hasta, sahip, gün); karar bütün tablolardan sonra.</summary>
+    private readonly List<(int Index, string PetKey, string OwnerKey, Guid? PetId, DateOnly Day)> _pendingArrivals = new();
+
+    /// <summary>
+    /// Boş muayene satırının gelişi aynı gün başka bir kayıtla zaten görünüyorsa atlanır (kural tek yerde): aynı hastanın aktarılacak
+    /// aşısı, dolu klinik kaydı ya da randevusu, sahibinin hesap hareketi (satış, tahsilat), daha önce içe aktarılmış klinik kaydı
+    /// ya da aşısı, ya da aynı gün için önceki geliş satırı. Kalanlar geliş kaydı olarak aktarılır.
+    /// </summary>
+    private void ResolveArrivals()
+    {
+        if (_pendingArrivals.Count == 0)
+            return;
+
+        var pending = _pendingArrivals.Select(a => a.Index).ToHashSet();
+        var days = new HashSet<(string Key, DateOnly Day)>();
+        for (var i = 0; i < _results.Count; i++)
+        {
+            var result = _results[i];
+            if (pending.Contains(i) || result.Status == ImportRowValidationStatus.Error
+                || result.Normalized.Action is not (ImportRowAction.Create or ImportRowAction.Match))
+            {
+                continue;
+            }
+
+            switch (result.Normalized)
+            {
+                case ImportNormalizedVaccination { PetKey: { } pet, AppliedAt: { } applied }:
+                    days.Add(("pet:" + pet, applied));
+                    break;
+                case ImportNormalizedClinicalRecord { PetKey: { } pet, RecordedOn: { } recorded }:
+                    days.Add(("pet:" + pet, recorded));
+                    break;
+                case ImportNormalizedAppointment { PetKey: { } pet, ScheduledAtUtc: { } scheduled }:
+                    days.Add(("pet:" + pet, OperationDayBounds.ToLocalDate(scheduled)));
+                    break;
+                case ImportNormalizedAccountEntry { OwnerKey: { } owner, OccurredOn: { } occurred }:
+                    days.Add(("owner:" + owner, occurred));
+                    break;
+            }
+        }
+
+        var dbDays = _dbClinicalRecords.Select(r => (r.PetId, r.Date)).Concat(_dbVaccinations.Select(v => (v.PetId, v.Date))).ToHashSet();
+        foreach (var (index, petKey, ownerKey, petId, day) in _pendingArrivals)
+        {
+            if (days.Contains(("pet:" + petKey, day)) || days.Contains(("owner:" + ownerKey, day))
+                || (petId is { } id && dbDays.Contains((id, day))))
+            {
+                var row = _results[index];
+                _results[index] = Finish(ImportTable.ClinicalRecords, row.RowNumber, [ImportRules.BlankExaminationSameDay.At()], row.Normalized,
+                    ImportRowAction.Skip);
+                continue;
+            }
+
+            // İlk geliş satırı o günü kapsar; aynı gün sonraki boş satırlar atlanır.
+            days.Add(("pet:" + petKey, day));
+        }
+    }
 
     /// <summary>
     /// Mükerrer kayıt anahtarı: içerik alanları ve hekim (katlanmış; yazım/boşluk farkı yok sayılır), kilo ve ateş (saklanan
@@ -69,10 +128,26 @@ public sealed partial class ImportValidationEngine
             content[0], content[1], content[2], content[3], content[4], content[5], content[6], content[7],
             veterinarian, weight, temperature);
 
-        // Boş kayıt taşınacak bilgi içermez: hata değil, atlanır (eski programda doldurulmamış muayene). Diğer sorunları
-        // (hasta bulunamadı, tarih) bilgi taşımayan satırda anlamsızdır; kliniği hata listesiyle uğraştırmamak için düşülür.
         if (!recordContent.HasContent())
         {
+            // Boş muayene satırı (eski programda doldurulmamış muayene) hastanın o gün geldiğini söyler: hasta ve tarih okunduysa geliş
+            // kaydı olur; aynı gün başka kaydı varsa doğrulama sonunda atlanır (ResolveArrivals).
+            if (!HasError(issues) && petSkip is null && pet is not null && recordedOn is { } day)
+            {
+                var arrival = normalized with { RecordType = ImportedClinicalRecord.ArrivalRecordType };
+                if (pet.PetId is { } existingPetId && _dbClinicalRecords.Contains((existingPetId, day, ClinicalRecordKey(content, veterinarian, null, null))))
+                {
+                    issues.Add(ImportRules.ClinicalRecordImportedBefore.At());
+                    return Finish(ImportTable.ClinicalRecords, reader.RowNumber, issues, arrival, ImportRowAction.Skip);
+                }
+
+                issues.Add(ImportRules.ClinicalRecordArrival.At());
+                _pendingArrivals.Add((_results.Count, pet.Key, pet.Owner.Key, pet.PetId, day));
+                return Finish(ImportTable.ClinicalRecords, reader.RowNumber, issues, arrival, ImportRowAction.Create);
+            }
+
+            // Hastası ya da tarihi okunamayan boş satır taşınacak bilgi içermez: hata değil, atlanır. Diğer sorunları (hasta
+            // bulunamadı, tarih) bilgi taşımayan satırda anlamsızdır; kliniği hata listesiyle uğraştırmamak için düşülür.
             issues.Clear();
             issues.Add(ImportRules.ClinicalRecordEmpty.At());
             return Finish(ImportTable.ClinicalRecords, reader.RowNumber, issues, normalized, ImportRowAction.Skip);

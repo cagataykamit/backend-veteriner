@@ -94,6 +94,17 @@ public sealed class ImportFullMigrationDomainTests
     }
 
     [Fact]
+    public void Arrival_Record_Without_Content_Should_Be_Created()
+    {
+        var arrival = new ImportedClinicalRecord.Content(ImportedClinicalRecord.ArrivalRecordType, null, null, null, null, null, null, null, null, "Dr. A", null, null);
+
+        var created = ImportedClinicalRecord.Create(TenantId, ClinicId, Guid.NewGuid(), Guid.NewGuid(), BatchId, new DateOnly(2024, 1, 1), arrival, Now);
+
+        created.IsSuccess.Should().BeTrue();
+        (created.Value!.RecordType, created.Value.VeterinarianName).Should().Be(("Geliş", "Dr. A"));
+    }
+
+    [Fact]
     public void Clinical_Record_Out_Of_Range_Temperature_Or_Missing_Batch_Should_Fail()
     {
         ImportedClinicalRecord.Create(

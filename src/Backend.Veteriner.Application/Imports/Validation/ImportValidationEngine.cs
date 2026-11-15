@@ -118,6 +118,7 @@ public sealed partial class ImportValidationEngine
             }
         }
 
+        ResolveArrivals();
         return new ImportValidationOutput(_results);
     }
 

@@ -163,13 +163,67 @@ public sealed class ImportFullMigrationValidationTests
     }
 
     [Fact]
-    public void Clinical_Record_Without_Content_Should_Be_Skipped_Not_An_Error()
+    public void Blank_Examination_Without_Other_Record_That_Day_Should_Become_An_Arrival()
     {
-        var output = WithOwnerAndPet(ImportTable.ClinicalRecords, [["H-1", "12.05.2024", "Muayene"]]);
+        // HayvanNo, Tarih, KayitTuru, Sikayet, Tani, Tedavi, Recete, Not, Hekim
+        var output = WithOwnerAndPet(ImportTable.ClinicalRecords, [["H-1", "12.05.2024", "Muayene", null, null, null, null, null, "Dr. A"]]);
         var row = Row(output, ImportTable.ClinicalRecords);
 
-        Codes(row).Should().Contain(ImportRules.ClinicalRecordEmpty.Code);
-        row.Status.Should().NotBe(ImportRowValidationStatus.Error);
+        Codes(row).Should().Equal(ImportRules.ClinicalRecordArrival.Code);
+        row.Normalized.Action.Should().Be(ImportRowAction.Create);
+        var arrival = (ImportNormalizedClinicalRecord)row.Normalized;
+        (arrival.RecordType, arrival.VeterinarianName, arrival.RecordedOn).Should().Be(("Geliş", "Dr. A", new DateOnly(2024, 5, 12)));
+    }
+
+    [Fact]
+    public void Blank_Examination_Should_Be_Skipped_When_The_Pet_Has_Another_Record_That_Day()
+    {
+        var output = Run(new()
+        {
+            [ImportTable.Customers] = Table(ImportTable.Customers, ["M-1", "Ayşe Yılmaz", "05321234567"]),
+            [ImportTable.Pets] = Table(ImportTable.Pets, ["M-1", "H-1", "Pamuk", "Kedi"]),
+            [ImportTable.ClinicalRecords] = Table(ImportTable.ClinicalRecords,
+                ["H-1", "12.05.2024", "Muayene"],           // aynı gün dolu muayene var
+                ["H-1", "12.05.2024", null, "Kusma"],
+                ["H-1", "13.05.2024", "Muayene"],           // aynı gün sahibin hesap hareketi var
+                ["H-1", "14.05.2024", "Muayene", null, null, null, null, null, "Dr. A"],
+                ["H-1", "14.05.2024", "Muayene", null, null, null, null, null, "Dr. B"]), // aynı gün önceki geliş satırı
+            [ImportTable.AccountEntries] = Table(ImportTable.AccountEntries, ["M-1", "13.05.2024", "Borç", "100"]),
+        });
+
+        foreach (var skipped in new[] { 2, 4, 6 })
+        {
+            var row = Row(output, ImportTable.ClinicalRecords, skipped);
+            Codes(row).Should().Equal(ImportRules.BlankExaminationSameDay.Code);
+            row.Normalized.Action.Should().Be(ImportRowAction.Skip);
+        }
+
+        Row(output, ImportTable.ClinicalRecords, 5).Normalized.Action.Should().Be(ImportRowAction.Create);
+        ImportRules.BlankExaminationSameDay.Message.Should().Be("Aynı gün başka kaydı var; geliş o kayıtla görünüyor.");
+    }
+
+    [Fact]
+    public void Arrival_Imported_Before_Should_Not_Be_Added_Again()
+    {
+        var clientId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var existing = new ImportExistingData([new(clientId, "Ayşe Yılmaz", "905321234567", null)], [new(petId, clientId, "Pamuk", Cat, null, null)], [])
+        {
+            ClinicalRecords = [new(petId, new DateOnly(2024, 5, 12), null, null, null, null, null, null, null, null, "Dr. A")],
+        };
+        string[] fields = ["SahipAdSoyad", "SahipTelefon", "HayvanAdi", "Tur", "Tarih", "Hekim"];
+        var rows = new List<ImportSourceRow>
+        {
+            new(2, fields.Zip(new string?[] { "Ayşe Yılmaz", "05321234567", "Pamuk", "Kedi", "12.05.2024", "Dr. A" }).ToDictionary(x => x.First, x => x.Second)),
+        };
+        var mapping = new ImportMappingDocument { Columns = new() { ["clinicalRecords"] = fields.ToDictionary(f => f, f => f) } };
+
+        var output = ImportValidationEngine.Run(new ImportValidationInput(
+            new Dictionary<ImportTable, IReadOnlyList<ImportSourceRow>> { [ImportTable.ClinicalRecords] = rows },
+            mapping, new ImportOptionsDocument(ImportOptionsDocument.Match), Catalogs, existing, Now));
+
+        var row = Row(output, ImportTable.ClinicalRecords);
+        Codes(row).Should().Equal(ImportRules.ClinicalRecordImportedBefore.Code);
         row.Normalized.Action.Should().Be(ImportRowAction.Skip);
     }
 

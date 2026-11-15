@@ -179,7 +179,7 @@ public sealed class ImportIdentityAndStatusValidationTests
     [Theory]
     [InlineData("0", null)]
     [InlineData(null, null)]
-    public void Clinical_Record_Without_Text_Or_Measurement_Should_Be_Empty(string? weight, string? temperature)
+    public void Clinical_Record_Without_Text_Or_Measurement_Should_Become_An_Arrival(string? weight, string? temperature)
     {
         var output = Run(new()
         {
@@ -188,6 +188,6 @@ public sealed class ImportIdentityAndStatusValidationTests
             [ImportTable.ClinicalRecords] = Table(ImportTable.ClinicalRecords, ["H-1", null, null, "01.06.2025", weight, temperature]),
         });
 
-        Row(output, ImportTable.ClinicalRecords).Issues.Should().Contain(i => i.Code == ImportRules.ClinicalRecordEmpty.Code);
+        Row(output, ImportTable.ClinicalRecords).Issues.Should().Contain(i => i.Code == ImportRules.ClinicalRecordArrival.Code);
     }
 }
