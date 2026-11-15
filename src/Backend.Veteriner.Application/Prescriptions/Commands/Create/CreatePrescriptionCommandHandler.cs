@@ -87,7 +87,7 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
         if (effectiveClinicId == Guid.Empty)
-            return Result<Guid>.Failure("Prescriptions.Validation", "ClinicId is required.");
+            return Result<Guid>.Failure("Prescriptions.Validation", "Klinik seçimi zorunludur.");
 
         var clinicAccess = await PrescriptionClinicWriteScope.EnsureWriteAccessAsync(
             _clinicScopeResolver, tenantId, effectiveClinicId, ct);
@@ -129,14 +129,14 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
             {
                 return Result<Guid>.Failure(
                     "Prescriptions.ExaminationClinicMismatch",
-                    "Examination clinic does not match prescription clinic.");
+                    "Seçilen muayene bu kliniğe ait değil.");
             }
 
             if (exam.PetId != request.PetId)
             {
                 return Result<Guid>.Failure(
                     "Prescriptions.ExaminationPetMismatch",
-                    "Examination pet does not match prescription pet.");
+                    "Seçilen muayene bu hastaya ait değil.");
             }
         }
 
@@ -149,7 +149,7 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
             {
                 return Result<Guid>.Failure(
                     "Treatments.NotFound",
-                    "Treatment not found or does not belong to tenant.");
+                    "Tedavi kaydı bulunamadı.");
             }
 
             var acceptsLink = treatment.EnsureAcceptsLinkedRecords();
@@ -160,14 +160,14 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
             {
                 return Result<Guid>.Failure(
                     "Prescriptions.TreatmentClinicMismatch",
-                    "Treatment clinic does not match prescription clinic.");
+                    "Seçilen tedavi bu kliniğe ait değil.");
             }
 
             if (treatment.PetId != request.PetId)
             {
                 return Result<Guid>.Failure(
                     "Prescriptions.TreatmentPetMismatch",
-                    "Treatment pet does not match prescription pet.");
+                    "Seçilen tedavi bu hastaya ait değil.");
             }
 
             if (request.ExaminationId is { } prescribedExamId)
@@ -176,7 +176,7 @@ public sealed class CreatePrescriptionCommandHandler : IRequestHandler<CreatePre
                 {
                     return Result<Guid>.Failure(
                         "Prescriptions.ExaminationTreatmentMismatch",
-                        "When both examination and treatment are set, the treatment must reference the same examination.");
+                        "Seçilen tedavi, seçilen muayeneye ait değil.");
                 }
             }
         }

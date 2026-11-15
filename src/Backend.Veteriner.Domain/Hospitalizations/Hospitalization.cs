@@ -122,14 +122,14 @@ public sealed class Hospitalization : AggregateRoot, IClinicScoped, ITenantOwned
         if (IsCancelled)
             return CancelledFailure();
         if (DischargedAtUtc.HasValue)
-            return Result.Failure("Hospitalizations.AlreadyDischarged", "Discharged hospitalization cannot be updated.");
+            return Result.Failure("Hospitalizations.AlreadyDischarged", "Taburcu edilmiş yatış değiştirilemez.");
 
         if (clinicId == Guid.Empty)
-            return Result.Failure("Hospitalizations.Validation", "ClinicId is invalid.");
+            return Result.Failure("Hospitalizations.Validation", "Geçerli bir klinik seçin.");
         if (petId == Guid.Empty)
-            return Result.Failure("Hospitalizations.Validation", "PetId is invalid.");
+            return Result.Failure("Hospitalizations.Validation", "Geçerli bir hasta seçin.");
         if (string.IsNullOrWhiteSpace(reason))
-            return Result.Failure("Hospitalizations.Validation", "Reason is required.");
+            return Result.Failure("Hospitalizations.Validation", "Yatış nedeni zorunludur.");
         var subject = RecordSubjectRule.EnsureUnchanged(ClinicId, PetId, clinicId, petId, "Hospitalizations");
         if (!subject.IsSuccess)
             return subject;
@@ -139,7 +139,7 @@ public sealed class Hospitalization : AggregateRoot, IClinicScoped, ITenantOwned
         {
             return Result.Failure(
                 "Hospitalizations.PlannedDischargeBeforeAdmission",
-                "Planned discharge must not be before admission.");
+                "Planlanan taburcu tarihi yatış tarihinden önce olamaz.");
         }
 
         ClinicId = clinicId;
@@ -164,14 +164,14 @@ public sealed class Hospitalization : AggregateRoot, IClinicScoped, ITenantOwned
         if (IsCancelled)
             return CancelledFailure();
         if (DischargedAtUtc.HasValue)
-            return Result.Failure("Hospitalizations.AlreadyDischarged", "Hospitalization is already discharged.");
+            return Result.Failure("Hospitalizations.AlreadyDischarged", "Hasta zaten taburcu edilmiş.");
 
         var d = NormalizeUtc(dischargedAtUtc);
         if (d < AdmittedAtUtc)
         {
             return Result.Failure(
                 "Hospitalizations.DischargedBeforeAdmission",
-                "Discharge time must not be before admission.");
+                "Taburcu zamanı yatış zamanından önce olamaz.");
         }
 
         DischargedAtUtc = d;
@@ -194,7 +194,7 @@ public sealed class Hospitalization : AggregateRoot, IClinicScoped, ITenantOwned
         if (IsCancelled)
             return CancelledFailure();
         if (DischargedAtUtc.HasValue)
-            return Result.Failure("Hospitalizations.AlreadyDischarged", "Discharged hospitalization cannot be updated.");
+            return Result.Failure("Hospitalizations.AlreadyDischarged", "Taburcu edilmiş yatış değiştirilemez.");
         if (room.WardId != ward.Id)
             throw new ArgumentException("Room does not belong to the given ward.", nameof(room));
         if (room.TenantId != TenantId || room.ClinicId != ClinicId)
@@ -211,7 +211,7 @@ public sealed class Hospitalization : AggregateRoot, IClinicScoped, ITenantOwned
         if (IsCancelled)
             return CancelledFailure();
         if (DischargedAtUtc.HasValue)
-            return Result.Failure("Hospitalizations.AlreadyDischarged", "Discharged hospitalization cannot be updated.");
+            return Result.Failure("Hospitalizations.AlreadyDischarged", "Taburcu edilmiş yatış değiştirilemez.");
 
         RoomId = null;
         return Result.Success();

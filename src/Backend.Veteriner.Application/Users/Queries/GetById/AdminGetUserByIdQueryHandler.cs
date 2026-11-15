@@ -17,7 +17,7 @@ public sealed class AdminGetUserByIdQueryHandler
     {
         var user = await _users.FirstOrDefaultAsync(new UserByIdWithRolesSpec(request.Id), ct);
         if (user is null)
-            return Result<AdminUserDetailDto>.Failure("Users.NotFound", "User not found.");
+            return Result<AdminUserDetailDto>.Failure("Users.NotFound", "Kullanıcı bulunamadı.");
 
         var dto = new AdminUserDetailDto(
             user.Id,

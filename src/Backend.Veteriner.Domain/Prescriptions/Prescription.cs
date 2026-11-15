@@ -106,16 +106,16 @@ public sealed class Prescription : AggregateRoot, IClinicScoped, ITenantOwned
         if (IsCancelled)
             return CancelledFailure();
         if (clinicId == Guid.Empty)
-            return Result.Failure("Prescriptions.Validation", "ClinicId is invalid.");
+            return Result.Failure("Prescriptions.Validation", "Geçerli bir klinik seçin.");
         var subject = RecordSubjectRule.EnsureUnchanged(ClinicId, PetId, clinicId, petId, "Prescriptions");
         if (!subject.IsSuccess)
             return subject;
         if (petId == Guid.Empty)
-            return Result.Failure("Prescriptions.Validation", "PetId is invalid.");
+            return Result.Failure("Prescriptions.Validation", "Geçerli bir hasta seçin.");
         if (string.IsNullOrWhiteSpace(title))
-            return Result.Failure("Prescriptions.Validation", "Title is required.");
+            return Result.Failure("Prescriptions.Validation", "Başlık zorunludur.");
         if (string.IsNullOrWhiteSpace(content))
-            return Result.Failure("Prescriptions.Validation", "Content is required.");
+            return Result.Failure("Prescriptions.Validation", "Reçete içeriği zorunludur.");
 
         ClinicId = clinicId;
         PetId = petId;
@@ -142,14 +142,14 @@ public sealed class Prescription : AggregateRoot, IClinicScoped, ITenantOwned
         {
             return Result.Failure(
                 "Prescriptions.Validation",
-                $"A prescription can have at most {PrescriptionItem.MaxPerPrescription} items.");
+                $"Bir reçetede en fazla {PrescriptionItem.MaxPerPrescription} kalem olabilir.");
         }
 
         var ids = drafts.Where(d => d.Id.HasValue).Select(d => d.Id!.Value).ToList();
         if (ids.Distinct().Count() != ids.Count)
-            return Result.Failure("Prescriptions.Validation", "An item id can appear only once.");
+            return Result.Failure("Prescriptions.Validation", "Aynı reçete kalemi birden fazla kez gönderilemez.");
         if (ids.Any(id => _items.All(i => i.Id != id)))
-            return Result.Failure("Prescriptions.Validation", "Item id does not belong to this prescription.");
+            return Result.Failure("Prescriptions.Validation", "Reçete kalemi bu reçeteye ait değil.");
 
         foreach (var draft in drafts)
         {

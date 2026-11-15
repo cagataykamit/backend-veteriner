@@ -25,7 +25,7 @@ public sealed class ExaminationsListVisitFilterTests
         var result = Validator.Validate(new GetExaminationsListQuery(new PageRequest { Page = 1, PageSize = 20 }, VisitId: Guid.Empty));
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.ErrorMessage == "visitId is invalid.");
+        result.Errors.Should().Contain(e => e.ErrorMessage == "Geliş filtresi geçersiz.");
     }
 
     [Fact]

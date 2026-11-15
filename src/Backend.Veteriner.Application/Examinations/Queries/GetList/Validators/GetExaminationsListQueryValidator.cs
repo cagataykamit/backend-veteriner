@@ -18,23 +18,23 @@ public sealed class GetExaminationsListQueryValidator : AbstractValidator<GetExa
 
         RuleFor(x => x.ClinicId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("clinicId is invalid.");
+            .WithMessage("Klinik filtresi geçersiz.");
 
         RuleFor(x => x.PetId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("petId is invalid.");
+            .WithMessage("Hasta filtresi geçersiz.");
 
         RuleFor(x => x.AppointmentId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("appointmentId is invalid.");
+            .WithMessage("Randevu filtresi geçersiz.");
 
         RuleFor(x => x.VisitId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("visitId is invalid.");
+            .WithMessage("Geliş filtresi geçersiz.");
 
         RuleFor(x => x.ClientId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("clientId is invalid.");
+            .WithMessage("Müşteri filtresi geçersiz.");
 
         RuleFor(x => x.PageRequest.Sort)
             .Must(ExaminationListSort.Catalog.IsAllowedSort)

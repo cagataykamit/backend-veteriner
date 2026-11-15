@@ -11,13 +11,13 @@ public sealed class CreateCareInstructionCommandValidator : AbstractValidator<Cr
         RuleFor(x => x.PetId).NotEmpty();
         RuleFor(x => x.HospitalizationId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("HospitalizationId is invalid.");
+            .WithMessage("Geçerli bir yatış seçin.");
         RuleFor(x => x.ExaminationId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("ExaminationId is invalid.");
+            .WithMessage("Geçerli bir muayene seçin.");
         RuleFor(x => x.VisitId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("VisitId is invalid.");
+            .WithMessage("Geçerli bir geliş seçin.");
         RuleFor(x => x.Text).NotEmpty().MaximumLength(CareInstruction.MaxTextLength);
     }
 }

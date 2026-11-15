@@ -19,7 +19,7 @@ public sealed class RevokeAllMySessionsCommandHandler : IRequestHandler<RevokeAl
     {
         var userId = _client.UserId;
         if (userId is null)
-            return Result.Failure("Sessions.Unauthorized", "Authenticated user required.");
+            return Result.Failure("Sessions.Unauthorized", "Bu işlem için oturum açmanız gerekiyor.");
 
         if (request.UserId != userId.Value)
             return Result.Failure("Sessions.Forbidden", "Sadece kendi oturumlarınızı kapatabilirsiniz.");

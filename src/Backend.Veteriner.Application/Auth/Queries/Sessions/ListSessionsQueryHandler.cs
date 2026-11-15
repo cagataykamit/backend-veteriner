@@ -19,7 +19,7 @@ public sealed class ListSessionsQueryHandler : IRequestHandler<ListSessionsQuery
     {
         var userId = _client.UserId;
         if (userId is null)
-            return Result<IReadOnlyList<SessionDto>>.Failure("Sessions.Unauthorized", "Authenticated user required.");
+            return Result<IReadOnlyList<SessionDto>>.Failure("Sessions.Unauthorized", "Bu işlem için oturum açmanız gerekiyor.");
 
         var list = await _repo.GetByUserAsync(userId.Value, ct);
 

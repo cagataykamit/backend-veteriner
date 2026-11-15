@@ -44,13 +44,13 @@ namespace Backend.Veteriner.Application.Auth.Commands.Permissions.Update;
 
             if (entity is null)
             {
-                return Result.Failure("Permissions.NotFound", "Permission not found.");
+                return Result.Failure("Permissions.NotFound", "Yetki bulunamadı.");
             }
 
             if (!string.Equals(entity.Code, cmd.Code, StringComparison.OrdinalIgnoreCase)
                 && await _repo.ExistsByCodeAsync(cmd.Code, ct))
             {
-                return Result.Failure("Permissions.DuplicateCode", "Code already in use.");
+                return Result.Failure("Permissions.DuplicateCode", "Bu kod zaten kullanılıyor.");
             }
 
             var userIds = await _ocpRepo.GetUserIdsByPermissionIdAsync(cmd.Id, ct);

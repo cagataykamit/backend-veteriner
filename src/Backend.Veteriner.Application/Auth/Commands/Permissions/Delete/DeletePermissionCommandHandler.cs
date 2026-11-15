@@ -44,7 +44,7 @@ namespace Backend.Veteriner.Application.Auth.Commands.Permissions.Delete;
 
             if (entity is null)
             {
-                return Result.Failure("Permissions.NotFound", "Permission not found.");
+                return Result.Failure("Permissions.NotFound", "Yetki bulunamadı.");
             }
 
             var userIds = await _ocpRepo.GetUserIdsByPermissionIdAsync(cmd.Id, ct);

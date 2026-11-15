@@ -21,7 +21,7 @@ public sealed class RevokeMySessionCommandHandler : IRequestHandler<RevokeMySess
     {
         var userId = _client.UserId;
         if (userId is null)
-            return Result.Failure("Sessions.Unauthorized", "Authenticated user required.");
+            return Result.Failure("Sessions.Unauthorized", "Bu işlem için oturum açmanız gerekiyor.");
 
         var token = await _repo.GetByIdAsync(request.Id, ct);
         if (token is null)

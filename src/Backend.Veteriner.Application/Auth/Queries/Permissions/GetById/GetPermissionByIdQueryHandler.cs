@@ -18,7 +18,7 @@ public sealed class GetPermissionByIdQueryHandler
         {
             return Result<PermissionDto>.Failure(
                 "Permissions.NotFound",
-                "Permission not found.");
+                "Yetki bulunamadı.");
         }
 
         var dto = new PermissionDto(p.Id, p.Code, p.Description);

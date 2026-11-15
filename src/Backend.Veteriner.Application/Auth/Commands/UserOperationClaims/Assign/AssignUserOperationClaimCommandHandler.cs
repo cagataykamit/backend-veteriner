@@ -33,15 +33,15 @@ public sealed class AssignUserOperationClaimCommandHandler
     {
         var user = await _users.FirstOrDefaultAsync(new UserByIdWithRolesSpec(request.UserId), ct);
         if (user is null)
-            return Result<Guid>.Failure("UserOperationClaims.UserNotFound", "User not found.");
+            return Result<Guid>.Failure("UserOperationClaims.UserNotFound", "Kullanıcı bulunamadı.");
 
         var claimExists = await _operationClaims.ExistsAsync(request.OperationClaimId, ct);
         if (!claimExists)
-            return Result<Guid>.Failure("UserOperationClaims.OperationClaimNotFound", "Operation claim not found.");
+            return Result<Guid>.Failure("UserOperationClaims.OperationClaimNotFound", "Yetki rolü bulunamadı.");
 
         var linkExists = await _repo.ExistsAsync(request.UserId, request.OperationClaimId, ct);
         if (linkExists)
-            return Result<Guid>.Failure("UserOperationClaims.Duplicate", "User already has this operation claim.");
+            return Result<Guid>.Failure("UserOperationClaims.Duplicate", "Kullanıcıda bu yetki rolü zaten var.");
 
         var entity = new UserOperationClaim(request.UserId, request.OperationClaimId);
         await _repo.AddAsync(entity, ct);

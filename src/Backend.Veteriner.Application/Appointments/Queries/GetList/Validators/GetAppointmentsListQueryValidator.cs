@@ -27,7 +27,7 @@ public sealed class GetAppointmentsListQueryValidator : AbstractValidator<GetApp
 
         RuleFor(x => x.ClientId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("clientId is invalid.");
+            .WithMessage("Müşteri filtresi geçersiz.");
 
         RuleFor(x => x)
             .Must(q =>

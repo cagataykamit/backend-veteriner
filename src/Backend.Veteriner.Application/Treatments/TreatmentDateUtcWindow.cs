@@ -28,7 +28,7 @@ internal static class TreatmentDateUtcWindow
         {
             return Result.Failure(
                 "Treatments.DateTooFarInFuture",
-                "Treatment date may be at most 2 years in the future.");
+                "Tedavi tarihi en fazla 2 yıl ileride olabilir.");
         }
 
         return Result.Success();
@@ -43,7 +43,7 @@ internal static class TreatmentDateUtcWindow
         {
             return Result.Failure(
                 "Treatments.FollowUpBeforeTreatment",
-                "Follow-up date must not be before treatment date.");
+                "Kontrol tarihi tedavi tarihinden önce olamaz.");
         }
 
         return Result.Success();

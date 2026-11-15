@@ -87,7 +87,7 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
 
         var effectiveClinicId = _clinicContext.ClinicId ?? request.ClinicId;
         if (effectiveClinicId == Guid.Empty)
-            return Result<Guid>.Failure("LabResults.Validation", "ClinicId is required.");
+            return Result<Guid>.Failure("LabResults.Validation", "Klinik seçimi zorunludur.");
 
         var clinicAccess = await LabResultClinicWriteScope.EnsureWriteAccessAsync(
             _clinicScopeResolver, tenantId, effectiveClinicId, ct);
@@ -128,14 +128,14 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
             {
                 return Result<Guid>.Failure(
                     "LabResults.ExaminationClinicMismatch",
-                    "Examination clinic does not match lab result clinic.");
+                    "Seçilen muayene bu kliniğe ait değil.");
             }
 
             if (exam.PetId != request.PetId)
             {
                 return Result<Guid>.Failure(
                     "LabResults.ExaminationPetMismatch",
-                    "Examination pet does not match lab result pet.");
+                    "Seçilen muayene bu hastaya ait değil.");
             }
         }
 

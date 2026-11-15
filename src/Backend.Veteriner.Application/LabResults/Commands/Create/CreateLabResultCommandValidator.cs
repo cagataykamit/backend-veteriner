@@ -10,10 +10,10 @@ public sealed class CreateLabResultCommandValidator : AbstractValidator<CreateLa
         RuleFor(x => x.PetId).NotEmpty();
         RuleFor(x => x.ExaminationId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("ExaminationId is invalid.");
+            .WithMessage("Geçerli bir muayene seçin.");
         RuleFor(x => x.VisitId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
-            .WithMessage("VisitId is invalid.");
+            .WithMessage("Geçerli bir geliş seçin.");
         RuleFor(x => x.ResultDateUtc)
             .NotEqual(default(DateTime))
             .When(x => x.ResultDateUtc.HasValue);
