@@ -11,8 +11,8 @@ public sealed class TenantPlanFeatureEvaluatorTests
     private static readonly Guid TenantId = Guid.NewGuid();
 
     [Theory]
-    [InlineData(SubscriptionPlanCode.Basic, PlanFeature.OwnerPortal, false)]
-    [InlineData(SubscriptionPlanCode.Basic, PlanFeature.PortalAppointmentRequests, false)]
+    [InlineData(SubscriptionPlanCode.Basic, PlanFeature.OwnerPortal, true)]
+    [InlineData(SubscriptionPlanCode.Basic, PlanFeature.PortalAppointmentRequests, true)]
     [InlineData(SubscriptionPlanCode.Basic, PlanFeature.MultiClinic, false)]
     [InlineData(SubscriptionPlanCode.Pro, PlanFeature.OwnerPortal, true)]
     [InlineData(SubscriptionPlanCode.Pro, PlanFeature.PortalAppointmentRequests, true)]
@@ -54,8 +54,8 @@ public sealed class TenantPlanFeatureEvaluatorTests
         => SubscriptionPlanCatalog.Allows(plan, feature).Should().Be(expected);
 
     [Theory]
-    [InlineData(PlanFeature.OwnerPortal, SubscriptionPlanCode.Pro)]
-    [InlineData(PlanFeature.PortalAppointmentRequests, SubscriptionPlanCode.Pro)]
+    [InlineData(PlanFeature.OwnerPortal, SubscriptionPlanCode.Basic)]
+    [InlineData(PlanFeature.PortalAppointmentRequests, SubscriptionPlanCode.Basic)]
     [InlineData(PlanFeature.MultiClinic, SubscriptionPlanCode.Premium)]
     [InlineData(PlanFeature.ClinicsOverview, SubscriptionPlanCode.Premium)]
     [InlineData(PlanFeature.CashManagement, SubscriptionPlanCode.Pro)]
@@ -70,11 +70,11 @@ public sealed class TenantPlanFeatureEvaluatorTests
     public async Task EnsureAllowed_Should_Fail_With_RequiredPlan_When_Feature_Not_In_Plan()
     {
         var result = await PlanFeatureTestFactory.ForPlan(SubscriptionPlanCode.Basic)
-            .EnsureAllowedAsync(TenantId, PlanFeature.OwnerPortal, CancellationToken.None);
+            .EnsureAllowedAsync(TenantId, PlanFeature.Waitlist, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be(TenantPlanFeatureEvaluator.FeatureNotInPlanCode);
-        result.Error.Extensions!["feature"].Should().Be("OwnerPortal");
+        result.Error.Extensions!["feature"].Should().Be("Waitlist");
         result.Error.Extensions!["currentPlanCode"].Should().Be("Basic");
         result.Error.Extensions!["requiredPlanCode"].Should().Be("Pro");
     }
@@ -123,12 +123,14 @@ public sealed class TenantPlanFeatureEvaluatorTests
         (await evaluator.IsAllowedAsync(TenantId, PlanFeature.MultiClinic, CancellationToken.None)).Should().Be(allowed);
     }
 
+    /// <summary>2026-11-16: portal Temel denemesi dahil her pakette açık; üst paket özelliği denemede de seçilen pakete bağlı.</summary>
     [Fact]
-    public async Task Trial_Should_Follow_Selected_Plan_For_Portal()
+    public async Task Trial_Should_Follow_Selected_Plan_For_Portal_And_Upper_Features()
     {
         var evaluator = PlanFeatureTestFactory.ForPlan(SubscriptionPlanCode.Basic, trialing: true);
 
-        (await evaluator.IsAllowedAsync(TenantId, PlanFeature.OwnerPortal, CancellationToken.None)).Should().BeFalse();
+        (await evaluator.IsAllowedAsync(TenantId, PlanFeature.OwnerPortal, CancellationToken.None)).Should().BeTrue();
+        (await evaluator.IsAllowedAsync(TenantId, PlanFeature.Waitlist, CancellationToken.None)).Should().BeFalse();
     }
 
     [Fact]
