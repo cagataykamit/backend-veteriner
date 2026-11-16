@@ -75,7 +75,7 @@ public sealed class AppointmentScheduleConcurrencyIntegrationTests : IClassFixtu
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var request = AppointmentRequest.CreateFromLink(
             ctx.TenantId, ctx.ClinicId, null, new PetText("Pamuk", null, null), null, startUtc,
-            "Eşzamanlı Sahip", $"es-{Guid.NewGuid():N}@example.com", "05551234567", null, DateTime.UtcNow).Value!;
+            "Eşzamanlı Sahip", $"es-{Guid.NewGuid():N}@example.com", "05551234567", "Genel kontrol için geliyoruz", DateTime.UtcNow).Value!;
         db.AppointmentRequests.Add(request);
         await db.SaveChangesAsync();
         return request.Id;
