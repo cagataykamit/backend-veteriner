@@ -21,6 +21,12 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 | E-vet geçmiş görevleri (ADR-048 eki, 2026-11-12) | Randevu Listesi'nde geçmişte kalan aşı dışı görev (tamamlanmış ya da gelinmemiş) klinik geçmiş satırına çevrilir; bu satırların `rowNumber` değeri `1.000.000 + Excel satırı` (bölüm 13.2) | **Uygulandı** (migration yok) |
 | E-vet aynı hayvanın kayıtları (2026-11-14) | Sahibi değişen hayvanın eski kayıtları (aynı protokol ya da mikroçip, zincir dahil) ve aynı sahipteki kopya kayıt tek hastada birleşir: geçmişi ona bağlanır, vefat olarak gelmez (bölüm 13.2) | **Uygulandı** (migration yok) |
 | Eksik alanlar (2026-11-12) | Müşteri `Not`; ürün `KdvOrani`, `AlisFiyati`; E-vet müşteri açıklaması/meslek/doğum tarihi/ikinci telefon/kayıt tarihi, hasta kayıt tarihi ve işaretleri, aşı SKT'si, ürün KDV'si ve alış fiyatı (bölüm 4.3, 13.2) | **Uygulandı** (migration `AddProductTaxAndClientNotes`) |
+| Dosya notları (2026-11-16) | `warnings[]` öğesine isteğe bağlı satır alanları (`severity`, `count`, `unit`, `title`, `source`, `parts`, `outcome`, `example`, `target`); E-vet notlarına tür başına kod; notlar partiye yazılır ve parti ayrıntısıyla döner (bölüm 7.2.1) | **Uygulandı** (migration `AddImportBatchWarnings`) |
+
+**Frontend için değişenler (dosya notları, 2026-11-16; geriye uyumlu, bölüm 7.2.1):**
+- `warnings[]` artık yalnız yükleme yanıtında değil, **parti ayrıntısında** da döner (`GET /imports/batches/{id}`, eşleme, doğrulama, uygulama, geri alma yanıtları; `tables[]` ile birlikte). Notlar yüklemede partiye yazılır; sayfa yenilenince, geçmişten açılınca ya da başka cihazda da gelir. Bu alandan önce yüklenmiş partide `warnings = null`. Listede yine `null`.
+- Öğeye isteğe bağlı alanlar eklendi; yoksa yazılmazlar. `message` her notta vardır; alanları olmayan not düz metin gösterilir ve "bilgi" sayılır.
+- E-vet notlarının hepsi `Imports.EVetConversion` kodunu taşıyordu; artık her not türünün kendi kodu var (`Imports.EVet.*`, tablo bölüm 7.2.1). `Imports.EVetConversion` kalktı.
 
 **Frontend için değişenler (B1):**
 - Yeni izinler `Imports.Read`, `Imports.Manage`, `Imports.Commit` yalnız yönetici düzeyine (Admin, Owner, ClinicAdmin) bağlanır. Seed çalışıp kullanıcı çıkış-giriş yapana kadar bu uçlar `403` döner; menü öğesi izinle gizlenmelidir.
@@ -84,7 +90,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 **Frontend için değişenler (E-vet yedeği, 2026-11-11; geriye uyumlu ekleme, bölüm 13):**
 - `sourceProfile = EVet` iken `file` E-vet'in **Genel > Yedek Al** Excel dosyası olabilir; sunucu onu eşleme adımından önce kanonik tablolara çevirir (müşteri, hasta, aşı, klinik geçmiş, randevu). Sütunlar kanonik adlarla gelir (`confidence = Exact`); kullanıcı eşleme yapmaz, yalnız değer eşlemesi (tür, aşı adı) gerekebilir.
 - Yedekle birlikte üç isteğe bağlı CSV alanı: `productsFile` (E-vet Rapor > Depo > Ürün Listesi; gruplu biçim çözülür), **`evetPatientReportFile`** (Rapor > Genel > Hasta Listesi; hasta → müşteri protokolü), **`evetVaccineReportFile`** (Rapor > Resmi > Aşı Bilgisi; seri no ve ürün adı). Yeni alanlar yalnız `EVet` profilinde ve yedekle birlikte kabul edilir; aksi `400 Imports.UnsupportedFile`. `EVet` dışında `file` ile CSV birlikte gönderilemez (değişmedi).
-- Yükleme yanıtının `warnings[]` dizisinde `code = "Imports.EVetConversion"` öğeleri dönüştürmenin özetini verir (bağlantı kaynağı, atlanan görevler ve nedenleri, sonraki aşı tarihi sayısı, seri eşleşmesi, pasif ürün). Ekran bunları bilgi olarak göstermelidir.
+- Yükleme yanıtının `warnings[]` dizisindeki `Imports.EVet.*` öğeleri dönüştürmenin özetini verir (bağlantı kaynağı, atlanan görevler ve nedenleri, sonraki aşı tarihi sayısı, seri eşleşmesi, pasif ürün). (2026-11-16'ya dek hepsi `Imports.EVetConversion` kodunu taşıyordu; kodlar ve türleri bölüm 7.2.1.)
 - `GET /imports/source-profiles`: E-vet profilinin notu ve eşlemeleri gerçek dosyaya göre güncellendi, `verified = true`.
 - Yeni kanonik alanlar (her profilde, şablonda da): müşteri `KimlikNo`, `VergiDairesi`, `Durum`; hasta `Alerji`, `Durum`, `VefatTarihi` (bölüm 4.3). Yeni satır kodları: `Imports.TaxIdInvalid`, `Imports.StatusUnrecognized`, `Imports.InactiveClient`, `Imports.DeceasedDateIgnored` (bölüm 6.4).
 - **Davranış değişiklikleri:** klinik geçmişte yalnız kilo (> 0) veya ateş taşıyan satır artık boş sayılmaz (`ClinicalRecordEmpty` değişti, bölüm 12.3); hastaya bağlanan tablolarda `Tur` boşsa sahibin aynı adlı tek hastası bağlanır (bölüm 6.4); satır tavanları tablo başına 50.000, parti toplamı 100.000 oldu (bölüm 4.1).
@@ -347,7 +353,9 @@ Kural kodları, önem dereceleri ve varsayılan mesajlar kodda **tek yerde** tan
 | `Imports.BreedFreeText` | Info | Irk katalogda yok / atlandı → serbest metin; `value` kaynak. |
 | `Imports.ColorFreeText` | Info | Renk katalogda yok / atlandı → `Notes`'a `Renk: <değer>` eklenir; `value` kaynak. |
 | `Pets.BreedSpeciesMismatch` | Warning | Kullanıcının eşlediği ırk, satırın türüne ait değil; ırk metin olarak aktarılır (2026-11-14; önce Error). |
-| `VaccineDefinitions.InvalidSpecies` | Error | Kullanıcının eşlediği aşı tanımı hastanın türüyle uyumsuz. |
+| `VaccineDefinitions.InvalidSpecies` | Error | Kullanıcının eşlediği aşı tanımı hastanın türüyle uyumsuz. Yalnız türü dosyada **açıkça yazılı** hastada; türü bilinmeyen hastada aşağıdaki iki kural geçerlidir. |
+| `Imports.SpeciesFromVaccines` | Info | (2026-11-16) Hastanın türü dosyada boş ya da `Diğer` (katalog kodu `OTHER`; E-vet türü seçilmemiş hastaya `Diğer` yazar) ve hasta no'suyla bağlanan aşılarından türe özgü olanların hepsi aynı türü gösteriyor (eşlenen tanımın türü, yoksa adında geçen `kedi`/`köpek`): hasta o türle aktarılır. Mesaj türü söyler ("Türü dosyada yok (Diğer); aşılarının hepsi Köpek aşısı olduğu için Köpek olarak aktarılacak."). Boş türde `RequiredMissing` kalkar. Kural tek yerde: `ImportValidationEngine.SpeciesFromVaccines`. |
+| `Imports.VaccineSpeciesUnverified` | Warning | (2026-11-16) Türü bilinmeyen (`Diğer`) hastanın aşıları farklı türleri gösteriyor ya da tür çıkarılamadı: türe özgü aşı **reddedilmez**, tür denetlenmeden aktarılır (normalize satırda `speciesUnverified = true`; uygulamada `CreateImportedVaccinationCommand.SpeciesUnverified`, aşı-tür uyumu `VaccinationCatalogResolver` içinde atlanır). Türü bilinmeyen hastanın aşı adı tür süzmeden eşlenir. |
 | `Imports.GenderUnrecognized` | Warning | Cinsiyet tanınmadı; boş aktarılır. |
 | `Imports.NeuteredUnrecognized` | Warning | Kısır değeri tanınmadı; `false` aktarılır. |
 | `Imports.WeightInvalid` | Warning | Ağırlık sayı değil veya 0–9999,99 dışında; boş aktarılır. |
@@ -410,7 +418,7 @@ Hata zarfı için bölüm 8. `{id}` = parti kimliği.
 
 **B2 davranışı (uygulandı):** Dosya alanları işlenir (bölüm 4.1 "B2 okuyucu ayrıntıları"). Sıra: kiracı/klinik denetimi → dosya imza/boyut denetimi → içerik özeti → aynı `requestId` tekrarı (`200` aynı parti; `name`, `clinicId` **ve içerik özeti** aynı olmalı, aksi `409 Imports.RequestIdConflict`) → aynı özetli aktif parti (`409 Imports.DuplicateFile`; `extensions.batchId` yalnız çağıranın görebildiği partiyse) → açık taslak sınırı → okuma (bölüm 4.1 hataları) → aşı tablosu var ve `clinicId` yok (`400 Imports.ClinicRequired`) → kayıt. Parti ve hazırlık satırları **tek veritabanı işleminde** yazılır; okuma hatasında hiçbir şey kalmaz. Satırlar `ImportBatchRow` olarak saklanır (`SourceJson` = başlık → metin sözlüğü, `NormalizedJson` boş, doğrulama durumu `Pending`); `summary.<tablo>.total` satır sayısı olur. Dosya yoksa `400 Imports.EmptyFile`. Aşı için `clinicId` erişimi B1'deki gibi okuma kapsamıyla denetlenir; aşı yazma erişimi ve `Vaccinations.Create` denetimi uygulama (B4) adımındadır. `encoding` ve `delimiter` değerleri izinli kümede değilse `400 Validation.FluentValidation`. Audit payload'ı dosya içeriği ve satır verisi taşımaz (yalnız `requestId`, `name`, `clinicId`, `encoding`, `delimiter`).
 
-Yanıt gövdesi (B1 alanlarına ek): `tables[]` ve yalnız yükleme yanıtında `warnings[]` (`{ code, table?, message }`: `Imports.EncodingSuspect`, `Imports.TableEmpty`). `tables[].table` = `customers|pets|vaccinations`; `rowCount` = veri satırı sayısı; `columns[]` = dosyadaki başlıklar sırasıyla `{ source, suggested, confidence, mapped }`: `suggested` kanonik başlık veya `null`, `confidence` `Exact` (kanonik adla katlanmış eşit) | `Profile` (seçilen kaynak programın hazır eşlemesi, bölüm 4.5) | `Alias` (takma adla eşit) | `None`, `mapped` kayıtlı eşlemedeki kanonik ad (eşleme kaydedilmemişse `null`). Öneri kuralı: önce `Exact`, sonra `Profile`, sonra `Alias`; bir kanonik alan en çok bir sütuna, bir sütun en çok bir kanonik alana önerilir (ilk gelen kazanır). Sütun başlığı karşılaştırması bölüm 4.1/5 katlamasıyladır. Takma ad tablosu koddadır (`ImportCanonicalSchema`); yönetilen veri değildir.
+Yanıt gövdesi (B1 alanlarına ek): `tables[]` ve `warnings[]` (dosya okunurken çıkan notlar, bölüm 7.2.1). `tables[].table` = `customers|pets|vaccinations`; `rowCount` = veri satırı sayısı; `columns[]` = dosyadaki başlıklar sırasıyla `{ source, suggested, confidence, mapped }`: `suggested` kanonik başlık veya `null`, `confidence` `Exact` (kanonik adla katlanmış eşit) | `Profile` (seçilen kaynak programın hazır eşlemesi, bölüm 4.5) | `Alias` (takma adla eşit) | `None`, `mapped` kayıtlı eşlemedeki kanonik ad (eşleme kaydedilmemişse `null`). Öneri kuralı: önce `Exact`, sonra `Profile`, sonra `Alias`; bir kanonik alan en çok bir sütuna, bir sütun en çok bir kanonik alana önerilir (ilk gelen kazanır). Sütun başlığı karşılaştırması bölüm 4.1/5 katlamasıyladır. Takma ad tablosu koddadır (`ImportCanonicalSchema`); yönetilen veri değildir.
 
 **B1 davranışı (uygulandı):** Dosya alanları henüz yoktur; yalnız `requestId` (zorunlu), `name` (≤ 100, boşluk kırpılır, boşsa null) ve `clinicId` (opsiyonel) okunur. `clinicId` verilirse kiracıya ait ve çağıranın erişebildiği klinik olmalı (`404 Clinics.NotFound` / `403 Clinics.AccessDenied`) ve aktif klinik bağlamıyla çelişmemeli (`400 Imports.ClinicContextMismatch`). Pasif kiracı `403 Tenants.TenantInactive`; abonelik yazma koruması mevcut kodlarla. Aynı `requestId` + aynı `name`/`clinicId` → `200` aynı parti; farklı `name` veya `clinicId` → `409 Imports.RequestIdConflict` (B2'de içerik özeti de karşılaştırmaya girer). Kiracıda 5 açık taslak varsa `409 Imports.TooManyOpenDrafts`. Yanıt gövdesi bölüm 7.5'teki parti nesnesidir (`tables[]` B2'de eklenir).
 
@@ -430,10 +438,59 @@ Aynı kiracıda **aynı içerik özetli** ve durumu `Discarded/Expired/RolledBac
     { "table": "customers", "rowCount": 1200,
       "columns": [ { "source": "Ad Soyad", "suggested": "AdSoyad", "confidence": "Exact|Profile|Alias|None", "mapped": null } ] }
   ],
-  "warnings": [ { "code": "Imports.EncodingSuspect", "table": "customers", "message": "..." } ],
+  "warnings": [ { "code": "Imports.EncodingSuspect", "table": "customers", "message": "...", "severity": "attention" } ],
   "createdAtUtc": "...", "createdBy": "guid"
 }
 ```
+
+#### 7.2.1 Dosya notları (`warnings[]`, 2026-11-16)
+
+Hata olmayan okuma ve dönüştürme bulguları. Yüklemede partiye yazılır (`ImportBatches.WarningsJson`, yanıttaki biçimle) ve sonra değişmez; parti ayrıntısıyla (`tables[]` ile birlikte: yükleme, `GET .../{id}`, eşleme, doğrulama, uygulama, geri alma yanıtları) döner, listede `null`'dır. Bu alandan önce yüklenmiş partide `null`. Notlar kişisel veri taşımaz (sayı ve genel metin); satır verisi temizlense de kalır.
+
+```json
+{
+  "code": "Imports.EVet.SameOwnerSameName", "table": "pets",
+  "message": "Aynı sahipte aynı adlı birden çok hasta: 184 muayene / görev satırı … ; 26 satırın hangi hastaya ait olduğu aktarma ekranında sorulacak.",
+  "severity": "decision", "count": 26, "unit": "satır", "title": "hangi hastaya ait, sizden sorulacak",
+  "source": "Randevu ve Muayene Listesi",
+  "parts": [ { "label": "Hastası size sorulacak", "count": 26, "severity": "decision" },
+             { "label": "Doğru hastaya kendiliğinden bağlandı", "count": 184 } ],
+  "outcome": "Aynı sahipte aynı adlı birden çok hasta var. …",
+  "target": { "anchor": "required" }
+}
+```
+
+| Alan | Anlam |
+|------|-------|
+| `code`, `table`, `message` | Değişmedi. `message` her notta vardır: tam cümle, geri dönüş ve günlük için. `table` kanonik anahtar ya da `null` (dosya geneli). |
+| `severity` | `decision` (sizden seçim bekleniyor) · `attention` (aktarılır ama veri değişir ya da kontrol edilmeli) · `info` · `skipped` (aktarılmayacak). Yoksa `info` sayılır. Ekran sırası: karar → dikkat → bilgi → aktarılmayacak; aynı türde dizi sırası korunur. |
+| `count`, `unit`, `title` | Tek satır: `{count} {unit} {title}` ("26 satır hangi hastaya ait, sizden sorulacak"). `count` ham sayıdır, biçimi ekran yapar. `count` ya da `title` yoksa not düz metin (`message`) gösterilir. |
+| `source` | Notun dayandığı dosya ya da rapor ("Randevu Listesi", "Aşı Bilgisi raporu"). |
+| `parts[]` | Alt kırılım `{ label, count, severity? }`. |
+| `outcome`, `example` | "Ne olacak" cümlesi; örnek değer ("Pamuk (E-vet 1234)", "1234#56"). |
+| `target` | Gidilecek yer. `anchor = required`: Doğrulama adımındaki "Sizden beklenen" (belirsiz hasta seçimi, bölüm 13.4). `anchor = rows` (`table`, `reason`): satır incelemesi; satırlar neden kodu taşımadığından **henüz üretilmez** (faz 2). Düğme metnini ekran üretir. |
+
+Kodlar ve türler (tek yer: `ImportReadNotes`, `EVetNotes`):
+
+| Kod | Tür | Ne zaman |
+|-----|-----|----------|
+| `Imports.EncodingSuspect` | attention (yapısız) | CSV'de okunamayan karakter var. |
+| `Imports.TableEmpty` | skipped (yapısız) | Sayfa ya da dosyada veri satırı yok. |
+| `Imports.EVet.OwnerLink` | info | Hastaların sahibine bağlanma yolu (rapordaki protokol / sahip adı). |
+| `Imports.EVet.OwnerReportMissing` | attention | Hasta Listesi raporu yüklenmedi; hastalar sahibine yalnız adla bağlanır. |
+| `Imports.EVet.ChipToNote` | attention | Mikroçip rakam dışı ya da başka hastada kayıtlı; nota taşınır. |
+| `Imports.EVet.FormerRecordsMerged` | info | Aynı hayvanın ek kayıtları tek hastada birleşir. |
+| `Imports.EVet.SameNameRenamed` | attention (yalnız birleşen tekrar kayıt varsa info) | Aynı sahipte aynı ad ve türle birden çok hasta; adına E-vet protokolü eklenir. |
+| `Imports.EVet.DuplicateProtocol` | attention | Protokol numarası birden çok kayıtta; numaraya satır no eklenir. |
+| `Imports.EVet.SameOwnerSameName` | decision (seçilecek satır yoksa info) | Aynı sahipte aynı adlı hastalar; çözülemeyen satırların hastası sorulur (`target.anchor = required`). |
+| `Imports.EVet.TaskConversion` | info | Görevler aşı geçmişine ve randevuya dönüşür. |
+| `Imports.EVet.TasksToRecords` | info | Geçmiş aşı dışı görevler eski program kayıtlarına eklenir. |
+| `Imports.EVet.EarlyCompleted` | attention | Planlanandan önce tamamlanmış görev aktarma günüyle yazılır. |
+| `Imports.EVet.TasksSkipped` | skipped | Aktarılmayacak görevler; `parts` nedenler (çoktan aza). |
+| `Imports.EVet.VaccineReport` | attention (hepsi eşleştiyse info) | Aşı Bilgisi raporu satırlarının aşılarla eşleşmesi. |
+| `Imports.EVet.PassiveProducts` | skipped | E-vet ürün listesindeki pasif (`[-]`) ürünler. |
+
+Karar notu yükleme anının durumudur; seçimler doğrulamada yapılır. Önizlemede bekleyen hasta seçimi kalmadıysa ekran karar notunu "bilgi" gösterir (sunucu notu yeniden yazmaz).
 
 ### 7.3 `PUT /imports/batches/{id}/mapping`
 `Imports.Manage`; durum `Uploaded|Mapped|Validated|ValidationFailed`. Tam değiştirme:

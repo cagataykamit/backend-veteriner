@@ -97,6 +97,12 @@ public static class ImportRules
     public static readonly ImportRule VaccineInvalidSpecies = new("VaccineDefinitions.InvalidSpecies", ImportIssueSeverity.Error,
         "Eşlenen aşı tanımı hayvan türü ile uyumlu değil.");
 
+    // Türü bilinmeyen hasta (dosyada boş ya da "Diğer"; 2026-11-16): tür aşılarından çıkarılır, çıkarılamazsa aşı reddedilmez.
+    public static readonly ImportRule SpeciesFromVaccines = new("Imports.SpeciesFromVaccines", ImportIssueSeverity.Info,
+        "Türü dosyada yok; aşılarının hepsi aynı türe ait olduğu için o türle aktarılacak.");
+    public static readonly ImportRule VaccineSpeciesUnverified = new("Imports.VaccineSpeciesUnverified", ImportIssueSeverity.Warning,
+        "Hastanın türü bilinmiyor; aşının türüyle karşılaştırılamadı, aşı yine de aktarılacak.");
+
     // Hasta alanları
     public static readonly ImportRule GenderUnrecognized = new("Imports.GenderUnrecognized", ImportIssueSeverity.Warning,
         "Cinsiyet tanınmadı; boş aktarılacak.");

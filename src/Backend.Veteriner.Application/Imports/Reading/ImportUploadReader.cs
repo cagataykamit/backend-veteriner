@@ -152,10 +152,7 @@ public sealed class ImportUploadReader
 
             if (read.Value is not { Rows.Count: > 0 } source)
             {
-                warnings.Add(new ImportReadWarning(
-                    "Imports.TableEmpty",
-                    table,
-                    $"{ImportCanonicalNames.Display(table)} dosyasında veri satırı yok; atlandı."));
+                warnings.Add(ImportReadNotes.TableEmpty(table, sheet: false));
                 continue;
             }
 

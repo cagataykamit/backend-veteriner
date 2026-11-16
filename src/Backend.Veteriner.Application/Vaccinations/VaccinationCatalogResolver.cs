@@ -19,10 +19,11 @@ public static class VaccinationCatalogResolver
         CancellationToken ct)
         => ResolveActiveForSpeciesAsync(tenantId, vaccineDefinitionId, pet.SpeciesId, definitions, ct);
 
+    /// <summary><paramref name="speciesId"/> null: tür uyumu denetlenmez (içe aktarmada türü eski programda belirtilmemiş hasta).</summary>
     public static async Task<Result<VaccineDefinition>> ResolveActiveForSpeciesAsync(
         Guid tenantId,
         Guid vaccineDefinitionId,
-        Guid speciesId,
+        Guid? speciesId,
         IReadRepository<VaccineDefinition> definitions,
         CancellationToken ct)
     {
@@ -36,7 +37,7 @@ public static class VaccinationCatalogResolver
         if (def.TenantId is not null && def.TenantId != tenantId)
             return Result<VaccineDefinition>.Failure("VaccineDefinitions.NotFound", "Aşı tanımı bulunamadı.");
 
-        if (def.SpeciesId is { } sp && sp != speciesId)
+        if (def.SpeciesId is { } sp && speciesId is not null && sp != speciesId)
         {
             return Result<VaccineDefinition>.Failure(
                 "VaccineDefinitions.InvalidSpecies",

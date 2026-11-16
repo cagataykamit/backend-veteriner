@@ -4214,6 +4214,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid?>("ValidationId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("WarningsJson")
+                        .HasColumnType("nvarchar(max)");
+
                     b.ComplexProperty(typeof(Dictionary<string, object>), "AccountEntryCounts", "Backend.Veteriner.Domain.Imports.ImportBatch.AccountEntryCounts#ImportTableCounts", b1 =>
                         {
                             b1.IsRequired();

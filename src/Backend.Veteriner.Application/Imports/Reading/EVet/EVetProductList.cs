@@ -98,12 +98,7 @@ internal static class EVetProductList
         }
 
         if (passive > 0)
-        {
-            warnings.Add(new ImportReadWarning(
-                EVetBackupConverter.WarningCode,
-                ImportTable.Products,
-                $"E-vet ürün listesi: {passive} pasif ürün ([-]) aktarılmayacak."));
-        }
+            warnings.Add(EVetNotes.PassiveProducts(passive));
 
         return Result<ImportSourceTable?>.Success(rows.Count == 0 ? null : new ImportSourceTable(ImportTable.Products, Headers, rows));
     }

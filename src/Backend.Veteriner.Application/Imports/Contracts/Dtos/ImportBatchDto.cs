@@ -4,9 +4,9 @@ using Backend.Veteriner.Domain.Imports;
 namespace Backend.Veteriner.Application.Imports.Contracts.Dtos;
 
 /// <summary>
-/// İçe aktarma partisi (ayrıntı ve liste öğesi). Satır verisi içermez. <see cref="Tables"/> ayrıntı, yükleme ve eşleme
-/// yanıtında, <see cref="Warnings"/> yalnız yükleme yanıtında dolar (listede ikisi de null). <see cref="SourceProfile"/> kliniğin
-/// seçtiği kaynak programdır (TIER-021).
+/// İçe aktarma partisi (ayrıntı ve liste öğesi). Satır verisi içermez. <see cref="Tables"/> ve <see cref="Warnings"/> ayrıntı,
+/// yükleme ve eşleme yanıtında dolar (listede ikisi de null); notlar yüklemede partiye yazılır, not kaydı olmayan eski partide
+/// <see cref="Warnings"/> null'dır. <see cref="SourceProfile"/> kliniğin seçtiği kaynak programdır (TIER-021).
 /// </summary>
 public sealed record ImportBatchDto(
     Guid Id,

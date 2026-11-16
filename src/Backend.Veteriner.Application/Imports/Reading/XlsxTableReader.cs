@@ -66,10 +66,7 @@ public static class XlsxTableReader
 
             if (assembled.Value is not { Rows.Count: > 0 } source)
             {
-                warnings.Add(new ImportReadWarning(
-                    "Imports.TableEmpty",
-                    table,
-                    $"{ImportCanonicalNames.Display(table)} sayfasında veri satırı yok; atlandı."));
+                warnings.Add(ImportReadNotes.TableEmpty(table, sheet: true));
                 continue;
             }
 
