@@ -243,6 +243,25 @@ public sealed class VaccinationsController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <summary>Takvim ay görünümünde aşı katmanı: <c>calendar</c> ile aynı kurallar, gün başına sayı (APPOINTMENT_CALENDAR_API_CONTRACT.md §7).</summary>
+    [HttpGet("calendar/summary")]
+    [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
+    [ProducesResponseType(typeof(IReadOnlyList<CalendarDaySummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetCalendarSummary(
+        [FromQuery] DateTime? dateFromUtc,
+        [FromQuery] DateTime? dateToUtc,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] CalendarItemState[]? states = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetVaccinationsCalendarSummaryQuery(dateFromUtc, dateToUtc, clinicId, states), ct);
+        return result.ToActionResult(this);
+    }
+
     /// <summary>Sayfalı aşı listesi. <c>search</c> (veya <c>page.search</c>): aşı adı, notlar; müşteri metin alanlarında; hayvan ad/tür/ırk (hayvan listesi ile aynı küme). <c>onlyOverdue</c>: planlı ve vadesi geçmiş aşılar (Scheduled, DueAtUtc bugünün İstanbul gün başından önce; bugün vadeli aşı saati geçse de gecikmiş değildir, ADR-028); açıkken istek <c>status</c> değerini yok sayar; vefat eden hayvanın aşısı çıkmaz. <c>onlyReceivingCare</c>: yalnız bakımdaki (vefat etmemiş) hayvanların aşıları; verilmezse tümü. <c>examinationId</c>: yalnız bu muayeneye bağlı aşılar (kiracı/klinik kapsamı yine uygulanır).
     /// <c>clientId</c>: yalnız bu müşterinin hayvanlarının aşıları. <c>dateFromUtc</c>/<c>dateToUtc</c> (iki uç dahil): birleşik tarih — Uygulandı ise <c>AppliedAtUtc</c>, değilse <c>DueAtUtc</c>
     /// (<c>dueFromUtc</c>/<c>dueToUtc</c>, <c>appliedFromUtc</c>/<c>appliedToUtc</c> geriye uyumluluk için korunur). Tüm süzgeçler AND.

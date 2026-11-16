@@ -155,3 +155,24 @@ değiştiriciyle aynı yol); takvim aynı görünüm ve filtrelerle yeni klinikt
 - Application: `AppointmentCalendarFilterTests` (hekim, hekimsiz, tür, gün bazlı durum, iptal/gelmedi, VE), `GetAppointmentsCalendarQueryHandlerTests`
   (komut ve okuma modeli yolunda filtre), `GetVaccinationsCalendarQueryHandlerTests` (durum filtresi).
 - Entegrasyon: `AppointmentCalendarFilterEndpointTests` (tekrarlı parametreler HTTP üzerinden, birlikte hekim + hekimsiz 400, aşı `states`).
+
+## 7) Ay görünümü: gün özeti (2026-11-16)
+
+Kaynak: kullanıcı isteği 2026-11-16 (Ay / Hafta / Gün). Ay hücresi kart değil özet gösterir; planlı aşılarla bir günde onlarca kayıt
+olabildiği için istemci kayıtları çekip saymaz. Migration yok, yeni izin yok.
+
+| Uç | İzin | Parametreler |
+|---|---|---|
+| `GET /api/v1/appointments/calendar/summary` | `Appointments.Read` | `calendar` ile aynı: `dateFromUtc`, `dateToUtc` (en çok 45 gün; 6 haftalık ay ızgarası 42 gün), `clinicId`, `veterinarianUserId` / `withoutVeterinarian`, `appointmentTypes`, `states` |
+| `GET /api/v1/vaccinations/calendar/summary` | `Vaccinations.Read` | `calendar` ile aynı: `dateFromUtc`, `dateToUtc`, `clinicId`, `states` |
+
+Yanıt (yalnız kaydı olan günler, tarih sırasıyla):
+
+```json
+[ { "date": "2026-11-16", "total": 8, "dueToday": 5, "upcoming": 0, "overdue": 1, "completed": 2 } ]
+```
+
+- Sayılar §6.1 durumlarıdır; `total` dört durumun toplamıdır. İptal ve gelmedi randevu sayılmaz (durumu yoktur).
+- Kural tek yerde kalsın diye özet işleyicisi aynı takvim sorgusunu gönderir (doğrulama, kapsam, filtre, karşılanmış sonraki tarih,
+  vefat kuralı orada) ve gün + durum bazında sayar (`CalendarDaySummary`). Hata kodları `calendar` ile aynı.
+- Testler: Application `CalendarSummaryTests`; entegrasyon `AppointmentCalendarFilterEndpointTests` (özet ve filtre).

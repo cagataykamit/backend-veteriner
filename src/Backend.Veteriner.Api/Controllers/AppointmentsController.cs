@@ -177,6 +177,30 @@ public sealed class AppointmentsController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <summary>Takvim ay görünümü: <c>calendar</c> ile aynı aralık ve filtreler, gün başına sayı (APPOINTMENT_CALENDAR_API_CONTRACT.md §7).</summary>
+    [HttpGet("calendar/summary")]
+    [Authorize(Policy = PermissionCatalog.Appointments.Read)]
+    [ProducesResponseType(typeof(IReadOnlyList<CalendarDaySummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetCalendarSummary(
+        [FromQuery] DateTime? dateFromUtc,
+        [FromQuery] DateTime? dateToUtc,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] Guid? veterinarianUserId = null,
+        [FromQuery] bool withoutVeterinarian = false,
+        [FromQuery] AppointmentType[]? appointmentTypes = null,
+        [FromQuery] CalendarItemState[]? states = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(
+            new GetAppointmentsCalendarSummaryQuery(dateFromUtc, dateToUtc, clinicId, veterinarianUserId, withoutVeterinarian, appointmentTypes, states),
+            ct);
+        return result.ToActionResult(this);
+    }
+
     /// <summary>Planlı randevuyu iptal eder; yanıt "Geri al" süresini taşır (APPOINTMENT_CANCEL_UNDO_API_CONTRACT.md).</summary>
     [HttpPost("{id:guid}/cancel")]
     [Authorize(Policy = PermissionCatalog.Appointments.Cancel)]

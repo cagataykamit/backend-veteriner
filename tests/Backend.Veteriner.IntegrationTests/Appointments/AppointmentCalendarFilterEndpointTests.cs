@@ -48,6 +48,24 @@ public sealed class AppointmentCalendarFilterEndpointTests : IClassFixture<Custo
     }
 
     [Fact]
+    public async Task Calendar_Summary_Counts_Per_Day_With_Same_Filters()
+    {
+        var ctx = await SeedAsync();
+        var http = Client(ctx.Token);
+
+        var all = await http.GetFromJsonAsync<JsonElement>($"/api/v1/appointments/calendar/summary?{ctx.Window}");
+        var days = all.EnumerateArray().ToList();
+
+        // Dün: tamamlanan 1; yarın: planlı 2 (iptal sayılmaz).
+        days.Sum(d => d.GetProperty("total").GetInt32()).Should().Be(3);
+        days.Sum(d => d.GetProperty("completed").GetInt32()).Should().Be(1);
+        days.Sum(d => d.GetProperty("upcoming").GetInt32()).Should().Be(2);
+
+        var vetOnly = await http.GetFromJsonAsync<JsonElement>($"/api/v1/appointments/calendar/summary?{ctx.Window}&veterinarianUserId={ctx.VetId:D}&states=Upcoming");
+        vetOnly.EnumerateArray().Single().GetProperty("total").GetInt32().Should().Be(1);
+    }
+
+    [Fact]
     public async Task Calendar_Rejects_Veterinarian_And_WithoutVeterinarian_Together()
     {
         var ctx = await SeedAsync();
@@ -63,8 +81,10 @@ public sealed class AppointmentCalendarFilterEndpointTests : IClassFixture<Custo
         var ctx = await SeedAsync(PermissionCatalog.Vaccinations.Read);
 
         var response = await Client(ctx.Token).GetAsync($"/api/v1/vaccinations/calendar?{ctx.Window}&states=Overdue&states=DueToday");
+        var summary = await Client(ctx.Token).GetAsync($"/api/v1/vaccinations/calendar/summary?{ctx.Window}&states=Overdue");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
+        summary.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     private HttpClient Client(string token)
