@@ -42,7 +42,7 @@ public sealed class VaccinationsCalendarEndpointTests : IClassFixture<CustomWebA
         {
             (ctx.PlannedTomorrowId, "Planned", "Upcoming"),
             (ctx.ImportedNextDueTodayId, "NextDue", "DueToday"),
-            (ctx.AppliedTodayId, "Applied", "Applied"),
+            (ctx.AppliedTodayId, "Applied", "Completed"),
         });
 
         var imported = items.Single(i => i.GetProperty("vaccinationId").GetGuid() == ctx.ImportedNextDueTodayId);
