@@ -97,4 +97,15 @@ public static class ImportBatchStatusSets
         ImportBatchStatus.Discarded,
         ImportBatchStatus.Expired,
     ];
+
+    /// <summary>
+    /// Kapanmış partiler: verisi üründe kalmayan (tamamen geri alınmış) veya hiç uygulanmamış (silinmiş, süresi dolmuş
+    /// taslak). Parti listesi bunları yalnız istenince gösterir.
+    /// </summary>
+    public static readonly IReadOnlyList<ImportBatchStatus> Closed =
+    [
+        ImportBatchStatus.RolledBack,
+        ImportBatchStatus.Discarded,
+        ImportBatchStatus.Expired,
+    ];
 }
