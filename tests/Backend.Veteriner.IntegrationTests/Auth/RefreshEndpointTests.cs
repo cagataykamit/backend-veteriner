@@ -58,6 +58,20 @@ public sealed class RefreshEndpointTests
     }
 
     [Fact]
+    public async Task Concurrent_Refresh_With_Same_Token_Should_Issue_Exactly_One_New_Token()
+    {
+        var (_, refreshToken) = await LoginAndGetTokensAsync();
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 8)
+            .Select(_ => _client.PostAsJsonAsync("/api/v1/auth/refresh", new { RefreshToken = refreshToken })));
+
+        responses.Count(r => r.StatusCode == HttpStatusCode.OK)
+            .Should().Be(1, "refresh token tek kullanımlıktır; eşzamanlı ikinci kullanım yeni jeton alamaz");
+        responses.Where(r => r.StatusCode != HttpStatusCode.OK)
+            .Should().OnlyContain(r => r.StatusCode == HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task Refresh_Should_ReturnUnauthorized_When_RefreshTokenIsInvalid()
     {
         // Arrange

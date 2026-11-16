@@ -243,6 +243,21 @@ public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWe
     }
 
     [Fact]
+    public async Task Concurrent_Refresh_With_Same_Token_Should_Issue_Exactly_One_New_Token()
+    {
+        var staff = await SeedStaffAsync();
+        var portal = await InviteAndAcceptAsync(staff);
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 8)
+            .Select(_ => SendAsync(HttpMethod.Post, "/api/portal/v1/auth/refresh", body: new { refreshToken = portal.RefreshToken })));
+
+        responses.Count(r => r.StatusCode == HttpStatusCode.OK)
+            .Should().Be(1, "portal jetonu tek kullanımlıktır; eşzamanlı ikinci kullanım yeni jeton alamaz");
+        responses.Where(r => r.StatusCode != HttpStatusCode.OK)
+            .Should().OnlyContain(r => r.StatusCode == HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task Staff_And_Portal_Tokens_Should_Be_Rejected_On_Each_Others_Surface()
     {
         var staff = await SeedStaffAsync([PermissionCatalog.OwnerPortal.Manage, PermissionCatalog.Clients.Read]);

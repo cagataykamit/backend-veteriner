@@ -18,6 +18,8 @@ public sealed class OwnerPortalRefreshTokenConfiguration : IEntityTypeConfigurat
         b.Property(x => x.ExpiresAtUtc).IsRequired();
         b.Property(x => x.RevokeReason).HasMaxLength(OwnerPortalRefreshToken.MaxRevokeReasonLength);
         b.Property(x => x.ReplacedByTokenHash).HasMaxLength(OwnerPortalRefreshToken.TokenHashLength);
+        // Tek kullanımlık döndürme (personel RefreshTokens ile aynı kural): eşzamanlı ikinci yenileme DbUpdateConcurrencyException alır.
+        b.Property(x => x.RevokedAtUtc).IsConcurrencyToken();
 
         b.HasIndex(x => x.TokenHash).IsUnique();
         b.HasIndex(x => x.OwnerAccountId);

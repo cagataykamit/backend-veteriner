@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.OwnerPortal.Specs;
 using Backend.Veteriner.Domain.OwnerPortal;
 using Backend.Veteriner.Domain.Shared;
 using Mediator;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Application.OwnerPortal.Commands.RefreshPortalSession;
 
@@ -65,6 +66,15 @@ public sealed class RefreshPortalSessionCommandHandler : IRequestHandler<Refresh
         if (account is not { IsActive: true })
             return Result<PortalAuthTokensDto>.Failure(OwnerPortalErrors.InvalidRefreshToken);
 
-        return Result<PortalAuthTokensDto>.Success(await _sessions.IssueAsync(account, utcNow, ct, replacing: stored));
+        try
+        {
+            return Result<PortalAuthTokensDto>.Success(await _sessions.IssueAsync(account, utcNow, ct, replacing: stored));
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Aynı jetonla eşzamanlı yenileme kazandı (RevokedAtUtc eşzamanlılık belirteci); bu istek yeni jeton almaz.
+            // Diğer oturumlar kapatılmaz: çoğunlukla aynı tarayıcının iki sekmesidir, kazanan oturum sürer.
+            return Result<PortalAuthTokensDto>.Failure(OwnerPortalErrors.InvalidRefreshToken);
+        }
     }
 }
