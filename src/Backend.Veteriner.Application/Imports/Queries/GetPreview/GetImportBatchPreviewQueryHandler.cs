@@ -64,8 +64,8 @@ public sealed class GetImportBatchPreviewQueryHandler : IRequestHandler<GetImpor
                 $"Parti '{batch.Status}' durumundayken önizleme yok; önce doğrulayın.");
         }
 
-        var summary = batch.ToDto().Summary;
         var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var summary = batch.ToDto(now).Summary;
 
         // Uygulama başladıysa etki gerçek kayıtlardan (satır verisi temizlenmiş olsa da) hesaplanır.
         var impact = await _reminderImpact.ReadAsync(batch, now, ct);

@@ -16,17 +16,20 @@ public sealed class GetImportBatchesListQueryHandler
     private readonly IClinicContext _clinicContext;
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<ImportBatch> _batches;
+    private readonly TimeProvider _timeProvider;
 
     public GetImportBatchesListQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
-        IReadRepository<ImportBatch> batches)
+        IReadRepository<ImportBatch> batches,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
         _batches = batches;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<PagedResult<ImportBatchDto>>> Handle(GetImportBatchesListQuery request, CancellationToken ct)
@@ -46,6 +49,7 @@ public sealed class GetImportBatchesListQueryHandler
         var singleClinicId = scope.Value!.SingleClinicId;
         var accessibleClinicIds = scope.Value!.AccessibleClinicIds;
 
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
         var total = await _batches.CountAsync(
             new ImportBatchesFilteredSpec(tenantId, request.Status, singleClinicId, accessibleClinicIds), ct);
         var rows = await _batches.ListAsync(
@@ -53,6 +57,6 @@ public sealed class GetImportBatchesListQueryHandler
                 tenantId, request.Status, singleClinicId, accessibleClinicIds, request.Page, request.PageSize), ct);
 
         return Result<PagedResult<ImportBatchDto>>.Success(
-            PagedResult<ImportBatchDto>.Create(rows.Select(r => r.ToDto()).ToList(), total, request.Page, request.PageSize));
+            PagedResult<ImportBatchDto>.Create(rows.Select(r => r.ToDto(now)).ToList(), total, request.Page, request.PageSize));
     }
 }

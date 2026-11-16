@@ -192,7 +192,7 @@ public sealed class CreateImportBatchCommandHandler
 
         var headers = tables.ToDictionary(t => t.Table, t => t.Headers);
         return Result<ImportBatchCreateResultDto>.Success(
-            new ImportBatchCreateResultDto(true, batch.ToDto(ImportTableInfoLoader.Build(batch, headers), warnings)));
+            new ImportBatchCreateResultDto(true, batch.ToDto(_timeProvider.GetUtcNow().UtcDateTime, ImportTableInfoLoader.Build(batch, headers), warnings)));
     }
 
     private async Task<Result<ImportBatchCreateResultDto>> ReplayAsync(
@@ -206,7 +206,7 @@ public sealed class CreateImportBatchCommandHandler
 
         var tables = await _tableInfo.LoadAsync(existing, ct);
         return Result<ImportBatchCreateResultDto>.Success(
-            new ImportBatchCreateResultDto(false, existing.ToDto(tables)));
+            new ImportBatchCreateResultDto(false, existing.ToDto(_timeProvider.GetUtcNow().UtcDateTime, tables)));
     }
 
     /// <summary>

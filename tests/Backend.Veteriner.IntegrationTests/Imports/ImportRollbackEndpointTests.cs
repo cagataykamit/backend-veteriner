@@ -424,6 +424,42 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
         (await CountsInTenantAsync(ctx.TenantId)).Should().Be((2, 2, 3));
     }
 
+    [Fact]
+    public async Task Rollback_Should_Be_Refused_After_Window_And_Batch_Should_Be_Final()
+    {
+        var ctx = await SeedAsync();
+        var client = ClientFor(ctx.Token);
+        var (id, validationId) = await UploadValidatedScenarioAsync(client, ctx);
+        await CommitAndRunAsync(client, id, validationId);
+
+        var open = await GetJsonAsync(client, $"/api/v1/imports/batches/{id}");
+        open.GetProperty("canRollback").GetBoolean().Should().BeTrue();
+        var committedAt = open.GetProperty("committedAtUtc").GetDateTime();
+        open.GetProperty("rollbackDeadlineUtc").GetDateTime().Should().Be(committedAt + ImportBatch.RollbackWindow);
+
+        // Uygulama anı süre kadar geriye: aktarma kesinleşmiş sayılır.
+        var backdated = committedAt - ImportBatch.RollbackWindow - TimeSpan.FromMinutes(1);
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.ImportBatches.Where(b => b.Id == id)
+                .ExecuteUpdateAsync(s => s.SetProperty(b => b.CommittedAtUtc, backdated));
+        }
+
+        var final = await GetJsonAsync(client, $"/api/v1/imports/batches/{id}");
+        final.GetProperty("canRollback").GetBoolean().Should().BeFalse();
+        final.GetProperty("rollbackDeadlineUtc").GetDateTime().Should().Be(backdated + ImportBatch.RollbackWindow);
+        var preview = await GetJsonAsync(client, $"/api/v1/imports/batches/{id}/rollback-preview");
+        preview.GetProperty("canRollback").GetBoolean().Should().BeFalse();
+        preview.GetProperty("canDeleteUnblockedOnly").GetBoolean().Should().BeFalse();
+
+        var refused = await PostRollbackAsync(client, id, Guid.NewGuid(), "Süre dolduktan sonra");
+        refused.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await CodeAsync(refused)).Should().Be("Imports.RollbackWindowClosed");
+        (await StatusAsync(id)).Should().Be(ImportBatchStatus.Committed);
+        (await CountsInTenantAsync(ctx.TenantId)).Should().Be((2, 2, 3));
+    }
+
     // ================================================================ Bakım işi (K9)
 
     [Fact]

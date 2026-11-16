@@ -99,7 +99,7 @@ public sealed class ReleaseImportRemindersCommandHandler
         }
 
         return Result<ImportReleaseRemindersResultDto>.Success(
-            new ImportReleaseRemindersResultDto(batch.ToDto(), impact, AlreadyReleased: false, NoteFor(impact)));
+            new ImportReleaseRemindersResultDto(batch.ToDto(now), impact, AlreadyReleased: false, NoteFor(impact)));
     }
 
     private async Task<Result<ImportReleaseRemindersResultDto>> ResultAsync(
@@ -107,7 +107,7 @@ public sealed class ReleaseImportRemindersCommandHandler
     {
         var impact = await _reminderImpact.ReadAsync(batch, now, ct);
         return Result<ImportReleaseRemindersResultDto>.Success(
-            new ImportReleaseRemindersResultDto(batch.ToDto(), impact, alreadyReleased, NoteFor(impact)));
+            new ImportReleaseRemindersResultDto(batch.ToDto(now), impact, alreadyReleased, NoteFor(impact)));
     }
 
     /// <summary>Randevu içeren partide iki ayar birlikte değerlendirilir; randevusuz partide yalnız aşı ayarı (önceki davranış).</summary>

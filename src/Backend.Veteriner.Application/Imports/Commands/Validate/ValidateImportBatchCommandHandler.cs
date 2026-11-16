@@ -94,7 +94,7 @@ public sealed class ValidateImportBatchCommandHandler
 
     private async Task<Result<ImportValidationStartResultDto>> ResultAsync(ImportBatch batch, bool started, CancellationToken ct)
         => Result<ImportValidationStartResultDto>.Success(
-            new ImportValidationStartResultDto(started, batch.ToDto(await _tableInfo.LoadAsync(batch, ct))));
+            new ImportValidationStartResultDto(started, batch.ToDto(_timeProvider.GetUtcNow().UtcDateTime, await _tableInfo.LoadAsync(batch, ct))));
 
     private static Result<ImportValidationStartResultDto> Fail(string code, string message)
         => Result<ImportValidationStartResultDto>.Failure(code, message);
