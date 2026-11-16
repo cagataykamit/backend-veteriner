@@ -25,6 +25,7 @@ public sealed class GetAppointmentsCalendarQueryHandlerTests
     private readonly Mock<IReadRepository<Appointment>> _appointments = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
+    private readonly Mock<IReadRepository<AppointmentReason>> _reasons = new();
     private readonly Mock<IAppointmentReadModelReader> _readModelReader = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private static readonly Guid VetId = Guid.NewGuid();
@@ -41,7 +42,8 @@ public sealed class GetAppointmentsCalendarQueryHandlerTests
             _clients.Object,
             _readModelReader.Object,
             Options.Create(new QueryReadModelsOptions { AppointmentsEnabled = appointmentsQueryEnabled }),
-            VeterinarianReaderMock.Create(new Dictionary<Guid, string?> { [VetId] = "Dr. Ayşe" }).Object);
+            VeterinarianReaderMock.Create(new Dictionary<Guid, string?> { [VetId] = "Dr. Ayşe" }).Object,
+            _reasons.Object);
 
     [Fact]
     public async Task Handle_Should_Fail_When_TenantContextMissing()
@@ -193,6 +195,68 @@ public sealed class GetAppointmentsCalendarQueryHandlerTests
         result.Value[0].VeterinarianName.Should().Be("Dr. Ayşe");
         result.Value[1].VeterinarianUserId.Should().BeNull();
         result.Value[1].VeterinarianName.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_Should_MapReasonNameAndNotes_ForDetailBubble()
+    {
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var reasonId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tenantId);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(clinicId);
+        _appointments.Setup(r => r.ListAsync(It.IsAny<AppointmentsCalendarSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<AppointmentCalendarRow>
+            {
+                new(Guid.NewGuid(), clinicId, petId, DateTime.UtcNow.AddHours(1), 30, AppointmentStatus.Scheduled, AppointmentType.Vaccination, null, reasonId, "İç ve dış parazit"),
+                new(Guid.NewGuid(), clinicId, petId, DateTime.UtcNow.AddHours(2), 30, AppointmentStatus.Scheduled, AppointmentType.Consultation, null),
+            });
+        _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantIdsNameClientSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<PetNameClientRow>());
+        _reasons.Setup(r => r.ListAsync(It.IsAny<AppointmentReasonNamesByIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<AppointmentReasonNameRow> { new(reasonId, "Aşılama") });
+
+        var result = await CreateHandler().Handle(
+            new GetAppointmentsCalendarQuery(DateTime.UtcNow, DateTime.UtcNow.AddDays(1)),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value![0].ReasonId.Should().Be(reasonId);
+        result.Value[0].ReasonName.Should().Be("Aşılama");
+        result.Value[0].Notes.Should().Be("İç ve dış parazit");
+        result.Value[1].ReasonName.Should().BeNull();
+        result.Value[1].Notes.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_Should_CompleteDetails_FromCommandDb_When_CqrsEnabled()
+    {
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var appointmentId = Guid.NewGuid();
+        var reasonId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tenantId);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(clinicId);
+        _readModelReader.Setup(r => r.GetCalendarAsync(It.IsAny<AppointmentCalendarReadRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[]
+            {
+                new AppointmentCalendarItemDto(appointmentId, clinicId, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow, 30, DateTime.UtcNow.AddMinutes(30),
+                    AppointmentStatus.Scheduled, AppointmentType.Checkup, "Pamuk", "Ali Veli"),
+            });
+        _appointments.Setup(r => r.ListAsync(It.IsAny<AppointmentCalendarDetailsByIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<AppointmentCalendarDetailsRow> { new(appointmentId, VetId, reasonId, "Kontrol notu") });
+        _reasons.Setup(r => r.ListAsync(It.IsAny<AppointmentReasonNamesByIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<AppointmentReasonNameRow> { new(reasonId, "Kontrol") });
+
+        var result = await CreateHandler(appointmentsQueryEnabled: true).Handle(
+            new GetAppointmentsCalendarQuery(DateTime.UtcNow, DateTime.UtcNow.AddDays(1)),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value![0].VeterinarianName.Should().Be("Dr. Ayşe");
+        result.Value[0].ReasonName.Should().Be("Kontrol");
+        result.Value[0].Notes.Should().Be("Kontrol notu");
     }
 
     [Fact]

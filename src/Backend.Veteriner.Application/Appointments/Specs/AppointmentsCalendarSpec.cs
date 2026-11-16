@@ -11,7 +11,9 @@ public sealed record AppointmentCalendarRow(
     int DurationMinutes,
     AppointmentStatus Status,
     AppointmentType AppointmentType,
-    Guid? VeterinarianUserId);
+    Guid? VeterinarianUserId,
+    Guid? ReasonId = null,
+    string? Notes = null);
 
 public sealed class AppointmentsCalendarSpec : Specification<Appointment, AppointmentCalendarRow>
 {
@@ -41,20 +43,38 @@ public sealed class AppointmentsCalendarSpec : Specification<Appointment, Appoin
             a.DurationMinutes,
             a.Status,
             a.AppointmentType,
-            a.VeterinarianUserId));
+            a.VeterinarianUserId,
+            a.ReasonId,
+            a.Notes));
     }
 }
 
-/// <summary>Randevuların hekimi (takvimde okuma modeli yolu hekim taşımaz; komut veritabanından tamamlanır).</summary>
-public sealed class AppointmentVeterinariansByIdsSpec : Specification<Appointment, AppointmentVeterinarianRow>
+/// <summary>
+/// Randevuların hekimi, nedeni ve notu: okuma modeli yolu bunları taşımaz; takvim aynı istekte komut veritabanından tamamlar.
+/// </summary>
+public sealed class AppointmentCalendarDetailsByIdsSpec : Specification<Appointment, AppointmentCalendarDetailsRow>
 {
-    public AppointmentVeterinariansByIdsSpec(Guid tenantId, IReadOnlyCollection<Guid> appointmentIds)
+    public AppointmentCalendarDetailsByIdsSpec(Guid tenantId, IReadOnlyCollection<Guid> appointmentIds)
     {
         var ids = appointmentIds.ToArray();
         Query.AsNoTracking();
-        Query.Where(a => a.TenantId == tenantId && ids.Contains(a.Id) && a.VeterinarianUserId != null);
-        Query.Select(a => new AppointmentVeterinarianRow(a.Id, a.VeterinarianUserId!.Value));
+        Query.Where(a => a.TenantId == tenantId && ids.Contains(a.Id));
+        Query.Select(a => new AppointmentCalendarDetailsRow(a.Id, a.VeterinarianUserId, a.ReasonId, a.Notes));
     }
 }
 
-public sealed record AppointmentVeterinarianRow(Guid AppointmentId, Guid VeterinarianUserId);
+public sealed record AppointmentCalendarDetailsRow(Guid AppointmentId, Guid? VeterinarianUserId, Guid? ReasonId, string? Notes);
+
+/// <summary>Takvimdeki randevu nedenlerinin adı (pasif neden de adıyla görünür).</summary>
+public sealed class AppointmentReasonNamesByIdsSpec : Specification<AppointmentReason, AppointmentReasonNameRow>
+{
+    public AppointmentReasonNamesByIdsSpec(Guid tenantId, IReadOnlyCollection<Guid> reasonIds)
+    {
+        var ids = reasonIds.ToArray();
+        Query.AsNoTracking();
+        Query.Where(r => r.TenantId == tenantId && ids.Contains(r.Id));
+        Query.Select(r => new AppointmentReasonNameRow(r.Id, r.Name));
+    }
+}
+
+public sealed record AppointmentReasonNameRow(Guid Id, string Name);
