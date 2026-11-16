@@ -30,7 +30,8 @@ public sealed class AppointmentLifecycleCommandHandlerTests
         _read.Object,
         new Mock<IClinicVeterinarianReader>().Object,
         new Mock<IUserNotificationPublisher>().Object,
-        new Mock<IClientContext>().Object);
+        new Mock<IClientContext>().Object,
+        new Mock<ITransactionLock>().Object);
 
     private readonly Mock<IReadRepository<ClinicAppointmentSettings>> _clinicAppointmentSettings = new();
     private readonly Mock<IReadRepository<ClinicWorkingHour>> _clinicWorkingHoursRead = new();

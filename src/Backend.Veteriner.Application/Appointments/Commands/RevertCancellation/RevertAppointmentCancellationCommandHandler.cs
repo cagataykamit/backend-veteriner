@@ -98,6 +98,7 @@ public sealed class RevertAppointmentCancellationCommandHandler : IRequestHandle
 
         var settingsRow = await _settings.FirstOrDefaultAsync(
             new ClinicAppointmentSettingsByClinicSpec(tenantId, appointment.ClinicId), ct);
+        await _assignment.LockScheduleAsync(tenantId, ct);
         var conflicts = await AppointmentSlotRules.EnsureNoConflictAsync(
             _appointmentsRead,
             _assignment,

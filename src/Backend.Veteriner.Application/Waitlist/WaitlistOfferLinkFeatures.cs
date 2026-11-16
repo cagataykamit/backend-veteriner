@@ -33,7 +33,7 @@ public sealed record GetWaitlistOfferByLinkQuery(string Token) : IRequest<Result
 /// Sahip teklifi kabul eder: saat hâlâ uygunsa randevu oluşur, kayıt kapanır, klinik bildirim merkezine bildirim düşer. Saat bu arada
 /// dolduysa 409 <see cref="WaitlistErrors.SlotTakenCode"/>; randevu oluşmaz, teklif "saat doldu" kapanır ve sıradakine teklif açılmaz.
 /// </summary>
-public sealed record AcceptWaitlistOfferByLinkCommand(string Token) : IRequest<Result>;
+public sealed record AcceptWaitlistOfferByLinkCommand(string Token) : IRequest<Result>, ITransactionalRequest;
 
 /// <summary>Sahip teklifi istemez: teklif kapanır, işleyici sıradaki uygun kayda geçer; bekleme kaydı sırada kalır.</summary>
 public sealed record DeclineWaitlistOfferByLinkCommand(string Token) : IRequest<Result>;
@@ -205,6 +205,7 @@ public sealed class AcceptWaitlistOfferByLinkCommandHandler : IRequestHandler<Ac
         var bookable = s.Pet.EnsureCanStartCare();
         if (bookable.IsSuccess)
         {
+            await _assignment.LockScheduleAsync(offer.TenantId, ct);
             bookable = await AppointmentSlotRules.EnsureBookableAsync(
                 _appointmentsRead, _workingHours, _assignment, settings, offer.TenantId, offer.ClinicId, s.Pet.Id,
                 offer.VeterinarianUserId, offer.SlotStartUtc, offer.DurationMinutes, ct);

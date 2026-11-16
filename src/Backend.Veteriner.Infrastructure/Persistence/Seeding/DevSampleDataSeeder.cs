@@ -401,7 +401,8 @@ public static class DevSampleDataSeeder
                         new UserNotificationRecipientReader(db),
                         new EfRepository<UserNotification>(db),
                         TimeProvider.System),
-                    clientContext),
+                    clientContext,
+                    new NoTransactionLock()),
                 TimeProvider.System);
 
             CreateCharge = new CreateChargeCommandHandler(
@@ -464,6 +465,12 @@ public static class DevSampleDataSeeder
         public string? Path => null;
         public string? Method => null;
         public string? CorrelationId => null;
+    }
+
+    /// <summary>Seed tek iş parçacığında ve transaction'sız yazar; eşzamanlı yazım olmadığından takvim kilidi gerekmez.</summary>
+    private sealed class NoTransactionLock : ITransactionLock
+    {
+        public Task AcquireAsync(string resource, CancellationToken ct) => Task.CompletedTask;
     }
 
     /// <summary>Seed sistem adına çalışır: istenen klinik kiracıya ait olduğu için kapsam doğrudan verilir.</summary>

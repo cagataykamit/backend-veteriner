@@ -102,6 +102,7 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
         var allowClinicOverlap = appointmentSettingsRow?.AllowOverlappingAppointments
             ?? ClinicAppointmentSettingsDefaults.Build().AllowOverlappingAppointments;
 
+        await _assignment.LockScheduleAsync(tenantId, ct);
         var conflicts = await AppointmentSlotRules.EnsureNoConflictAsync(
             _appointmentsRead,
             _assignment,

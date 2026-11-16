@@ -30,7 +30,8 @@ public sealed class UpdateAppointmentCommandHandlerTests
         _appointmentsRead.Object,
         new Mock<IClinicVeterinarianReader>().Object,
         new Mock<IUserNotificationPublisher>().Object,
-        new Mock<IClientContext>().Object);
+        new Mock<IClientContext>().Object,
+        new Mock<ITransactionLock>().Object);
 
     private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();

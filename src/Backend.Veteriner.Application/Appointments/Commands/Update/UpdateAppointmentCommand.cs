@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Shared;
 using Mediator;
@@ -14,4 +15,4 @@ public sealed record UpdateAppointmentCommand(
     string? Notes = null,
     int? DurationMinutes = null,
     Guid? ReasonId = null,
-    Guid? VeterinarianUserId = null) : IRequest<Result>;
+    Guid? VeterinarianUserId = null) : IRequest<Result>, ITransactionalRequest;
