@@ -135,7 +135,7 @@ public sealed class ImportCommitProcessor
                     "Import commit progress. Batch={BatchId} Units={Done}/{Total}", batchId, unitsDone, plan.Units.Count);
             }
 
-            await CompleteAsync(batchId, tenantId, ct);
+            await TransientSqlRetry.ExecuteAsync(c => CompleteAsync(batchId, tenantId, c), _logger, "import-commit-complete", ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -151,22 +151,29 @@ public sealed class ImportCommitProcessor
         }
     }
 
-    private async Task<IReadOnlyList<ImportCommitRowInfo>> LoadRowsAsync(Guid batchId, CancellationToken ct)
-    {
-        await using var scope = _scopes.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        return await db.ImportBatchRows
-            .AsNoTracking()
-            .Where(r => r.BatchId == batchId)
-            .Select(r => new ImportCommitRowInfo(r.Id, r.Table, r.RowNumber, r.ValidationStatus, r.ApplyStatus, r.NormalizedJson))
-            .ToListAsync(ct);
-    }
+    private Task<IReadOnlyList<ImportCommitRowInfo>> LoadRowsAsync(Guid batchId, CancellationToken ct)
+        => TransientSqlRetry.ExecuteAsync<IReadOnlyList<ImportCommitRowInfo>>(
+            async c =>
+            {
+                await using var scope = _scopes.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                return await db.ImportBatchRows
+                    .AsNoTracking()
+                    .Where(r => r.BatchId == batchId)
+                    .Select(r => new ImportCommitRowInfo(r.Id, r.Table, r.RowNumber, r.ValidationStatus, r.ApplyStatus, r.NormalizedJson))
+                    .ToListAsync(c);
+            },
+            _logger, "import-commit-rows", ct);
 
-    private async Task<ImportOutboxPressure> ReadPressureAsync(CancellationToken ct)
-    {
-        await using var scope = _scopes.CreateAsyncScope();
-        return await scope.ServiceProvider.GetRequiredService<IImportBackpressureProbe>().ReadAsync(ct);
-    }
+    /// <summary>Yalnız okuyan ölçüm; geçici hata (ör. outbox güncellemesiyle kilitlenme) işi düşürmez, kısa beklemeyle yeniden okunur.</summary>
+    private Task<ImportOutboxPressure> ReadPressureAsync(CancellationToken ct)
+        => TransientSqlRetry.ExecuteAsync(
+            async c =>
+            {
+                await using var scope = _scopes.CreateAsyncScope();
+                return await scope.ServiceProvider.GetRequiredService<IImportBackpressureProbe>().ReadAsync(c);
+            },
+            _logger, "import-commit-backpressure", ct);
 
     /// <summary>Uygulanmayacak satırlar <c>Skipped</c> yazılır; kira aynı kayıtta yenilenir (devralındıysa false).</summary>
     private async Task<bool> SkipRowsAsync(Guid batchId, Guid tenantId, IReadOnlyList<Guid> rowIds, CancellationToken ct)
@@ -193,9 +200,15 @@ public sealed class ImportCommitProcessor
             Result<ImportOwnerUnitResult> result;
             try
             {
-                await using var scope = _scopes.CreateTenantScope(tenantId);
-                var sender = scope.ServiceProvider.GetRequiredService<ISender>();
-                result = await sender.Send(new ApplyImportOwnerUnitCommand(batchId, WorkerId, unit.OwnerKey, unit.RowIds), ct);
+                // Geçici hatada birimin işlemi tümüyle geri alınmıştır: yeni kapsamda baştan denenir (mükerrer yarışı ayrıca aşağıda).
+                result = await TransientSqlRetry.ExecuteAsync(
+                    async c =>
+                    {
+                        await using var scope = _scopes.CreateTenantScope(tenantId);
+                        var sender = scope.ServiceProvider.GetRequiredService<ISender>();
+                        return await sender.Send(new ApplyImportOwnerUnitCommand(batchId, WorkerId, unit.OwnerKey, unit.RowIds), c);
+                    },
+                    _logger, "import-commit-unit", ct);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -242,7 +255,10 @@ public sealed class ImportCommitProcessor
     /// Bekleyen satırları yazar ve kirayı aynı <c>SaveChanges</c>'te yeniler: kira başka işçideyse hiçbir şey yazılmaz
     /// (rowversion), false döner.
     /// </summary>
-    private async Task<bool> WriteRowsAsync(Guid batchId, Guid tenantId, Guid[] rowIds, Action<ImportBatchRow> write, CancellationToken ct)
+    private Task<bool> WriteRowsAsync(Guid batchId, Guid tenantId, Guid[] rowIds, Action<ImportBatchRow> write, CancellationToken ct)
+        => TransientSqlRetry.ExecuteAsync(c => WriteRowsOnceAsync(batchId, tenantId, rowIds, write, c), _logger, "import-commit-rows-write", ct);
+
+    private async Task<bool> WriteRowsOnceAsync(Guid batchId, Guid tenantId, Guid[] rowIds, Action<ImportBatchRow> write, CancellationToken ct)
     {
         await using var scope = _scopes.CreateTenantScope(tenantId);
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();

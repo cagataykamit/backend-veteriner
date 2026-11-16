@@ -22,6 +22,17 @@ internal static class IntegrationTestDatabaseReset
     public static async Task ResetAndMigrateAsync(QueryDbContext db, CancellationToken ct = default)
         => await ResetAndMigrateAsync((DbContext)db, ct);
 
+    /// <summary>
+    /// <c>EnsureCreated</c> migration koşmaz: komut veritabanı canlıdaki gibi READ_COMMITTED_SNAPSHOT ile kurulsun diye
+    /// migration <c>EnableReadCommittedSnapshot</c> ile aynı ayar uygulanır (biri değişirse diğeri de değişir).
+    /// </summary>
+    public static void EnableReadCommittedSnapshot(AppDbContext db)
+        => db.Database.ExecuteSqlRaw(
+            """
+            IF EXISTS (SELECT 1 FROM sys.databases WHERE database_id = DB_ID() AND is_read_committed_snapshot_on = 0)
+                EXEC (N'ALTER DATABASE CURRENT SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE');
+            """);
+
     private static async Task ResetAndMigrateAsync(DbContext db, CancellationToken ct = default)
     {
         var connectionString = db.Database.GetConnectionString()

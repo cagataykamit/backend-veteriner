@@ -6,12 +6,15 @@ namespace Backend.Veteriner.Application.Imports.Specs;
 /// <summary>
 /// Parti listesi filtresi. Klinik bağsız parti kiracı genelidir; klinik bağlı parti yalnız erişilebilen kliniklerde görünür.
 /// <paramref name="singleClinicId"/> ve <paramref name="accessibleClinicIds"/> ikisi de null ise klinik filtresi yoktur.
+/// Durum verilmezse kapanmış partiler (<see cref="ImportBatchStatusSets.Closed"/>) yalnız <paramref name="includeClosed"/> ile
+/// gelir; verilen durum her zaman uygulanır.
 /// </summary>
 public sealed class ImportBatchesFilteredSpec : Specification<ImportBatch>
 {
     public ImportBatchesFilteredSpec(
         Guid tenantId,
         ImportBatchStatus? status,
+        bool includeClosed,
         Guid? singleClinicId,
         IReadOnlyCollection<Guid>? accessibleClinicIds,
         int? page = null,
@@ -21,7 +24,14 @@ public sealed class ImportBatchesFilteredSpec : Specification<ImportBatch>
         Query.Where(b => b.TenantId == tenantId);
 
         if (status.HasValue)
+        {
             Query.Where(b => b.Status == status.Value);
+        }
+        else if (!includeClosed)
+        {
+            var closed = ImportBatchStatusSets.Closed.ToArray();
+            Query.Where(b => !closed.Contains(b.Status));
+        }
 
         if (singleClinicId is { } clinicId)
         {

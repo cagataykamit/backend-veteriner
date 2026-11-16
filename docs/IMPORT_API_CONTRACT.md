@@ -21,6 +21,18 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 | E-vet geçmiş görevleri (ADR-048 eki, 2026-11-12) | Randevu Listesi'nde geçmişte kalan aşı dışı görev (tamamlanmış ya da gelinmemiş) klinik geçmiş satırına çevrilir; bu satırların `rowNumber` değeri `1.000.000 + Excel satırı` (bölüm 13.2) | **Uygulandı** (migration yok) |
 | E-vet aynı hayvanın kayıtları (2026-11-14) | Sahibi değişen hayvanın eski kayıtları (aynı protokol ya da mikroçip, zincir dahil) ve aynı sahipteki kopya kayıt tek hastada birleşir: geçmişi ona bağlanır, vefat olarak gelmez (bölüm 13.2) | **Uygulandı** (migration yok) |
 | Eksik alanlar (2026-11-12) | Müşteri `Not`; ürün `KdvOrani`, `AlisFiyati`; E-vet müşteri açıklaması/meslek/doğum tarihi/ikinci telefon/kayıt tarihi, hasta kayıt tarihi ve işaretleri, aşı SKT'si, ürün KDV'si ve alış fiyatı (bölüm 4.3, 13.2) | **Uygulandı** (migration `AddProductTaxAndClientNotes`) |
+| Dosya notları (2026-11-16) | `warnings[]` öğesine isteğe bağlı satır alanları (`severity`, `count`, `unit`, `title`, `source`, `parts`, `outcome`, `example`, `target`); E-vet notlarına tür başına kod; notlar partiye yazılır ve parti ayrıntısıyla döner (bölüm 7.2.1) | **Uygulandı** (migration `AddImportBatchWarnings`) |
+| Geri alma süresi ve sade liste (2026-11-16) | Geri alma uygulamadan sonra 30 gün açık, sonra aktarma kesinleşir (`409 Imports.RollbackWindowClosed`); parti nesnesinde `canRollback`, `rollbackDeadlineUtc`; liste varsayılan olarak kapanmış partileri (`RolledBack`, `Discarded`, `Expired`) göstermez, `includeClosed=true` ile gelir (bölüm 7.5, 7.11, 7.12, 9.1) | **Uygulandı** (migration yok) |
+
+**Frontend için değişenler (geri alma süresi ve sade liste, 2026-11-16; bölüm 7.5, 9.1):**
+- Parti nesnesine (ayrıntı, liste ve bütün parti yanıtları) `canRollback` (bool) ve `rollbackDeadlineUtc` (UTC, geri alınabilir durumda olmayan partide `null`) eklendi. "Geri al" düğmesi `canRollback` ile gösterilir; son tarih `rollbackDeadlineUtc`'den yazılır. `rollbackDeadlineUtc` geçmişse aktarma kesinleşmiştir. İstemci süreyi kendisi hesaplamaz.
+- `POST .../rollback` süre dolmuş partide `409 Imports.RollbackWindowClosed` döner; `rollback-preview` aynı partide `canRollback = false`, `canDeleteUnblockedOnly = false` döner (önizleme okunabilir kalır).
+- **Davranış değişikliği:** `GET /imports/batches` `status` verilmeden çağrılınca artık kapanmış partileri (`RolledBack`, `Discarded`, `Expired`) döndürmez; sayfalama ve `totalItems` buna göre hesaplanır. Hepsi için `includeClosed=true`; tek durum için `status=` (verilen durum her zaman uygulanır).
+
+**Frontend için değişenler (dosya notları, 2026-11-16; geriye uyumlu, bölüm 7.2.1):**
+- `warnings[]` artık yalnız yükleme yanıtında değil, **parti ayrıntısında** da döner (`GET /imports/batches/{id}`, eşleme, doğrulama, uygulama, geri alma yanıtları; `tables[]` ile birlikte). Notlar yüklemede partiye yazılır; sayfa yenilenince, geçmişten açılınca ya da başka cihazda da gelir. Bu alandan önce yüklenmiş partide `warnings = null`. Listede yine `null`.
+- Öğeye isteğe bağlı alanlar eklendi; yoksa yazılmazlar. `message` her notta vardır; alanları olmayan not düz metin gösterilir ve "bilgi" sayılır.
+- E-vet notlarının hepsi `Imports.EVetConversion` kodunu taşıyordu; artık her not türünün kendi kodu var (`Imports.EVet.*`, tablo bölüm 7.2.1). `Imports.EVetConversion` kalktı.
 
 **Frontend için değişenler (B1):**
 - Yeni izinler `Imports.Read`, `Imports.Manage`, `Imports.Commit` yalnız yönetici düzeyine (Admin, Owner, ClinicAdmin) bağlanır. Seed çalışıp kullanıcı çıkış-giriş yapana kadar bu uçlar `403` döner; menü öğesi izinle gizlenmelidir.
@@ -84,7 +96,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 **Frontend için değişenler (E-vet yedeği, 2026-11-11; geriye uyumlu ekleme, bölüm 13):**
 - `sourceProfile = EVet` iken `file` E-vet'in **Genel > Yedek Al** Excel dosyası olabilir; sunucu onu eşleme adımından önce kanonik tablolara çevirir (müşteri, hasta, aşı, klinik geçmiş, randevu). Sütunlar kanonik adlarla gelir (`confidence = Exact`); kullanıcı eşleme yapmaz, yalnız değer eşlemesi (tür, aşı adı) gerekebilir.
 - Yedekle birlikte üç isteğe bağlı CSV alanı: `productsFile` (E-vet Rapor > Depo > Ürün Listesi; gruplu biçim çözülür), **`evetPatientReportFile`** (Rapor > Genel > Hasta Listesi; hasta → müşteri protokolü), **`evetVaccineReportFile`** (Rapor > Resmi > Aşı Bilgisi; seri no ve ürün adı). Yeni alanlar yalnız `EVet` profilinde ve yedekle birlikte kabul edilir; aksi `400 Imports.UnsupportedFile`. `EVet` dışında `file` ile CSV birlikte gönderilemez (değişmedi).
-- Yükleme yanıtının `warnings[]` dizisinde `code = "Imports.EVetConversion"` öğeleri dönüştürmenin özetini verir (bağlantı kaynağı, atlanan görevler ve nedenleri, sonraki aşı tarihi sayısı, seri eşleşmesi, pasif ürün). Ekran bunları bilgi olarak göstermelidir.
+- Yükleme yanıtının `warnings[]` dizisindeki `Imports.EVet.*` öğeleri dönüştürmenin özetini verir (bağlantı kaynağı, atlanan görevler ve nedenleri, sonraki aşı tarihi sayısı, seri eşleşmesi, pasif ürün). (2026-11-16'ya dek hepsi `Imports.EVetConversion` kodunu taşıyordu; kodlar ve türleri bölüm 7.2.1.)
 - `GET /imports/source-profiles`: E-vet profilinin notu ve eşlemeleri gerçek dosyaya göre güncellendi, `verified = true`.
 - Yeni kanonik alanlar (her profilde, şablonda da): müşteri `KimlikNo`, `VergiDairesi`, `Durum`; hasta `Alerji`, `Durum`, `VefatTarihi` (bölüm 4.3). Yeni satır kodları: `Imports.TaxIdInvalid`, `Imports.StatusUnrecognized`, `Imports.InactiveClient`, `Imports.DeceasedDateIgnored` (bölüm 6.4).
 - **Davranış değişiklikleri:** klinik geçmişte yalnız kilo (> 0) veya ateş taşıyan satır artık boş sayılmaz (`ClinicalRecordEmpty` değişti, bölüm 12.3); hastaya bağlanan tablolarda `Tur` boşsa sahibin aynı adlı tek hastası bağlanır (bölüm 6.4); satır tavanları tablo başına 50.000, parti toplamı 100.000 oldu (bölüm 4.1).
@@ -347,7 +359,9 @@ Kural kodları, önem dereceleri ve varsayılan mesajlar kodda **tek yerde** tan
 | `Imports.BreedFreeText` | Info | Irk katalogda yok / atlandı → serbest metin; `value` kaynak. |
 | `Imports.ColorFreeText` | Info | Renk katalogda yok / atlandı → `Notes`'a `Renk: <değer>` eklenir; `value` kaynak. |
 | `Pets.BreedSpeciesMismatch` | Warning | Kullanıcının eşlediği ırk, satırın türüne ait değil; ırk metin olarak aktarılır (2026-11-14; önce Error). |
-| `VaccineDefinitions.InvalidSpecies` | Error | Kullanıcının eşlediği aşı tanımı hastanın türüyle uyumsuz. |
+| `VaccineDefinitions.InvalidSpecies` | Error | Kullanıcının eşlediği aşı tanımı hastanın türüyle uyumsuz. Yalnız türü dosyada **açıkça yazılı** hastada; türü bilinmeyen hastada aşağıdaki iki kural geçerlidir. |
+| `Imports.SpeciesFromVaccines` | Info | (2026-11-16) Hastanın türü dosyada boş ya da `Diğer` (katalog kodu `OTHER`; E-vet türü seçilmemiş hastaya `Diğer` yazar) ve hasta no'suyla bağlanan aşılarından türe özgü olanların hepsi aynı türü gösteriyor (eşlenen tanımın türü, yoksa adında geçen `kedi`/`köpek`): hasta o türle aktarılır. Mesaj türü söyler ("Türü dosyada yok (Diğer); aşılarının hepsi Köpek aşısı olduğu için Köpek olarak aktarılacak."). Boş türde `RequiredMissing` kalkar. Kural tek yerde: `ImportValidationEngine.SpeciesFromVaccines`. |
+| `Imports.VaccineSpeciesUnverified` | Warning | (2026-11-16) Türü bilinmeyen (`Diğer`) hastanın aşıları farklı türleri gösteriyor ya da tür çıkarılamadı: türe özgü aşı **reddedilmez**, tür denetlenmeden aktarılır (normalize satırda `speciesUnverified = true`; uygulamada `CreateImportedVaccinationCommand.SpeciesUnverified`, aşı-tür uyumu `VaccinationCatalogResolver` içinde atlanır). Türü bilinmeyen hastanın aşı adı tür süzmeden eşlenir. |
 | `Imports.GenderUnrecognized` | Warning | Cinsiyet tanınmadı; boş aktarılır. |
 | `Imports.NeuteredUnrecognized` | Warning | Kısır değeri tanınmadı; `false` aktarılır. |
 | `Imports.WeightInvalid` | Warning | Ağırlık sayı değil veya 0–9999,99 dışında; boş aktarılır. |
@@ -410,7 +424,7 @@ Hata zarfı için bölüm 8. `{id}` = parti kimliği.
 
 **B2 davranışı (uygulandı):** Dosya alanları işlenir (bölüm 4.1 "B2 okuyucu ayrıntıları"). Sıra: kiracı/klinik denetimi → dosya imza/boyut denetimi → içerik özeti → aynı `requestId` tekrarı (`200` aynı parti; `name`, `clinicId` **ve içerik özeti** aynı olmalı, aksi `409 Imports.RequestIdConflict`) → aynı özetli aktif parti (`409 Imports.DuplicateFile`; `extensions.batchId` yalnız çağıranın görebildiği partiyse) → açık taslak sınırı → okuma (bölüm 4.1 hataları) → aşı tablosu var ve `clinicId` yok (`400 Imports.ClinicRequired`) → kayıt. Parti ve hazırlık satırları **tek veritabanı işleminde** yazılır; okuma hatasında hiçbir şey kalmaz. Satırlar `ImportBatchRow` olarak saklanır (`SourceJson` = başlık → metin sözlüğü, `NormalizedJson` boş, doğrulama durumu `Pending`); `summary.<tablo>.total` satır sayısı olur. Dosya yoksa `400 Imports.EmptyFile`. Aşı için `clinicId` erişimi B1'deki gibi okuma kapsamıyla denetlenir; aşı yazma erişimi ve `Vaccinations.Create` denetimi uygulama (B4) adımındadır. `encoding` ve `delimiter` değerleri izinli kümede değilse `400 Validation.FluentValidation`. Audit payload'ı dosya içeriği ve satır verisi taşımaz (yalnız `requestId`, `name`, `clinicId`, `encoding`, `delimiter`).
 
-Yanıt gövdesi (B1 alanlarına ek): `tables[]` ve yalnız yükleme yanıtında `warnings[]` (`{ code, table?, message }`: `Imports.EncodingSuspect`, `Imports.TableEmpty`). `tables[].table` = `customers|pets|vaccinations`; `rowCount` = veri satırı sayısı; `columns[]` = dosyadaki başlıklar sırasıyla `{ source, suggested, confidence, mapped }`: `suggested` kanonik başlık veya `null`, `confidence` `Exact` (kanonik adla katlanmış eşit) | `Profile` (seçilen kaynak programın hazır eşlemesi, bölüm 4.5) | `Alias` (takma adla eşit) | `None`, `mapped` kayıtlı eşlemedeki kanonik ad (eşleme kaydedilmemişse `null`). Öneri kuralı: önce `Exact`, sonra `Profile`, sonra `Alias`; bir kanonik alan en çok bir sütuna, bir sütun en çok bir kanonik alana önerilir (ilk gelen kazanır). Sütun başlığı karşılaştırması bölüm 4.1/5 katlamasıyladır. Takma ad tablosu koddadır (`ImportCanonicalSchema`); yönetilen veri değildir.
+Yanıt gövdesi (B1 alanlarına ek): `tables[]` ve `warnings[]` (dosya okunurken çıkan notlar, bölüm 7.2.1). `tables[].table` = `customers|pets|vaccinations`; `rowCount` = veri satırı sayısı; `columns[]` = dosyadaki başlıklar sırasıyla `{ source, suggested, confidence, mapped }`: `suggested` kanonik başlık veya `null`, `confidence` `Exact` (kanonik adla katlanmış eşit) | `Profile` (seçilen kaynak programın hazır eşlemesi, bölüm 4.5) | `Alias` (takma adla eşit) | `None`, `mapped` kayıtlı eşlemedeki kanonik ad (eşleme kaydedilmemişse `null`). Öneri kuralı: önce `Exact`, sonra `Profile`, sonra `Alias`; bir kanonik alan en çok bir sütuna, bir sütun en çok bir kanonik alana önerilir (ilk gelen kazanır). Sütun başlığı karşılaştırması bölüm 4.1/5 katlamasıyladır. Takma ad tablosu koddadır (`ImportCanonicalSchema`); yönetilen veri değildir.
 
 **B1 davranışı (uygulandı):** Dosya alanları henüz yoktur; yalnız `requestId` (zorunlu), `name` (≤ 100, boşluk kırpılır, boşsa null) ve `clinicId` (opsiyonel) okunur. `clinicId` verilirse kiracıya ait ve çağıranın erişebildiği klinik olmalı (`404 Clinics.NotFound` / `403 Clinics.AccessDenied`) ve aktif klinik bağlamıyla çelişmemeli (`400 Imports.ClinicContextMismatch`). Pasif kiracı `403 Tenants.TenantInactive`; abonelik yazma koruması mevcut kodlarla. Aynı `requestId` + aynı `name`/`clinicId` → `200` aynı parti; farklı `name` veya `clinicId` → `409 Imports.RequestIdConflict` (B2'de içerik özeti de karşılaştırmaya girer). Kiracıda 5 açık taslak varsa `409 Imports.TooManyOpenDrafts`. Yanıt gövdesi bölüm 7.5'teki parti nesnesidir (`tables[]` B2'de eklenir).
 
@@ -430,10 +444,59 @@ Aynı kiracıda **aynı içerik özetli** ve durumu `Discarded/Expired/RolledBac
     { "table": "customers", "rowCount": 1200,
       "columns": [ { "source": "Ad Soyad", "suggested": "AdSoyad", "confidence": "Exact|Profile|Alias|None", "mapped": null } ] }
   ],
-  "warnings": [ { "code": "Imports.EncodingSuspect", "table": "customers", "message": "..." } ],
+  "warnings": [ { "code": "Imports.EncodingSuspect", "table": "customers", "message": "...", "severity": "attention" } ],
   "createdAtUtc": "...", "createdBy": "guid"
 }
 ```
+
+#### 7.2.1 Dosya notları (`warnings[]`, 2026-11-16)
+
+Hata olmayan okuma ve dönüştürme bulguları. Yüklemede partiye yazılır (`ImportBatches.WarningsJson`, yanıttaki biçimle) ve sonra değişmez; parti ayrıntısıyla (`tables[]` ile birlikte: yükleme, `GET .../{id}`, eşleme, doğrulama, uygulama, geri alma yanıtları) döner, listede `null`'dır. Bu alandan önce yüklenmiş partide `null`. Notlar kişisel veri taşımaz (sayı ve genel metin); satır verisi temizlense de kalır.
+
+```json
+{
+  "code": "Imports.EVet.SameOwnerSameName", "table": "pets",
+  "message": "Aynı sahipte aynı adlı birden çok hasta: 184 muayene / görev satırı … ; 26 satırın hangi hastaya ait olduğu aktarma ekranında sorulacak.",
+  "severity": "decision", "count": 26, "unit": "satır", "title": "hangi hastaya ait, sizden sorulacak",
+  "source": "Randevu ve Muayene Listesi",
+  "parts": [ { "label": "Hastası size sorulacak", "count": 26, "severity": "decision" },
+             { "label": "Doğru hastaya kendiliğinden bağlandı", "count": 184 } ],
+  "outcome": "Aynı sahipte aynı adlı birden çok hasta var. …",
+  "target": { "anchor": "required" }
+}
+```
+
+| Alan | Anlam |
+|------|-------|
+| `code`, `table`, `message` | Değişmedi. `message` her notta vardır: tam cümle, geri dönüş ve günlük için. `table` kanonik anahtar ya da `null` (dosya geneli). |
+| `severity` | `decision` (sizden seçim bekleniyor) · `attention` (aktarılır ama veri değişir ya da kontrol edilmeli) · `info` · `skipped` (aktarılmayacak). Yoksa `info` sayılır. Ekran sırası: karar → dikkat → bilgi → aktarılmayacak; aynı türde dizi sırası korunur. |
+| `count`, `unit`, `title` | Tek satır: `{count} {unit} {title}` ("26 satır hangi hastaya ait, sizden sorulacak"). `count` ham sayıdır, biçimi ekran yapar. `count` ya da `title` yoksa not düz metin (`message`) gösterilir. |
+| `source` | Notun dayandığı dosya ya da rapor ("Randevu Listesi", "Aşı Bilgisi raporu"). |
+| `parts[]` | Alt kırılım `{ label, count, severity? }`. |
+| `outcome`, `example` | "Ne olacak" cümlesi; örnek değer ("Pamuk (E-vet 1234)", "1234#56"). |
+| `target` | Gidilecek yer. `anchor = required`: Doğrulama adımındaki "Sizden beklenen" (belirsiz hasta seçimi, bölüm 13.4). `anchor = rows` (`table`, `reason`): satır incelemesi; satırlar neden kodu taşımadığından **henüz üretilmez** (faz 2). Düğme metnini ekran üretir. |
+
+Kodlar ve türler (tek yer: `ImportReadNotes`, `EVetNotes`):
+
+| Kod | Tür | Ne zaman |
+|-----|-----|----------|
+| `Imports.EncodingSuspect` | attention (yapısız) | CSV'de okunamayan karakter var. |
+| `Imports.TableEmpty` | skipped (yapısız) | Sayfa ya da dosyada veri satırı yok. |
+| `Imports.EVet.OwnerLink` | info | Hastaların sahibine bağlanma yolu (rapordaki protokol / sahip adı). |
+| `Imports.EVet.OwnerReportMissing` | attention | Hasta Listesi raporu yüklenmedi; hastalar sahibine yalnız adla bağlanır. |
+| `Imports.EVet.ChipToNote` | attention | Mikroçip rakam dışı ya da başka hastada kayıtlı; nota taşınır. |
+| `Imports.EVet.FormerRecordsMerged` | info | Aynı hayvanın ek kayıtları tek hastada birleşir. |
+| `Imports.EVet.SameNameRenamed` | attention (yalnız birleşen tekrar kayıt varsa info) | Aynı sahipte aynı ad ve türle birden çok hasta; adına E-vet protokolü eklenir. |
+| `Imports.EVet.DuplicateProtocol` | attention | Protokol numarası birden çok kayıtta; numaraya satır no eklenir. |
+| `Imports.EVet.SameOwnerSameName` | decision (seçilecek satır yoksa info) | Aynı sahipte aynı adlı hastalar; çözülemeyen satırların hastası sorulur (`target.anchor = required`). |
+| `Imports.EVet.TaskConversion` | info | Görevler aşı geçmişine ve randevuya dönüşür. |
+| `Imports.EVet.TasksToRecords` | info | Geçmiş aşı dışı görevler eski program kayıtlarına eklenir. |
+| `Imports.EVet.EarlyCompleted` | attention | Planlanandan önce tamamlanmış görev aktarma günüyle yazılır. |
+| `Imports.EVet.TasksSkipped` | skipped | Aktarılmayacak görevler; `parts` nedenler (çoktan aza). |
+| `Imports.EVet.VaccineReport` | attention (hepsi eşleştiyse info) | Aşı Bilgisi raporu satırlarının aşılarla eşleşmesi. |
+| `Imports.EVet.PassiveProducts` | skipped | E-vet ürün listesindeki pasif (`[-]`) ürünler. |
+
+Karar notu yükleme anının durumudur; seçimler doğrulamada yapılır. Önizlemede bekleyen hasta seçimi kalmadıysa ekran karar notunu "bilgi" gösterir (sunucu notu yeniden yazmaz).
 
 ### 7.3 `PUT /imports/batches/{id}/mapping`
 `Imports.Manage`; durum `Uploaded|Mapped|Validated|ValidationFailed`. Tam değiştirme:
@@ -504,7 +567,8 @@ Durum geçişi domain'dedir (`Uploaded|Mapped|Validated|ValidationFailed` → `M
 ```
 
 - `progress` parti nesnesine **eklenmedi**; B4'te ayrı uçtur (bölüm 7.14). `updatedAtUtc` son durum değişikliğidir (7 günlük süre bunun üzerinden, yoksa `createdAtUtc`).
-- Liste: `GET /imports/batches?page=1&pageSize=20&status=Uploaded` → `{ items, page, pageSize, totalItems, totalPages }`; `pageSize` 1–100, `status` geçersizse `400`. Sıralama `createdAtUtc` azalan.
+- `canRollback`, `rollbackDeadlineUtc` (2026-11-16): geri almanın şu an başlatılabildiği ve son anı (bölüm 9.1). `rollbackDeadlineUtc` yalnız geri alınabilir durumda (`Committed|CommitFailed|PartiallyRolledBack|RollbackFailed`) doludur; geçmişse aktarma kesinleşmiştir ve `canRollback = false`.
+- Liste: `GET /imports/batches?page=1&pageSize=20&status=Uploaded&includeClosed=false` → `{ items, page, pageSize, totalItems, totalPages }`; `pageSize` 1–100, `status` geçersizse `400`. Sıralama `createdAtUtc` azalan. `status` verilmezse kapanmış partiler (`RolledBack`, `Discarded`, `Expired`; kodda `ImportBatchStatusSets.Closed`) yalnız `includeClosed=true` ile gelir; verilen `status` her zaman uygulanır. Filtre sorguda uygulanır, `totalItems` ve sayfalama buna göre hesaplanır.
 - Görünürlük: yalnız çağıranın kiracısı. Klinik bağlı parti (`clinicId` dolu) yalnız o kliniğe erişebilen kullanıcıya görünür; erişemeyen için ayrıntı `404 Imports.BatchNotFound`, listede görünmez. Klinik bağsız parti kiracıdaki `Imports.Read` sahiplerine görünür (müşteri/hasta kiracı genelidir).
 
 ### 7.6 `GET /imports/batches/{id}/preview` (kuru çalıştırma sonucu)
@@ -606,7 +670,7 @@ Uygulama (arka plan): müşteri → hasta → aşı sırası; **sahip bazlı** i
 - `deletable` / `blocked`: tablo başına kayıt sayısı. `blockedItems`: engelli kayıtlar (`entity` = `Client|Pet|Vaccination`, kaydı oluşturan satırın `table`/`rowNumber`'ı, `reasons` neden kodları); en çok 200 öğe, fazlası varsa `blockedItemsTruncated = true`. Kişisel veri (ad, telefon) dönmez; satır ayrıntısı `rows` ucundan okunur.
 - `kept`: mevcut kayıtla eşleşen (`Matched`) satırlar; bunlar **hiçbir zaman** silinmez.
 - `rolledBack`: daha önce geri alınmış (`RolledBack`) satır sayıları.
-- `canRollback`: durum geri alınabilir (`Committed|CommitFailed|PartiallyRolledBack|RollbackFailed`) ve `blocked` toplamı 0 (varsayılan `Fail` politikası). `canDeleteUnblockedOnly`: durum geri alınabilir, `blocked` > 0 ve `deletable` > 0.
+- `canRollback`: geri alma başlatılabilir (durum `Committed|CommitFailed|PartiallyRolledBack|RollbackFailed` **ve** geri alma süresi dolmamış, bölüm 9.1) ve `blocked` toplamı 0 (varsayılan `Fail` politikası). `canDeleteUnblockedOnly`: geri alma başlatılabilir, `blocked` > 0 ve `deletable` > 0. Süresi dolmuş partide ikisi de `false`; önizleme okunabilir kalır.
 - `warnings`: `Imports.PetEditsNotTracked` (silinecek hayvan varsa: `Pet`'te düzenleme zamanı tutulmadığından sonradan yapılan düzenleme tespit edilemez ve hayvanla birlikte silinir; tasarım §9.3), `Imports.RemindersAlreadyReleased` (hatırlatmalar serbest bırakılmış: gönderilmiş e-postalar geri alınamaz). Arayüz onay metninde gösterir.
 
 ### 7.12 `POST /imports/batches/{id}/rollback` (B5, uygulandı)
@@ -616,9 +680,9 @@ Uygulama (arka plan): müşteri → hasta → aşı sırası; **sahip bazlı** i
 { "requestId": "guid", "reason": "Yanlış dosya yüklendi", "blockedPolicy": "Fail" }
 ```
 - `requestId` zorunlu (istek anahtarı). `reason` zorunlu, kırpılmış 1–500 karakter; audit'e yazılır (kişisel veri yazmayın). `blockedPolicy` `[K7]`: `Fail` (varsayılan) | `DeleteUnblockedOnly`. Geçersiz gövde `400 Validation.FluentValidation`.
-- Sıra: kiracı → görünürlük (`404 Imports.BatchNotFound`) → **tekrar**: partinin son geri alma isteği bu `requestId` ise ve durum `RollingBack|RolledBack|PartiallyRolledBack|RollbackFailed` ise `200` + parti (iş yeniden başlamaz; aynı `requestId` farklı `blockedPolicy` ile gelirse `409 Imports.RequestIdConflict`) → durum `Committed|CommitFailed|PartiallyRolledBack|RollbackFailed` değilse `409 Imports.InvalidState` → ek izinler → pasif kiracı `403 Tenants.TenantInactive` → **plan** (bölüm 7.11 ile aynı hesap): `Fail` ve engelli kayıt varsa, ya da hiç silinebilir kayıt yokken engelli kayıt varsa `409 Imports.RollbackBlocked` + `extensions.blocked` (sayılar) + `extensions.blockedItems` (en çok 50) — hiçbir şey silinmez, durum değişmez → durum `RollingBack` kaydedilir (kiracıda başka aktif iş `409 Imports.AnotherJobRunning`; eşzamanlı ikinci istek aynı `requestId` ise `200` tekrar, aksi `409 Imports.ConcurrencyConflict`) → `202` + parti.
+- Sıra: kiracı → görünürlük (`404 Imports.BatchNotFound`) → **tekrar**: partinin son geri alma isteği bu `requestId` ise ve durum `RollingBack|RolledBack|PartiallyRolledBack|RollbackFailed` ise `200` + parti (iş yeniden başlamaz; aynı `requestId` farklı `blockedPolicy` ile gelirse `409 Imports.RequestIdConflict`) → durum `Committed|CommitFailed|PartiallyRolledBack|RollbackFailed` değilse `409 Imports.InvalidState` → geri alma süresi dolduysa `409 Imports.RollbackWindowClosed` ("Geri alma süresi doldu; aktarma kesinleşti.", bölüm 9.1) → ek izinler → pasif kiracı `403 Tenants.TenantInactive` → **plan** (bölüm 7.11 ile aynı hesap): `Fail` ve engelli kayıt varsa, ya da hiç silinebilir kayıt yokken engelli kayıt varsa `409 Imports.RollbackBlocked` + `extensions.blocked` (sayılar) + `extensions.blockedItems` (en çok 50) — hiçbir şey silinmez, durum değişmez → durum `RollingBack` kaydedilir (kiracıda başka aktif iş `409 Imports.AnotherJobRunning`; eşzamanlı ikinci istek aynı `requestId` ise `200` tekrar, aksi `409 Imports.ConcurrencyConflict`) → `202` + parti.
 - **Arka plan işi** (commit işiyle aynı desen: iş kuyruğu parti tablosu, kira 2 dk + devralma, parça başına geri basınç; `Imports:Commit` ayarları geri alma işine de uygulanır): iş başında plan yeniden hesaplanır; `Fail` politikasında bu arada engel doğduysa hiçbir şey silinmez ve parti `RollbackFailed` olur (audit nedeni `Imports.RollbackBlocked`). Sonra **sahip birimleri** (bir müşteri + o müşterinin partide oluşturulan hastaları + bu hastaların ya da müşterinin mevcut hastalarının partide oluşturulan aşıları) sırayla, her biri **tek veritabanı işleminde** işlenir: bağımlılık denetimi silmeyle aynı işlemde yeniden yapılır (denetimle silme arasında açılan geliş/ücret yarışına karşı), sıra aşı → hasta → müşteri. `Fail` politikasında birimde iş sırasında engel doğarsa **birimin hiçbir kaydı silinmez** (satırlar `Kept`, neden `OwnerUnitBlocked`); `DeleteUnblockedOnly` politikasında birimin silinebilir kayıtları silinir, engelliler kalır. Satır sonucu (`RolledBack` / `Kept` + neden) ve kira yenilemesi silmeyle aynı işlemde yazılır; kirayı başka işçi devraldıysa birim geri alınır.
-- Son durum: tüm hedef satırlar `RolledBack` → `RolledBack`; en az bir `Kept` → `PartiallyRolledBack`; beklenmeyen hata → `RollbackFailed` (silinmiş birimler silinmiş kalır; yeniden denenebilir). `PartiallyRolledBack` ve `RollbackFailed` partide **yeni `requestId`** ile tekrar geri alma başlatılabilir (yalnız kalan `Created`/`Kept` satırlar değerlendirilir).
+- Son durum: tüm hedef satırlar `RolledBack` → `RolledBack`; en az bir `Kept` → `PartiallyRolledBack`; beklenmeyen hata → `RollbackFailed` (silinmiş birimler silinmiş kalır; yeniden denenebilir). `PartiallyRolledBack` ve `RollbackFailed` partide geri alma süresi içinde (bölüm 9.1) **yeni `requestId`** ile tekrar geri alma başlatılabilir (yalnız kalan `Created`/`Kept` satırlar değerlendirilir).
 - Silinen müşteri/hasta için `client.deleted.v1` / `pet.deleted.v1` outbox olayı silmeyle aynı işlemde yazılır (bölüm 9). Geri alma partinin içerik özetini serbest bırakır (`RolledBack`): aynı dosya yeniden yüklenebilir. `PartiallyRolledBack` serbest bırakmaz.
 - Audit: istek `ImportBatch.Rollback` (payload: `id`, `requestId`, `reason`, `blockedPolicy`); iş bitince `ImportBatch.RollbackCompleted` (aktör yok; payload yalnız durum, politika ve tablo başına silinen/kalan sayılar; başarısızlıkta `failureReason` kodu).
 
@@ -681,6 +745,7 @@ Uygulama (arka plan): müşteri → hasta → aşı sırası; **sahip bazlı** i
 | 403 | `Imports.AccessDenied` | Commit için ek `Clients.Create` / `Pets.Create` / `Vaccinations.Create` izni yok |
 | 409 | `Imports.RollbackBlocked` | `Fail` politikasında engelli kayıt var, ya da silinebilir kayıt yokken engelli kayıt var (`extensions.blocked` sayılar, `extensions.blockedItems` en çok 50 öğe; bölüm 7.12) |
 | 409 | `Imports.RequestIdConflict` | (geri alma) Aynı `requestId` farklı `blockedPolicy` ile |
+| 409 | `Imports.RollbackWindowClosed` | Geri alma süresi (uygulamadan sonra 30 gün) doldu; aktarma kesinleşti (bölüm 9.1) |
 | 403/409 | `Tenants.TenantInactive` / abonelik yazma koruması | Mevcut kiracı kodları |
 | 500 | — | Beklenmeyen; parti `CommitFailed` olur, uygulanmış satırlar korunur ve geri alınabilir |
 
@@ -716,6 +781,16 @@ Silinmeyen kayıt `Kept` ve nedeni (kodlar aşağıdaki B5 tablosunda; taslaktak
 - `Matched`/`Skipped`/`Failed` satırlar geri almada değişmez (eşleşen mevcut kayıt asla silinmez); yalnız `Created` (ve önceki kısmi geri almadan `Kept`) satırlar `RolledBack` veya `Kept` olur. `Kept` nedeni satır sorunlarına `Imports.RollbackKept` (Info; `value` = virgülle ayrılmış neden kodları) olarak eklenir (satır verisi temizlenmemişse; yeniden denemede önceki neden değiştirilir).
 - **Silme yolu:** ürün kodunda müşteri/hasta/aşı silme komutu yoktur ve açılmaz; silme yalnız geri alma birim komutunda (`RollbackImportOwnerUnitCommand`) yapılır. Silinen müşteri için `client.deleted.v1` (`{ eventId, occurredAtUtc, clientId, tenantId }`), hasta için `pet.deleted.v1` (`{ eventId, occurredAtUtc, petId, tenantId }`) outbox olayı aynı işlemde yazılır; aşı için olay yoktur (aşı okuma modeli yok). Projeksiyon işleyicileri silme olayında okuma modeli satırını siler (olay okuma modelindeki son olaydan eskiyse yok sayılır; satır yoksa iş yapılmaz). Pilot ayarında hasta projeksiyonu kapalıdır (`PetProjection:Enabled = false`): `pet.deleted.v1` olayları `pet.created.v1` gibi kuyrukta bekler ve projeksiyon açıldığında sırayla işlenir; müşteri projeksiyonu açıktır.
 - **Bilinen sınır:** denetim ve silme aynı işlemdedir (okuma kararlı/`READ COMMITTED`); ilgili tablolarda veritabanı yabancı anahtarı olmadığından, denetimden hemen sonra ve işlem bitmeden başka istekle eklenen bağlı kayıt (milisaniyelik pencere) tespit edilemez. Pilot hacminde kabul edildi; kesin güvence için `SERIALIZABLE` veya kilit ipucu ayrı iştir.
+
+### 9.1 Geri alma süresi (2026-11-16, kullanıcı kararı)
+
+Geri alma uygulamadan sonra **30 gün** açıktır; süre dolunca aktarma **kesinleşir**. Amaç: aylar sonra, klinikte dokunulmamış binlerce kaydın tek tıkla silinememesi. Kural tek yerde: `ImportBatch.RollbackWindow`, `RollbackDeadlineUtc`, `CheckRollbackAllowed` (domain). Geri alma isteği, `rollback-preview` ve parti nesnesi (`canRollback`, `rollbackDeadlineUtc`) aynı kuralı okur.
+
+- **Sayım:** `committedAtUtc`'den. Uygulaması yarıda kalan (`CommitFailed`) partiye uygulama anı yazılmaz; onda uygulamanın kabul edildiği son doğrulama anından (`validatedAtUtc`) sayılır. Uygulama doğrulamadan önce başlayamadığından süre en fazla o aradaki gün kadar erken kapanır, hiçbir zaman uzamaz.
+- **Kapsam:** bütün geri alınabilir durumlar (`Committed`, `CommitFailed`, `PartiallyRolledBack`, `RollbackFailed`). Süre geçince `409 Imports.RollbackWindowClosed`; durum ve kayıtlar değişmez.
+- **Yarım kalmış geri alma:** `PartiallyRolledBack` veya `RollbackFailed` parti süre dolduktan sonra **yeniden denenemez**. Gerekçe: kalan kayıtlar ya bağı olduğu için korunmuştur ya da süre boyunca klinikte kullanılmaya devam etmiştir; süre dolunca onları silmek tam da bu kuralın önlediği şeydir. Her sahip birimi tek işlemde silindiğinden kalan veri tutarlıdır (yarım müşteri/hasta kalmaz). Geri alma hatası genelde hemen fark edilip süre içinde yeniden denenir.
+- **Başlamış iş biter:** süre yalnız yeni geri almanın başlatılmasını sınırlar. Süre dolmadan başlamış (`RollingBack`) iş, çökme sonrası devralma dahil, süre dolsa da tamamlanır.
+- Satır verisinin 30 günlük temizliği (bölüm 10, ADR-019 K9) ayrı kuraldır ve son durum değişikliğinden sayılır; geri alma satır verisine değil hedef kimliklere dayandığından ikisi birbirini beklemez.
 
 ## 10) Audit ve gizlilik
 

@@ -6,8 +6,14 @@ namespace Backend.Veteriner.Application.Imports;
 
 internal static class ImportBatchMappings
 {
+    /// <summary>
+    /// Ayrıntı yanıtı (<paramref name="tables"/> verilmiş) partiye yazılmış okuma notlarını da taşır; listede ikisi de null.
+    /// <paramref name="warnings"/> verilirse (yükleme anında bellekte) yeniden okunmaz. <paramref name="nowUtc"/> geri alma
+    /// süresinin (<see cref="ImportBatch.RollbackWindow"/>) değerlendirildiği andır.
+    /// </summary>
     public static ImportBatchDto ToDto(
         this ImportBatch b,
+        DateTime nowUtc,
         IReadOnlyList<ImportTableInfoDto>? tables = null,
         IReadOnlyList<ImportWarningDto>? warnings = null)
         => new(
@@ -28,8 +34,10 @@ internal static class ImportBatchMappings
                 b.CustomerCounts.ToDto(), b.PetCounts.ToDto(), b.VaccinationCounts.ToDto(), b.ClinicalRecordCounts.ToDto(),
                 b.AccountEntryCounts.ToDto(), b.AppointmentCounts.ToDto(), b.ProductCounts.ToDto()),
             tables,
-            warnings,
-            b.SourceProfile);
+            warnings ?? (tables is null ? null : ImportWarningsDocument.Parse(b.WarningsJson)),
+            b.SourceProfile,
+            b.CanStartRollback(nowUtc),
+            b.RollbackDeadlineUtc);
 
     public static ImportIssueDto ToDto(this ImportIssue i)
         => new(i.Severity.ToString(), i.Code, i.Field, i.Message, i.Value);

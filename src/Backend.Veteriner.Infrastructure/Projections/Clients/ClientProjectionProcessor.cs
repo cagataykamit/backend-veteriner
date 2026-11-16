@@ -314,7 +314,15 @@ public sealed class ClientProjectionProcessor : IClientProjectionProcessor
         return processedCount;
     }
 
-    private async Task<ClientProjectionApplyResult> ApplyTransactionallyAsync(
+    /// <summary>
+    /// Olayı tek işlemde uygular. Geçici hatada (kilitlenme vb.) işlem geri alınmış ve değişiklik izleyicisi temizlenmiştir;
+    /// işlenmiş olay kaydı tekrarı engellediğinden kısa beklemeyle yeniden denenir, deneme sayacı boşuna artmaz.
+    /// </summary>
+    private Task<ClientProjectionApplyResult> ApplyTransactionallyAsync(ClientProjectionEvent integrationEvent, Guid eventId, DateTime occurredAtUtc, CancellationToken cancellationToken)
+        => TransientSqlRetry.ExecuteAsync(
+            c => ApplyTransactionallyOnceAsync(integrationEvent, eventId, occurredAtUtc, c), _logger, "client-projection-apply", cancellationToken);
+
+    private async Task<ClientProjectionApplyResult> ApplyTransactionallyOnceAsync(
         ClientProjectionEvent integrationEvent,
         Guid eventId,
         DateTime occurredAtUtc,

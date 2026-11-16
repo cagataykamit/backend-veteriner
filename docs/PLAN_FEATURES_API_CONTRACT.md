@@ -2,7 +2,7 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu backlog `TIER-001`, ADR-035 (paket tablosu), ADR-045 K13 (klinik web sitesi tüm paketlerde), `TRIAL_LIMITS_API_CONTRACT.md` K7. İlgili: `SUBSCRIPTION_PLAN_CATALOG_API_CONTRACT.md` (fiyat ve kullanıcı sınırı), `PORTAL_API_CONTRACT.md`, `ONLINE_APPOINTMENT_API_CONTRACT.md`.
 
-> **Durum:** Uygulandı (kod + test), dal `feat/tier-001-paket-ozellik`. Migration yok, yeni izin yok, yeni uç yok. §4 2026-11-08 kullanıcı kararıyla seçenek A'ya geçti (dal `feat/kararlar-2026-11-08`); dönem sonu davranışı çalışma varsayımıdır.
+> **Durum:** Uygulandı (kod + test), dal `feat/tier-001-paket-ozellik`. Migration yok, yeni izin yok, yeni uç yok. §4 2026-11-08 kullanıcı kararıyla seçenek A'ya geçti (dal `feat/kararlar-2026-11-08`); dönem sonu davranışı çalışma varsayımıdır. 2026-11-16 kullanıcı kararıyla `OwnerPortal` ve `PortalAppointmentRequests` Temel dahil tüm paketlerde açık (ADR-035; dal `feature/portal-tum-paketler`, migration yok); değerler ve kapılar ileride yeniden kilitlenebilsin diye durur, bugün yalnız abonelik kaydı olmayan kiracıda kapalıdır.
 
 ---
 
@@ -10,8 +10,8 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu backlog `TIER-001`, A
 
 | Özellik (`feature`) | Basic | Pro | Premium |
 |---|---|---|---|
-| `OwnerPortal` | yok | var | var |
-| `PortalAppointmentRequests` | yok | var | var |
+| `OwnerPortal` (2026-11-16 kullanıcı kararı: tüm paketler) | var | var | var |
+| `PortalAppointmentRequests` (2026-11-16 kullanıcı kararı: tüm paketler) | var | var | var |
 | `MultiClinic` | yok | yok | var |
 | `Waitlist` (TIER-018, `WAITLIST_API_CONTRACT.md`) | yok | var | var |
 | `CashManagement` (TIER-008, `CASH_REGISTERS_API_CONTRACT.md`; 2026-11-09 kullanıcı kararı: Profesyonel ve Kurumsal. Okumalar, gün sonu raporu ve Ana kasaya nakit tahsilat her pakette) | yok | var | var |
@@ -33,10 +33,12 @@ Standart `ProblemDetails`, `extensions` alanları:
 ```json
 { "status": 403, "code": "Subscriptions.FeatureNotInPlan",
   "detail": "Bu özellik mevcut paketinizde yok; üst pakete geçerek kullanabilirsiniz.",
-  "feature": "OwnerPortal", "currentPlanCode": "Basic", "requiredPlanCode": "Pro" }
+  "feature": "Waitlist", "currentPlanCode": "Basic", "requiredPlanCode": "Pro" }
 ```
 
 `currentPlanCode` abonelik kaydı yoksa `null`. `requiredPlanCode` özelliği içeren en küçük pakettir.
+
+Portal satırları (`OwnerPortal`) 2026-11-16'dan beri hiçbir pakette tetiklenmez; kapı yalnız abonelik kaydı olmayan kiracıda kapalıdır (`requiredPlanCode: "Basic"`). Kapılar ileride yeniden kilitleme için durur.
 
 | Uç | Koşul | Yanıt |
 |---|---|---|
@@ -57,8 +59,8 @@ Kayıt (`owner-signup`) ilk kliniği her pakette oluşturur. Pasif klinik sayıl
 { "tenantId": "…", "isReadOnly": false, "reasonCode": null, "message": null,
   "planCode": "Pro",
   "planFeatures": [
-    { "feature": "OwnerPortal", "isEnabled": true, "requiredPlanCode": "Pro" },
-    { "feature": "PortalAppointmentRequests", "isEnabled": true, "requiredPlanCode": "Pro" },
+    { "feature": "OwnerPortal", "isEnabled": true, "requiredPlanCode": "Basic" },
+    { "feature": "PortalAppointmentRequests", "isEnabled": true, "requiredPlanCode": "Basic" },
     { "feature": "MultiClinic", "isEnabled": false, "requiredPlanCode": "Premium" }
   ] }
 ```
@@ -101,11 +103,13 @@ Hata gövdesi (standart `ProblemDetails`, alanlar üst düzeyde):
 
 `PortalAppointmentRequests` için ayrı kapı yoktur: bağ üzerinden talep `OwnerPortal` kapısıyla kapanır. Satır `access-state` ve paket tablosu içindir.
 
-**Kapanan risk:** üst paket alıp şube açarak ya da portal daveti göndererek düşmek artık mümkün değil.
+2026-11-16'dan beri portalsız paket yoktur; tablo ve kapı kodu (`OwnerPortalAccess`, davet ve önizleme kapıları) portal ileride yeniden kilitlenirse geçerli olsun diye durur. Paketle kurulamadığı için bu davranışın entegrasyon testi `Downgrade_To_Basic_Should_Keep_Portal_Open`'a çevrildi (eski hâli git geçmişinde `Downgrade_Should_Close_Reads_On_Existing_Link_But_Keep_Owner_Rights`); portal yeniden kilitlenirse geri getirilir.
+
+**Kapanan risk:** üst paket alıp şube açarak düşmek artık mümkün değil.
 ## 5) Testler
 
 - Application: `TenantPlanFeatureEvaluatorTests` (paket tablosu, gereken paket, kayıtsız kiracı, ilk ve ikinci klinik, deneme, sığma kuralı ve bekleyen davet), `StartSubscriptionCheckoutCommandHandlerTests` (denemede değişimde ve yenilemede sığma), `CreateClinicCommandHandlerTests`, `ClinicSettingsHandlersTests`, `CreateClientPortalInviteCommandHandlerTests`.
-- Entegrasyon: `OwnerPortalPlanFeatureIntegrationTests` (Temel red, deneme dahil; Profesyonel davet ve kabul; portalsız pakette okuma kapalı, veri talebi, tercihler ve hesap silme açık, yükseltince geri gelir; bekleyen davet ve fazla klinik; Temel ve Profesyonel denemede ikinci klinik reddi, Kurumsal denemede kabul; denemede eski iki klinik kalır; `access-state`), `TenantInviteUserLimitIntegrationTests` (sığmayan düşürmede 409 ve sayılar, bekleyen davet ve fazla klinik, sığan düşürmede kabul, dönem sonu ret ve uygulama, dönem sonunda ödemesiz dönem açılmaz ve abonelik salt okunur kalır, denemede düşürme denemeyi korur, özetteki `rejectedPlanChange`).
+- Entegrasyon: `OwnerPortalPlanFeatureIntegrationTests` (her pakette davet ve kabul, Temel denemesi dahil; Temel'e inince portal açık kalır; fazla klinik; Temel ve Profesyonel denemede ikinci klinik reddi, Kurumsal denemede kabul; denemede eski iki klinik kalır; `access-state`), `TenantInviteUserLimitIntegrationTests` (sığmayan düşürmede 409 ve sayılar, bekleyen davet ve fazla klinik, sığan düşürmede kabul, dönem sonu ret ve uygulama, dönem sonunda ödemesiz dönem açılmaz ve abonelik salt okunur kalır, denemede düşürme denemeyi korur, özetteki `rejectedPlanChange`).
 
 ## 6) Bilinen sınırlar
 

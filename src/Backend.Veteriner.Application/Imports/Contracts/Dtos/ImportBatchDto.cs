@@ -4,9 +4,11 @@ using Backend.Veteriner.Domain.Imports;
 namespace Backend.Veteriner.Application.Imports.Contracts.Dtos;
 
 /// <summary>
-/// İçe aktarma partisi (ayrıntı ve liste öğesi). Satır verisi içermez. <see cref="Tables"/> ayrıntı, yükleme ve eşleme
-/// yanıtında, <see cref="Warnings"/> yalnız yükleme yanıtında dolar (listede ikisi de null). <see cref="SourceProfile"/> kliniğin
-/// seçtiği kaynak programdır (TIER-021).
+/// İçe aktarma partisi (ayrıntı ve liste öğesi). Satır verisi içermez. <see cref="Tables"/> ve <see cref="Warnings"/> ayrıntı,
+/// yükleme ve eşleme yanıtında dolar (listede ikisi de null); notlar yüklemede partiye yazılır, not kaydı olmayan eski partide
+/// <see cref="Warnings"/> null'dır. <see cref="SourceProfile"/> kliniğin seçtiği kaynak programdır (TIER-021).
+/// <see cref="CanRollback"/> geri almanın şu an başlatılabildiğini, <see cref="RollbackDeadlineUtc"/> son anını bildirir (geri
+/// alınabilir durumda olmayan partide null; geçmişse aktarma kesinleşmiştir). Kural domain'dedir, istemci yeniden hesaplamaz.
 /// </summary>
 public sealed record ImportBatchDto(
     Guid Id,
@@ -25,7 +27,9 @@ public sealed record ImportBatchDto(
     ImportBatchSummaryDto Summary,
     IReadOnlyList<ImportTableInfoDto>? Tables = null,
     IReadOnlyList<ImportWarningDto>? Warnings = null,
-    [property: JsonConverter(typeof(JsonStringEnumConverter))] ImportSourceProfile SourceProfile = ImportSourceProfile.Generic);
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] ImportSourceProfile SourceProfile = ImportSourceProfile.Generic,
+    bool CanRollback = false,
+    DateTime? RollbackDeadlineUtc = null);
 
 /// <summary>Tablo başına sayaçlar; tam geçiş tabloları (ADR-048) partide yoksa sıfırdır.</summary>
 public sealed record ImportBatchSummaryDto(

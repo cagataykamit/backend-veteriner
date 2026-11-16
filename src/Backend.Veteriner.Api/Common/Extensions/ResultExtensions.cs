@@ -87,7 +87,8 @@ public static class ResultExtensions
         // "validation" dalına düşmesin diye önce değerlendirilir.
         if (normalized is "imports.invalidstate" or "imports.requestidconflict" or "imports.toomanyopendrafts"
             or "imports.anotherjobrunning" or "imports.validationstale" or "imports.haserrorrows"
-            or "imports.reminderimpactchanged" or "imports.rollbackblocked" or "imports.commitblocked")
+            or "imports.reminderimpactchanged" or "imports.rollbackblocked" or "imports.commitblocked"
+            or "imports.rollbackwindowclosed")
         {
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }

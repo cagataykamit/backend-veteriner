@@ -151,7 +151,11 @@ public sealed class CreateImportBatchCommandHandler
             return Result<ImportBatchCreateResultDto>.Failure(created.Error);
 
         var batch = created.Value!;
-        var attached = batch.AttachFile(upload.ContentHash, tables.ToDictionary(t => t.Table, t => t.Rows.Count));
+        var warnings = ImportWarningsDocument.From(read.Value.Warnings);
+        var attached = batch.AttachFile(
+            upload.ContentHash,
+            tables.ToDictionary(t => t.Table, t => t.Rows.Count),
+            ImportWarningsDocument.Serialize(warnings));
         if (!attached.IsSuccess)
             return Result<ImportBatchCreateResultDto>.Failure(attached.Error);
 
@@ -187,15 +191,8 @@ public sealed class CreateImportBatchCommandHandler
         await _rowsWrite.InsertAsync(rows, ct);
 
         var headers = tables.ToDictionary(t => t.Table, t => t.Headers);
-        var warnings = read.Value.Warnings
-            .Select(w => new ImportWarningDto(
-                w.Code,
-                w.Table is { } table ? ImportCanonicalNames.Key(table) : null,
-                w.Message))
-            .ToList();
-
         return Result<ImportBatchCreateResultDto>.Success(
-            new ImportBatchCreateResultDto(true, batch.ToDto(ImportTableInfoLoader.Build(batch, headers), warnings)));
+            new ImportBatchCreateResultDto(true, batch.ToDto(_timeProvider.GetUtcNow().UtcDateTime, ImportTableInfoLoader.Build(batch, headers), warnings)));
     }
 
     private async Task<Result<ImportBatchCreateResultDto>> ReplayAsync(
@@ -209,7 +206,7 @@ public sealed class CreateImportBatchCommandHandler
 
         var tables = await _tableInfo.LoadAsync(existing, ct);
         return Result<ImportBatchCreateResultDto>.Success(
-            new ImportBatchCreateResultDto(false, existing.ToDto(tables)));
+            new ImportBatchCreateResultDto(false, existing.ToDto(_timeProvider.GetUtcNow().UtcDateTime, tables)));
     }
 
     /// <summary>

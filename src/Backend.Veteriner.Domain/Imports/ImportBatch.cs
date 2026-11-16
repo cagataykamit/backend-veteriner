@@ -40,6 +40,12 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
     /// <summary>Satır verisinin (kişisel veri) saklama süresi; son durum değişikliğinden sayılır (ADR-019 K9).</summary>
     public static readonly TimeSpan PayloadRetention = TimeSpan.FromDays(30);
 
+    /// <summary>
+    /// Uygulanan partinin geri alınabildiği süre; uygulama anından sayılır (<see cref="RollbackDeadlineUtc"/>). Süre dolunca
+    /// aktarma kesinleşir: hiçbir geri alınabilir durumdan (yarım kalmış geri alma dahil) yeni geri alma başlatılamaz.
+    /// </summary>
+    public static readonly TimeSpan RollbackWindow = TimeSpan.FromDays(30);
+
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
 
@@ -61,6 +67,9 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
     public ImportBatchStatus Status { get; private set; }
     public string? MappingJson { get; private set; }
     public string? OptionsJson { get; private set; }
+
+    /// <summary>Dosya okunurken çıkan notlar (yanıttaki <c>warnings[]</c>); yüklemede yazılır, sonra değişmez. Kişisel veri taşımaz.</summary>
+    public string? WarningsJson { get; private set; }
 
     /// <summary>Son başarılı doğrulamanın kimliği; uygulama yalnız bununla kabul edilir. Eşleme değişince silinir.</summary>
     public Guid? ValidationId { get; private set; }
@@ -214,10 +223,10 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
            && string.Equals(ContentHash, contentHash, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Yüklenen içeriğin özetini ve tablo başına satır sayısını kaydeder (B2). Yalnız dosyası henüz bağlanmamış
+    /// Yüklenen içeriğin özetini, tablo başına satır sayısını ve okuma notlarını kaydeder (B2). Yalnız dosyası henüz bağlanmamış
     /// <c>Uploaded</c> parti için; sayaçların yalnız <c>Total</c> alanı dolar, doğrulama sonrası diğerleri gelir.
     /// </summary>
-    public Result AttachFile(string contentHash, IReadOnlyDictionary<ImportTable, int> rowCounts)
+    public Result AttachFile(string contentHash, IReadOnlyDictionary<ImportTable, int> rowCounts, string? warningsJson = null)
     {
         if (Status != ImportBatchStatus.Uploaded || ContentHash is not null)
             return InvalidState("Dosya yalnız yeni oluşturulan partiye bağlanabilir.");
@@ -229,6 +238,7 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
             return Result.Failure("Imports.Validation", "Satır sayısı negatif olamaz.");
 
         ContentHash = contentHash.ToLowerInvariant();
+        WarningsJson = warningsJson;
         foreach (var table in ImportTables.All)
             SetCounts(table, ImportTableCounts.Empty with { Total = rowCounts.GetValueOrDefault(table) });
         return Result.Success();
@@ -426,17 +436,49 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
         return moved;
     }
 
-    /// <summary>Geri alma başlatılabilen durumlar (geçiş tablosu); <see cref="StartRollback"/> ile aynı küme.</summary>
-    public bool CanStartRollback => ImportBatchStatusSets.RollbackableFrom.Contains(Status);
+    /// <summary>
+    /// Geri almanın son anı (<see cref="RollbackWindow"/>); geri alınabilir durumda olmayan partide null. Uygulama anından
+    /// sayılır. Uygulaması yarıda kalan (<c>CommitFailed</c>) partiye uygulama anı yazılmaz; onda uygulamanın kabul edildiği
+    /// son doğrulama anından sayılır (uygulama ondan önce başlayamaz, süre en fazla birkaç gün erken kapanır).
+    /// </summary>
+    public DateTime? RollbackDeadlineUtc
+        => ImportBatchStatusSets.RollbackableFrom.Contains(Status)
+            ? (CommittedAtUtc ?? ValidatedAtUtc ?? CreatedAtUtc) + RollbackWindow
+            : null;
+
+    /// <summary>Geri alma başlatılabilir mi; kuralın tek yeri <see cref="CheckRollbackAllowed"/>.</summary>
+    public bool CanStartRollback(DateTime nowUtc) => CheckRollbackAllowed(nowUtc).IsSuccess;
 
     /// <summary>
-    /// Geri almayı kuyruğa alır (ADR-019 K7). <paramref name="optionsJson"/> partinin seçenek belgesidir; geri alma isteği
-    /// (istek anahtarı, politika) uygulama katmanınca bu belgeye eklenir ve iş boyunca buradan okunur.
+    /// Geri alma kuralı: geçiş tablosundaki durumlardan (<see cref="ImportBatchStatusSets.RollbackableFrom"/>) ve
+    /// <see cref="RollbackDeadlineUtc"/> geçmeden. Süre dolduysa <c>Imports.RollbackWindowClosed</c> döner.
+    /// </summary>
+    public Result CheckRollbackAllowed(DateTime nowUtc)
+    {
+        if (RollbackDeadlineUtc is not { } deadline)
+            return InvalidState($"Parti '{Status}' durumundayken geri alınamaz.");
+
+        return NormalizeUtc(nowUtc) < deadline
+            ? Result.Success()
+            : Result.Failure(
+                "Imports.RollbackWindowClosed",
+                $"Geri alma süresi doldu; aktarma kesinleşti. Aktarmalar uygulandıktan sonra {RollbackWindow.TotalDays:0} gün içinde geri alınabilir.");
+    }
+
+    /// <summary>
+    /// Geri almayı kuyruğa alır (ADR-019 K7); kural <see cref="CheckRollbackAllowed"/>. Süre yalnız yeni geri almanın
+    /// başlatılmasını sınırlar: başlamış iş (çökme sonrası devralma dahil) süre dolsa da biter. <paramref name="optionsJson"/>
+    /// partinin seçenek belgesidir; geri alma isteği (istek anahtarı, politika) uygulama katmanınca bu belgeye eklenir ve iş
+    /// boyunca buradan okunur.
     /// </summary>
     public Result StartRollback(string optionsJson, DateTime nowUtc)
     {
         if (string.IsNullOrWhiteSpace(optionsJson))
             return Result.Failure("Imports.Validation", "Geri alma seçenekleri boş olamaz.");
+
+        var allowed = CheckRollbackAllowed(nowUtc);
+        if (!allowed.IsSuccess)
+            return allowed;
 
         var moved = MoveTo(ImportBatchStatus.RollingBack, nowUtc, [.. ImportBatchStatusSets.RollbackableFrom]);
         if (!moved.IsSuccess)

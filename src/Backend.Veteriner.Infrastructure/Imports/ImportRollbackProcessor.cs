@@ -136,7 +136,7 @@ public sealed class ImportRollbackProcessor
                     "Import rollback progress. Batch={BatchId} Units={Done}/{Total}", batchId, unitsDone, plan.Units.Count);
             }
 
-            await CompleteAsync(batchId, tenantId, policy, ct);
+            await TransientSqlRetry.ExecuteAsync(c => CompleteAsync(batchId, tenantId, policy, c), _logger, "import-rollback-complete", ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -153,28 +153,43 @@ public sealed class ImportRollbackProcessor
     }
 
     /// <summary>Tüm partinin planı (önizlemeyle aynı kural); birimler ve <c>Fail</c> politikasının başlangıç denetimi.</summary>
-    private async Task<ImportRollbackPlan> PlanAsync(Guid batchId, Guid tenantId, CancellationToken ct)
-    {
-        await using var scope = _scopes.CreateTenantScope(tenantId);
-        var loader = scope.ServiceProvider.GetRequiredService<ImportRollbackPlanLoader>();
-        return (await loader.LoadAsync(tenantId, batchId, rowIds: null, ct)).Plan;
-    }
+    private Task<ImportRollbackPlan> PlanAsync(Guid batchId, Guid tenantId, CancellationToken ct)
+        => TransientSqlRetry.ExecuteAsync(
+            async c =>
+            {
+                await using var scope = _scopes.CreateTenantScope(tenantId);
+                var loader = scope.ServiceProvider.GetRequiredService<ImportRollbackPlanLoader>();
+                return (await loader.LoadAsync(tenantId, batchId, rowIds: null, c)).Plan;
+            },
+            _logger, "import-rollback-plan", ct);
 
-    private async Task<ImportOutboxPressure> ReadPressureAsync(CancellationToken ct)
-    {
-        await using var scope = _scopes.CreateAsyncScope();
-        return await scope.ServiceProvider.GetRequiredService<IImportBackpressureProbe>().ReadAsync(ct);
-    }
+    /// <summary>Yalnız okuyan ölçüm; geçici hata (ör. outbox güncellemesiyle kilitlenme) işi düşürmez, kısa beklemeyle yeniden okunur.</summary>
+    private Task<ImportOutboxPressure> ReadPressureAsync(CancellationToken ct)
+        => TransientSqlRetry.ExecuteAsync(
+            async c =>
+            {
+                await using var scope = _scopes.CreateAsyncScope();
+                return await scope.ServiceProvider.GetRequiredService<IImportBackpressureProbe>().ReadAsync(c);
+            },
+            _logger, "import-rollback-backpressure", ct);
 
-    /// <summary>Birimi tek işlemde geri alır; kira kaybında false (işçi durur, birim geri alınmıştır).</summary>
+    /// <summary>
+    /// Birimi tek işlemde geri alır; kira kaybında false (işçi durur, birim geri alınmıştır). Geçici hatada işlemin tamamı
+    /// geri alınmıştır: birim yeni kapsamda baştan (plan ve bağımlılık denetimiyle) yeniden denenir.
+    /// </summary>
     private async Task<bool> RollbackUnitAsync(Guid batchId, Guid tenantId, string policy, ImportRollbackUnit unit, CancellationToken ct)
     {
         Result<ImportRollbackUnitResult> result;
         try
         {
-            await using var scope = _scopes.CreateTenantScope(tenantId);
-            var sender = scope.ServiceProvider.GetRequiredService<ISender>();
-            result = await sender.Send(new RollbackImportOwnerUnitCommand(batchId, WorkerId, unit.RowIds, policy), ct);
+            result = await TransientSqlRetry.ExecuteAsync(
+                async c =>
+                {
+                    await using var scope = _scopes.CreateTenantScope(tenantId);
+                    var sender = scope.ServiceProvider.GetRequiredService<ISender>();
+                    return await sender.Send(new RollbackImportOwnerUnitCommand(batchId, WorkerId, unit.RowIds, policy), c);
+                },
+                _logger, "import-rollback-unit", ct);
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -189,7 +204,10 @@ public sealed class ImportRollbackProcessor
         throw new InvalidOperationException($"Geri alma birimi başarısız: {result.Error.Code}");
     }
 
-    private async Task<bool> RenewLeaseAsync(Guid batchId, Guid tenantId, CancellationToken ct)
+    private Task<bool> RenewLeaseAsync(Guid batchId, Guid tenantId, CancellationToken ct)
+        => TransientSqlRetry.ExecuteAsync(c => RenewLeaseOnceAsync(batchId, tenantId, c), _logger, "import-rollback-lease", ct);
+
+    private async Task<bool> RenewLeaseOnceAsync(Guid batchId, Guid tenantId, CancellationToken ct)
     {
         await using var scope = _scopes.CreateTenantScope(tenantId);
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();

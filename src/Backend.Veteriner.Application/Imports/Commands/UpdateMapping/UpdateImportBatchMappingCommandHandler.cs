@@ -106,7 +106,7 @@ public sealed class UpdateImportBatchMappingCommandHandler
                 headers[table] = info.Columns.Select(c => c.Source).ToList();
         }
 
-        return Result<ImportBatchDto>.Success(batch.ToDto(ImportTableInfoLoader.Build(batch, headers)));
+        return Result<ImportBatchDto>.Success(batch.ToDto(_timeProvider.GetUtcNow().UtcDateTime, ImportTableInfoLoader.Build(batch, headers)));
     }
 
     /// <summary>Tablo → (kanonik alan → kaynak sütun); partideki her tablo zorunlu alanlarını karşılamalıdır.</summary>

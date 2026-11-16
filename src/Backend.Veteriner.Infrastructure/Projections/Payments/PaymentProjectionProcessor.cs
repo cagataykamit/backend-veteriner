@@ -309,7 +309,15 @@ public sealed class PaymentProjectionProcessor : IPaymentProjectionProcessor
         return processedCount;
     }
 
-    private async Task<PaymentProjectionApplyResult> ApplyTransactionallyAsync(
+    /// <summary>
+    /// Olayı tek işlemde uygular. Geçici hatada (kilitlenme vb.) işlem geri alınmış ve değişiklik izleyicisi temizlenmiştir;
+    /// işlenmiş olay kaydı tekrarı engellediğinden kısa beklemeyle yeniden denenir, deneme sayacı boşuna artmaz.
+    /// </summary>
+    private Task<PaymentProjectionApplyResult> ApplyTransactionallyAsync(PaymentProjectionSnapshot snapshot, Guid eventId, DateTime occurredAtUtc, bool voided, CancellationToken cancellationToken)
+        => TransientSqlRetry.ExecuteAsync(
+            c => ApplyTransactionallyOnceAsync(snapshot, eventId, occurredAtUtc, voided, c), _logger, "payment-projection-apply", cancellationToken);
+
+    private async Task<PaymentProjectionApplyResult> ApplyTransactionallyOnceAsync(
         PaymentProjectionSnapshot snapshot,
         Guid eventId,
         DateTime occurredAtUtc,
