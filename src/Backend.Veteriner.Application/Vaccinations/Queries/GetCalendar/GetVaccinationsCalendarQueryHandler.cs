@@ -2,6 +2,7 @@ using System.Globalization;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Vaccinations.Calendar;
 using Backend.Veteriner.Application.Vaccinations.Contracts.Dtos;
@@ -16,7 +17,8 @@ namespace Backend.Veteriner.Application.Vaccinations.Queries.GetCalendar;
 
 /// <summary>
 /// Takvim aşı katmanı: klinikte aralıktaki planlı aşılar, sonraki uygulama tarihleri ve uygulanan aşılar. Gecikmiş aşı yalnız vadesi
-/// görüntülenen aralıktaysa gelir (bugüne taşınmaz). Karşılanmış sonraki tarih ve vefat eden hayvanın vadesi gösterilmez.
+/// görüntülenen aralıktaysa gelir (bugüne taşınmaz). Karşılanmış sonraki tarih ve vefat eden hayvanın vadesi gösterilmez. "Durum" filtresi
+/// (<c>States</c>) sunucuda uygulanır.
 /// Kurallar <see cref="VaccinationCalendarRules"/>.
 /// </summary>
 public sealed class GetVaccinationsCalendarQueryHandler
@@ -106,7 +108,10 @@ public sealed class GetVaccinationsCalendarQueryHandler
             return Result<IReadOnlyList<VaccinationCalendarItemDto>>.Success(Array.Empty<VaccinationCalendarItemDto>());
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
-        var entries = Expand(rows, fromUtc, toUtc).ToList();
+        var states = request.States is { Count: > 0 } s ? s.ToHashSet() : null;
+        var entries = Expand(rows, fromUtc, toUtc)
+            .Where(e => states is null || states.Contains(VaccinationCalendarRules.State(e.Kind, e.AtUtc, utcNow)))
+            .ToList();
 
         var dueEntries = entries.Where(e => e.Kind != VaccinationCalendarKind.Applied).ToList();
         if (dueEntries.Count > 0)
@@ -136,7 +141,7 @@ public sealed class GetVaccinationsCalendarQueryHandler
                 return new VaccinationCalendarItemDto(
                     e.Row.Id,
                     e.Kind,
-                    e.Kind == VaccinationCalendarKind.Applied ? VaccinationCalendarState.Applied : VaccinationCalendarRules.DueState(e.AtUtc, utcNow),
+                    VaccinationCalendarRules.State(e.Kind, e.AtUtc, utcNow),
                     VaccinationCalendarRules.LocalDate(e.AtUtc),
                     e.AtUtc,
                     e.Row.ClinicId,

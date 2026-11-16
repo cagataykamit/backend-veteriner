@@ -16,32 +16,17 @@ public enum VaccinationCalendarKind
     Applied = 2,
 }
 
-/// <summary>Takvimdeki aşının rengi buradan gelir: uygulandı yeşil, bugün sarı, ileri tarih koyu, gecikmiş kırmızı.</summary>
-public enum VaccinationCalendarState
-{
-    Applied = 0,
-    DueToday = 1,
-    Upcoming = 2,
-    Overdue = 3,
-}
-
 /// <summary>
-/// Takvim aşı katmanının kuralları (tek yer). Gün sınırı ve gecikme tanımı <see cref="VaccinationDueRule"/> (ADR-028, İstanbul günü).
-/// Aşı randevu değildir: saat dilimini doldurmaz, çakışma ve boş saat hesabına girmez, randevu hatırlatması üretmez.
+/// Takvim aşı katmanının kuralları (tek yer). Durum (renk) <see cref="CalendarItemStateRule"/>: uygulanan aşı tamamlanan, vadeli aşı
+/// vadesine göre bugün, gelecek ya da gecikmiş. Aşı randevu değildir: saat dilimini doldurmaz, çakışma ve boş saat hesabına girmez,
+/// randevu hatırlatması üretmez.
 /// </summary>
 public static class VaccinationCalendarRules
 {
     private static readonly CompareInfo TurkishCompare = CultureInfo.GetCultureInfo("tr-TR").CompareInfo;
 
-    /// <summary>Vadesi olan (planlı ya da sonraki) aşının durumu: bugünün başından önce gecikmiş, bugün içinde bugün, sonrası ileri.</summary>
-    public static VaccinationCalendarState DueState(DateTime dueAtUtc, DateTime utcNow)
-    {
-        var (todayStartUtc, tomorrowStartUtc) = VaccinationDueRule.UpcomingWindow(utcNow, 1);
-        if (VaccinationDueRule.IsOverdueAt(dueAtUtc, todayStartUtc))
-            return VaccinationCalendarState.Overdue;
-
-        return dueAtUtc < tomorrowStartUtc ? VaccinationCalendarState.DueToday : VaccinationCalendarState.Upcoming;
-    }
+    public static CalendarItemState State(VaccinationCalendarKind kind, DateTime atUtc, DateTime utcNow)
+        => kind == VaccinationCalendarKind.Applied ? CalendarItemState.Completed : CalendarItemStateRule.ForDue(atUtc, utcNow);
 
     /// <summary>Kaydın takvimde göründüğü İstanbul günü.</summary>
     public static DateOnly LocalDate(DateTime utc) => OperationDayBounds.ToLocalDate(utc);

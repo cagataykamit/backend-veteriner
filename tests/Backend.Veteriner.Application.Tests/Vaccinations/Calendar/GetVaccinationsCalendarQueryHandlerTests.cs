@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -123,9 +124,9 @@ public sealed class GetVaccinationsCalendarQueryHandlerTests
         var items = result.Value!;
         items.Should().HaveCount(3);
         items.Select(i => (i.Kind, i.State, i.VaccineName)).Should().Equal(
-            (VaccinationCalendarKind.Applied, VaccinationCalendarState.Applied, "İç parazit"),
-            (VaccinationCalendarKind.Planned, VaccinationCalendarState.DueToday, "Kuduz"),
-            (VaccinationCalendarKind.NextDue, VaccinationCalendarState.Upcoming, "Karma"));
+            (VaccinationCalendarKind.Applied, CalendarItemState.Completed, "İç parazit"),
+            (VaccinationCalendarKind.Planned, CalendarItemState.DueToday, "Kuduz"),
+            (VaccinationCalendarKind.NextDue, CalendarItemState.Upcoming, "Karma"));
         items[0].Date.Should().Be(new DateOnly(2026, 11, 16));
         items[0].PetName.Should().Be("Pamuk");
         items[0].ClientName.Should().Be("Ali Veli");
@@ -140,7 +141,7 @@ public sealed class GetVaccinationsCalendarQueryHandlerTests
 
         var result = await CreateHandler().Handle(new GetVaccinationsCalendarQuery(lastWeekFrom, FromUtc), CancellationToken.None);
 
-        result.Value!.Single().State.Should().Be(VaccinationCalendarState.Overdue);
+        result.Value!.Single().State.Should().Be(CalendarItemState.Overdue);
     }
 
     [Fact]
@@ -180,5 +181,21 @@ public sealed class GetVaccinationsCalendarQueryHandlerTests
 
         result.Value!.Select(i => i.Kind).Should().Equal(VaccinationCalendarKind.Applied, VaccinationCalendarKind.NextDue);
         result.Value!.Select(i => i.VaccinationId).Distinct().Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Apply_State_Filter_On_Server()
+    {
+        Rows(
+            Row(VaccinationStatus.Applied, NowUtc.AddHours(-1), NowUtc.AddDays(3), "Karma"),
+            Row(VaccinationStatus.Scheduled, null, NowUtc.AddHours(1), "Kuduz"));
+
+        var result = await CreateHandler().Handle(
+            new GetVaccinationsCalendarQuery(FromUtc, ToUtc, States: [CalendarItemState.DueToday, CalendarItemState.Completed]),
+            CancellationToken.None);
+
+        result.Value!.Select(i => (i.Kind, i.State)).Should().Equal(
+            (VaccinationCalendarKind.Applied, CalendarItemState.Completed),
+            (VaccinationCalendarKind.Planned, CalendarItemState.DueToday));
     }
 }

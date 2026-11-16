@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Appointments.Calendar;
 using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Appointments.ReadModels;
 using Backend.Veteriner.Application.Appointments.Specs;
@@ -31,6 +32,7 @@ public sealed class GetAppointmentsCalendarQueryHandler
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly IClinicVeterinarianReader _veterinarians;
     private readonly IReadRepository<AppointmentReason> _reasons;
+    private readonly TimeProvider _timeProvider;
 
     public GetAppointmentsCalendarQueryHandler(
         ITenantContext tenantContext,
@@ -42,7 +44,8 @@ public sealed class GetAppointmentsCalendarQueryHandler
         IAppointmentReadModelReader readModelReader,
         IOptions<QueryReadModelsOptions> queryReadModelsOptions,
         IClinicVeterinarianReader veterinarians,
-        IReadRepository<AppointmentReason> reasons)
+        IReadRepository<AppointmentReason> reasons,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -54,6 +57,7 @@ public sealed class GetAppointmentsCalendarQueryHandler
         _queryReadModelsOptions = queryReadModelsOptions.Value;
         _veterinarians = veterinarians;
         _reasons = reasons;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<IReadOnlyList<AppointmentCalendarItemDto>>> Handle(GetAppointmentsCalendarQuery request, CancellationToken ct)
@@ -106,6 +110,8 @@ public sealed class GetAppointmentsCalendarQueryHandler
             return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Failure(scopeResult.Error);
 
         var effectiveClinicId = scopeResult.Value!.SingleClinicId ?? requestedClinicId.Value;
+        var filter = new AppointmentCalendarFilter(request.VeterinarianUserId, request.WithoutVeterinarian, request.AppointmentTypes, request.States);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
 
         if (_queryReadModelsOptions.AppointmentsEnabled)
         {
@@ -117,7 +123,10 @@ public sealed class GetAppointmentsCalendarQueryHandler
                     request.Status),
                 ct);
 
-            return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Success(await WithDetailsFromCommandDbAsync(tenantId, items, ct));
+            var detailed = await WithDetailsFromCommandDbAsync(tenantId, items, ct);
+            return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Success(filter.IsEmpty
+                ? detailed
+                : detailed.Where(i => filter.Matches(i.VeterinarianUserId, i.AppointmentType, i.Status, i.ScheduledAtUtc, utcNow)).ToList());
         }
 
         return await HandleFromCommandDbAsync(
@@ -126,6 +135,8 @@ public sealed class GetAppointmentsCalendarQueryHandler
             dateFromUtc,
             dateToUtc,
             request.Status,
+            filter,
+            utcNow,
             ct);
     }
 
@@ -135,9 +146,11 @@ public sealed class GetAppointmentsCalendarQueryHandler
         DateTime dateFromUtc,
         DateTime dateToUtc,
         AppointmentStatus? status,
+        AppointmentCalendarFilter filter,
+        DateTime utcNow,
         CancellationToken ct)
     {
-        var rows = await _appointments.ListAsync(
+        var all = await _appointments.ListAsync(
             new AppointmentsCalendarSpec(
                 tenantId,
                 effectiveClinicId,
@@ -145,6 +158,9 @@ public sealed class GetAppointmentsCalendarQueryHandler
                 dateToUtc,
                 status),
             ct);
+        var rows = filter.IsEmpty
+            ? all
+            : all.Where(r => filter.Matches(r.VeterinarianUserId, r.AppointmentType, r.Status, r.ScheduledAtUtc, utcNow)).ToList();
 
         if (rows.Count == 0)
             return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Success(Array.Empty<AppointmentCalendarItemDto>());

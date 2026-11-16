@@ -17,6 +17,7 @@ using Backend.Veteriner.Application.Appointments.Queries.GetList;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Shared;
 using Mediator;
@@ -141,6 +142,8 @@ public sealed class AppointmentsController : ControllerBase
 
     /// <summary>
     /// Takvim görünümü için hafif randevu listesi. dateFromUtc/dateToUtc zorunludur; aralık en fazla 45 gün.
+    /// Filtreler (APPOINTMENT_CALENDAR_API_CONTRACT.md §6): <c>veterinarianUserId</c> ya da <c>withoutVeterinarian</c>,
+    /// <c>appointmentTypes</c> (tekrarlı), <c>states</c> (tekrarlı: DueToday, Upcoming, Overdue, Completed).
     /// </summary>
     [HttpGet("calendar")]
     [Authorize(Policy = PermissionCatalog.Appointments.Read)]
@@ -151,6 +154,10 @@ public sealed class AppointmentsController : ControllerBase
         [FromQuery] DateTime? dateToUtc,
         [FromQuery] Guid? clinicId = null,
         [FromQuery] AppointmentStatus? status = null,
+        [FromQuery] Guid? veterinarianUserId = null,
+        [FromQuery] bool withoutVeterinarian = false,
+        [FromQuery] AppointmentType[]? appointmentTypes = null,
+        [FromQuery] CalendarItemState[]? states = null,
         CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
@@ -161,7 +168,11 @@ public sealed class AppointmentsController : ControllerBase
                 dateFromUtc,
                 dateToUtc,
                 clinicId,
-                status),
+                status,
+                veterinarianUserId,
+                withoutVeterinarian,
+                appointmentTypes,
+                states),
             ct);
         return result.ToActionResult(this);
     }

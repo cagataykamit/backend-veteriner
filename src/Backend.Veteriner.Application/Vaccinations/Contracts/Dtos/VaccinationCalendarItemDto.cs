@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Vaccinations.Calendar;
 
 namespace Backend.Veteriner.Application.Vaccinations.Contracts.Dtos;
@@ -12,7 +13,7 @@ namespace Backend.Veteriner.Application.Vaccinations.Contracts.Dtos;
 public sealed record VaccinationCalendarItemDto(
     Guid VaccinationId,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] VaccinationCalendarKind Kind,
-    [property: JsonConverter(typeof(JsonStringEnumConverter))] VaccinationCalendarState State,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] CalendarItemState State,
     DateOnly Date,
     DateTime AtUtc,
     Guid ClinicId,

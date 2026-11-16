@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Vaccinations.Calendar;
 using AwesomeAssertions;
 
@@ -11,16 +12,16 @@ public sealed class VaccinationCalendarRulesTests
     private static readonly DateTime TodayStartUtc = new(2026, 11, 15, 21, 0, 0, DateTimeKind.Utc);
 
     [Theory]
-    [InlineData(-1, VaccinationCalendarState.Overdue)]
-    [InlineData(0, VaccinationCalendarState.DueToday)]
-    [InlineData(23 * 60 + 59, VaccinationCalendarState.DueToday)]
-    [InlineData(24 * 60, VaccinationCalendarState.Upcoming)]
-    public void DueState_Should_Use_IstanbulDay(int minutesFromTodayStart, VaccinationCalendarState expected)
-        => VaccinationCalendarRules.DueState(TodayStartUtc.AddMinutes(minutesFromTodayStart), NowUtc).Should().Be(expected);
+    [InlineData(-1, CalendarItemState.Overdue)]
+    [InlineData(0, CalendarItemState.DueToday)]
+    [InlineData(23 * 60 + 59, CalendarItemState.DueToday)]
+    [InlineData(24 * 60, CalendarItemState.Upcoming)]
+    public void DueState_Should_Use_IstanbulDay(int minutesFromTodayStart, CalendarItemState expected)
+        => CalendarItemStateRule.ForDue(TodayStartUtc.AddMinutes(minutesFromTodayStart), NowUtc).Should().Be(expected);
 
     [Fact]
     public void DueState_Should_Keep_TodayDue_As_Today_After_Its_Time_Passed()
-        => VaccinationCalendarRules.DueState(NowUtc.AddHours(-2), NowUtc).Should().Be(VaccinationCalendarState.DueToday);
+        => CalendarItemStateRule.ForDue(NowUtc.AddHours(-2), NowUtc).Should().Be(CalendarItemState.DueToday);
 
     [Fact]
     public void LocalDate_Should_Be_IstanbulDate()

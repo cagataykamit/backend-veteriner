@@ -22,5 +22,9 @@ public sealed class GetVaccinationsCalendarQueryValidator : AbstractValidator<Ge
             .Must(q => !q.DateFromUtc.HasValue || !q.DateToUtc.HasValue
                        || (q.DateToUtc.Value - q.DateFromUtc.Value) <= GetVaccinationsCalendarQueryHandler.MaxWindow)
             .WithMessage("Tarih aralığı en fazla 45 gün olabilir.");
+
+        RuleForEach(x => x.States)
+            .IsInEnum()
+            .WithMessage("Geçersiz takvim durumu.");
     }
 }

@@ -78,7 +78,7 @@ ikisi de yoksa 400 `Vaccinations.ClinicScopeRequired`; bağlamla çelişirse 400
 | Alan | Anlam |
 |---|---|
 | `kind` | `Planned`: planlı aşı kaydı (`Scheduled`, tarih `dueAtUtc`). `NextDue`: uygulanmış aşının sonraki uygulama tarihi (`Applied` + `dueAtUtc`; E-vet aktarmasının "sonraki aşı tarihi" buradan görünür). `Applied`: o gün uygulanan aşı (tarih `appliedAtUtc`). |
-| `state` | `Applied` (yeşil), `DueToday` (sarı), `Upcoming` (koyu), `Overdue` (kırmızı). Gün sınırı ve gecikme tanımı `VaccinationDueRule` (ADR-028, İstanbul günü): bugünün başından önceki vade gecikmiş, bugün içindeki vade saati geçse de "bugün". |
+| `state` | Ortak takvim durumu (§6): `Completed` (uygulandı, yeşil), `DueToday` (sarı), `Upcoming` (gelecek, siyah), `Overdue` (kırmızı). Gün sınırı ve gecikme tanımı `VaccinationDueRule` (ADR-028, İstanbul günü): bugünün başından önceki vade gecikmiş, bugün içindeki vade saati geçse de "bugün". Kural `CalendarItemStateRule`. |
 | `date` | Satırın göründüğü İstanbul günü. |
 | `atUtc` | Vade ya da uygulama anı. Vadeli satırda saat anlamlı değildir; istemci satırı günün üst şeridinde (tüm gün) gösterir. |
 
@@ -87,7 +87,7 @@ Sıralama `atUtc`, hayvan adı, aşı adı.
 
 Kurallar (tek yer `VaccinationCalendarRules`):
 
-- **Kapsam:** yalnız istenen kliniğin aşı kayıtları; iptal edilen kayıt girmez. İçe aktarılan kayıt (hatırlatması serbest bırakılmamış
+- **Kapsam:** yalnız istenen kliniğin aşı kayıtları; `states` (tekrarlı) verilirse yalnız o durumlar (§6); iptal edilen kayıt girmez. İçe aktarılan kayıt (hatırlatması serbest bırakılmamış
   olsa da) görünür; aktarma kuralı değişmedi.
 - **Gecikmiş aşı:** yalnız vadesi görüntülenen aralıktaysa gelir; bugüne taşınmaz, ayrı bir "eski gecikmişler" listesi yoktur.
   Gecikmiş aşı listesi için mevcut `GET /vaccinations?onlyOverdue=true`.
@@ -108,3 +108,50 @@ her vadeli satırda "Randevu ver" → yeni randevu (`?petId&clientId&date&type=V
   (neden adı ve not; okuma modeli yolunda tamamlama).
 - Entegrasyon: `VaccinationsCalendarEndpointTests` (kaynaklar ve durumlar, içe aktarılan sonraki tarih, karşılanmış tarih, iptal ve
   başka klinik dışarıda, gecikmiş, yetki, 45 gün sınırı).
+
+## 6) Takvim filtreleri (2026-11-16)
+
+Kaynak: kullanıcı isteği 2026-11-16 ("takvimde filtreleme yok, rakipte var"). Filtreler sunucuda uygulanır; panel seçimleri adres
+çubuğunda tutar. Migration yok, yeni izin yok. Eski istemci etkilenmez (tüm parametreler isteğe bağlı).
+
+### 6.1 Ortak durum dili (`CalendarItemState`)
+
+Renk açıklaması ve "Durum" filtresi randevu ve aşıda aynıdır. Kural tek yer `CalendarItemStateRule` (İstanbul günü, ADR-028):
+
+| Değer | Randevu | Aşı |
+|---|---|---|
+| `DueToday` | Planlı, bugün | Vadesi bugün (planlı ya da sonraki) |
+| `Upcoming` | Planlı, yarın ya da sonra | Vadesi yarın ya da sonra |
+| `Overdue` | Planlı, günü geçmiş (gelmedi işaretlenmemiş) | Vadesi geçmiş, yapılmamış |
+| `Completed` | Tamamlandı | O gün uygulandı (`kind: Applied`) |
+
+İptal ve gelmedi randevu hiçbir duruma girmez: durum filtresi seçiliyken görünmez, seçili değilken görünür (bugünkü gibi soluk).
+
+### 6.2 `GET /api/v1/appointments/calendar` ek parametreleri
+
+| Parametre | Anlam |
+|---|---|
+| `veterinarianUserId` | Yalnız bu hekimin randevuları. |
+| `withoutVeterinarian=true` | Yalnız hekimsiz randevular. `veterinarianUserId` ile birlikte 400 (`Validation.FluentValidation`). |
+| `appointmentTypes` (tekrarlı) | Yalnız bu türler (`Vaccination`, `Checkup`… ya da sayı). |
+| `states` (tekrarlı) | Yalnız bu durumlar (§6.1). |
+
+Filtreler birlikte (VE) uygulanır. Aralık en çok 45 gün olduğundan filtre sunucuda bellekte uygulanır (`AppointmentCalendarFilter`);
+komut veritabanı ve okuma modeli yolları aynı kuralı kullanır. Mevcut `status` parametresi (hazır listeler) değişmedi.
+
+### 6.3 `GET /api/v1/vaccinations/calendar` ek parametresi
+
+`states` (tekrarlı): yalnız bu durumlar. Aşı kaydında hekim ve tür yoktur; panel hekim filtresi bir hekime ayarlıyken ya da tür
+filtresinde "Planlı aşılar" seçili değilken aşı katmanını istemez (aşı "hekim atanmamış" sayılır).
+
+### 6.4 Şube
+
+Takvim aktif klinik bağlamıyla çalışır; bağlamla çelişen `clinicId` 400 `*.ClinicContextMismatch` (değişmedi). Panelde "Şube" seçimi
+yalnız birden çok kliniğe erişen kullanıcıda görünür ve aktif kliniği değiştirir (`POST /auth/select-clinic`, üst çubuktaki klinik
+değiştiriciyle aynı yol); takvim aynı görünüm ve filtrelerle yeni klinikte açılır. Birden çok kliniği aynı takvimde gösterme yok.
+
+### 6.5 Testler
+
+- Application: `AppointmentCalendarFilterTests` (hekim, hekimsiz, tür, gün bazlı durum, iptal/gelmedi, VE), `GetAppointmentsCalendarQueryHandlerTests`
+  (komut ve okuma modeli yolunda filtre), `GetVaccinationsCalendarQueryHandlerTests` (durum filtresi).
+- Entegrasyon: `AppointmentCalendarFilterEndpointTests` (tekrarlı parametreler HTTP üzerinden, birlikte hekim + hekimsiz 400, aşı `states`).
