@@ -113,6 +113,26 @@ public sealed class ImportBatchesEndpointTests : IClassFixture<CustomWebApplicat
     }
 
     [Fact]
+    public async Task Concurrent_Creates_Should_Not_Exceed_Open_Draft_Limit()
+    {
+        var ctx = await SeedAsync();
+        var client = ClientFor(ctx.Token);
+        var attempts = ImportBatch.MaxOpenDraftsPerTenant + 3;
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, attempts)
+            .Select(i => PostAsync(client, Guid.NewGuid(), $"Eşzamanlı {i}", null)));
+
+        responses.Count(r => r.StatusCode == HttpStatusCode.Created).Should().Be(ImportBatch.MaxOpenDraftsPerTenant);
+        foreach (var rejected in responses.Where(r => r.StatusCode != HttpStatusCode.Created))
+        {
+            rejected.StatusCode.Should().Be(HttpStatusCode.Conflict);
+            (await CodeAsync(rejected)).Should().Be("Imports.TooManyOpenDrafts");
+        }
+
+        (await BatchCountAsync(ctx.TenantId)).Should().Be(ImportBatch.MaxOpenDraftsPerTenant);
+    }
+
+    [Fact]
     public async Task Discard_Should_Mark_Discarded_And_Second_Discard_Should_Conflict()
     {
         var ctx = await SeedAsync();
