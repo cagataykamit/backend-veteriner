@@ -29,6 +29,7 @@ public sealed class ImportBatchConfiguration : IEntityTypeConfiguration<ImportBa
         b.Property(x => x.Status).IsRequired();
         b.Property(x => x.MappingJson);
         b.Property(x => x.OptionsJson);
+        b.Property(x => x.WarningsJson);
         b.Property(x => x.ValidationId);
 
         // Sayaçlar tablo başına sütun grubu: CustomerCounts_Total, PetCounts_Created, ...

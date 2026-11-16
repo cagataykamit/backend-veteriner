@@ -331,8 +331,17 @@ public sealed class ImportEVetEndToEndTests : IClassFixture<CustomWebApplication
         var response = await http.PostAsync("/api/v1/imports/batches", form);
         response.IsSuccessStatusCode.Should().BeTrue(await response.Content.ReadAsStringAsync());
         var batch = await response.Content.ReadFromJsonAsync<JsonElement>();
-        batch.GetProperty("warnings").EnumerateArray().Should().Contain(w => w.GetProperty("code").GetString() == "Imports.EVetConversion");
+        var notes = batch.GetProperty("warnings").EnumerateArray().Select(w => w.GetProperty("code").GetString()).ToList();
+        notes.Should().Contain(c => c!.StartsWith("Imports.EVet."));
         var id = batch.GetProperty("id").GetGuid();
+
+        // Notlar partiye yazılır: sayfa yenilenince ya da parti geçmişten açılınca da ayrıntıyla döner.
+        var detail = await http.GetFromJsonAsync<JsonElement>($"/api/v1/imports/batches/{id}");
+        var stored = detail.GetProperty("warnings").EnumerateArray().ToList();
+        stored.Select(w => w.GetProperty("code").GetString()).Should().Equal(notes);
+        stored.Where(w => w.GetProperty("code").GetString()!.StartsWith("Imports.EVet."))
+            .Should().OnlyContain(w => w.GetProperty("severity").ValueKind == JsonValueKind.String
+                                       && w.GetProperty("count").ValueKind == JsonValueKind.Number);
 
         // Dönüştürülmüş başlıklar kanonik: önerilen eşleme kaydedilir.
         var columns = batch.GetProperty("tables").EnumerateArray().ToDictionary(

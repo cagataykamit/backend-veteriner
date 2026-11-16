@@ -231,6 +231,18 @@ public sealed class ImportBatchTests
         b.AttachFile(Hash, 1, 1, 1).Error.Code.Should().Be("Imports.InvalidState");
     }
 
+    [Fact]
+    public void AttachFile_Should_Store_Read_Notes_With_The_File()
+    {
+        var b = NewBatch();
+
+        b.AttachFile(Hash, new Dictionary<ImportTable, int> { [ImportTable.Pets] = 2 }, "[{\"code\":\"Imports.TableEmpty\"}]")
+            .IsSuccess.Should().BeTrue();
+
+        b.WarningsJson.Should().Be("[{\"code\":\"Imports.TableEmpty\"}]");
+        NewBatch().WarningsJson.Should().BeNull();
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("abc")]

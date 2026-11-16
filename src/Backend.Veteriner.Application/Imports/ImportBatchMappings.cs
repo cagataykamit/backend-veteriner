@@ -6,6 +6,10 @@ namespace Backend.Veteriner.Application.Imports;
 
 internal static class ImportBatchMappings
 {
+    /// <summary>
+    /// Ayrıntı yanıtı (<paramref name="tables"/> verilmiş) partiye yazılmış okuma notlarını da taşır; listede ikisi de null.
+    /// <paramref name="warnings"/> verilirse (yükleme anında bellekte) yeniden okunmaz.
+    /// </summary>
     public static ImportBatchDto ToDto(
         this ImportBatch b,
         IReadOnlyList<ImportTableInfoDto>? tables = null,
@@ -28,7 +32,7 @@ internal static class ImportBatchMappings
                 b.CustomerCounts.ToDto(), b.PetCounts.ToDto(), b.VaccinationCounts.ToDto(), b.ClinicalRecordCounts.ToDto(),
                 b.AccountEntryCounts.ToDto(), b.AppointmentCounts.ToDto(), b.ProductCounts.ToDto()),
             tables,
-            warnings,
+            warnings ?? (tables is null ? null : ImportWarningsDocument.Parse(b.WarningsJson)),
             b.SourceProfile);
 
     public static ImportIssueDto ToDto(this ImportIssue i)
