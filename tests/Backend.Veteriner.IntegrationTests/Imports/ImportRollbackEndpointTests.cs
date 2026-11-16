@@ -460,6 +460,69 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
         (await CountsInTenantAsync(ctx.TenantId)).Should().Be((2, 2, 3));
     }
 
+    [Fact]
+    public async Task Deadlock_On_Backpressure_Read_Should_Not_Fail_Rollback()
+    {
+        // Canlı olay (2026-11-16): ölçüm okuması outbox güncellemesiyle kilitlenme kurbanı oldu, iş RollbackFailed'a düştü.
+        var ctx = await SeedAsync();
+        var client = ClientFor(ctx.Token);
+        var (id, validationId) = await UploadValidatedScenarioAsync(client, ctx);
+        await CommitAndRunAsync(client, id, validationId);
+        (await PostRollbackAsync(client, id, Guid.NewGuid(), "Kilitlenme denemesi")).StatusCode.Should().Be(HttpStatusCode.Accepted);
+
+        var probe = new DeadlockOnceProbe();
+        var processor = new ImportRollbackProcessor(
+            new ProbeOverridingScopes(_factory.Services.GetRequiredService<IServiceScopeFactory>(), probe),
+            Options.Create(new ImportCommitOptions { Backpressure = new ImportBackpressureOptions { Enabled = true, WaitSeconds = 0 } }),
+            TimeProvider.System,
+            NullLogger<ImportRollbackProcessor>.Instance,
+            $"w-dl-{Guid.NewGuid():N}"[..20]);
+        for (var i = 0; i < 20 && await processor.ProcessNextAsync(CancellationToken.None); i++)
+        {
+        }
+
+        probe.Calls.Should().BeGreaterThanOrEqualTo(2, "ilk okuma kilitlenme kurbanı oldu, kısa beklemeyle yeniden okundu");
+        (await StatusAsync(id)).Should().Be(ImportBatchStatus.RolledBack);
+        (await CountsInTenantAsync(ctx.TenantId)).Should().Be((0, 0, 0));
+    }
+
+    /// <summary>İlk okumada SQL Server kilitlenme kurbanı (1205) hatası atar, sonra baskı yok döner.</summary>
+    private sealed class DeadlockOnceProbe : IImportBackpressureProbe
+    {
+        private int _calls;
+
+        public int Calls => _calls;
+
+        public Task<ImportOutboxPressure> ReadAsync(CancellationToken ct)
+            => Interlocked.Increment(ref _calls) == 1
+                ? Task.FromException<ImportOutboxPressure>(SqlExceptionFactory.Create(1205))
+                : Task.FromResult(new ImportOutboxPressure(0, 1000, []));
+    }
+
+    /// <summary>Gerçek DI kapsamları; yalnız basınç ölçümü sahteyle değiştirilir.</summary>
+    private sealed class ProbeOverridingScopes(IServiceScopeFactory inner, IImportBackpressureProbe probe) : IServiceScopeFactory
+    {
+        public IServiceScope CreateScope() => new Scope(inner.CreateScope(), probe);
+
+        private sealed class Scope(IServiceScope inner, IImportBackpressureProbe probe) : IServiceScope, IServiceProvider, IAsyncDisposable
+        {
+            public IServiceProvider ServiceProvider => this;
+
+            public object? GetService(Type serviceType)
+                => serviceType == typeof(IImportBackpressureProbe) ? probe : inner.ServiceProvider.GetService(serviceType);
+
+            public void Dispose() => inner.Dispose();
+
+            public ValueTask DisposeAsync()
+            {
+                if (inner is IAsyncDisposable asyncDisposable)
+                    return asyncDisposable.DisposeAsync();
+                inner.Dispose();
+                return ValueTask.CompletedTask;
+            }
+        }
+    }
+
     // ================================================================ Bakım işi (K9)
 
     [Fact]
