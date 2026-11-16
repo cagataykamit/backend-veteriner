@@ -164,6 +164,31 @@ public sealed partial class OwnerPortalIntegrationTests
     // ---------- testler ----------
 
     [Fact]
+    public async Task Concurrent_Portal_Requests_Should_Not_Exceed_Pending_Limit()
+    {
+        var b = await SetupBookingAsync();
+        var slots = await PublicSlotsAsync(b);
+        var portal = await InviteAndAcceptAsync(b.Staff);
+        var attempts = AppointmentRequest.MaxPendingPerEmailAndClinic + 3;
+        slots.Count.Should().BeGreaterThanOrEqualTo(attempts);
+
+        var responses = await Task.WhenAll(slots.Take(attempts).Select(slot =>
+            SendAsync(HttpMethod.Post, $"/api/portal/v1/links/{portal.LinkId}/appointment-requests", portal.AccessToken, new
+            {
+                petName = "Minnoş",
+                reasonId = b.ReasonId,
+                requestedStartUtc = slot,
+            })));
+
+        responses.Count(r => r.StatusCode == HttpStatusCode.Created).Should().Be(AppointmentRequest.MaxPendingPerEmailAndClinic);
+        foreach (var rejected in responses.Where(r => r.StatusCode != HttpStatusCode.Created))
+        {
+            rejected.StatusCode.Should().Be(HttpStatusCode.Conflict);
+            (await IntegrationTestProblemDetails.ReadCodeAsync(rejected)).Should().Be("AppointmentRequests.PendingLimitReached");
+        }
+    }
+
+    [Fact]
     public async Task Link_Should_Require_Email_Code_Show_Only_Online_Reasons_And_Respect_Slot_And_Pending_Limits()
     {
         var b = await SetupBookingAsync();

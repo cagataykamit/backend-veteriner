@@ -36,7 +36,7 @@ public sealed record CreatePortalAppointmentRequestCommand(
     DateTime RequestedStartUtc,
     string? Phone,
     string? Note)
-    : IRequest<Result<AppointmentRequestCreatedDto>>, IAuditableRequest
+    : IRequest<Result<AppointmentRequestCreatedDto>>, IAuditableRequest, ITransactionalRequest
 {
     public string AuditAction => "AppointmentRequest.Create.Portal";
     public string? AuditTarget => $"OwnerAccountId={OwnerAccountId};LinkId={LinkId}";
