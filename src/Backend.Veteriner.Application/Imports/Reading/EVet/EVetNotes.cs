@@ -27,7 +27,7 @@ internal static class EVetNotes
 
     private const string PetReport = "Hasta Listesi raporu";
     private const string VaccineReportSource = "Aşı Bilgisi raporu";
-    private const string BackupPets = "Yedek · Hastalar";
+    private const string Backup = "E-vet yedeği";
     private const string TaskList = "Randevu Listesi";
 
     private static readonly CultureInfo Tr = CultureInfo.GetCultureInfo("tr-TR");
@@ -52,7 +52,7 @@ internal static class EVetNotes
             Count = pets,
             Unit = "hasta",
             Title = "sahibine yalnız adla bağlanacak",
-            Source = BackupPets,
+            Source = Backup,
             Outcome = "Hasta Listesi raporu yüklenmedi. Aynı adlı müşterilerin hastaları hata alır; raporla yeniden yüklerseniz protokolle bağlanır.",
         };
 
@@ -64,7 +64,7 @@ internal static class EVetNotes
             Count = pets,
             Unit = "hasta",
             Title = "mikroçip numarası nota taşınacak",
-            Source = BackupPets,
+            Source = Backup,
             Outcome = "Numara rakam dışı karakter içeriyor ya da başka hastada da kayıtlı. Mikroçip alanı boş kalır, numara hastanın notuna yazılır.",
         };
 
@@ -78,7 +78,7 @@ internal static class EVetNotes
             Count = byProtocol + byChip + byCopy,
             Unit = "ek kayıt",
             Title = "aynı hayvanın kaydıyla birleşecek",
-            Source = BackupPets,
+            Source = Backup,
             Parts =
             [
                 new("Eski sahipteki kaydı, aynı protokolle", byProtocol),
@@ -99,7 +99,7 @@ internal static class EVetNotes
             Count = renamed > 0 ? renamed : merged,
             Unit = renamed > 0 ? "hasta" : "tekrar kayıt",
             Title = renamed > 0 ? "adına E-vet protokolü eklenecek" : "ilk kayıtla birleşecek",
-            Source = BackupPets,
+            Source = Backup,
             Parts =
             [
                 new("Bilgileri farklı: ayrı aktarılacak", renamed, ImportNoteSeverity.Attention),
@@ -119,7 +119,7 @@ internal static class EVetNotes
             Count = customers + pets,
             Unit = "protokol numarası",
             Title = "birden çok kayıtta geçiyor",
-            Source = "Yedek · Müşteriler, Hastalar",
+            Source = Backup,
             Parts = [new("Müşteri", customers), new("Hasta", pets)],
             Example = "1234#56",
             Outcome = "Bu kayıtların numarasına satır numarası eklendi. Tek aktif kaydın sahibi Hasta Listesi raporundan, diğerlerinin sahibi adla bağlanacak.",
@@ -138,7 +138,7 @@ internal static class EVetNotes
             Count = decision ? unresolved : resolved,
             Unit = "satır",
             Title = decision ? "hangi hastaya ait, sizden sorulacak" : "doğru hastaya kendiliğinden bağlandı",
-            Source = "Randevu Listesi, muayeneler",
+            Source = "Randevu ve Muayene Listesi",
             Parts = decision
                 ? [new("Hastası size sorulacak", unresolved, ImportNoteSeverity.Decision), new("Doğru hastaya kendiliğinden bağlandı", resolved)]
                 : null,

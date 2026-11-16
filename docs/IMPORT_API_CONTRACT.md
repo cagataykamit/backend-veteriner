@@ -452,7 +452,7 @@ Hata olmayan okuma ve dönüştürme bulguları. Yüklemede partiye yazılır (`
   "code": "Imports.EVet.SameOwnerSameName", "table": "pets",
   "message": "Aynı sahipte aynı adlı birden çok hasta: 184 muayene / görev satırı … ; 26 satırın hangi hastaya ait olduğu aktarma ekranında sorulacak.",
   "severity": "decision", "count": 26, "unit": "satır", "title": "hangi hastaya ait, sizden sorulacak",
-  "source": "Randevu Listesi, muayeneler",
+  "source": "Randevu ve Muayene Listesi",
   "parts": [ { "label": "Hastası size sorulacak", "count": 26, "severity": "decision" },
              { "label": "Doğru hastaya kendiliğinden bağlandı", "count": 184 } ],
   "outcome": "Aynı sahipte aynı adlı birden çok hasta var. …",
