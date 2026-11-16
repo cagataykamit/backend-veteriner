@@ -311,7 +311,15 @@ public sealed class PetProjectionProcessor : IPetProjectionProcessor
         return processedCount;
     }
 
-    private async Task<PetProjectionApplyResult> ApplyTransactionallyAsync(
+    /// <summary>
+    /// Olayı tek işlemde uygular. Geçici hatada (kilitlenme vb.) işlem geri alınmış ve değişiklik izleyicisi temizlenmiştir;
+    /// işlenmiş olay kaydı tekrarı engellediğinden kısa beklemeyle yeniden denenir, deneme sayacı boşuna artmaz.
+    /// </summary>
+    private Task<PetProjectionApplyResult> ApplyTransactionallyAsync(PetProjectionEvent integrationEvent, Guid eventId, DateTime occurredAtUtc, CancellationToken cancellationToken)
+        => TransientSqlRetry.ExecuteAsync(
+            c => ApplyTransactionallyOnceAsync(integrationEvent, eventId, occurredAtUtc, c), _logger, "pet-projection-apply", cancellationToken);
+
+    private async Task<PetProjectionApplyResult> ApplyTransactionallyOnceAsync(
         PetProjectionEvent integrationEvent,
         Guid eventId,
         DateTime occurredAtUtc,

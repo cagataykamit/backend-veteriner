@@ -580,7 +580,7 @@ public sealed partial class ReminderProcessorService
         }
 
         if (hasChanges)
-            await _db.SaveChangesAsync(ct);
+            await SaveAsync(ct);
     }
 
     private async Task ReconcileLegacyEnqueuedLogsWithoutOutboxIdAsync(
@@ -605,7 +605,7 @@ public sealed partial class ReminderProcessorService
         foreach (var log in legacyLogs)
             log.MarkFailed(nowUtc, message, nowUtc);
 
-        await _db.SaveChangesAsync(ct);
+        await SaveAsync(ct);
     }
 
     private async Task<bool> TryInsertLogAsync(
@@ -617,7 +617,7 @@ public sealed partial class ReminderProcessorService
         try
         {
             await _db.ReminderDispatchLogs.AddAsync(log, ct);
-            await _db.SaveChangesAsync(ct);
+            await SaveAsync(ct);
             return true;
         }
         catch (DbUpdateException ex) when (IsDedupeConflict(ex))
@@ -648,6 +648,13 @@ public sealed partial class ReminderProcessorService
             return outboxMessage.Error!.Length > 1000 ? outboxMessage.Error[..1000] : outboxMessage.Error;
         return "Outbox message moved to dead-letter.";
     }
+
+    /// <summary>
+    /// Geçici hatada (kilitlenme vb.) aynı bağlamda yeniden kaydeder: başarısız <c>SaveChanges</c> izleyicideki kayıtları korur,
+    /// outbox tamponu ilk denemede boşaltıldığından ileti iki kez eklenmez. Tekrar engeli (benzersiz anahtar) geçici sayılmaz.
+    /// </summary>
+    private Task<int> SaveAsync(CancellationToken ct)
+        => TransientSqlRetry.ExecuteAsync(_db.SaveChangesAsync, _logger, "reminder-save", ct);
 
     private static bool IsDedupeConflict(DbUpdateException ex)
         => ex.InnerException?.Message.Contains("IX_ReminderDispatchLogs_TenantId_DedupeKey", StringComparison.OrdinalIgnoreCase) == true

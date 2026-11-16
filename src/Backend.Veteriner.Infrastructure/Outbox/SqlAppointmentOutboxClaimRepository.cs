@@ -74,7 +74,7 @@ public sealed class SqlAppointmentOutboxClaimRepository : IAppointmentOutboxClai
         command.Parameters.Add(new SqlParameter("@claimToken", SqlDbType.UniqueIdentifier) { Value = claimToken });
         command.Parameters.Add(new SqlParameter("@workerId", SqlDbType.NVarChar, 128) { Value = workerId });
 
-        var affected = await command.ExecuteNonQueryAsync(cancellationToken);
+        var affected = await ExecuteMarkAsync(command, cancellationToken);
         return affected > 0;
     }
 
@@ -114,7 +114,7 @@ public sealed class SqlAppointmentOutboxClaimRepository : IAppointmentOutboxClai
         command.Parameters.Add(new SqlParameter("@claimToken", SqlDbType.UniqueIdentifier) { Value = claimToken });
         command.Parameters.Add(new SqlParameter("@workerId", SqlDbType.NVarChar, 128) { Value = workerId });
 
-        var affected = await command.ExecuteNonQueryAsync(cancellationToken);
+        var affected = await ExecuteMarkAsync(command, cancellationToken);
         return affected > 0;
     }
 
@@ -150,7 +150,7 @@ public sealed class SqlAppointmentOutboxClaimRepository : IAppointmentOutboxClai
         command.Parameters.Add(new SqlParameter("@claimToken", SqlDbType.UniqueIdentifier) { Value = claimToken });
         command.Parameters.Add(new SqlParameter("@workerId", SqlDbType.NVarChar, 128) { Value = workerId });
 
-        var affected = await command.ExecuteNonQueryAsync(cancellationToken);
+        var affected = await ExecuteMarkAsync(command, cancellationToken);
         return affected > 0;
     }
 
@@ -228,6 +228,15 @@ public sealed class SqlAppointmentOutboxClaimRepository : IAppointmentOutboxClai
             });
         }
     }
+
+    /// <summary>
+    /// Sonuç yazımı claim token koşullu tek UPDATE'tir, tekrarı zararsızdır. Dış işlem yoksa geçici hata (kilitlenme vb.)
+    /// kısa beklemeyle yeniden denenir: işlenmiş mesaj kira dolup yeniden alınmaz.
+    /// </summary>
+    private static Task<int> ExecuteMarkAsync(DbCommand command, CancellationToken cancellationToken)
+        => command.Transaction is null
+            ? TransientSqlRetry.ExecuteAsync(command.ExecuteNonQueryAsync, null, "outbox-claim-mark", cancellationToken)
+            : command.ExecuteNonQueryAsync(cancellationToken);
 
     private async Task<DbCommand> CreateCommandAsync(string sql, CancellationToken cancellationToken)
     {

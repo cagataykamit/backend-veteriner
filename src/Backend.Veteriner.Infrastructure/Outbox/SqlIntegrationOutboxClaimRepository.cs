@@ -109,7 +109,7 @@ public abstract class SqlIntegrationOutboxClaimRepository
         command.Parameters.Add(new SqlParameter("@nowUtc", SqlDbType.DateTime2) { Value = _timeProvider.GetUtcNow().UtcDateTime });
         AddClaimIdentity(command, messageId, claimToken, workerId);
 
-        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+        return await ExecuteMarkAsync(command, cancellationToken) > 0;
     }
 
     public async Task<bool> MarkRetryAsync(
@@ -146,7 +146,7 @@ public abstract class SqlIntegrationOutboxClaimRepository
         command.Parameters.Add(new SqlParameter("@error", SqlDbType.NVarChar, -1) { Value = error });
         AddClaimIdentity(command, messageId, claimToken, workerId);
 
-        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+        return await ExecuteMarkAsync(command, cancellationToken) > 0;
     }
 
     public async Task<bool> MarkDeadLetterAsync(
@@ -178,7 +178,7 @@ public abstract class SqlIntegrationOutboxClaimRepository
         command.Parameters.Add(new SqlParameter("@error", SqlDbType.NVarChar, -1) { Value = error });
         AddClaimIdentity(command, messageId, claimToken, workerId);
 
-        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+        return await ExecuteMarkAsync(command, cancellationToken) > 0;
     }
 
     private static void AddClaimIdentity(DbCommand command, Guid messageId, Guid claimToken, string workerId)
@@ -229,6 +229,15 @@ public abstract class SqlIntegrationOutboxClaimRepository
             INNER JOIN candidates c ON c.Id = o.Id
             """;
     }
+
+    /// <summary>
+    /// Sonuç yazımı claim token koşullu tek UPDATE'tir, tekrarı zararsızdır. Dış işlem yoksa geçici hata (kilitlenme vb.)
+    /// kısa beklemeyle yeniden denenir: işlenmiş mesaj kira dolup yeniden alınmaz (e-posta iki kez gitmez).
+    /// </summary>
+    private static Task<int> ExecuteMarkAsync(DbCommand command, CancellationToken cancellationToken)
+        => command.Transaction is null
+            ? TransientSqlRetry.ExecuteAsync(command.ExecuteNonQueryAsync, null, "outbox-claim-mark", cancellationToken)
+            : command.ExecuteNonQueryAsync(cancellationToken);
 
     private async Task<DbCommand> CreateCommandAsync(string sql, CancellationToken cancellationToken)
     {

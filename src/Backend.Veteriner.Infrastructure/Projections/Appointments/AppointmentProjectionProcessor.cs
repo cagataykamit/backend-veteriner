@@ -393,7 +393,15 @@ public sealed class AppointmentProjectionProcessor : IAppointmentProjectionProce
             .ThenBy(m => m.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-    private async Task<AppointmentProjectionApplyResult> ApplyTransactionallyAsync(
+    /// <summary>
+    /// Olayı tek işlemde uygular. Geçici hatada (kilitlenme vb.) işlem geri alınmış ve değişiklik izleyicisi temizlenmiştir;
+    /// işlenmiş olay kaydı tekrarı engellediğinden kısa beklemeyle yeniden denenir, deneme sayacı boşuna artmaz.
+    /// </summary>
+    private Task<AppointmentProjectionApplyResult> ApplyTransactionallyAsync(object integrationEvent, Guid eventId, DateTime messageCreatedAtUtc, CancellationToken cancellationToken)
+        => TransientSqlRetry.ExecuteAsync(
+            c => ApplyTransactionallyOnceAsync(integrationEvent, eventId, messageCreatedAtUtc, c), _logger, "appointment-projection-apply", cancellationToken);
+
+    private async Task<AppointmentProjectionApplyResult> ApplyTransactionallyOnceAsync(
         object integrationEvent,
         Guid eventId,
         DateTime messageCreatedAtUtc,
