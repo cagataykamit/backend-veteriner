@@ -498,6 +498,7 @@ public static class DependencyInjection
 
         /// ===== Unit of Work =====
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
+        services.AddScoped<ITransactionLock, SqlTransactionLock>();
 
 
         return services;
