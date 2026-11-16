@@ -11,6 +11,9 @@ public sealed class ImportBatchTests
     private static readonly Guid UserId = Guid.NewGuid();
     private static readonly Guid ValidationId = Guid.NewGuid();
     private static readonly DateTime Now = new(2026, 10, 14, 9, 0, 0, DateTimeKind.Utc);
+
+    /// <summary>Geçiş tablosu anı: taslak süresinden (7 gün) sonra, geri alma süresinden (30 gün) önce.</summary>
+    private static readonly DateTime Later = Now.AddDays(29);
     private static readonly string Hash = new('a', ImportBatch.ContentHashLength);
     private static readonly ImportTableCounts Counts = new() { Total = 3, Valid = 2, Error = 1, WillCreate = 2 };
     private const string RollbackOptions = "{\"onDuplicateClient\":\"Match\",\"rollback\":{\"requestId\":\"7d0b7c3e-0000-4000-8000-000000000001\",\"policy\":\"Fail\"}}";
@@ -93,7 +96,7 @@ public sealed class ImportBatchTests
 
     private static Result Apply(ImportBatch b, string operation)
     {
-        var later = Now.AddDays(30);
+        var later = Later;
         return operation switch
         {
             "ApplyMapping" => b.ApplyMapping("{\"columns\":{}}", null, later),
@@ -129,7 +132,7 @@ public sealed class ImportBatchTests
             {
                 result.IsSuccess.Should().BeTrue($"{operation}: {from} → {target} izinli olmalı ({result.Error.Message})");
                 batch.Status.Should().Be(target);
-                batch.UpdatedAtUtc.Should().Be(Now.AddDays(30));
+                batch.UpdatedAtUtc.Should().Be(Later);
             }
             else
             {
@@ -352,14 +355,14 @@ public sealed class ImportBatchTests
     public void StartRollback_Should_Store_Options_And_Reject_Empty_Options()
     {
         var b = BatchIn(ImportBatchStatus.Committed);
-        b.CanStartRollback.Should().BeTrue();
+        b.CanStartRollback(Now).Should().BeTrue();
 
         b.StartRollback(" ", Now).Error.Code.Should().Be("Imports.Validation");
         b.Status.Should().Be(ImportBatchStatus.Committed);
 
         b.StartRollback(RollbackOptions, Now.AddHours(1)).IsSuccess.Should().BeTrue();
         b.OptionsJson.Should().Be(RollbackOptions);
-        b.CanStartRollback.Should().BeFalse();
+        b.CanStartRollback(Now).Should().BeFalse();
         b.LeaseOwner.Should().BeNull();
     }
 
@@ -372,7 +375,7 @@ public sealed class ImportBatchTests
     [InlineData(ImportBatchStatus.RolledBack, false)]
     [InlineData(ImportBatchStatus.Validated, false)]
     public void CanStartRollback_Should_Match_Transition_Table(ImportBatchStatus status, bool expected)
-        => BatchIn(status).CanStartRollback.Should().Be(expected);
+        => BatchIn(status).CanStartRollback(Now).Should().Be(expected);
 
     [Fact]
     public void Rollback_Lease_Should_Be_Claimed_Renewed_Taken_Over_And_Released()
@@ -407,8 +410,76 @@ public sealed class ImportBatchTests
         b.FailRollback(Now).IsSuccess.Should().BeTrue();
 
         b.LeaseOwner.Should().BeNull();
-        b.CanStartRollback.Should().BeTrue();
+        b.CanStartRollback(Now).Should().BeTrue();
         b.StartRollback(RollbackOptions, Now).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Rollback_Window_Should_Close_At_Deadline_Counted_From_Commit()
+    {
+        var b = BatchIn(ImportBatchStatus.Committed);
+        var deadline = Now + ImportBatch.RollbackWindow;
+
+        b.RollbackDeadlineUtc.Should().Be(deadline);
+        b.CanStartRollback(deadline.AddTicks(-1)).Should().BeTrue();
+        b.CanStartRollback(deadline).Should().BeFalse();
+
+        var result = b.StartRollback(RollbackOptions, deadline);
+
+        result.Error.Code.Should().Be("Imports.RollbackWindowClosed");
+        b.Status.Should().Be(ImportBatchStatus.Committed);
+        b.OptionsJson.Should().NotBe(RollbackOptions);
+    }
+
+    [Theory]
+    [InlineData(ImportBatchStatus.Committed)]
+    [InlineData(ImportBatchStatus.CommitFailed)]
+    [InlineData(ImportBatchStatus.PartiallyRolledBack)]
+    [InlineData(ImportBatchStatus.RollbackFailed)]
+    public void Rollback_Window_Should_Apply_To_Every_Rollbackable_Status(ImportBatchStatus status)
+    {
+        var b = BatchIn(status);
+        var after = Now + ImportBatch.RollbackWindow;
+
+        b.RollbackDeadlineUtc.Should().Be(after);
+        b.CheckRollbackAllowed(after).Error.Code.Should().Be("Imports.RollbackWindowClosed");
+        b.StartRollback(RollbackOptions, after).Error.Code.Should().Be("Imports.RollbackWindowClosed");
+        b.Status.Should().Be(status);
+    }
+
+    [Fact]
+    public void Rollback_Deadline_Of_Failed_Commit_Should_Count_From_Validation()
+    {
+        var b = BatchIn(ImportBatchStatus.Validated);
+        b.StartCommit(ValidationId, Now.AddDays(2)).IsSuccess.Should().BeTrue();
+        b.FailCommit(Now.AddDays(2)).IsSuccess.Should().BeTrue();
+
+        b.CommittedAtUtc.Should().BeNull();
+        b.RollbackDeadlineUtc.Should().Be(Now + ImportBatch.RollbackWindow, "uygulama anı yazılmadığından doğrulama anından sayılır");
+    }
+
+    [Theory]
+    [InlineData(ImportBatchStatus.Validated)]
+    [InlineData(ImportBatchStatus.RollingBack)]
+    [InlineData(ImportBatchStatus.RolledBack)]
+    [InlineData(ImportBatchStatus.Discarded)]
+    public void Rollback_Deadline_Should_Be_Null_When_Not_Rollbackable(ImportBatchStatus status)
+    {
+        var b = BatchIn(status);
+
+        b.RollbackDeadlineUtc.Should().BeNull();
+        b.CheckRollbackAllowed(Now).Error.Code.Should().Be("Imports.InvalidState");
+    }
+
+    [Fact]
+    public void Started_Rollback_Should_Finish_After_Deadline()
+    {
+        var b = BatchIn(ImportBatchStatus.RollingBack);
+        var after = Now + ImportBatch.RollbackWindow + TimeSpan.FromDays(1);
+
+        b.ClaimRollbackLease("w1", after).IsSuccess.Should().BeTrue("süre yalnız yeni geri almayı sınırlar; başlamış iş devralınır");
+        b.CompleteRollback(partial: true, after).IsSuccess.Should().BeTrue();
+        b.CanStartRollback(after).Should().BeFalse("yarım kalan geri alma süre dolunca yeniden başlatılamaz");
     }
 
     [Fact]

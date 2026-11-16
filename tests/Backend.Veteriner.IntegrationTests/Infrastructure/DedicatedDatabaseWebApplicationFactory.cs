@@ -99,6 +99,7 @@ public abstract class DedicatedDatabaseWebApplicationFactory : WebApplicationFac
             // bağlantıları açılmadan önce güvenli reset ile eski veritabanı düşürülür, şema temiz kurulur.
             IntegrationTestDatabaseReset.EnsureDroppedAsync(CommandConnection).GetAwaiter().GetResult();
             commandDb.Database.EnsureCreated();
+            IntegrationTestDatabaseReset.EnableReadCommittedSnapshot(commandDb);
             TestDataSeeder.Seed(commandDb, hasher);
             if (SeedAuthorization)
             {

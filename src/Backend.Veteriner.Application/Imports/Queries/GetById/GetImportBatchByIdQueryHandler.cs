@@ -16,19 +16,22 @@ public sealed class GetImportBatchByIdQueryHandler : IRequestHandler<GetImportBa
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<ImportBatch> _batches;
     private readonly ImportTableInfoLoader _tableInfo;
+    private readonly TimeProvider _timeProvider;
 
     public GetImportBatchByIdQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<ImportBatch> batches,
-        ImportTableInfoLoader tableInfo)
+        ImportTableInfoLoader tableInfo,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
         _batches = batches;
         _tableInfo = tableInfo;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<ImportBatchDto>> Handle(GetImportBatchByIdQuery request, CancellationToken ct)
@@ -44,6 +47,6 @@ public sealed class GetImportBatchByIdQueryHandler : IRequestHandler<GetImportBa
         if (batch is null || !await ImportBatchVisibility.IsVisibleAsync(batch, _clinicContext, _clinicScopeResolver, ct))
             return Result<ImportBatchDto>.Failure(ImportBatchVisibility.NotFound());
 
-        return Result<ImportBatchDto>.Success(batch.ToDto(await _tableInfo.LoadAsync(batch, ct)));
+        return Result<ImportBatchDto>.Success(batch.ToDto(_timeProvider.GetUtcNow().UtcDateTime, await _tableInfo.LoadAsync(batch, ct)));
     }
 }

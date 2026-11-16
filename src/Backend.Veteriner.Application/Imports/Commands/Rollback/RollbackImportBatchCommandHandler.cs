@@ -72,8 +72,10 @@ public sealed class RollbackImportBatchCommandHandler
         if (await ReplayAsync(batch, request, ct) is { } replay)
             return replay;
 
-        if (!batch.CanStartRollback)
-            return Fail("Imports.InvalidState", $"Parti '{batch.Status}' durumundayken geri alınamaz.");
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var allowed = batch.CheckRollbackAllowed(now);
+        if (!allowed.IsSuccess)
+            return Result<ImportRollbackResultDto>.Failure(allowed.Error);
 
         var permission = ImportWritePermissions.Check(batch, _permissions);
         if (!permission.IsSuccess)
@@ -95,7 +97,7 @@ public sealed class RollbackImportBatchCommandHandler
         {
             Rollback = new ImportRollbackRequest(request.RequestId, policy),
         };
-        var started = batch.StartRollback(options.ToJson(), _timeProvider.GetUtcNow().UtcDateTime);
+        var started = batch.StartRollback(options.ToJson(), now);
         if (!started.IsSuccess)
             return Result<ImportRollbackResultDto>.Failure(started.Error);
 
@@ -117,7 +119,7 @@ public sealed class RollbackImportBatchCommandHandler
         }
 
         return Result<ImportRollbackResultDto>.Success(
-            new ImportRollbackResultDto(Started: true, batch.ToDto(await _tableInfo.LoadAsync(batch, ct))));
+            new ImportRollbackResultDto(Started: true, batch.ToDto(_timeProvider.GetUtcNow().UtcDateTime, await _tableInfo.LoadAsync(batch, ct))));
     }
 
     /// <summary>
@@ -139,7 +141,7 @@ public sealed class RollbackImportBatchCommandHandler
             return Fail("Imports.RequestIdConflict", "Aynı requestId farklı blockedPolicy ile kullanılmış.");
 
         return Result<ImportRollbackResultDto>.Success(
-            new ImportRollbackResultDto(Started: false, batch.ToDto(await _tableInfo.LoadAsync(batch, ct))));
+            new ImportRollbackResultDto(Started: false, batch.ToDto(_timeProvider.GetUtcNow().UtcDateTime, await _tableInfo.LoadAsync(batch, ct))));
     }
 
     private static Error BlockedError(ImportRollbackPlan plan, string policy)

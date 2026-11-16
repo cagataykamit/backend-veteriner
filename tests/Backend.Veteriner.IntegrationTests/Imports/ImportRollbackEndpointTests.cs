@@ -424,6 +424,105 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
         (await CountsInTenantAsync(ctx.TenantId)).Should().Be((2, 2, 3));
     }
 
+    [Fact]
+    public async Task Rollback_Should_Be_Refused_After_Window_And_Batch_Should_Be_Final()
+    {
+        var ctx = await SeedAsync();
+        var client = ClientFor(ctx.Token);
+        var (id, validationId) = await UploadValidatedScenarioAsync(client, ctx);
+        await CommitAndRunAsync(client, id, validationId);
+
+        var open = await GetJsonAsync(client, $"/api/v1/imports/batches/{id}");
+        open.GetProperty("canRollback").GetBoolean().Should().BeTrue();
+        var committedAt = open.GetProperty("committedAtUtc").GetDateTime();
+        open.GetProperty("rollbackDeadlineUtc").GetDateTime().Should().Be(committedAt + ImportBatch.RollbackWindow);
+
+        // Uygulama anı süre kadar geriye: aktarma kesinleşmiş sayılır.
+        var backdated = committedAt - ImportBatch.RollbackWindow - TimeSpan.FromMinutes(1);
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.ImportBatches.Where(b => b.Id == id)
+                .ExecuteUpdateAsync(s => s.SetProperty(b => b.CommittedAtUtc, backdated));
+        }
+
+        var final = await GetJsonAsync(client, $"/api/v1/imports/batches/{id}");
+        final.GetProperty("canRollback").GetBoolean().Should().BeFalse();
+        final.GetProperty("rollbackDeadlineUtc").GetDateTime().Should().Be(backdated + ImportBatch.RollbackWindow);
+        var preview = await GetJsonAsync(client, $"/api/v1/imports/batches/{id}/rollback-preview");
+        preview.GetProperty("canRollback").GetBoolean().Should().BeFalse();
+        preview.GetProperty("canDeleteUnblockedOnly").GetBoolean().Should().BeFalse();
+
+        var refused = await PostRollbackAsync(client, id, Guid.NewGuid(), "Süre dolduktan sonra");
+        refused.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await CodeAsync(refused)).Should().Be("Imports.RollbackWindowClosed");
+        (await StatusAsync(id)).Should().Be(ImportBatchStatus.Committed);
+        (await CountsInTenantAsync(ctx.TenantId)).Should().Be((2, 2, 3));
+    }
+
+    [Fact]
+    public async Task Deadlock_On_Backpressure_Read_Should_Not_Fail_Rollback()
+    {
+        // Canlı olay (2026-11-16): ölçüm okuması outbox güncellemesiyle kilitlenme kurbanı oldu, iş RollbackFailed'a düştü.
+        var ctx = await SeedAsync();
+        var client = ClientFor(ctx.Token);
+        var (id, validationId) = await UploadValidatedScenarioAsync(client, ctx);
+        await CommitAndRunAsync(client, id, validationId);
+        (await PostRollbackAsync(client, id, Guid.NewGuid(), "Kilitlenme denemesi")).StatusCode.Should().Be(HttpStatusCode.Accepted);
+
+        var probe = new DeadlockOnceProbe();
+        var processor = new ImportRollbackProcessor(
+            new ProbeOverridingScopes(_factory.Services.GetRequiredService<IServiceScopeFactory>(), probe),
+            Options.Create(new ImportCommitOptions { Backpressure = new ImportBackpressureOptions { Enabled = true, WaitSeconds = 0 } }),
+            TimeProvider.System,
+            NullLogger<ImportRollbackProcessor>.Instance,
+            $"w-dl-{Guid.NewGuid():N}"[..20]);
+        for (var i = 0; i < 20 && await processor.ProcessNextAsync(CancellationToken.None); i++)
+        {
+        }
+
+        probe.Calls.Should().BeGreaterThanOrEqualTo(2, "ilk okuma kilitlenme kurbanı oldu, kısa beklemeyle yeniden okundu");
+        (await StatusAsync(id)).Should().Be(ImportBatchStatus.RolledBack);
+        (await CountsInTenantAsync(ctx.TenantId)).Should().Be((0, 0, 0));
+    }
+
+    /// <summary>İlk okumada SQL Server kilitlenme kurbanı (1205) hatası atar, sonra baskı yok döner.</summary>
+    private sealed class DeadlockOnceProbe : IImportBackpressureProbe
+    {
+        private int _calls;
+
+        public int Calls => _calls;
+
+        public Task<ImportOutboxPressure> ReadAsync(CancellationToken ct)
+            => Interlocked.Increment(ref _calls) == 1
+                ? Task.FromException<ImportOutboxPressure>(SqlExceptionFactory.Create(1205))
+                : Task.FromResult(new ImportOutboxPressure(0, 1000, []));
+    }
+
+    /// <summary>Gerçek DI kapsamları; yalnız basınç ölçümü sahteyle değiştirilir.</summary>
+    private sealed class ProbeOverridingScopes(IServiceScopeFactory inner, IImportBackpressureProbe probe) : IServiceScopeFactory
+    {
+        public IServiceScope CreateScope() => new Scope(inner.CreateScope(), probe);
+
+        private sealed class Scope(IServiceScope inner, IImportBackpressureProbe probe) : IServiceScope, IServiceProvider, IAsyncDisposable
+        {
+            public IServiceProvider ServiceProvider => this;
+
+            public object? GetService(Type serviceType)
+                => serviceType == typeof(IImportBackpressureProbe) ? probe : inner.ServiceProvider.GetService(serviceType);
+
+            public void Dispose() => inner.Dispose();
+
+            public ValueTask DisposeAsync()
+            {
+                if (inner is IAsyncDisposable asyncDisposable)
+                    return asyncDisposable.DisposeAsync();
+                inner.Dispose();
+                return ValueTask.CompletedTask;
+            }
+        }
+    }
+
     // ================================================================ Bakım işi (K9)
 
     [Fact]

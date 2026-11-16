@@ -34,19 +34,22 @@ public sealed class GetImportRollbackPreviewQueryHandler
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<ImportBatch> _batches;
     private readonly ImportRollbackPlanLoader _plans;
+    private readonly TimeProvider _timeProvider;
 
     public GetImportRollbackPreviewQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<ImportBatch> batches,
-        ImportRollbackPlanLoader plans)
+        ImportRollbackPlanLoader plans,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
         _batches = batches;
         _plans = plans;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<ImportRollbackPreviewDto>> Handle(GetImportRollbackPreviewQuery request, CancellationToken ct)
@@ -70,15 +73,15 @@ public sealed class GetImportRollbackPreviewQueryHandler
         }
 
         var snapshot = await _plans.LoadAsync(tenantId, batch.Id, rowIds: null, ct);
-        return Result<ImportRollbackPreviewDto>.Success(Build(batch, snapshot));
+        return Result<ImportRollbackPreviewDto>.Success(Build(batch, snapshot, _timeProvider.GetUtcNow().UtcDateTime));
     }
 
-    private static ImportRollbackPreviewDto Build(ImportBatch batch, ImportRollbackSnapshot snapshot)
+    private static ImportRollbackPreviewDto Build(ImportBatch batch, ImportRollbackSnapshot snapshot, DateTime nowUtc)
     {
         var plan = snapshot.Plan;
         var deletable = ImportRollbackPlanLoader.Counts(plan, ImportRollbackDecision.Delete);
         var blocked = ImportRollbackPlanLoader.Counts(plan, ImportRollbackDecision.Keep);
-        var rollbackable = batch.CanStartRollback;
+        var rollbackable = batch.CanStartRollback(nowUtc);
 
         var warnings = new List<string>();
         if (deletable.Pets > 0)

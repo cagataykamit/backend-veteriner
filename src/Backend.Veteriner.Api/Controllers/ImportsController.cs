@@ -184,7 +184,10 @@ public sealed class ImportsController : ControllerBase
         return (await _mediator.Send(new GetImportSourceProfilesQuery(), ct)).ToActionResult(this);
     }
 
-    /// <summary>Kiracının partileri; sıralama oluşturulma zamanı azalan. <c>pageSize</c> 1–100.</summary>
+    /// <summary>
+    /// Kiracının partileri; sıralama oluşturulma zamanı azalan. <c>pageSize</c> 1–100. <c>status</c> verilmezse kapanmış
+    /// partiler (<c>RolledBack</c>, <c>Discarded</c>, <c>Expired</c>) yalnız <c>includeClosed=true</c> ile gelir.
+    /// </summary>
     [HttpGet("batches")]
     [Authorize(Policy = PermissionCatalog.Imports.Read)]
     [ProducesResponseType(typeof(PagedResult<ImportBatchDto>), StatusCodes.Status200OK)]
@@ -194,12 +197,13 @@ public sealed class ImportsController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] ImportBatchStatus? status = null,
+        [FromQuery] bool includeClosed = false,
         CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new GetImportBatchesListQuery(page, pageSize, status), ct);
+        var result = await _mediator.Send(new GetImportBatchesListQuery(page, pageSize, status, includeClosed), ct);
         return result.ToActionResult(this);
     }
 

@@ -238,6 +238,53 @@ public sealed class ImportBatchesEndpointTests : IClassFixture<CustomWebApplicat
         await SeedBatchAsync(ctx.TenantId, null, _ => { }, hash);
     }
 
+    [Fact]
+    public async Task List_Should_Hide_Closed_Batches_Unless_Status_Or_IncludeClosed_Is_Given()
+    {
+        var ctx = await SeedAsync();
+        var now = DateTime.UtcNow;
+        var draft = await SeedBatchAsync(ctx.TenantId, null, _ => { });
+        var committed = await SeedBatchAsync(ctx.TenantId, null, ToCommitted);
+        var discarded = await SeedBatchAsync(ctx.TenantId, null, b => b.Discard(now));
+        var expired = await SeedBatchAsync(ctx.TenantId, null, b => b.Expire(now + ImportBatch.DraftLifetime + TimeSpan.FromMinutes(1)));
+        var rolledBack = await SeedBatchAsync(ctx.TenantId, null, b =>
+        {
+            ToCommitted(b);
+            b.StartRollback("{}", now);
+            b.CompleteRollback(partial: false, now);
+        });
+        var client = ClientFor(ctx.Token);
+
+        var current = await client.GetFromJsonAsync<JsonElement>("/api/v1/imports/batches");
+        Ids(current).Should().BeEquivalentTo([draft, committed]);
+        current.GetProperty("totalItems").GetInt32().Should().Be(2);
+        var committedItem = current.GetProperty("items").EnumerateArray().Single(i => i.GetProperty("id").GetGuid() == committed);
+        committedItem.GetProperty("canRollback").GetBoolean().Should().BeTrue();
+        committedItem.GetProperty("rollbackDeadlineUtc").ValueKind.Should().Be(JsonValueKind.String);
+
+        var all = await client.GetFromJsonAsync<JsonElement>("/api/v1/imports/batches?includeClosed=true");
+        Ids(all).Should().BeEquivalentTo([draft, committed, discarded, expired, rolledBack]);
+        all.GetProperty("totalItems").GetInt32().Should().Be(5);
+
+        var byStatus = await client.GetFromJsonAsync<JsonElement>("/api/v1/imports/batches?status=RolledBack");
+        Ids(byStatus).Should().Equal(rolledBack);
+
+        static Guid[] Ids(JsonElement page)
+            => page.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetGuid()).ToArray();
+    }
+
+    private static void ToCommitted(ImportBatch b)
+    {
+        var now = DateTime.UtcNow;
+        var validationId = Guid.NewGuid();
+        var none = new Dictionary<ImportTable, ImportTableCounts>();
+        b.ApplyMapping("{}", null, now);
+        b.StartValidation(now);
+        b.CompleteValidation(validationId, none, now);
+        b.StartCommit(validationId, now);
+        b.CompleteCommit(none, now);
+    }
+
     private static void ToValidating(ImportBatch b)
     {
         b.ApplyMapping("{}", null, DateTime.UtcNow);

@@ -137,7 +137,7 @@ public sealed class CommitImportBatchCommandHandler : IRequestHandler<CommitImpo
         }
 
         return Result<ImportCommitResultDto>.Success(
-            new ImportCommitResultDto(Started: true, batch.ToDto(await _tableInfo.LoadAsync(batch, ct))));
+            new ImportCommitResultDto(Started: true, batch.ToDto(_timeProvider.GetUtcNow().UtcDateTime, await _tableInfo.LoadAsync(batch, ct))));
     }
 
     private static bool IsReplay(ImportBatch batch, Guid validationId)
@@ -146,7 +146,7 @@ public sealed class CommitImportBatchCommandHandler : IRequestHandler<CommitImpo
 
     private async Task<Result<ImportCommitResultDto>> ReplayAsync(ImportBatch batch, CancellationToken ct)
         => Result<ImportCommitResultDto>.Success(
-            new ImportCommitResultDto(Started: false, batch.ToDto(await _tableInfo.LoadAsync(batch, ct))));
+            new ImportCommitResultDto(Started: false, batch.ToDto(_timeProvider.GetUtcNow().UtcDateTime, await _tableInfo.LoadAsync(batch, ct))));
 
     /// <summary>Aşı tablosu varsa partinin kliniğine yazma erişimi (günlük aşı girişiyle aynı kural).</summary>
     private async Task<Result> CheckClinicAsync(ImportBatch batch, Guid tenantId, CancellationToken ct)
