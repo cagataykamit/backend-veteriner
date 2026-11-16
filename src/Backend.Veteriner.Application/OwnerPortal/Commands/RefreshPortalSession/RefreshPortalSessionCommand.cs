@@ -54,16 +54,9 @@ public sealed class RefreshPortalSessionCommandHandler : IRequestHandler<Refresh
 
         if (stored.IsRevoked)
         {
+            // Başka bir istek aynı anda kapattıysa çakışma "zaten kapatılmış" sayılır (RefreshTokenRevokeConflictInterceptor).
             await _sessions.RevokeAllAsync(stored.OwnerAccountId, "reuse-detected", utcNow, ct);
-            try
-            {
-                await _uow.SaveChangesAsync(ct);
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                // Aynı anda başka bir istek de oturumları kapattı (RevokedAtUtc eşzamanlılık belirteci); sonuç aynı.
-            }
-
+            await _uow.SaveChangesAsync(ct);
             return Result<PortalAuthTokensDto>.Failure(OwnerPortalErrors.RefreshTokenReused);
         }
 

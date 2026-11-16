@@ -33,6 +33,7 @@ internal static class IntegrationTestDbContextOverride
                 sp.GetRequiredService<OutboxSaveChangesInterceptor>(),
                 sp.GetRequiredService<RecordHistorySaveChangesInterceptor>(),
                 sp.GetRequiredService<ExpectedRowVersionSaveChangesInterceptor>(),
+                sp.GetRequiredService<RefreshTokenRevokeConflictInterceptor>(),
                 sp.GetRequiredService<SlowQueryLoggingInterceptor>(),
                 sp.GetRequiredService<DbConnectionSlowOpenInterceptor>());
         });

@@ -258,6 +258,64 @@ public sealed partial class OwnerPortalIntegrationTests : IClassFixture<CustomWe
     }
 
     [Fact]
+    public async Task Revoke_Saved_After_Concurrent_Rotation_Should_Succeed_As_Already_Revoked()
+    {
+        var staff = await SeedStaffAsync();
+        var portal = await InviteAndAcceptAsync(staff);
+        Guid tokenId;
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var accountId = await db.OwnerAccounts.Where(a => a.Email == portal.Email).Select(a => a.Id).SingleAsync();
+            tokenId = await db.OwnerPortalRefreshTokens.Where(t => t.OwnerAccountId == accountId && t.RevokedAtUtc == null).Select(t => t.Id).SingleAsync();
+        }
+
+        // Çıkış (tüm oturumları kapatma) jetonu okudu; o kaydetmeden yenileme aynı jetonu döndürüp kaydetti.
+        await using var logoutScope = _factory.Services.CreateSystemScope();
+        var logoutDb = logoutScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await logoutDb.OwnerPortalRefreshTokens.SingleAsync(t => t.Id == tokenId)).Revoke("logout-all", DateTime.UtcNow);
+        await using (var refreshScope = _factory.Services.CreateSystemScope())
+        {
+            var refreshDb = refreshScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (await refreshDb.OwnerPortalRefreshTokens.SingleAsync(t => t.Id == tokenId)).ReplaceWith(new string('c', 64), DateTime.UtcNow);
+            await refreshDb.SaveChangesAsync();
+        }
+
+        var save = () => logoutDb.SaveChangesAsync();
+
+        await save.Should().NotThrowAsync("çakışan kapatma 'zaten kapatılmış' sayılır");
+    }
+
+    [Theory]
+    [InlineData("/api/portal/v1/auth/logout")]
+    [InlineData("/api/portal/v1/auth/logout-all")]
+    public async Task Logout_Racing_Refresh_With_Same_Token_Should_Succeed_And_Refresh_Should_Get_401_Not_500(string logoutUrl)
+    {
+        var staff = await SeedStaffAsync();
+        var portal = await InviteAndAcceptAsync(staff);
+
+        // Birkaç tur: çıkışın kaydı bazen yenilemeden önce, bazen sonra düşer; iki yolda da 500 olmamalı.
+        for (var round = 0; round < 5; round++)
+        {
+            var login = await SendAsync(HttpMethod.Post, "/api/portal/v1/auth/login", body: new { email = portal.Email, password = Password });
+            login.StatusCode.Should().Be(HttpStatusCode.OK, await login.Content.ReadAsStringAsync());
+            var session = await login.Content.ReadFromJsonAsync<JsonElement>();
+            var access = session.GetProperty("accessToken").GetString()!;
+            var refresh = session.GetProperty("refreshToken").GetString()!;
+
+            var refreshes = Enumerable.Range(0, 3)
+                .Select(_ => SendAsync(HttpMethod.Post, "/api/portal/v1/auth/refresh", body: new { refreshToken = refresh }))
+                .ToList();
+            var logout = await SendAsync(HttpMethod.Post, logoutUrl, access, new { refreshToken = refresh });
+            var refreshResponses = await Task.WhenAll(refreshes);
+
+            logout.IsSuccessStatusCode.Should().BeTrue($"çakışan kapatma 'zaten kapatılmış' sayılır: {(int)logout.StatusCode}");
+            refreshResponses.Should().OnlyContain(r => r.StatusCode == HttpStatusCode.OK || r.StatusCode == HttpStatusCode.Unauthorized);
+            refreshResponses.Count(r => r.StatusCode == HttpStatusCode.OK).Should().BeLessThanOrEqualTo(1);
+        }
+    }
+
+    [Fact]
     public async Task Staff_And_Portal_Tokens_Should_Be_Rejected_On_Each_Others_Surface()
     {
         var staff = await SeedStaffAsync([PermissionCatalog.OwnerPortal.Manage, PermissionCatalog.Clients.Read]);
