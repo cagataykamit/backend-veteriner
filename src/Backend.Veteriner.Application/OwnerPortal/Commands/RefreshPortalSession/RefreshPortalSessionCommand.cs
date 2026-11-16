@@ -55,7 +55,15 @@ public sealed class RefreshPortalSessionCommandHandler : IRequestHandler<Refresh
         if (stored.IsRevoked)
         {
             await _sessions.RevokeAllAsync(stored.OwnerAccountId, "reuse-detected", utcNow, ct);
-            await _uow.SaveChangesAsync(ct);
+            try
+            {
+                await _uow.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Aynı anda başka bir istek de oturumları kapattı (RevokedAtUtc eşzamanlılık belirteci); sonuç aynı.
+            }
+
             return Result<PortalAuthTokensDto>.Failure(OwnerPortalErrors.RefreshTokenReused);
         }
 
