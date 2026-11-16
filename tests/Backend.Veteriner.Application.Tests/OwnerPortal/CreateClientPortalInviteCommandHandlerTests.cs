@@ -78,12 +78,11 @@ public sealed class CreateClientPortalInviteCommandHandlerTests
     private void VerifyNoEmail() =>
         _f.Email.Verify(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()), Times.Never);
 
-    [Theory]
-    [InlineData(SubscriptionPlanCode.Basic)]
-    [InlineData(null)]
-    public async Task Should_Reject_When_Plan_Has_No_Portal_And_Send_Nothing(SubscriptionPlanCode? plan)
+    /// <summary>2026-11-16: portal tüm paketlerde açık; kapı yalnız abonelik kaydı olmayan kiracıda kapanır.</summary>
+    [Fact]
+    public async Task Should_Reject_When_Tenant_Has_No_Subscription_And_Send_Nothing()
     {
-        _plan = plan;
+        _plan = null;
 
         var result = await Handler().Handle(new CreateClientPortalInviteCommand(_client.Id, null), CancellationToken.None);
 
@@ -91,6 +90,20 @@ public sealed class CreateClientPortalInviteCommandHandlerTests
         result.Error.Code.Should().Be("Subscriptions.FeatureNotInPlan");
         _added.Should().BeEmpty();
         VerifyNoEmail();
+    }
+
+    [Theory]
+    [InlineData(SubscriptionPlanCode.Basic)]
+    [InlineData(SubscriptionPlanCode.Pro)]
+    [InlineData(SubscriptionPlanCode.Premium)]
+    public async Task Should_Invite_On_Every_Plan(SubscriptionPlanCode plan)
+    {
+        _plan = plan;
+
+        var result = await Handler().Handle(new CreateClientPortalInviteCommand(_client.Id, null), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        _added.Should().ContainSingle();
     }
 
     [Fact]

@@ -17,7 +17,8 @@ public static class SubscriptionPlanCatalog
 
     public static IReadOnlyList<PlanEntry> All { get; } =
     [
-        new(SubscriptionPlanCode.Basic, "Basic", "Temel özellikler.", 3, new HashSet<PlanFeature>()),
+        new(SubscriptionPlanCode.Basic, "Basic", "Temel özellikler.", 3,
+            new HashSet<PlanFeature> { PlanFeature.OwnerPortal, PlanFeature.PortalAppointmentRequests }),
         new(SubscriptionPlanCode.Pro, "Pro", "Gelişmiş özellikler.", 5,
             new HashSet<PlanFeature>
             {

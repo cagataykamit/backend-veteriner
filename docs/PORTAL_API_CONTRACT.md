@@ -71,7 +71,7 @@ Müşteri kartındaki "Portal" bölümü: bağ durumu ve davet listesi (son 20 d
 }
 ```
 
-- `canInvite`: müşteri davet kuralına uyuyor **ve** aktif bağı yok. Değilse `inviteBlockedCode` (`OwnerPortal.ClientEmailMissing`, `OwnerPortal.ClientOptedOut`, `OwnerPortal.ClientNotInvitable`, `OwnerPortal.AlreadyLinked`). Paket portalı içermiyorsa önce `Subscriptions.FeatureNotInPlan`: yeni davet (§4.2) 403, bekleyen davetin önizleme ve kabulü (§5.2, §5.3) 404; mevcut bağda okuma kapanır, sahip hakları açık kalır (§12.1, `PLAN_FEATURES_API_CONTRACT.md`).
+- `canInvite`: müşteri davet kuralına uyuyor **ve** aktif bağı yok. Değilse `inviteBlockedCode` (`OwnerPortal.ClientEmailMissing`, `OwnerPortal.ClientOptedOut`, `OwnerPortal.ClientNotInvitable`, `OwnerPortal.AlreadyLinked`). Paket portalı içermiyorsa (2026-11-16'dan beri tüm paketler içerir; bugün yalnız abonelik kaydı olmayan kiracı) önce `Subscriptions.FeatureNotInPlan`: yeni davet (§4.2) 403, bekleyen davetin önizleme ve kabulü (§5.2, §5.3) 404; mevcut bağda okuma kapanır, sahip hakları açık kalır (§12.1, `PLAN_FEATURES_API_CONTRACT.md`).
 - Davet `status`: `Pending`, `Accepted`, `Revoked`, `Expired` (bekleyen ama süresi geçmiş; hesaplanır).
 - Bağ `closeReason`: kapalı bağda `ClinicClosed` (personel kapattı) ya da `OwnerAccountDeleted` (hasta sahibi hesabını sildi, §5.10); aktif bağda `null`. Silinen hesabın bağında `accountEmail` `null` döner; tarih `closedAtUtc`'dir.
 
@@ -570,7 +570,7 @@ Denetim: `PortalInbox.DataRequest.UpdateStatus`, hedef `DataRequestId=…;Status
 
 ### 12.1 Portalsız pakette mevcut bağ (ADR-035 2026-11-08 kullanıcı kararı, TIER-001 §4)
 
-Kiracının paketinde `OwnerPortal` yoksa (Temel; düşürme sonrası dahil) mevcut bağ silinmez, kısmen kapanır. Yükseltince her şey geri gelir.
+Kiracının paketinde `OwnerPortal` yoksa mevcut bağ silinmez, kısmen kapanır. Yükseltince her şey geri gelir. 2026-11-16 kullanıcı kararıyla portal Temel dahil tüm paketlerde açıktır (ADR-035); bugün portalsız paket yoktur, kural portal ileride yeniden kilitlenirse geçerli olsun diye durur.
 
 | Uç grubu | Durum |
 |---|---|

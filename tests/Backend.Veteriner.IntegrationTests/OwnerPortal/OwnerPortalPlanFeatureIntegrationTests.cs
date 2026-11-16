@@ -16,8 +16,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Backend.IntegrationTests.OwnerPortal;
 
 /// <summary>
-/// TIER-001 (docs/PLAN_FEATURES_API_CONTRACT.md): paket portalı ve çok kliniği gerçekten zorlar. Portalsız pakette mevcut bağda okuma
-/// kapanır, sahip hakları açık kalır; veri silinmez (ADR-035 2026-11-08). Deneme seçilen pakete göre davranır, çok klinik dahil.
+/// TIER-001 (docs/PLAN_FEATURES_API_CONTRACT.md): paket çok kliniği gerçekten zorlar; portal 2026-11-16 kullanıcı kararıyla Temel dahil
+/// her pakette açık (ADR-035). Deneme seçilen pakete göre davranır, çok klinik dahil.
 /// </summary>
 public sealed partial class OwnerPortalIntegrationTests
 {
@@ -78,35 +78,28 @@ public sealed partial class OwnerPortalIntegrationTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Basic_Should_Reject_Portal_Invite_Also_In_Trial(bool trialing)
+    [InlineData(SubscriptionPlanCode.Basic, false)]
+    [InlineData(SubscriptionPlanCode.Basic, true)]
+    [InlineData(SubscriptionPlanCode.Pro, false)]
+    [InlineData(SubscriptionPlanCode.Premium, false)]
+    public async Task Every_Plan_Should_Allow_Portal_Invite_And_Accept(SubscriptionPlanCode plan, bool trialing)
     {
-        var staff = await SeedPlanTenantAsync(SubscriptionPlanCode.Basic, trialing);
+        var staff = await SeedPlanTenantAsync(plan, trialing);
         var client = await SeedClientAsync(staff.TenantId);
-
-        var invite = await SendAsync(HttpMethod.Post, $"/api/v1/clients/{client.Id}/portal-invites", staff.Token);
-        await ShouldBeNotInPlanAsync(invite, "Pro");
 
         var access = await (await SendAsync(HttpMethod.Get, $"/api/v1/clients/{client.Id}/portal-access", staff.Token))
             .Content.ReadFromJsonAsync<JsonElement>();
-        access.GetProperty("canInvite").GetBoolean().Should().BeFalse();
-        access.GetProperty("inviteBlockedCode").GetString().Should().Be(FeatureNotInPlan);
-    }
+        access.GetProperty("canInvite").GetBoolean().Should().BeTrue();
 
-    [Fact]
-    public async Task Pro_Should_Allow_Portal_Invite_And_Accept()
-    {
-        var staff = await SeedPlanTenantAsync(SubscriptionPlanCode.Pro);
-
-        var session = await InviteAndAcceptAsync(staff);
+        var session = await InviteAndAcceptAsync(staff, client: client);
 
         (await SendAsync(HttpMethod.Get, $"/api/portal/v1/links/{session.LinkId}/pets", session.AccessToken))
             .StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    /// <summary>2026-11-16: Temel'e inmek portalı kapatmaz; mevcut bağ, bekleyen davet ve yeni davet açık kalır.</summary>
     [Fact]
-    public async Task Downgrade_Should_Close_Reads_On_Existing_Link_But_Keep_Owner_Rights()
+    public async Task Downgrade_To_Basic_Should_Keep_Portal_Open()
     {
         var staff = await SeedPlanTenantAsync(SubscriptionPlanCode.Pro);
         var session = await InviteAndAcceptAsync(staff);
@@ -115,46 +108,19 @@ public sealed partial class OwnerPortalIntegrationTests
 
         await ChangePlanAsync(staff.TenantId, SubscriptionPlanCode.Basic);
 
-        // Okuma uçları kapalı; yanıt sahiplik kuralıyla aynı (paket bilgisi portala çıkmaz).
         foreach (var path in new[] { "pets", "appointments", "balance", "clinic" })
         {
-            var read = await SendAsync(HttpMethod.Get, $"/api/portal/v1/links/{session.LinkId}/{path}", session.AccessToken);
-            read.StatusCode.Should().Be(HttpStatusCode.NotFound, path);
-            (await IntegrationTestProblemDetails.ReadCodeAsync(read)).Should().Be("Portal.Links.NotFound");
+            (await SendAsync(HttpMethod.Get, $"/api/portal/v1/links/{session.LinkId}/{path}", session.AccessToken))
+                .StatusCode.Should().Be(HttpStatusCode.OK, path);
         }
 
-        // Sahip hakları açık: KVKK talebi, tercihler, hesap silme kodu.
-        (await SendAsync(HttpMethod.Post, $"/api/portal/v1/links/{session.LinkId}/data-requests", session.AccessToken, new { type = "Access", message = "Kayıtlarımı istiyorum" }))
-            .StatusCode.Should().Be(HttpStatusCode.Created);
-        (await SendAsync(HttpMethod.Get, $"/api/portal/v1/links/{session.LinkId}/data-requests", session.AccessToken))
-            .StatusCode.Should().Be(HttpStatusCode.OK);
-        (await SendAsync(HttpMethod.Get, $"/api/portal/v1/links/{session.LinkId}/notification-preferences", session.AccessToken))
-            .StatusCode.Should().Be(HttpStatusCode.OK);
-        (await SendAsync(HttpMethod.Get, $"/api/portal/v1/links/{session.LinkId}/reminder-preferences", session.AccessToken))
-            .StatusCode.Should().Be(HttpStatusCode.OK);
-        (await SendAsync(HttpMethod.Post, "/api/portal/v1/me/deletion-code", session.AccessToken))
-            .StatusCode.Should().Be(HttpStatusCode.NoContent);
         var me = await (await SendAsync(HttpMethod.Get, "/api/portal/v1/me", session.AccessToken)).Content.ReadFromJsonAsync<JsonElement>();
-        var link = me.GetProperty("links").EnumerateArray().Single();
-        link.GetProperty("isClinicPortalEnabled").GetBoolean().Should().BeTrue();
-        link.GetProperty("isPortalServiceAvailable").GetBoolean().Should().BeFalse();
+        me.GetProperty("links").EnumerateArray().Single().GetProperty("isPortalServiceAvailable").GetBoolean().Should().BeTrue();
+        (await SendAsync(HttpMethod.Get, $"/api/portal/v1/invites/{pendingToken}")).StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // Veri silinmez: yükseltince okuma geri gelir.
-        await ChangePlanAsync(staff.TenantId, SubscriptionPlanCode.Pro);
-        (await SendAsync(HttpMethod.Get, $"/api/portal/v1/links/{session.LinkId}/pets", session.AccessToken))
+        var newSession = await InviteAndAcceptAsync(staff);
+        (await SendAsync(HttpMethod.Get, $"/api/portal/v1/links/{newSession.LinkId}/pets", newSession.AccessToken))
             .StatusCode.Should().Be(HttpStatusCode.OK);
-        await ChangePlanAsync(staff.TenantId, SubscriptionPlanCode.Basic);
-
-        // Yeni kullanım kapalı: yeni davet reddedilir, bekleyen davet yeni bağ açamaz.
-        var newClient = await SeedClientAsync(staff.TenantId);
-        await ShouldBeNotInPlanAsync(await SendAsync(HttpMethod.Post, $"/api/v1/clients/{newClient.Id}/portal-invites", staff.Token), "Pro");
-        (await SendAsync(HttpMethod.Get, $"/api/portal/v1/invites/{pendingToken}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
-        (await SendAsync(HttpMethod.Post, $"/api/portal/v1/invites/{pendingToken}/accept", body: new { acceptedLegalDocuments = PortalDocuments() }))
-            .StatusCode.Should().Be(HttpStatusCode.NotFound);
-
-        // Klinik mevcut erişimi yönetebilir.
-        (await SendAsync(HttpMethod.Post, $"/api/v1/clients/{session.ClientId}/portal-links/{session.LinkId}/close", staff.Token))
-            .StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
     [Theory]
@@ -241,7 +207,7 @@ public sealed partial class OwnerPortalIntegrationTests
     }
 
     [Fact]
-    public async Task Portal_Settings_Should_Stay_Writable_On_Basic_For_Existing_Links()
+    public async Task Portal_Settings_Should_Be_Writable_On_Basic()
     {
         var staff = await SeedPlanTenantAsync(SubscriptionPlanCode.Basic);
 
@@ -252,17 +218,19 @@ public sealed partial class OwnerPortalIntegrationTests
     [Fact]
     public async Task AccessState_Should_Report_Plan_Features()
     {
-        var staff = await SeedPlanTenantAsync(SubscriptionPlanCode.Pro);
+        var staff = await SeedPlanTenantAsync(SubscriptionPlanCode.Basic);
 
         var response = await SendAsync(HttpMethod.Get, $"/api/v1/tenants/{staff.TenantId}/access-state", staff.Token);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-        json.GetProperty("planCode").GetString().Should().Be("Pro");
+        json.GetProperty("planCode").GetString().Should().Be("Basic");
         var features = json.GetProperty("planFeatures").EnumerateArray()
             .ToDictionary(f => f.GetProperty("feature").GetString()!, f => f);
         features["OwnerPortal"].GetProperty("isEnabled").GetBoolean().Should().BeTrue();
+        features["OwnerPortal"].GetProperty("requiredPlanCode").GetString().Should().Be("Basic");
         features["PortalAppointmentRequests"].GetProperty("isEnabled").GetBoolean().Should().BeTrue();
+        features["Waitlist"].GetProperty("isEnabled").GetBoolean().Should().BeFalse();
         features["MultiClinic"].GetProperty("isEnabled").GetBoolean().Should().BeFalse();
         features["MultiClinic"].GetProperty("requiredPlanCode").GetString().Should().Be("Premium");
     }
