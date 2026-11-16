@@ -16,6 +16,7 @@ using Backend.Veteriner.Application.Hbs.Contracts;
 using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Application.Vaccinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Vaccinations.Queries.GetById;
+using Backend.Veteriner.Application.Vaccinations.Queries.GetCalendar;
 using Backend.Veteriner.Application.Vaccinations.Queries.GetList;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
@@ -215,6 +216,28 @@ public sealed class VaccinationsController : ControllerBase
 
         var result = await _mediator.Send(
             new UpdateVaccinationHbsCommand(id, body.Status, body.ReferenceNumber, body.NotRequiredReason), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Randevu takviminin aşı katmanı (APPOINTMENT_CALENDAR_API_CONTRACT.md §5): <c>[dateFromUtc, dateToUtc)</c> aralığında (en çok 45 gün)
+    /// planlı aşılar, sonraki uygulama tarihleri ve uygulanan aşılar; durum (bugün, ileri, gecikmiş, uygulandı) İstanbul gününe göre.
+    /// Klinik kapsamı randevu takvimiyle aynı. Aşı randevu sayılmaz.
+    /// </summary>
+    [HttpGet("calendar")]
+    [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
+    [ProducesResponseType(typeof(IReadOnlyList<VaccinationCalendarItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetCalendar(
+        [FromQuery] DateTime? dateFromUtc,
+        [FromQuery] DateTime? dateToUtc,
+        [FromQuery] Guid? clinicId = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetVaccinationsCalendarQuery(dateFromUtc, dateToUtc, clinicId), ct);
         return result.ToActionResult(this);
     }
 

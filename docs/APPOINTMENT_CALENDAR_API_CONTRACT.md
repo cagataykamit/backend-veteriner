@@ -44,3 +44,67 @@ değişmedi: `[{ userId, name? }]`. Takvim boş hekimin de sütununu bu listeden
 - "Boş saat bul": `GET /api/v1/clinics/{clinicId}/online-booking/availability?reasonId&from&days` (personel, en çok 14 gün;
   `reasonId` boşsa 30 dk, tüm hekimler). Yanıttaki `freeVeterinarianUserIds` ilk boş hekimi önerir.
 - Boş hücreden ya da boş saatten yeni randevu: panel `/panel/appointments/new?date=yyyy-MM-dd&time=HH:mm&vet={userId}`.
+
+## 5) Aşı katmanı ve ayrıntı balonu (2026-11-16)
+
+Kaynak: kullanıcı kararı 2026-11-16 (E-vet takvimine bakarak): aşılar takvimde randevu olarak değil, ayrı bir katman olarak görünür;
+kartın üzerine gelince ayrıntı balonu. Migration yok, yeni izin yok.
+
+### 5.1 Randevu takvimi yanıtına eklenenler
+
+`AppointmentCalendarItemDto`'ya üç alan eklendi (eklemeli; eski istemci etkilenmez):
+
+| Alan | Tip | Anlam |
+|---|---|---|
+| `reasonId` | `guid?` | Randevu nedeni; nedensiz randevuda `null`. |
+| `reasonName` | `string?` | Nedenin adı (pasif neden de adıyla); bulunamazsa `null`. Balonda tür yerine bu yazılır. |
+| `notes` | `string?` | Randevu notu (balonda). |
+
+Okuma modeli yolu (`QueryReadModels:AppointmentsEnabled`) bunları taşımadığı için hekimle birlikte aynı istekte komut veritabanından
+tamamlanır (`AppointmentCalendarDetailsByIdsSpec`); iki yol aynı yanıtı verir.
+
+### 5.2 `GET /api/v1/vaccinations/calendar` (`Vaccinations.Read`)
+
+Parametreler randevu takvimiyle aynı: `dateFromUtc`, `dateToUtc` (zorunlu, `[from, to)`, en çok 45 gün), `clinicId` (yoksa aktif klinik;
+ikisi de yoksa 400 `Vaccinations.ClinicScopeRequired`; bağlamla çelişirse 400 `Vaccinations.ClinicContextMismatch`; atanmamış klinik
+403 `Clinics.AccessDenied`). Hatalı aralık 400 (`Validation.FluentValidation`). Yanıt dizi:
+
+```json
+[ { "vaccinationId": "…", "kind": "NextDue", "state": "DueToday", "date": "2026-11-16", "atUtc": "2026-11-16T09:00:00Z",
+    "clinicId": "…", "petId": "…", "petName": "Pamuk", "clientId": "…", "clientName": "Ayşe Yılmaz",
+    "vaccineDefinitionId": "…", "vaccineName": "Karma", "notes": null } ]
+```
+
+| Alan | Anlam |
+|---|---|
+| `kind` | `Planned`: planlı aşı kaydı (`Scheduled`, tarih `dueAtUtc`). `NextDue`: uygulanmış aşının sonraki uygulama tarihi (`Applied` + `dueAtUtc`; E-vet aktarmasının "sonraki aşı tarihi" buradan görünür). `Applied`: o gün uygulanan aşı (tarih `appliedAtUtc`). |
+| `state` | `Applied` (yeşil), `DueToday` (sarı), `Upcoming` (koyu), `Overdue` (kırmızı). Gün sınırı ve gecikme tanımı `VaccinationDueRule` (ADR-028, İstanbul günü): bugünün başından önceki vade gecikmiş, bugün içindeki vade saati geçse de "bugün". |
+| `date` | Satırın göründüğü İstanbul günü. |
+| `atUtc` | Vade ya da uygulama anı. Vadeli satırda saat anlamlı değildir; istemci satırı günün üst şeridinde (tüm gün) gösterir. |
+
+Satır anahtarı `vaccinationId` + `kind`: aynı kayıt aralıkta hem uygulandığı gün hem sonraki tarihi için iki satır verebilir.
+Sıralama `atUtc`, hayvan adı, aşı adı.
+
+Kurallar (tek yer `VaccinationCalendarRules`):
+
+- **Kapsam:** yalnız istenen kliniğin aşı kayıtları; iptal edilen kayıt girmez. İçe aktarılan kayıt (hatırlatması serbest bırakılmamış
+  olsa da) görünür; aktarma kuralı değişmedi.
+- **Gecikmiş aşı:** yalnız vadesi görüntülenen aralıktaysa gelir; bugüne taşınmaz, ayrı bir "eski gecikmişler" listesi yoktur.
+  Gecikmiş aşı listesi için mevcut `GET /vaccinations?onlyOverdue=true`.
+- **Karşılanmış sonraki tarih:** aynı hayvana aynı aşı (aşı tanımı kimliği; tanımsız eski kayıtta ad, büyük/küçük harf duyarsız) bu
+  uygulamadan sonra yeniden uygulanmışsa `NextDue` satırı çıkmaz. Yeniden uygulama kullanıcının okuyabildiği tüm kliniklerden sayılır.
+  Planlı kayıt bu kurala girmez; uygulanınca durumu `Applied` olur.
+- **Vefat:** bakım dışı hayvanın (`Pet.ReceivesCare` değil) `Planned`/`NextDue` satırı çıkmaz; `Applied` geçmişi görünür.
+- **Randevu değildir:** saat dilimini doldurmaz, çakışma (`ClinicOverlapBlocks`) ve "Boş saat bul" (`AppointmentAvailabilityCalculator`)
+  hesabına girmez, randevu hatırlatması üretmez. Aşı hatırlatması değişmedi (`ReminderProcessorService`).
+- **Hekim:** aşı kaydında hekim tutulmaz; hekim sütunlu görünümde satır günün üst şeridindedir.
+
+Panelde tıklama: `Planned` → aşı düzenleme (uygulandı yap); `NextDue` → yeni aşı (hasta ve aşı dolu); `Applied` → aşı ayrıntısı;
+her vadeli satırda "Randevu ver" → yeni randevu (`?petId&clientId&date&type=Vaccination&notes=`).
+
+### 5.3 Testler
+
+- Application: `VaccinationCalendarRulesTests`, `GetVaccinationsCalendarQueryHandlerTests`, `GetAppointmentsCalendarQueryHandlerTests`
+  (neden adı ve not; okuma modeli yolunda tamamlama).
+- Entegrasyon: `VaccinationsCalendarEndpointTests` (kaynaklar ve durumlar, içe aktarılan sonraki tarih, karşılanmış tarih, iptal ve
+  başka klinik dışarıda, gecikmiş, yetki, 45 gün sınırı).

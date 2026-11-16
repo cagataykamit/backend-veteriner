@@ -20,4 +20,12 @@ public sealed class PetIdsNotReceivingCareSpec : Specification<Pet, Guid>
         Query.Where(NotReceivingCare);
         Query.Select(p => p.Id);
     }
+
+    /// <summary>Yalnız verilen hayvanlar arasından (takvim aşı katmanı gibi küçük kümeler).</summary>
+    public PetIdsNotReceivingCareSpec(Guid tenantId, IReadOnlyCollection<Guid> petIds)
+        : this(tenantId)
+    {
+        var ids = petIds.ToArray();
+        Query.Where(p => ids.Contains(p.Id));
+    }
 }
