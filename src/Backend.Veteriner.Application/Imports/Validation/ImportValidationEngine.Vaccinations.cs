@@ -17,26 +17,107 @@ public sealed partial class ImportValidationEngine
         => _input.Tables.TryGetValue(ImportTable.Pets, out var rows) && rows.Count > 0
            && _input.Mapping.ColumnsOf(ImportTable.Pets).ContainsKey("HayvanNo");
 
+    /// <summary>"Diğer" türünün katalog kodu: eski programda türü seçilmemiş hasta (E-vet "Hasta Türü" boş bırakılınca Diğer yazar).</summary>
+    private const string UnknownSpeciesCode = "OTHER";
+
+    private HashSet<Guid>? _unknownSpeciesIds;
+
+    /// <summary>Hastanın türü dosyada belirtilmemiş sayılır ("Diğer"): aşı-tür uyumu denetlenmez (kural tek yer).</summary>
+    private bool IsUnknownSpecies(Guid speciesId)
+        => (_unknownSpeciesIds ??= _input.Catalogs.Species
+                .Where(s => string.Equals(s.Code, UnknownSpeciesCode, StringComparison.OrdinalIgnoreCase))
+                .Select(s => s.Id)
+                .ToHashSet())
+            .Contains(speciesId);
+
+    private Dictionary<string, Guid?>? _speciesByVaccines;
+
+    /// <summary>
+    /// Türü bilinmeyen hastanın (dosyada boş ya da "Diğer") aşılarından çıkan türü: hasta no'suyla bağlanan aşılardan türe özgü
+    /// olanların hepsi aynı türü gösteriyorsa o tür; farklı türler ya da türe özgü aşı yoksa null (tür bilinmiyor kalır). Hasta
+    /// tablosu aşılardan önce işlendiği için aşı satırları bir kez önden taranır.
+    /// </summary>
+    private Guid? SpeciesFromVaccines(string? reference)
+    {
+        if (reference is null)
+            return null;
+
+        _speciesByVaccines ??= ScanVaccineSpecies();
+        return _speciesByVaccines.GetValueOrDefault(reference);
+    }
+
+    private Dictionary<string, Guid?> ScanVaccineSpecies()
+    {
+        var species = new Dictionary<string, HashSet<Guid>>(StringComparer.Ordinal);
+        if (!PetReferenceUsable || !_input.Tables.TryGetValue(ImportTable.Vaccinations, out var rows))
+            return [];
+
+        var columns = _input.Mapping.ColumnsOf(ImportTable.Vaccinations);
+        foreach (var row in rows)
+        {
+            var reader = new ImportRowReader(columns, row);
+            var reference = ImportValueParsers.NormalizeText(reader.Raw("HayvanNo"));
+            if (reference is null || VaccineSpeciesOf(reader.Raw("AsiAdi")) is not { } vaccineSpecies)
+                continue;
+
+            if (_petChoices.TryGetValue(reference, out var choice))
+            {
+                if (choice.PetNo is null)
+                    continue;
+                reference = choice.PetNo;
+            }
+
+            reference = _mergedPets.GetValueOrDefault(reference) ?? reference;
+            if (!species.TryGetValue(reference, out var set))
+                species[reference] = set = [];
+            set.Add(vaccineSpecies);
+        }
+
+        return species.ToDictionary(kv => kv.Key, kv => kv.Value.Count == 1 ? kv.Value.First() : (Guid?)null, StringComparer.Ordinal);
+    }
+
+    /// <summary>Aşının türü: eşlenen tanımın türü, yoksa adında geçen tür (<c>KÖPEK KARMA 1</c>); türe özgü değilse null.</summary>
+    private Guid? VaccineSpeciesOf(string? rawVaccine)
+    {
+        var vaccine = _resolver.Resolve(ImportValueKind.Vaccine, rawVaccine);
+        if (vaccine.Kind == ImportValueResolutionKind.Resolved && _vaccinesById[vaccine.TargetId!.Value].ParentId is { } species)
+            return species;
+
+        return ImportValueResolver.VaccineSpecies(rawVaccine) is { } named
+               && _resolver.Resolve(ImportValueKind.Species, named) is { Kind: ImportValueResolutionKind.Resolved, TargetId: { } id }
+            ? id
+            : null;
+    }
+
     private ImportRowResult ProcessVaccination(ImportRowReader reader)
     {
         var issues = new List<ImportIssue>();
 
         var (pet, petSkip) = ResolvePetLink(reader, issues);
 
-        // Aşı tanımı (hastanın türüne göre)
+        // Aşı tanımı (hastanın türüne göre; türü bilinmeyen hastada tür süzmeden)
         Guid? definitionId = null;
         string? vaccineName = null;
         var vaccineSkipped = false;
+        var speciesUnverified = false;
+        var unknownSpecies = pet is not null && IsUnknownSpecies(pet.SpeciesId);
         var rawVaccine = reader.Raw("AsiAdi");
-        var vaccine = _resolver.Resolve(ImportValueKind.Vaccine, rawVaccine, pet?.SpeciesId);
+        var vaccine = _resolver.Resolve(ImportValueKind.Vaccine, rawVaccine, unknownSpecies ? null : pet?.SpeciesId);
         switch (vaccine.Kind)
         {
             case ImportValueResolutionKind.Resolved:
                 var entry = _vaccinesById[vaccine.TargetId!.Value];
                 if (pet is not null && entry.ParentId is { } vaccineSpecies && vaccineSpecies != pet.SpeciesId)
                 {
-                    issues.Add(ImportRules.VaccineInvalidSpecies.At("AsiAdi", value: rawVaccine));
-                    break;
+                    // Türü dosyada açıkça yazılı hastada uyumsuz aşı hatadır; türü bilinmeyen hastada aşı reddedilmez, uyarıyla gelir.
+                    if (!unknownSpecies)
+                    {
+                        issues.Add(ImportRules.VaccineInvalidSpecies.At("AsiAdi", value: rawVaccine));
+                        break;
+                    }
+
+                    issues.Add(ImportRules.VaccineSpeciesUnverified.At("AsiAdi", value: rawVaccine));
+                    speciesUnverified = true;
                 }
 
                 definitionId = entry.Id;
@@ -122,7 +203,8 @@ public sealed partial class ImportValidationEngine
             dueAt,
             appliedAtUtc,
             dueAtUtc,
-            notes);
+            notes,
+            speciesUnverified);
 
         if (HasError(issues))
             return Finish(ImportTable.Vaccinations, reader.RowNumber, issues, normalized);

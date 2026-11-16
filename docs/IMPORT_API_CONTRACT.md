@@ -347,7 +347,9 @@ Kural kodları, önem dereceleri ve varsayılan mesajlar kodda **tek yerde** tan
 | `Imports.BreedFreeText` | Info | Irk katalogda yok / atlandı → serbest metin; `value` kaynak. |
 | `Imports.ColorFreeText` | Info | Renk katalogda yok / atlandı → `Notes`'a `Renk: <değer>` eklenir; `value` kaynak. |
 | `Pets.BreedSpeciesMismatch` | Warning | Kullanıcının eşlediği ırk, satırın türüne ait değil; ırk metin olarak aktarılır (2026-11-14; önce Error). |
-| `VaccineDefinitions.InvalidSpecies` | Error | Kullanıcının eşlediği aşı tanımı hastanın türüyle uyumsuz. |
+| `VaccineDefinitions.InvalidSpecies` | Error | Kullanıcının eşlediği aşı tanımı hastanın türüyle uyumsuz. Yalnız türü dosyada **açıkça yazılı** hastada; türü bilinmeyen hastada aşağıdaki iki kural geçerlidir. |
+| `Imports.SpeciesFromVaccines` | Info | (2026-11-16) Hastanın türü dosyada boş ya da `Diğer` (katalog kodu `OTHER`; E-vet türü seçilmemiş hastaya `Diğer` yazar) ve hasta no'suyla bağlanan aşılarından türe özgü olanların hepsi aynı türü gösteriyor (eşlenen tanımın türü, yoksa adında geçen `kedi`/`köpek`): hasta o türle aktarılır. Mesaj türü söyler ("Türü dosyada yok (Diğer); aşılarının hepsi Köpek aşısı olduğu için Köpek olarak aktarılacak."). Boş türde `RequiredMissing` kalkar. Kural tek yerde: `ImportValidationEngine.SpeciesFromVaccines`. |
+| `Imports.VaccineSpeciesUnverified` | Warning | (2026-11-16) Türü bilinmeyen (`Diğer`) hastanın aşıları farklı türleri gösteriyor ya da tür çıkarılamadı: türe özgü aşı **reddedilmez**, tür denetlenmeden aktarılır (normalize satırda `speciesUnverified = true`; uygulamada `CreateImportedVaccinationCommand.SpeciesUnverified`, aşı-tür uyumu `VaccinationCatalogResolver` içinde atlanır). Türü bilinmeyen hastanın aşı adı tür süzmeden eşlenir. |
 | `Imports.GenderUnrecognized` | Warning | Cinsiyet tanınmadı; boş aktarılır. |
 | `Imports.NeuteredUnrecognized` | Warning | Kısır değeri tanınmadı; `false` aktarılır. |
 | `Imports.WeightInvalid` | Warning | Ağırlık sayı değil veya 0–9999,99 dışında; boş aktarılır. |

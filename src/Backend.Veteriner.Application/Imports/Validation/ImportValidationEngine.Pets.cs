@@ -80,6 +80,18 @@ public sealed partial class ImportValidationEngine
                 break;
         }
 
+        // Türü bilinmeyen hasta (dosyada boş ya da "Diğer"): aşılarının türe özgü olanları hep aynı türü gösteriyorsa o türle gelir.
+        if ((species.Kind == ImportValueResolutionKind.Empty || speciesId is { } known && IsUnknownSpecies(known))
+            && SpeciesFromVaccines(reference) is { } inferred)
+        {
+            issues.RemoveAll(i => i.Code == ImportRules.RequiredMissing.Code && i.Field == "Tur");
+            speciesId = inferred;
+            var inferredName = _input.Catalogs.Species.First(s => s.Id == inferred).Name;
+            issues.Add(ImportRules.SpeciesFromVaccines.At("Tur",
+                $"Türü dosyada yok ({rawSpecies ?? "boş"}); aşılarının hepsi {inferredName} aşısı olduğu için {inferredName} olarak aktarılacak.",
+                rawSpecies));
+        }
+
         // Irk (türe bağlı; eşlenmezse serbest metin)
         Guid? breedId = null;
         string? breedText = null;

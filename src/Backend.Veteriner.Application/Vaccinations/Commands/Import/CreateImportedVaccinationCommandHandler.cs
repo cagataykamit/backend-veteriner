@@ -84,8 +84,8 @@ public sealed class CreateImportedVaccinationCommandHandler : IRequestHandler<Cr
         if (pet is null)
             return Result<Guid>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
-        var definition = await VaccinationCatalogResolver.ResolveActiveForPetAsync(
-            tenantId, request.VaccineDefinitionId, pet, _vaccineDefinitions, ct);
+        var definition = await VaccinationCatalogResolver.ResolveActiveForSpeciesAsync(
+            tenantId, request.VaccineDefinitionId, request.SpeciesUnverified ? null : pet.SpeciesId, _vaccineDefinitions, ct);
         if (!definition.IsSuccess)
             return Result<Guid>.Failure(definition.Error);
 

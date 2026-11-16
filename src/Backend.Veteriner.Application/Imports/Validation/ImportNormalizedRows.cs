@@ -81,6 +81,7 @@ public sealed record ImportNormalizedPet(
 /// <summary>
 /// Aşı satırı. <see cref="OwnerKey"/>/<see cref="OwnerHasEmail"/>/<see cref="DueAtUtc"/> hatırlatma etkisini
 /// (<c>reminderImpact</c>) hesaplamak içindir; sahip anahtarı <c>file:&lt;satır&gt;</c> veya <c>db:&lt;müşteriId&gt;</c>.
+/// <see cref="SpeciesUnverified"/>: hastanın türü bilinmiyor, aşının türü denetlenmeden aktarılır (<c>Imports.VaccineSpeciesUnverified</c>).
 /// </summary>
 public sealed record ImportNormalizedVaccination(
     string? PetKey,
@@ -92,7 +93,8 @@ public sealed record ImportNormalizedVaccination(
     DateOnly? DueAt,
     DateTime? AppliedAtUtc,
     DateTime? DueAtUtc,
-    string? Notes)
+    string? Notes,
+    bool SpeciesUnverified = false)
     : ImportNormalizedRow;
 
 /// <summary>Klinik geçmiş satırı (salt okunur eski program kaydı; ADR-048 T1). Sahip anahtarı hastanın sahibidir.</summary>

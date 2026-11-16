@@ -171,6 +171,65 @@ public sealed class ImportEVetEndToEndTests : IClassFixture<CustomWebApplication
     }
 
     [Fact]
+    public async Task Pet_Without_Species_Should_Take_Species_From_Its_Vaccines_Or_Keep_Them_Unverified()
+    {
+        var ctx = await SeedAsync();
+        Guid dogVaccine, catVaccine, dog;
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            dog = (await db.Species.AsNoTracking().SingleAsync(s => s.Code == "DOG")).Id;
+            var cat = (await db.Species.AsNoTracking().SingleAsync(s => s.Code == "CAT")).Id;
+            var dogDefinition = VaccineDefinition.CreateTenant(ctx.TenantId, $"IEVD{ctx.Suffix}", $"Iev Köpek Aşısı {ctx.Suffix}", DateTime.UtcNow, dog);
+            var catDefinition = VaccineDefinition.CreateTenant(ctx.TenantId, $"IEVC{ctx.Suffix}", $"Iev Kedi Aşısı {ctx.Suffix}", DateTime.UtcNow, cat);
+            db.VaccineDefinitions.AddRange(dogDefinition, catDefinition);
+            await db.SaveChangesAsync();
+            (dogVaccine, catVaccine) = (dogDefinition.Id, catDefinition.Id);
+        }
+
+        var http = ClientFor(ctx.Token);
+        var owner = $"Ayşe {ctx.Suffix}";
+        var bytes = Workbook(
+            ("Müşteri Listesi", [["Kayıt Tarihi", "Müşteriler", "Protokol No", "Durum"], ["2018-01-01", owner, "101", "Aktif"]]),
+            ("Hasta Listesi", [
+                ["Müşteriler", "Hastalar", "Protokol No", "Hasta Türü", "Durum"],
+                [owner, "Cesur", "126", "Diğer", "Aktif"],
+                [owner, "Boncuk", "127", "Diğer", "Aktif"]]),
+            ("Randevu Listesi", [
+                ["Müşteriler", "Hastalar", "Görev Tipi", "Başlangıç Tarihi", "Aşı Paketi", "Veteriner", "Durum"],
+                [owner, "Cesur", "Aşılama", "2021-08-03T10:00:00", $"Iev Köpek Aşısı {ctx.Suffix}", "Dr. A", "Tamamlandı"],
+                [owner, "Boncuk", "Aşılama", "2021-08-03T10:00:00", $"Iev Köpek Aşısı {ctx.Suffix}", "Dr. A", "Tamamlandı"],
+                [owner, "Boncuk", "Aşılama", "2021-09-03T10:00:00", $"Iev Kedi Aşısı {ctx.Suffix}", "Dr. A", "Tamamlandı"]]));
+
+        var id = await UploadAsync(http, ctx, bytes);
+        var validationId = (await ImportValidationTestRunner.ValidateAsync(_factory.Services, http, id)).GetProperty("validationId").GetGuid();
+        var preview = await GetJsonAsync(http, $"/api/v1/imports/batches/{id}/preview");
+        var counts = preview.GetProperty("issueCounts").EnumerateArray().ToDictionary(c => c.GetProperty("code").GetString()!, c => c.GetProperty("rowCount").GetInt32());
+        (counts.GetValueOrDefault("Imports.SpeciesFromVaccines"), counts.GetValueOrDefault("Imports.VaccineSpeciesUnverified"),
+                counts.GetValueOrDefault("VaccineDefinitions.InvalidSpecies"))
+            .Should().Be((1, 2, 0), preview.ToString());
+
+        var commit = await http.PostAsJsonAsync($"/api/v1/imports/batches/{id}/commit", new { validationId });
+        commit.StatusCode.Should().Be(HttpStatusCode.Accepted, await commit.Content.ReadAsStringAsync());
+        await RunCommitWorkerAsync();
+
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var pets = await db.Pets.AsNoTracking().Where(p => p.TenantId == ctx.TenantId).ToDictionaryAsync(p => p.Name);
+            pets["Cesur"].SpeciesId.Should().Be(dog, "tek türe özgü aşısı köpek aşısı");
+            (await db.Species.AsNoTracking().SingleAsync(s => s.Id == pets["Boncuk"].SpeciesId)).Code.Should().Be("OTHER");
+            (await db.Vaccinations.AsNoTracking().Where(v => v.ImportBatchId == id).Select(v => new { v.PetId, v.VaccineDefinitionId }).ToListAsync())
+                .Should().BeEquivalentTo(new[]
+                {
+                    new { PetId = pets["Cesur"].Id, VaccineDefinitionId = dogVaccine },
+                    new { PetId = pets["Boncuk"].Id, VaccineDefinitionId = dogVaccine },
+                    new { PetId = pets["Boncuk"].Id, VaccineDefinitionId = catVaccine },
+                }, "türü bilinmeyen hastanın aşıları reddedilmez");
+        }
+    }
+
+    [Fact]
     public async Task Ambiguous_Pet_Group_Should_Show_Its_Records_And_Bind_Records_Before_Birth_Automatically()
     {
         var ctx = await SeedAsync();

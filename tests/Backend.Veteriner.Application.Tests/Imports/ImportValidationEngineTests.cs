@@ -16,13 +16,14 @@ public sealed class ImportValidationEngineTests
 
     private static readonly Guid Dog = Guid.NewGuid();
     private static readonly Guid Cat = Guid.NewGuid();
+    private static readonly Guid Other = Guid.NewGuid();
     private static readonly Guid Tekir = Guid.NewGuid();
     private static readonly Guid Rabies = Guid.NewGuid();
     private static readonly Guid FeLv = Guid.NewGuid();
     private static readonly Guid Bronchine = Guid.NewGuid();
 
     private static readonly ImportCatalogs Catalogs = new(
-        Species: [new(Dog, "Köpek", "DOG", null), new(Cat, "Kedi", "CAT", null)],
+        Species: [new(Dog, "Köpek", "DOG", null), new(Cat, "Kedi", "CAT", null), new(Other, "Diğer", "OTHER", null)],
         Breeds: [new(Tekir, "Tekir", null, Cat)],
         Colors: [],
         Vaccines:
@@ -1053,6 +1054,54 @@ public sealed class ImportValidationEngineTests
             mapping: mapping);
 
         Codes(Single(output, ImportTable.Vaccinations)).Should().Equal("VaccineDefinitions.InvalidSpecies");
+    }
+
+    [Theory]
+    [InlineData("Diğer")]
+    [InlineData(null)]
+    public void Pet_Without_Species_Should_Take_The_Species_All_Its_Specific_Vaccines_Show(string? species)
+    {
+        var output = Run(
+            customers: Customers(Customer(no: "M-1")),
+            pets: Pets(Pet(customerNo: "M-1", petNo: "H-1", name: "Cesur", species: species)),
+            vaccinations: Vaccinations(
+                Vaccination(petNo: "H-1", vaccine: "Bronşin", applied: "03.08.2021"),
+                Vaccination(petNo: "H-1", vaccine: "Kuduz", applied: "03.09.2021")));
+
+        var pet = Single(output, ImportTable.Pets);
+        Codes(pet).Should().Equal("Imports.SpeciesFromVaccines");
+        pet.Status.Should().Be(ImportRowValidationStatus.Valid);
+        ((ImportNormalizedPet)pet.Normalized).SpeciesId.Should().Be(Dog);
+        pet.Issues[0].Message.Should().Contain("Köpek olarak aktarılacak");
+        output.Rows.Where(r => r.Table == ImportTable.Vaccinations)
+            .Should().AllSatisfy(r => (r.Status, r.Normalized.Action).Should().Be((ImportRowValidationStatus.Valid, ImportRowAction.Create)));
+    }
+
+    [Fact]
+    public void Pet_Without_Species_And_Vaccines_Of_Different_Species_Should_Stay_Unknown_And_Keep_Its_Vaccines()
+    {
+        var output = Run(
+            customers: Customers(Customer(no: "M-1")),
+            pets: Pets(Pet(customerNo: "M-1", petNo: "H-1", species: "Diğer"), Pet(customerNo: "M-1", petNo: "H-2", name: "Zeytin", species: "Diğer")),
+            vaccinations: Vaccinations(
+                Vaccination(petNo: "H-1", vaccine: "Bronşin"),
+                Vaccination(petNo: "H-1", vaccine: "Lösemi"),
+                Vaccination(petNo: "H-2", vaccine: "Kuduz")));
+
+        ((ImportNormalizedPet)Single(output, ImportTable.Pets).Normalized).SpeciesId.Should().Be(Other);
+        Codes(Single(output, ImportTable.Pets)).Should().BeEmpty();
+        foreach (var row in new[] { 2, 3 })
+        {
+            var vaccination = Single(output, ImportTable.Vaccinations, row);
+            Codes(vaccination).Should().Equal("Imports.VaccineSpeciesUnverified");
+            vaccination.Status.Should().Be(ImportRowValidationStatus.Warning);
+            var data = (ImportNormalizedVaccination)vaccination.Normalized;
+            (data.Action, data.SpeciesUnverified).Should().Be((ImportRowAction.Create, true));
+        }
+
+        // Türe özgü aşısı olmayan hasta da Diğer kalır; genel aşı uyarısız gelir.
+        ((ImportNormalizedPet)Single(output, ImportTable.Pets, 3).Normalized).SpeciesId.Should().Be(Other);
+        Codes(Single(output, ImportTable.Vaccinations, 4)).Should().BeEmpty();
     }
 
     [Fact]
