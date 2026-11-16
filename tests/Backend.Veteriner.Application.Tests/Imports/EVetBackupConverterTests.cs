@@ -174,7 +174,50 @@ public sealed class EVetBackupConverterTests
             ImportTable.Products);
         result.Tables.SelectMany(t => t.Headers).Should().OnlyContain(h =>
             result.Tables.Any(t => ImportCanonicalSchema.IsCanonical(t.Table, h)));
-        result.Warnings.Should().OnlyContain(w => w.Code == "Imports.EVetConversion");
+        result.Warnings.Should().OnlyContain(w => w.Code.StartsWith("Imports.EVet.") && w.Severity != null && w.Count != null && w.Title != null);
+        result.Warnings.Select(w => w.Code).Should().OnlyHaveUniqueItems("her not türünün kendi kodu var");
+    }
+
+    [Fact]
+    public void Notes_Should_Carry_Kind_Count_And_Breakdown()
+    {
+        var notes = Read(Files()).Warnings.ToDictionary(w => w.Code);
+
+        var owner = notes[EVetNotes.OwnerLinkCode];
+        (owner.Severity, owner.Unit, owner.Title, owner.Source).Should().Be(("info", "hasta", "sahibine bağlanacak", "Hasta Listesi raporu"));
+        owner.Count.Should().Be(owner.Parts!.Sum(p => p.Count));
+
+        var skipped = notes[EVetNotes.TasksSkippedCode];
+        skipped.Severity.Should().Be("skipped");
+        skipped.Count.Should().Be(skipped.Parts!.Sum(p => p.Count));
+        skipped.Parts.Should().Contain(new ImportNotePart("Hastası olmayan", 1)).And.Contain(new ImportNotePart("İptal edilmiş", 1));
+        skipped.Parts.Select(p => p.Count).Should().BeInDescendingOrder();
+
+        notes[EVetNotes.TaskConversionCode].Severity.Should().Be("info");
+        notes[EVetNotes.TasksToRecordsCode].Parts!.Select(p => p.Count).Should().Equal(3, 1);
+    }
+
+    [Theory]
+    [InlineData(4, 1, "decision", 1, true)]
+    [InlineData(4, 0, "info", 4, false)]
+    public void Same_Owner_Same_Name_Note_Should_Be_A_Decision_Only_While_Rows_Await_A_Choice(
+        int resolved, int unresolved, string severity, int count, bool hasTarget)
+    {
+        var note = EVetNotes.SameOwnerSameName(resolved, unresolved);
+
+        (note.Severity, note.Count).Should().Be((severity, count));
+        (note.Target?.Anchor == ImportNoteTarget.Required).Should().Be(hasTarget);
+    }
+
+    [Theory]
+    [InlineData(3, 2, "attention", 2, "rapor satırı")]
+    [InlineData(3, 0, "info", 3, "aşı")]
+    public void Vaccine_Report_Note_Should_Ask_Attention_Only_For_Unmatched_Rows(
+        int matched, int unmatched, string severity, int count, string unit)
+    {
+        var note = EVetNotes.VaccineReport(matched, unmatched);
+
+        (note.Severity, note.Count, note.Unit).Should().Be((severity, count, unit));
     }
 
     [Fact]
@@ -599,7 +642,8 @@ public sealed class EVetBackupConverterTests
         Rows(result, ImportTable.Vaccinations).Select(v => v["HayvanNo"]).Should().Equal("811", "812", "811", "Belirsiz: 811 / 812");
         Rows(result, ImportTable.ClinicalRecords).Select(r => r["HayvanNo"]).Should().Equal("811");
         result.Warnings.Should().Contain(w => w.Message.StartsWith("Aynı sahipte aynı adlı birden çok hasta: 4 muayene / görev satırı")
-            && w.Message.Contains("1 satırın hangi hastaya ait olduğu aktarma ekranında sorulacak"));
+            && w.Message.Contains("1 satırın hangi hastaya ait olduğu aktarma ekranında sorulacak")
+            && w.Code == EVetNotes.SameOwnerSameNameCode && w.Severity == ImportNoteSeverity.Decision && w.Count == 1);
     }
 
     [Fact]

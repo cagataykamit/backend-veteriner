@@ -18,9 +18,6 @@ namespace Backend.Veteriner.Application.Imports.Reading.EVet;
 /// </summary>
 internal static class EVetBackupConverter
 {
-    /// <summary>Dönüştürme bilgisi (okuma uyarısı; parti oluşturma yanıtındaki <c>warnings</c>).</summary>
-    public const string WarningCode = "Imports.EVetConversion";
-
     private const string CustomerSheet = "musterilistesi";
     private const string PetSheet = "hastalistesi";
     private const string TaskSheet = "randevulistesi";
@@ -91,12 +88,6 @@ internal static class EVetBackupConverter
         var output = new List<ImportSourceTable>();
         var warnings = new List<ImportReadWarning>();
 
-        if (reports.OwnerByPetProtocol is null && sheets.ContainsKey(PetSheet))
-        {
-            warnings.Add(new ImportReadWarning(WarningCode, ImportTable.Pets,
-                "Hasta Listesi raporu yüklenmedi: hastalar sahibine yedekteki sahip adıyla bağlanacak; aynı adlı müşterilerin hastaları hata alır."));
-        }
-
         if (sheets.TryGetValue(CustomerSheet, out var customers))
             Add(output, ConvertCustomers(customers, state));
         if (sheets.TryGetValue(PetSheet, out var pets))
@@ -115,13 +106,7 @@ internal static class EVetBackupConverter
         Add(output, new ImportSourceTable(ImportTable.ClinicalRecords, ClinicalHeaders, clinicalRows));
 
         if (state.PetsByPair is { AutoResolved: > 0 } or { Unresolved: > 0 })
-        {
-            var (resolved, unresolved) = (state.PetsByPair.AutoResolved, state.PetsByPair.Unresolved);
-            warnings.Add(new ImportReadWarning(WarningCode, ImportTable.Pets,
-                $"Aynı sahipte aynı adlı birden çok hasta: {resolved} muayene / görev satırı tarihten (doğum, E-vet kaydı, vefat), "
-                + "türden (aşı adı, Aşı Bilgisi raporu), mikroçipten, kilodan ya da tek aktif kayıttan doğru hastaya kendiliğinden bağlandı"
-                + (unresolved > 0 ? $"; {unresolved} satırın hangi hastaya ait olduğu aktarma ekranında sorulacak." : ".")));
-        }
+            warnings.Add(EVetNotes.SameOwnerSameName(state.PetsByPair.AutoResolved, state.PetsByPair.Unresolved));
 
         foreach (var table in output)
         {
@@ -345,40 +330,17 @@ internal static class EVetBackupConverter
             ]));
         }
 
-        if (state.Reports.OwnerByPetProtocol is not null)
-        {
-            warnings.Add(new ImportReadWarning(WarningCode, ImportTable.Pets,
-                $"{reportLinked} hasta sahibine Hasta Listesi raporundaki protokolle, {rows.Count - reportLinked} hasta sahip adıyla bağlanacak."));
-        }
-
+        warnings.Add(state.Reports.OwnerByPetProtocol is not null
+            ? EVetNotes.OwnerLink(reportLinked, rows.Count - reportLinked)
+            : EVetNotes.OwnerReportMissing(rows.Count));
         if (movedChips > 0)
-        {
-            warnings.Add(new ImportReadWarning(WarningCode, ImportTable.Pets,
-                $"{movedChips} hastanın mikroçipi rakam dışı karakter içeriyor ya da başka hastada da kayıtlı; numara hastanın notuna yazılacak."));
-        }
-
+            warnings.Add(EVetNotes.ChipToNote(movedChips));
         if (formerByProtocol + formerByChip + formerByCopy > 0)
-        {
-            warnings.Add(new ImportReadWarning(WarningCode, ImportTable.Pets,
-                $"Aynı hayvanın {formerByProtocol + formerByChip + formerByCopy} ek kaydı tek hastada birleşecek (sahibi değişen hastanın eski "
-                + $"sahipteki kaydı: {formerByProtocol} aynı protokolle, {formerByChip} aynı mikroçiple; aynı sahipte {formerByCopy} kopya kayıt): "
-                + "birleşen kayıt vefat olarak gelmez, aşı ve muayene geçmişi hastaya yazılır, önceki sahip ve kopya hastanın notunda kalır."));
-        }
-
+            warnings.Add(EVetNotes.FormerRecordsMerged(formerByProtocol, formerByChip, formerByCopy));
         if (renamed > 0 || merged > 0)
-        {
-            warnings.Add(new ImportReadWarning(WarningCode, ImportTable.Pets,
-                $"Aynı sahipte aynı ad ve türle birden çok hasta var: bilgileri farklı {renamed} hasta ayrı aktarılacak ve adına E-vet "
-                + $"protokolü eklenecek (ör. Pamuk (E-vet 1234)); bilgileri aynı {merged} tekrar kayıt ilk kayıtla birleşecek. Muayene ve "
-                + "görevler o tarihte kayıtlı ve hayattaki tek hastaya bağlanır; ayırt edilemeyen satır hata alır (yanlış hastaya yazılmaz)."));
-        }
-
+            warnings.Add(EVetNotes.SameNameRenamed(renamed, merged));
         if (duplicated.Count > 0 || state.DuplicatedCustomerProtocols > 0)
-        {
-            warnings.Add(new ImportReadWarning(WarningCode, ImportTable.Pets,
-                $"Yedekte {state.DuplicatedCustomerProtocols} müşteri ve {duplicated.Count} hasta protokol numarası birden çok kayıtta geçiyor; "
-                + "bu kayıtların numarasına satır numarası eklendi (ör. 1234#56); tek aktif kaydın sahibi Hasta Listesi raporundan, diğerlerinin sahibi adla bağlanacak."));
-        }
+            warnings.Add(EVetNotes.DuplicateProtocol(state.DuplicatedCustomerProtocols, duplicated.Count));
 
         return new ImportSourceTable(ImportTable.Pets, PetHeaders, rows);
     }
@@ -669,36 +631,15 @@ internal static class EVetBackupConverter
 
         var (serialMatched, serialUnmatched) = MatchVaccineReport(applied, state.Reports);
         var vaccinationRows = applied.Select(a => a.ToRow()).ToList();
-        warnings.Add(new ImportReadWarning(WarningCode, ImportTable.Vaccinations,
-            $"Randevu Listesi: {vaccinationRows.Count} tamamlanmış aşı aşı geçmişine, {appointments.Count} gelecek görev randevuya dönüşecek; "
-            + $"{dueDates} aşının sonraki aşı tarihi E-vet'teki yapılacak aşı görevinden alındı."));
+        warnings.Add(EVetNotes.TaskConversion(vaccinationRows.Count, appointments.Count, dueDates));
         if (records.Count > 0)
-        {
-            warnings.Add(new ImportReadWarning(WarningCode, ImportTable.ClinicalRecords,
-                $"Randevu Listesi: geçmişte kalan {records.Count} aşı dışı görev ({records.Count - missed} tamamlanmış, {missed} gelinmemiş) "
-                + "hastanın eski program kayıtlarına eklenecek; kayıt türü görev tipidir."
-                + (treatments > 0 ? $" Aşı paketine yazılmış {treatments} tedavi (ör. uyuz tedavisi) aşı değil, tedavi olarak bunlara dahildir." : "")));
-        }
-
+            warnings.Add(EVetNotes.TasksToRecords(records.Count, missed, treatments));
         if (early > 0)
-        {
-            warnings.Add(new ImportReadWarning(WarningCode, ImportTable.ClinicalRecords,
-                $"Randevu Listesi: {early} görev planlanan tarihinden önce tamamlanmış (E-vet'te tarihi gelecekte kalmış); aktarma gününün "
-                + "tarihiyle yazılacak, planlanan tarih notta kalacak."));
-        }
-
+            warnings.Add(EVetNotes.EarlyCompleted(early));
         if (skipped.Total > 0)
-        {
-            warnings.Add(new ImportReadWarning(WarningCode, ImportTable.Appointments,
-                $"Randevu Listesi: {skipped.Total} görev aktarılmayacak ({skipped.Describe()})."));
-        }
-
+            warnings.Add(EVetNotes.TasksSkipped(skipped.Reasons));
         if (state.Reports.Vaccines is not null)
-        {
-            warnings.Add(new ImportReadWarning(WarningCode, ImportTable.Vaccinations,
-                $"Aşı Bilgisi raporu: {serialMatched} aşıya ürün adı ve seri numarası eklendi; {serialUnmatched} rapor satırı yedekteki "
-                + "tamamlanmış aşılarla eşleşmedi (o gün tamamlanmış aşı yok ya da ürün adından ayırt edilemedi)."));
-        }
+            warnings.Add(EVetNotes.VaccineReport(serialMatched, serialUnmatched));
 
         return (
             vaccinationRows.Count == 0 ? null : new ImportSourceTable(ImportTable.Vaccinations, VaccinationHeaders, vaccinationRows),
@@ -1113,8 +1054,9 @@ internal static class EVetBackupConverter
                 _reasons[reason] = _reasons.GetValueOrDefault(reason) + count;
         }
 
-        public string Describe()
-            => string.Join(", ", _reasons.OrderByDescending(r => r.Value).Select(r => $"{r.Key}: {r.Value}"));
+        /// <summary>Neden → sayı, çoktan aza.</summary>
+        public IReadOnlyList<(string Reason, int Count)> Reasons
+            => _reasons.OrderByDescending(r => r.Value).Select(r => (r.Key, r.Value)).ToList();
     }
 }
 

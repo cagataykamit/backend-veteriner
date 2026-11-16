@@ -58,10 +58,7 @@ public static class CsvTableReader
         var text = Decode(content, forcedUtf8);
         if (text.Contains('�'))
         {
-            warnings.Add(new ImportReadWarning(
-                "Imports.EncodingSuspect",
-                table,
-                $"{Mapping.ImportCanonicalNames.Display(table)} dosyasında okunamayan karakterler var; kodlama (UTF-8 / Windows-1254) yanlış olabilir."));
+            warnings.Add(ImportReadNotes.EncodingSuspect(table));
         }
 
         var separator = forcedDelimiter ?? DetectDelimiter(text);
