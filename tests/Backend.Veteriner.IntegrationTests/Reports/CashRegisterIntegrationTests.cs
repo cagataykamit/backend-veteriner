@@ -349,6 +349,23 @@ public sealed partial class DailyTransactionsReportIntegrationTests
     }
 
     [Fact]
+    public async Task Concurrent_Register_Creates_Should_Open_Exactly_One_Main_Register_Without_Server_Error()
+    {
+        var env = await SeedTenantAsync();
+        await SetPlanAsync(env.TenantId, SubscriptionPlanCode.Pro);
+        var manager = await env.NewHttpForAnotherUserAsync(CashManagerPermissions);
+
+        // Klinikte Ana kasa yok: her istek EnsureMain yolundan geçer.
+        var responses = await Task.WhenAll(Enumerable.Range(0, 6).Select(i =>
+            manager.PostAsJsonAsync(Registers, new { clinicId = env.ClinicId, code = $"E{i}", name = $"Eşzamanlı {i}" })));
+
+        responses.Should().OnlyContain(r => r.StatusCode == HttpStatusCode.OK, "eksik Ana kasayı eşzamanlı tamamlamak 500 vermez");
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await db.CashRegisters.IgnoreQueryFilters().CountAsync(r => r.ClinicId == env.ClinicId && r.IsMain)).Should().Be(1);
+    }
+
+    [Fact]
     public async Task Backfill_Should_Create_Main_Register_And_Link_Old_Cash_Once()
     {
         var env = await SeedTenantAsync();

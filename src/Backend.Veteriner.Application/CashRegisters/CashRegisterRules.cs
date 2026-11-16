@@ -165,12 +165,19 @@ internal static class CashRegisterRules
 
     /// <summary>
     /// Kliniğin Ana kasası; yoksa (migration sonrası açılan ve uygulama yolu dışında kurulan klinik) oluşturulur. Yeni klinikte
-    /// <see cref="CashRegister.CreateMain"/> klinikle birlikte yazılır; bu yol yalnız eksik kalanı tamamlar.
+    /// <see cref="CashRegister.CreateMain"/> klinikle birlikte yazılır; bu yol yalnız eksik kalanı tamamlar. Eksikse klinik kilidi
+    /// altında yeniden okunur: eşzamanlı iki çağrıdan ikincisi ilkinin oluşturduğu kasayı alır, benzersiz indekse çarpmaz. Çağıran
+    /// komut transaction içinde olmalı.
     /// </summary>
     public static async Task<CashRegister> EnsureMainAsync(
-        IRepositoryBase<CashRegister> registers, Guid tenantId, Guid clinicId, DateTime nowUtc, CancellationToken ct)
+        IRepositoryBase<CashRegister> registers, ITransactionLock locks, Guid tenantId, Guid clinicId, DateTime nowUtc, CancellationToken ct)
     {
         var main = await registers.FirstOrDefaultAsync(new MainCashRegisterSpec(tenantId, clinicId), ct);
+        if (main is not null)
+            return main;
+
+        await locks.AcquireAsync($"cash-register-main:{tenantId:N}:{clinicId:N}", ct);
+        main = await registers.FirstOrDefaultAsync(new MainCashRegisterSpec(tenantId, clinicId), ct);
         if (main is not null)
             return main;
 
