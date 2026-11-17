@@ -81,7 +81,8 @@ public sealed record GetCashCountsQuery(
 
 /// <summary>
 /// POST /api/v1/cash-counts. <see cref="ExpectedCashAmount"/> istemcinin gösterdiği beklenen nakittir; sunucunun hesabıyla aynı değilse
-/// kayıt yazılmaz (<c>CashCounts.ExpectedChanged</c>), personel güncel rakamı görüp yeniden onaylar. Kasa verilmezse Ana kasa.
+/// kayıt yazılmaz (<c>CashCounts.ExpectedChanged</c>), personel güncel rakamı görüp yeniden onaylar. Kasa verilmezse Ana kasa
+/// (eksikse <c>CashRegisterRules.EnsureMainAsync</c> kilitle tamamlar; kilit transaction ister).
 /// </summary>
 public sealed record CreateCashCountCommand(
     Guid? ClinicId,
@@ -91,7 +92,7 @@ public sealed record CreateCashCountCommand(
     decimal ExpectedCashAmount,
     string? Note,
     Guid? CashRegisterId = null)
-    : IRequest<Result<CashCountDto>>, IAuditableRequest
+    : IRequest<Result<CashCountDto>>, IAuditableRequest, ITransactionalRequest
 {
     public string AuditAction => "CashCount.Create";
     public string? AuditTarget => $"ClinicId={ClinicId};BusinessDate={BusinessDate:yyyy-MM-dd}";
