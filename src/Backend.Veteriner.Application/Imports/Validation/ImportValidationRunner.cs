@@ -43,7 +43,7 @@ public sealed class ImportValidationRunner
 
         var catalogs = await _catalogs.LoadAsync(batch.TenantId, ct);
         var existing = await _existingData.LoadAsync(
-            batch.TenantId, batch.ClinicId, ImportLookupKeys.From(tables, mapping), present, nowUtc, ct);
+            batch.TenantId, batch.ClinicId, batch.SourceProfile, ImportLookupKeys.From(tables, mapping), present, nowUtc, ct);
 
         var output = ImportValidationEngine.Run(new ImportValidationInput(
             tables, mapping, ImportOptionsDocument.Parse(batch.OptionsJson), catalogs, existing, nowUtc));

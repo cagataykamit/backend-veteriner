@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Backend.Veteriner.Application.Common.Auditing;
 using Backend.Veteriner.Application.Imports.Commands.ApplyOwnerUnit;
+using Backend.Veteriner.Application.Imports.Commands.RollbackBalanceAdjustments;
 using Backend.Veteriner.Application.Imports.Commands.RollbackOwnerUnit;
 using Backend.Veteriner.Application.Imports.Commit;
 using Backend.Veteriner.Application.Imports.Mapping;
@@ -136,6 +137,12 @@ public sealed class ImportRollbackProcessor
                     "Import rollback progress. Batch={BatchId} Units={Done}/{Total}", batchId, unitsDone, plan.Units.Count);
             }
 
+            if (!await RollbackBalanceAdjustmentsAsync(batchId, tenantId, ct))
+            {
+                LogLeaseLost(batchId);
+                return;
+            }
+
             await TransientSqlRetry.ExecuteAsync(c => CompleteAsync(batchId, tenantId, policy, c), _logger, "import-rollback-complete", ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -202,6 +209,47 @@ public sealed class ImportRollbackProcessor
             return false;
 
         throw new InvalidOperationException($"Geri alma birimi başarısız: {result.Error.Code}");
+    }
+
+    /// <summary>
+    /// Son adım (ADR-051): eşleşen müşterilere açılmış, değişmemiş bakiye farkı hareketleri silinir. Kira kaybında false. Tekrar
+    /// çalıştırılabilir (devralan işçi aynı adımı yeniden yapar, silinen bulunmaz).
+    /// </summary>
+    private async Task<bool> RollbackBalanceAdjustmentsAsync(Guid batchId, Guid tenantId, CancellationToken ct)
+    {
+        Result<ImportBalanceAdjustmentRollbackResult> result;
+        try
+        {
+            result = await TransientSqlRetry.ExecuteAsync(
+                async c =>
+                {
+                    await using var scope = _scopes.CreateTenantScope(tenantId);
+                    var sender = scope.ServiceProvider.GetRequiredService<ISender>();
+                    return await sender.Send(new RollbackImportBalanceAdjustmentsCommand(batchId, WorkerId), c);
+                },
+                _logger, "import-rollback-balance-adjustments", ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return false;
+        }
+
+        if (result.IsSuccess)
+        {
+            if (result.Value!.Deleted + result.Value.Kept > 0)
+            {
+                _logger.LogInformation(
+                    "Import rollback balance adjustments. Batch={BatchId} Deleted={Deleted} Kept={Kept}",
+                    batchId, result.Value.Deleted, result.Value.Kept);
+            }
+
+            return true;
+        }
+
+        if (result.Error.Code == ImportOwnerUnitErrors.LeaseLostCode)
+            return false;
+
+        throw new InvalidOperationException($"Bakiye farkı geri alınamadı: {result.Error.Code}");
     }
 
     private Task<bool> RenewLeaseAsync(Guid batchId, Guid tenantId, CancellationToken ct)

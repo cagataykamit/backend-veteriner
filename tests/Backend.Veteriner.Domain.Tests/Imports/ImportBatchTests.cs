@@ -415,10 +415,9 @@ public sealed class ImportBatchTests
     }
 
     [Fact]
-    public void Rollback_Window_Should_Be_15_Days_And_Separate_From_Payload_Retention()
+    public void Rollback_Window_Should_Be_15_Days()
     {
         ImportBatch.RollbackWindow.Should().Be(TimeSpan.FromDays(15), "kullanıcı kararı 2026-11-17");
-        ImportBatch.PayloadRetention.Should().Be(TimeSpan.FromDays(30), "satır verisi saklaması ayrı kuraldır");
     }
 
     [Fact]
@@ -570,11 +569,8 @@ public sealed class ImportBatchTests
         ImportBatchStatusSets.ContentHashReleased.Should().BeEquivalentTo(
             [ImportBatchStatus.CommitFailed, ImportBatchStatus.RolledBack, ImportBatchStatus.Discarded, ImportBatchStatus.Expired]);
         ImportBatchStatusSets.Draft.Should().Contain(ImportBatchStatusSets.IdleDraft).And.Contain(ImportBatchStatus.Validating);
-        ImportBatchStatusSets.PayloadRetained.Should().BeEquivalentTo(
-        [
-            ImportBatchStatus.Committed, ImportBatchStatus.CommitFailed, ImportBatchStatus.RolledBack,
-            ImportBatchStatus.PartiallyRolledBack, ImportBatchStatus.RollbackFailed,
-        ]);
+        ImportBatchStatusSets.Closed.Should().BeEquivalentTo(
+            [ImportBatchStatus.RolledBack, ImportBatchStatus.Discarded, ImportBatchStatus.Expired]);
     }
 
     [Fact]

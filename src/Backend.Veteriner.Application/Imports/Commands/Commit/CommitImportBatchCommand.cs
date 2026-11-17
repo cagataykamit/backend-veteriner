@@ -8,9 +8,10 @@ namespace Backend.Veteriner.Application.Imports.Commands.Commit;
 /// <summary>
 /// POST /api/v1/imports/batches/{id}/commit (IMPORT_API_CONTRACT.md §7.9): önizlenen doğrulamayı onaylar ve partiyi
 /// arka plan uygulamasına (<c>Committing</c>) alır. <see cref="ValidationId"/> istek anahtarıdır (tekrar = aynı parti).
-/// Audit payload'ı yalnız kimlikler ve seçeneği taşır.
+/// Audit payload'ı yalnız kimlikler ve seçenekleri taşır; <see cref="BalanceDifferences"/> eşleşen müşterilerin bakiye farkı seçimidir
+/// (ADR-051; <c>Skip</c> varsayılan, <c>Apply</c>).
 /// </summary>
-public sealed record CommitImportBatchCommand(Guid Id, Guid ValidationId, string? OnErrors)
+public sealed record CommitImportBatchCommand(Guid Id, Guid ValidationId, string? OnErrors, string? BalanceDifferences = null)
     : IRequest<Result<ImportCommitResultDto>>, IAuditableRequest
 {
     public const string SkipErrorRows = "SkipErrorRows";

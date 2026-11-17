@@ -4,21 +4,38 @@ using Backend.Veteriner.Domain.Imports;
 namespace Backend.Veteriner.Application.Imports.Specs;
 
 /// <summary>
-/// Satır verisinin saklama süresi (<see cref="ImportBatch.PayloadRetention"/>, K9) dolmuş ve henüz temizlenmemiş
-/// partiler. <see cref="ImportBatch.PayloadPurgeDueAtUtc"/> ile aynı kural; B5 bakım işi kullanır. Salt okunur
-/// (işçi her partiyi kendi kapsamında yeniden okur).
+/// Geri alma süresi dolmuş, satırları henüz silinmemiş aktarılmış partiler (ADR-051 eki). <see cref="ImportBatch.PayloadPurgeDueAtUtc"/>
+/// (= <see cref="ImportBatch.RollbackDeadlineUtc"/>) ile aynı kural; bakım işi kullanır. Salt okunur (işçi her partiyi kendi kapsamında
+/// yeniden okur).
 /// </summary>
 public sealed class ImportBatchesDuePayloadPurgeSpec : Specification<ImportBatch>
 {
     public ImportBatchesDuePayloadPurgeSpec(DateTime nowUtc, int batchSize)
     {
-        var retained = ImportBatchStatusSets.PayloadRetained.ToArray();
-        var cutoff = nowUtc - ImportBatch.PayloadRetention;
+        var applied = ImportBatchStatusSets.RollbackableFrom.ToArray();
+        var cutoff = nowUtc - ImportBatch.RollbackWindow;
 
         Query.AsNoTracking();
         Query.Where(b => b.PayloadPurgedAtUtc == null
-                         && retained.Contains(b.Status)
-                         && (b.UpdatedAtUtc ?? b.CreatedAtUtc) <= cutoff);
+                         && applied.Contains(b.Status)
+                         && (b.CommittedAtUtc ?? b.ValidatedAtUtc ?? b.CreatedAtUtc) <= cutoff);
+        Query.OrderBy(b => b.CommittedAtUtc).Take(batchSize);
+    }
+}
+
+/// <summary>
+/// Kaydıyla birlikte silinecek kapanmış partiler (ADR-051 eki): <see cref="ImportBatchStatusSets.Closed"/> ve son hareketten
+/// <see cref="ImportBatch.RollbackWindow"/> geçmiş. <see cref="ImportBatch.DeletionDueAtUtc"/> ile aynı kural. Salt okunur.
+/// </summary>
+public sealed class ImportBatchesDueDeletionSpec : Specification<ImportBatch>
+{
+    public ImportBatchesDueDeletionSpec(DateTime nowUtc, int batchSize)
+    {
+        var closed = ImportBatchStatusSets.Closed.ToArray();
+        var cutoff = nowUtc - ImportBatch.RollbackWindow;
+
+        Query.AsNoTracking();
+        Query.Where(b => closed.Contains(b.Status) && (b.UpdatedAtUtc ?? b.CreatedAtUtc) <= cutoff);
         Query.OrderBy(b => b.UpdatedAtUtc).Take(batchSize);
     }
 }

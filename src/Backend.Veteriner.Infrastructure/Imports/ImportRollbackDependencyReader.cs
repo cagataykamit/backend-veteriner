@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Imports.Rollback;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -65,6 +66,41 @@ public sealed class ImportRollbackDependencyReader : IImportRollbackDependencyRe
     private readonly AppDbContext _db;
 
     public ImportRollbackDependencyReader(AppDbContext db) => _db = db;
+
+    /// <summary>Partinin devir hareketi (ücret ya da alacak) ve "değişti" kuralı; tek yer.</summary>
+    private sealed record BatchBalance(Guid ClientId, Guid Id, bool Changed, bool IsCredit);
+
+    /// <summary>Partinin verilen müşterilere açtığı devir ücretleri; iptal ve tahsis "değişti" sayılır (iptal edilmiş ücret de okunur).</summary>
+    private IQueryable<BatchBalance> BatchCharges(Guid tenantId, Guid batchId, Guid[] clientIds)
+        => _db.Charges.IgnoreQueryFilters(QueryFilterNames.Ignorable).AsNoTracking()
+            .Where(c => c.TenantId == tenantId && c.ImportBatchId == batchId && clientIds.Contains(c.ClientId))
+            .Select(c => new BatchBalance(c.ClientId, c.Id, c.VoidedAtUtc != null || c.AllocatedAmount > 0, false));
+
+    /// <summary>Partinin verilen müşterilere açtığı devir alacakları (ADR-048 T3); herhangi bir mahsup satırı (geri alınmış da), iade ve iptal "değişti" sayılır.</summary>
+    private IQueryable<BatchBalance> BatchCredits(Guid tenantId, Guid batchId, Guid[] clientIds)
+        => _db.ClientCredits.AsNoTracking()
+            .Where(c => c.TenantId == tenantId && c.ImportBatchId == batchId && clientIds.Contains(c.ClientId))
+            .Select(c => new BatchBalance(
+                c.ClientId,
+                c.Id,
+                c.RefundedAtUtc != null || c.VoidedAtUtc != null || c.UsedAmount > 0 || _db.ClientCreditApplications.Any(a => a.CreditId == c.Id),
+                true));
+
+    public async Task<IReadOnlyList<ImportBalanceAdjustmentFact>> ReadBalanceAdjustmentsAsync(Guid tenantId, Guid batchId, CancellationToken ct)
+    {
+        var matchedClients = await _db.ImportBatchRows.AsNoTracking()
+            .Where(r => r.BatchId == batchId && r.Table == ImportTable.Customers && r.ApplyStatus == ImportRowApplyStatus.Matched
+                        && r.TargetEntityId != null)
+            .Select(r => r.TargetEntityId!.Value)
+            .Distinct()
+            .ToArrayAsync(ct);
+        if (matchedClients.Length == 0)
+            return [];
+
+        var charges = await BatchCharges(tenantId, batchId, matchedClients).ToListAsync(ct);
+        var credits = await BatchCredits(tenantId, batchId, matchedClients).ToListAsync(ct);
+        return charges.Concat(credits).Select(b => new ImportBalanceAdjustmentFact(b.Id, b.IsCredit, b.Changed)).ToList();
+    }
 
     public async Task<ImportRollbackFacts> ReadAsync(Guid tenantId, ImportRollbackTargets targets, CancellationToken ct)
     {
@@ -164,28 +200,13 @@ public sealed class ImportRollbackDependencyReader : IImportRollbackDependencyRe
                 .Select(e => new { e.ClientId, e.Id })
                 .ToListAsync(ct);
 
-        // Partinin devir ücretleri (müşteri başına en çok bir); iptal ve tahsis "değişti" sayılır.
+        // Partinin devir ücretleri ve alacakları (müşteri başına en çok bir).
         var openingBalances = clientIds.Length == 0
             ? []
-            : await _db.Charges.IgnoreQueryFilters(QueryFilterNames.Ignorable).AsNoTracking()
-                .Where(c => c.TenantId == tenantId && c.ImportBatchId == batchId && clientIds.Contains(c.ClientId))
-                .Select(c => new { c.ClientId, c.Id, Changed = c.VoidedAtUtc != null || c.AllocatedAmount > 0, IsCredit = false })
-                .ToListAsync(ct);
-
-        // Partinin devir alacakları (ADR-048 T3); herhangi bir mahsup satırı (geri alınmış da), iade ve iptal "değişti" sayılır.
+            : await BatchCharges(tenantId, batchId, clientIds).ToListAsync(ct);
         var openingCredits = clientIds.Length == 0
             ? []
-            : await _db.ClientCredits.AsNoTracking()
-                .Where(c => c.TenantId == tenantId && c.ImportBatchId == batchId && clientIds.Contains(c.ClientId))
-                .Select(c => new
-                {
-                    c.ClientId,
-                    c.Id,
-                    Changed = c.RefundedAtUtc != null || c.VoidedAtUtc != null || c.UsedAmount > 0
-                              || _db.ClientCreditApplications.Any(a => a.CreditId == c.Id),
-                    IsCredit = true,
-                })
-                .ToListAsync(ct);
+            : await BatchCredits(tenantId, batchId, clientIds).ToListAsync(ct);
 
         var productIds = targets.ProductIds.ToArray();
         var products = productIds.Length == 0

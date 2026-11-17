@@ -24,7 +24,16 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 | Dosya notları (2026-11-16) | `warnings[]` öğesine isteğe bağlı satır alanları (`severity`, `count`, `unit`, `title`, `source`, `parts`, `outcome`, `example`, `target`); E-vet notlarına tür başına kod; notlar partiye yazılır ve parti ayrıntısıyla döner (bölüm 7.2.1) | **Uygulandı** (migration `AddImportBatchWarnings`) |
 | Geri alma süresi ve sade liste (2026-11-16) | Geri alma uygulamadan sonra 30 gün açık, sonra aktarma kesinleşir (`409 Imports.RollbackWindowClosed`); parti nesnesinde `canRollback`, `rollbackDeadlineUtc`; liste varsayılan olarak kapanmış partileri (`RolledBack`, `Discarded`, `Expired`) göstermez, `includeClosed=true` ile gelir (bölüm 7.5, 7.11, 7.12, 9.1) | **Uygulandı** (migration yok) |
 | Kalan kayıtların tanıtımı (2026-11-17) | `rollback-preview` `blockedItems` öğesine `groupId` (geri alma birimi) ve `record` (ad, tür, hasta, sahip, tarih; yalnız `Clients.Read` + `Pets.Read` ile); liste zincir sırasıyla gruplu (bölüm 7.11) | **Uygulandı** (migration yok; geriye uyumlu ekleme, sıralama değişti) |
-| Geri alma süresi 15 gün (2026-11-17) | `ImportBatch.RollbackWindow` 30 → 15 gün; parti nesnesine `rollbackWindowDays` (süre, gün). Satır verisi saklaması (30 gün, K9) değişmedi (bölüm 7.5, 9.1) | **Uygulandı** (migration yok) |
+| Geri alma süresi 15 gün (2026-11-17) | `ImportBatch.RollbackWindow` 30 → 15 gün; parti nesnesine `rollbackWindowDays` (süre, gün). Satır ve parti saklaması da bu süreyi kullanır (aşağıdaki saklama satırı, bölüm 7.5, 9.1, 10.1) | **Uygulandı** (migration yok) |
+| Güncelleme aktarması (ADR-051, 2026-11-17) | Kaynak kimliği (`MusteriNo`, `HayvanNo`) kalıcı eşleme tablosunda; ikinci yedekte önce kaynak kimliğiyle eşleşme; klinik kayıtta uygulama anı mükerrer denetimi; bakiye farkı listesi ve commit seçimi `balanceDifferences`; önizlemede `overlap` özeti; geri almada fark hareketi (bölüm 14) | **Uygulandı** (migration `AddImportSourceLinks`) |
+| Satır ve parti saklama (ADR-051 eki, 2026-11-17) | Aktarılmış partinin satırları geri alma süresi dolunca silinir; kapanmış parti (`RolledBack`, `Discarded`, `Expired`) aynı süre sonra kaydıyla silinir; parçalı bakım; ayrı saklama sabiti kalktı (bölüm 10.1) | **Uygulandı** (migration yok) |
+
+**Frontend için değişenler (güncelleme aktarması, 2026-11-17; geriye uyumlu, bölüm 14):**
+- Önizlemeye `overlap` (güncelleme özeti) ve `balanceDifferences` (bakiye farkı listesi) eklendi. `overlap.isUpdate = true` iken sayfanın en üstünde "Bu dosya önceki aktarmayla büyük ölçüde örtüşüyor: X yeni müşteri, Y yeni hasta, Z yeni aşı… gelecek; geri kalanı zaten var" özeti gösterilir.
+- Commit gövdesine isteğe bağlı `balanceDifferences: "Skip" | "Apply"` (varsayılan `Skip`). Bakiye farkı varsa ekran farkları listeler ve tek seçimle "farkları devir olarak aç" ya da "atla" sunar.
+- Yeni satır kodları: `Imports.MatchedBySourceId` (bilgi), `Imports.BalanceDifference` (uyarı). `Imports.BalanceNotAppliedToExisting` artık yalnız dosya içi mükerrer müşteride çıkar.
+- `rollback-preview` yanıtına `balanceAdjustments: { delete, keep }`.
+- **Saklama değişti (bölüm 10.1):** aktarılmış partinin satırları geri alma süresi dolunca tamamen silinir (`payloadPurgedAtUtc` dolar; `rows`/`errors` `410`, `rollback-preview` sayıları 0). Ekran bu partide "Bu aktarma kesinleşti, satır ayrıntısı saklanmıyor" demeli. `RolledBack`, `Discarded`, `Expired` partiler son hareketten geri alma süresi kadar sonra tamamen silinir (listede görünmez, uçları `404`); "kapanmış/geri alınanları göster" filtresi bunu söylemeli.
 
 **Frontend için değişenler (geri alma süresi ve sade liste, 2026-11-16; bölüm 7.5, 9.1):**
 - Parti nesnesine (ayrıntı, liste ve bütün parti yanıtları) `canRollback` (bool) ve `rollbackDeadlineUtc` (UTC, geri alınabilir durumda olmayan partide `null`) eklendi. "Geri al" düğmesi `canRollback` ile gösterilir; son tarih `rollbackDeadlineUtc`'den yazılır. `rollbackDeadlineUtc` geçmişse aktarma kesinleşmiştir. İstemci süreyi kendisi hesaplamaz.
@@ -810,16 +819,27 @@ Geri alma uygulamadan sonra **15 gün** açıktır (2026-11-17 kullanıcı karar
 - **Kapsam:** bütün geri alınabilir durumlar (`Committed`, `CommitFailed`, `PartiallyRolledBack`, `RollbackFailed`). Süre geçince `409 Imports.RollbackWindowClosed`; durum ve kayıtlar değişmez.
 - **Yarım kalmış geri alma:** `PartiallyRolledBack` veya `RollbackFailed` parti süre dolduktan sonra **yeniden denenemez**. Gerekçe: kalan kayıtlar ya bağı olduğu için korunmuştur ya da süre boyunca klinikte kullanılmaya devam etmiştir; süre dolunca onları silmek tam da bu kuralın önlediği şeydir. Her sahip birimi tek işlemde silindiğinden kalan veri tutarlıdır (yarım müşteri/hasta kalmaz). Geri alma hatası genelde hemen fark edilip süre içinde yeniden denenir.
 - **Başlamış iş biter:** süre yalnız yeni geri almanın başlatılmasını sınırlar. Süre dolmadan başlamış (`RollingBack`) iş, çökme sonrası devralma dahil, süre dolsa da tamamlanır.
-- Satır verisinin 30 günlük temizliği (bölüm 10, ADR-019 K9) ayrı kuraldır ve son durum değişikliğinden sayılır; geri alma satır verisine değil hedef kimliklere dayandığından ikisi birbirini beklemez.
+- ~~Satır verisinin 30 günlük temizliği ayrı kuraldır~~ — **2026-11-17 ile değişti (bölüm 10.1, ADR-051 eki):** satırlar geri alma süresi dolunca silinir; süre tek sabittir (`RollbackWindow`).
 
 ## 10) Audit ve gizlilik
 
 - Audit (`AuditBehavior`, `IAuditableRequest`): parti oluşturma, eşleme değişikliği, doğrulama (istek + arka plan `ImportBatch.ValidationCompleted`), uygulama, hatırlatma serbest bırakma, geri alma, taslak silme, hata raporu indirme. Payload'a **dosya içeriği ve satır verisi yazılmaz**; yalnız parti kimliği, sayılar, içerik özeti, durum.
 - Satır verisi (kişisel veri) yalnız `ImportBatchRows` tablosunda tutulur; `Committed/RolledBack/Discarded/Expired` sonrası **30 gün** içinde `SourceJson`/`NormalizedJson` temizlenir (`payloadPurgedAtUtc`); sayılar ve sonuç özeti kalır `[K9]`. Temizlenmiş partide `rows`/`errors` uçları `410 Imports.PayloadPurged` döner. **B3 (saklama zamanlaması hazır, temizlik işi B5):** `ImportBatch.PayloadPurgeDueAtUtc` (hesaplanan alan; sütun yok) `Committed`, `RolledBack`, `PartiallyRolledBack` ve `Expired` partide son durum değişikliğinden (`updatedAtUtc`) **30 gün** sonrasıdır, temizlenmişse veya başka durumdaysa null; `Discarded` parti taslak silinirken zaten temizlenir. `ImportBatch.PurgePayload` `payloadPurgedAtUtc`'yi doldurur, `ImportBatchRow.PurgePayload` kaynak/normalize/sorun alanlarını (kişisel veri) boşaltır; süresi gelen partileri seçen sorgu (`ImportBatchesDuePayloadPurgeSpec`) B5 işçisi içindir. Süre `Imports` yapılandırmasına bağlanmadı: sabit 30 gün (K9; KVKK danışmanı farklı süre derse tek sabit değişir).
-- **B5 (uygulandı) bakım işi** (`ImportMaintenanceHostedService`, `Imports:Maintenance`): her turda (varsayılan 60 dk; uygulama açılışından 1 dk sonra ilk tur) (1) **süresi dolan taslaklar**: `Uploaded|Mapped|Validated|ValidationFailed` ve son hareketten (`updatedAtUtc`, yoksa `createdAtUtc`) ≥ 7 gün → `Expired`; hazırlık satırları aynı işlemde **silinir** ve `payloadPurgedAtUtc` dolar (`Discarded` ile aynı; `Expired` partinin satırları hiçbir uçtan okunamadığı için 30 gün tutulmaz). `Validating` (iş sürüyor) süresi dolmaz. (2) **satır verisi temizliği**: saklanan son durumlar `Committed`, `RolledBack`, `PartiallyRolledBack` ve (B5 ile eklenen) `CommitFailed`, `RollbackFailed` — "işlem bitti" durumları; son durum değişikliğinden ≥ 30 gün geçmiş partilerin satırlarında `SourceJson`, `NormalizedJson`, `IssuesJson` boşaltılır (`ImportBatchRow.PurgePayload`, 500'lük parçalar), sonra `payloadPurgedAtUtc` yazılır (`ImportBatch.PurgePayload`). Satır kimliği, durumları ve hedef kayıt kimliği **kalır** (geri alma temizlenmiş partide de çalışır); sayaçlar ve özet kalır. `Expired` artık bu kümede değildir (süre dolarken temizlenir). Yarıda kesilen temizlik sonraki turda kaldığı yerden sürer (parti işaretlenmeden önce satırlar boşaltılır). Tur başına en çok `BatchSize` (varsayılan 20) parti / tür. Çok örnekli kurulumda iki örnek aynı partiyi işlerse rowversion ikinciyi reddeder; satır boşaltma tekrar zararsızdır. Audit: `ImportBatch.Expired` ve `ImportBatch.PayloadPurged` (aktör yok, hedef parti; payload yalnız satır sayısı). Günlüklere yalnız parti kimliği ve sayılar yazılır.
+- **B5 (uygulandı) bakım işi** (`ImportMaintenanceHostedService`, `Imports:Maintenance`): her turda (varsayılan 60 dk; uygulama açılışından 1 dk sonra ilk tur) (1) **süresi dolan taslaklar**: `Uploaded|Mapped|Validated|ValidationFailed` ve son hareketten (`updatedAtUtc`, yoksa `createdAtUtc`) ≥ 7 gün → `Expired`; hazırlık satırları aynı işlemde **silinir** ve `payloadPurgedAtUtc` dolar (`Discarded` ile aynı; `Expired` partinin satırları hiçbir uçtan okunamadığı için 30 gün tutulmaz). `Validating` (iş sürüyor) süresi dolmaz. (2) **satır verisi temizliği**: saklanan son durumlar `Committed`, `RolledBack`, `PartiallyRolledBack` ve (B5 ile eklenen) `CommitFailed`, `RollbackFailed` — "işlem bitti" durumları; son durum değişikliğinden ≥ 30 gün geçmiş partilerin satırlarında `SourceJson`, `NormalizedJson`, `IssuesJson` boşaltılır (`ImportBatchRow.PurgePayload`, 500'lük parçalar), sonra `payloadPurgedAtUtc` yazılır (`ImportBatch.PurgePayload`). Satır kimliği, durumları ve hedef kayıt kimliği **kalır** (geri alma temizlenmiş partide de çalışır); sayaçlar ve özet kalır. `Expired` artık bu kümede değildir (süre dolarken temizlenir). Yarıda kesilen temizlik sonraki turda kaldığı yerden sürer (parti işaretlenmeden önce satırlar boşaltılır). Tur başına en çok `BatchSize` (varsayılan 20) parti / tür. Çok örnekli kurulumda iki örnek aynı partiyi işlerse rowversion ikinciyi reddeder; satır boşaltma tekrar zararsızdır. Audit: `ImportBatch.Expired` ve `ImportBatch.PayloadPurged` (aktör yok, hedef parti; payload yalnız satır sayısı). Günlüklere yalnız parti kimliği ve sayılar yazılır. **2026-11-17 ile (2) değişti ve (3) eklendi; güncel kural bölüm 10.1.**
+
+### 10.1 Satır ve parti saklama (2026-11-17, ADR-051 eki; önceki 30 gün/boşaltma kuralının yerine)
+
+Süre tek sabittir: geri alma süresi `ImportBatch.RollbackWindow` (bölüm 9.1). Ayrı saklama sabiti (`PayloadRetention`) ve `PayloadRetained` kümesi kalktı.
+
+- **Aktarılmış parti** (`Committed`, `CommitFailed`, `PartiallyRolledBack`, `RollbackFailed`): `rollbackDeadlineUtc` geçince satırlar **tamamen silinir** (yalnız JSON boşaltma değil). Parti kaydı, `summary` sayaçları, `createdByUserId`, tarih alanları kalır; `payloadPurgedAtUtc` dolar. `ImportBatch.PayloadPurgeDueAtUtc` = `rollbackDeadlineUtc` (silinmişse null). Seçim sorgusu `ImportBatchesDuePayloadPurgeSpec`. `RollingBack` iken silinmez (başlamış geri alma biter, sonra yeni durumuna göre değerlendirilir).
+- **Kapanmış parti** (`RolledBack`, `Discarded`, `Expired`): son hareketten (`updatedAtUtc`, yoksa `createdAtUtc`) `RollbackWindow` sonra **parti kaydı satırlarıyla birlikte silinir** (`ImportBatch.DeletionDueAtUtc`, seçim `ImportBatchesDueDeletionSpec`). Silmeden önce partiye `ImportBatchId` ile başvuran kayıt aranır (`Vaccinations`, `Charges` (iptal edilmiş dahil), `ClientCredits`, `ImportedClinicalRecords`, `ImportedAccountEntries`, `Appointments`); varsa parti **silinmez**, günlüğe uyarı ve sayı yazılır, sonraki turda yeniden denenir. Audit `ImportBatch.Deleted` silinmeden önce okunan kayıttan, silme başarılı olunca yazılır (aktör yok; payload: durum, kaynak program, klinik kimliği, oluşturan kullanıcı kimliği, oluşturma/uygulama/son hareket anı, tablo başına `total/created`; ad, dosya adı ve satır verisi yok). `ImportSourceLinks` bağları partiye yabancı anahtarla bağlı değildir, kalır.
+- **Parçalı:** satırlar 500'lük parçalarla silinir (kimlik listesi + `DELETE … WHERE Id IN`), her parça ayrı kısa işlem; yarıda kalırsa sonraki tur kaldığı yerden sürer (parti en son işaretlenir/silinir). Tur başına en çok `BatchSize` parti / tür (değişmedi).
+- **Uçlar (değişmedi):** satırı silinmiş partide `rows`/`errors` `410 Imports.PayloadPurged`, `preview` yalnız sayılar ve `payloadPurged = true`. `rollback-preview` çalışır ama süre dolduğu için `canRollback = false`; satır olmadığından sayılar 0'dır, ekran parti nesnesindeki `payloadPurgedAtUtc` ile "Bu aktarma kesinleşti, satır ayrıntısı saklanmıyor" der. Silinmiş partinin uçları `404 Imports.BatchNotFound` döner; liste onu göstermez.
+- **Liste:** `RolledBack`, `Discarded`, `Expired` partiler yalnız `RollbackWindow` boyunca `includeClosed=true` ya da `status=` ile görünür; ekran filtre metninde bunu söyler.
+- Audit eylemleri: `ImportBatch.PayloadPurged` (payload satır sayısı; artık silinen satır sayısı), yeni `ImportBatch.Deleted`. Bakım sonucu (`ImportMaintenanceResult`) `DeletedBatches` sayısını da verir.
 - Günlüklere (Serilog) satır verisi, telefon, e-posta, ad yazılmaz; yalnız parti kimliği, tablo, satır numarası, kod.
 - Ham dosya sunucuda **saklanmaz** (dosya deposu kodu yok); yükleme sırasında bellekte okunur, satırlar normalize edilmiş biçimde saklanır.
-- **Geçiş desteği ve KVKK (TIER-021):** klinik eski programın dosyasını Vetinity personeline e-postayla **göndermez**; dosyayı kendisi bu sihirbazla panele yükler. Destek ekibi gerekirse kliniğin izniyle ekran paylaşımında yardım eder; dosyayı devralmaz. Yüklenen satır verisi bu bölümdeki saklama kuralına (30 gün, `[K9]`) tabidir. Geçiş desteği talebi dosya ya da kişisel veri almaz (`CUSTOM_DEVELOPMENT_REQUESTS_API_CONTRACT.md` §11).
+- **Geçiş desteği ve KVKK (TIER-021):** klinik eski programın dosyasını Vetinity personeline e-postayla **göndermez**; dosyayı kendisi bu sihirbazla panele yükler. Destek ekibi gerekirse kliniğin izniyle ekran paylaşımında yardım eder; dosyayı devralmaz. Yüklenen satır verisi bu bölümdeki saklama kuralına (bölüm 10.1; geri alma süresi) tabidir. Geçiş desteği talebi dosya ya da kişisel veri almaz (`CUSTOM_DEVELOPMENT_REQUESTS_API_CONTRACT.md` §11).
 
 ## 11) Geriye uyumluluk / etkilenen mevcut kodlar
 
@@ -1108,3 +1128,69 @@ Dönüştürücü bir kaydı (aşı, klinik geçmiş, randevu) tek hastaya bağl
 - Yedekte hesap hareketi yok; bakiye müşteri listesindeki `Bakiye` sütunundan gelir (ADR-048 T3). Rapor > Bakiyesi Olan Müşteriler yalnız karşılaştırma içindir, yüklenmez.
 - Hasta yaş grubu aktarılmaz (doğum tarihinden türer); müşterinin "sahiplenmek ister" işareti ve görevin `Bölüm` alanı aktarılmaz. Ücret ve ödeme geçmişi yedekte yoktur (yalnız müşterinin net bakiyesi); Aşı Bilgisi raporundaki aşı fiyatı tek başına ücret geçmişi sayılmadığı için aktarılmaz.
 - Seri numarası yalnız Aşı Bilgisi raporundaki aşılar için gelir (rapor ticari aşıları içerir; parazit ilaçlarını içermez).
+
+## 14) Güncelleme aktarması: aynı programdan ikinci yedek (ADR-051, 2026-11-17; geriye uyumlu ekleme)
+
+Klinik eski programdan bir yedekle geçer, birkaç gün daha eski programda çalışır ve yeni bir tam yedek yükler. İkinci yedek mükerrer kayıt üretmez; yalnız yenisi gelir.
+
+### 14.1 Kaynak kimliği
+
+- Uygulanan aktarmada **oluşan ya da eşleşen** müşteri ve hasta, dosyadaki kaynak numarasıyla (`MusteriNo`, `HayvanNo`) kalıcı eşleme tablosuna (`ImportSourceLinks`) bağlanır. Anahtar: kiracı + partinin kliniği + kaynak program (`sourceProfile`) + kayıt türü (`Client` | `Pet`) + kaynak numarası. Satır verisinin geri alma süresi dolunca silinmesi (bölüm 10.1) bağı silmez.
+- Yalnız program profillerinde (`EVet`, `Kolayvet`) yazılır ve okunur; `Generic` şablonda kaynak numarası kalıcı kimlik sayılmaz. E-vet'te tekrar eden protokol no (`no#satır`, bölüm 13.2) için bağ yazılmaz.
+- Eşleşme sırası: **önce kaynak kimliği**, bulunamazsa bugünkü kural (müşteri ad + telefon / ad + e-posta; hasta sahip + ad + tür). Kaynak kimliğiyle eşleşen kayıt adı, telefonu ya da sahibi değişmiş olsa da eşleşir; mevcut bilgiler değişmez. Bağın kaydı Vetinity'de yoksa (geri alınmış, silinmiş) bağ yok sayılır ve uygulamada yenilenir.
+- `onDuplicateClient` seçeneği kaynak kimliğiyle eşleşmeye de uygulanır (`Match` varsayılan).
+- Satır kodu: **`Imports.MatchedBySourceId`** (bilgi; `Imports.MatchedExisting` yerine): "Önceki aktarmadaki kayıtla (kaynak no) eşleşti; yeni kayıt oluşmayacak." Eylem `Match`, `targetId` eşleşen kayıt.
+- Uygulama anında yeniden çözüm: oluşturulacak müşteri ve hasta önce kaynak kimliğiyle, sonra bugünkü kuralla yeniden aranır (`Imports.MatchedAtCommit`).
+- Klinik kayıt, aşı ve randevu için yedekte kalıcı numara yoktur; içerik anahtarı kullanılır (14.2).
+- Geriye dönük doldurma: migration `AddImportSourceLinks`, satır verisi temizlenmemiş partilerin `Created`/`Matched`/`Kept` müşteri ve hasta satırlarından bağ yazar.
+
+### 14.2 Klinik kayıt mükerrer anahtarı
+
+- Anahtar (değişmedi, bölüm 12.3): hasta + gün + içerik (içerik alanları, hekim, kilo, ateş; katlanmış). Kayıt türü bilerek anahtarda yoktur: aynı gün aynı içerikli türsüz ve türlü satır tek kayıttır (mevcut kural ve testi korunur).
+- Önizleme: daha önce içe aktarılmış kayıt `Imports.ClinicalRecordImportedBefore` ile atlanır (değişmedi; artık kaynak kimliğiyle eşleşen hastalarda da çalışır). Sayısı `notImportedReasons` ve `overlap` içinde görünür.
+- Uygulama: eşleşen hastada aynı anahtarlı kayıt uygulama anında da aranır; varsa satır `Skipped` + `Imports.ClinicalRecordImportedBefore` (aşıdaki `DuplicateVaccination` ile aynı desen).
+
+### 14.3 Bakiye farkı
+
+- Eşleşen müşteride (kaynak kimliği ya da bugünkü kural) `AcikBakiye` eşlenmişse dosyadaki bakiye (boş = 0) Vetinity'deki **net bakiye** ile karşılaştırılır. Net bakiye partinin kliniğinde: kalan ücret (ücret − tahsis) − bağlanmamış TRY ödeme − açık müşteri alacağı. Artı borç, eksi alacaktır (dosyadaki işaretle aynı).
+- Fark varsa satır kodu **`Imports.BalanceDifference`** (uyarı): "Dosyadaki bakiye Vetinity'dekinden farklı; uygularken farkı devir olarak açabilir ya da atlayabilirsiniz." Fark yoksa kod yazılmaz. `Imports.BalanceNotAppliedToExisting` artık yalnız dosya içi mükerrer müşteri satırında çıkar.
+- Önizleme yeni alan `balanceDifferences`:
+
+```json
+"balanceDifferences": {
+  "count": 12,
+  "totalIncrease": 4350.00,
+  "totalDecrease": 820.50,
+  "items": [ { "rowNumber": 41, "clientId": "guid", "clientName": "Ayşe Yılmaz", "currentBalance": 1200.00, "fileBalance": 1450.00, "difference": 250.00 } ],
+  "truncated": false
+}
+```
+  `items` en çok 200 öğe, `difference` azalan mutlak değere göre; `truncated` kesildiyse `true`. Fark yoksa `count = 0`, `items = []`. Satır verisi temizlenmiş partide boş.
+- Commit gövdesine isteğe bağlı alan **`balanceDifferences`**: `"Skip"` (varsayılan) | `"Apply"`. İzinli küme dışı `400 Validation.FluentValidation`. Seçim parti seçeneklerinde saklanır; tekrar çağrı (aynı `validationId`) seçimi değiştirmez.
+- `Apply`: her farklı müşteri için önizlemedeki fark tutarı açılır: fark artıysa devir ücreti (`Devir bakiyesi farkı (eski program[, gg.aa.yyyy])`), eksiyse devir alacağı. Yalıtım devir bakiyesiyle aynıdır (bölüm 12.7: ciro, gün sonu, kasa, e-belge dışı; `isImported = true`). Satır durumu `Matched` kalır.
+- Audit `ImportBatch.Commit` payload'ına `balanceDifferences` eklenir.
+
+### 14.4 Güncelleme özeti (önizleme)
+
+Önizleme yeni alan `overlap`:
+
+```json
+"overlap": {
+  "isUpdate": true,
+  "matchedBySourceId": 4310,
+  "tables": [
+    { "table": "customers", "willCreate": 12, "alreadyExists": 4365 },
+    { "table": "clinicalRecords", "willCreate": 140, "alreadyExists": 17233 }
+  ]
+}
+```
+- `alreadyExists`: `Match` eylemli satırlar + daha önce aktarıldığı için atlanacak satırlar (ilk atlama nedeni `DuplicateVaccination`, `ClinicalRecordImportedBefore`, `DuplicateAccountEntry` ya da `DuplicateAppointment`). `willCreate` tablo sayacıyla aynıdır.
+- `isUpdate`: `alreadyExists` toplamı > 0 ve (`willCreate` + `alreadyExists`) toplamının en az yarısı. Ekran `true` iken en üstte "Bu dosya önceki aktarmayla büyük ölçüde örtüşüyor: X yeni müşteri, Y yeni hasta, Z yeni aşı… gelecek; geri kalanı zaten var" özetini gösterir.
+- `matchedBySourceId`: `Imports.MatchedBySourceId` kodlu satır sayısı.
+- `tables` yalnız satırı olan tablolar, doğrulama sırasıyla. Satır verisi temizlenmiş partide `isUpdate = false`, `tables = []`.
+
+### 14.5 Geri alma
+
+- Eşleşen kayıt (müşteri, hasta) geri almada **hiçbir zaman silinmez** (değişmedi).
+- Partinin eşleşen müşteriye açtığı bakiye farkı hareketi (ücret ya da alacak) geri almada silinir; ücrete tahsis yapılmışsa ya da alacaktan mahsup edilmişse kalır. `rollback-preview` yanıtına `balanceAdjustments: { delete, keep }` eklendi (yalnız sayı).
+- Kaynak bağları geri almada silinmez; hedefi silinen bağ sonraki aktarmada yok sayılır (14.1).

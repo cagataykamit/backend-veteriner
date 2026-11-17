@@ -37,13 +37,11 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
     /// <summary>Geri alma işçisinin kirası; uygulama kirasıyla aynı devralma kuralı.</summary>
     public static readonly TimeSpan RollbackLeaseDuration = TimeSpan.FromMinutes(2);
 
-    /// <summary>Satır verisinin (kişisel veri) saklama süresi; son durum değişikliğinden sayılır (ADR-019 K9).</summary>
-    public static readonly TimeSpan PayloadRetention = TimeSpan.FromDays(30);
-
     /// <summary>
     /// Uygulanan partinin geri alınabildiği süre; uygulama anından sayılır (<see cref="RollbackDeadlineUtc"/>). Süre dolunca
     /// aktarma kesinleşir: hiçbir geri alınabilir durumdan (yarım kalmış geri alma dahil) yeni geri alma başlatılamaz.
-    /// 15 gün (kullanıcı kararı 2026-11-17; önce 30). Satır verisi saklaması (<see cref="PayloadRetention"/>) ayrı kuraldır.
+    /// 15 gün (kullanıcı kararı 2026-11-17; önce 30). Satır ve kapanmış parti saklaması da bu süreyi kullanır
+    /// (<see cref="PayloadPurgeDueAtUtc"/>, <see cref="DeletionDueAtUtc"/>; ADR-051 eki).
     /// </summary>
     public static readonly TimeSpan RollbackWindow = TimeSpan.FromDays(15);
 
@@ -160,13 +158,22 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
     public bool IsDraft => ImportBatchStatusSets.Draft.Contains(Status);
 
     /// <summary>
-    /// Satır verisinin temizlenmesi gereken an (<see cref="PayloadRetention"/>); temizlenmişse veya satırları saklanan
-    /// bir son duruma ulaşmamışsa null. Taslak silinirken veri zaten temizlenir (<see cref="Discard"/>).
+    /// Aktarılmış partinin satırlarının silinmesi gereken an (ADR-051 eki): geri alma süresinin sonu (<see cref="RollbackDeadlineUtc"/>);
+    /// satırların işi geri almadır, süre dolunca geri alma başlatılamaz. Silinmişse ya da parti aktarılmış bir durumda değilse (taslak,
+    /// geri alma sürüyor, kapanmış) null; kapanmış parti kaydıyla birlikte silinir (<see cref="DeletionDueAtUtc"/>).
     /// </summary>
     public DateTime? PayloadPurgeDueAtUtc
-        => PayloadPurgedAtUtc is null && ImportBatchStatusSets.PayloadRetained.Contains(Status)
-            ? (UpdatedAtUtc ?? CreatedAtUtc) + PayloadRetention
-            : null;
+        => PayloadPurgedAtUtc is null ? RollbackDeadlineUtc : null;
+
+    /// <summary>
+    /// Kapanmış (<see cref="ImportBatchStatusSets.Closed"/>: tamamen geri alınmış, silinmiş ya da süresi dolmuş taslak) partinin
+    /// kaydıyla birlikte silinmesi gereken an: son hareketten <see cref="RollbackWindow"/> sonra (ADR-051 eki). Başka durumda null.
+    /// </summary>
+    public DateTime? DeletionDueAtUtc
+        => ImportBatchStatusSets.Closed.Contains(Status) ? (UpdatedAtUtc ?? CreatedAtUtc) + RollbackWindow : null;
+
+    /// <summary>Parti kaydı silinebilir mi (yalnız süre kuralı; başvuran kayıt denetimi silen işte).</summary>
+    public bool IsDueForDeletion(DateTime nowUtc) => DeletionDueAtUtc is { } due && NormalizeUtc(nowUtc) >= due;
 
     /// <summary>Eşlemenin kaydedilebildiği durumlar; <see cref="ApplyMapping"/> geçiş tablosuyla aynı küme.</summary>
     private static readonly ImportBatchStatus[] MappableFrom =
@@ -539,14 +546,14 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
     }
 
     /// <summary>
-    /// Saklama süresi dolan partinin satır verisi temizlendi (satırlar ayrıca <see cref="ImportBatchRow.PurgePayload"/>
-    /// ile boşaltılır); sayaçlar ve özet kalır. Süre henüz dolmadıysa veya zaten temizlenmişse reddedilir.
+    /// Geri alma süresi dolan aktarılmış partinin satırları silindi (silme çağıranda, parça parça; ADR-051 eki); parti kaydı, sayaçlar ve
+    /// özet kalır. Süre henüz dolmadıysa veya zaten silinmişse reddedilir.
     /// </summary>
     public Result PurgePayload(DateTime nowUtc)
     {
         var now = NormalizeUtc(nowUtc);
         if (PayloadPurgeDueAtUtc is not { } due || now < due)
-            return InvalidState("Satır verisinin saklama süresi henüz dolmadı veya veri zaten temizlendi.");
+            return InvalidState("Geri alma süresi henüz dolmadı veya satırlar zaten silindi.");
 
         PayloadPurgedAtUtc = now;
         return Result.Success();

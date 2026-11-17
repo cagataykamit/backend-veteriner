@@ -114,7 +114,11 @@ public sealed class CommitImportBatchCommandHandler : IRequestHandler<CommitImpo
                 $"{ImportCommitGate.ErrorRows(batch)} hatalı satır var; 'FailIfAny' seçiminde hiçbir şey uygulanmaz.");
         }
 
-        var options = ImportOptionsDocument.Parse(batch.OptionsJson) with { CommittedByUserId = _clientContext.UserId };
+        var options = ImportOptionsDocument.Parse(batch.OptionsJson) with
+        {
+            CommittedByUserId = _clientContext.UserId,
+            BalanceDifferences = request.BalanceDifferences ?? ImportOptionsDocument.Skip,
+        };
         var started = batch.StartCommit(request.ValidationId, _timeProvider.GetUtcNow().UtcDateTime, options.ToJson());
         if (!started.IsSuccess)
             return Result<ImportCommitResultDto>.Failure(started.Error);

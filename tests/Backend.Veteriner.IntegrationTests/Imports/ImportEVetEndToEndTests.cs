@@ -170,6 +170,143 @@ public sealed class ImportEVetEndToEndTests : IClassFixture<CustomWebApplication
         }
     }
 
+    /// <summary>
+    /// Güncelleme aktarması (ADR-051, §14): klinik ilk yedekle geçer, E-vet'te çalışmayı sürdürür ve yeni bir tam yedek yükler. İkinci
+    /// yedekte telefonu değişen, adı değişen (telefonsuz) müşteri ve adı değişen hasta kaynak numarasıyla eşleşir; yalnız yeni kayıtlar
+    /// gelir; bakiye farkları önerilir ve seçimle açılır; ikinci partinin geri alınması eşleşen kayıtlara ve ilk partiye dokunmaz.
+    /// </summary>
+    [Fact]
+    public async Task Second_EVet_Backup_Should_Add_Only_New_Records_And_Offer_Balance_Differences()
+    {
+        var ctx = await SeedAsync();
+        var http = ClientFor(ctx.Token);
+        var ayse = $"Ayşe {ctx.Suffix}";
+        var mehmet = $"Mehmet {ctx.Suffix}";
+        string[] customerHeader = ["Kayıt Tarihi", "Müşteriler", "Bakiye", "Protokol No", "Gsm", "Durum"];
+        string[] petHeader = ["Müşteriler", "Hastalar", "Protokol No", "Hasta Türü", "Durum"];
+        string[] taskHeader = ["Müşteriler", "Hastalar", "Görev Tipi", "Başlangıç Tarihi", "Aşı Paketi", "Veteriner", "Durum"];
+        string[] examHeader = ["Tarih", "Hasta Sahibi", "Hasta Adı", "Veteriner Hekim", "Semptom"];
+
+        var first = Workbook(
+            ("Müşteri Listesi", [
+                customerHeader,
+                ["2024-01-01", ayse, "1250.50", "101", "905321234567", "Aktif"],
+                ["2024-01-01", mehmet, "0", "102", null, "Aktif"]]),
+            ("Hasta Listesi", [petHeader, [ayse, "Pamuk", "201", ctx.SpeciesName, "Aktif"], [mehmet, "Duman", "202", ctx.SpeciesName, "Aktif"]]),
+            ("Randevu Listesi", [taskHeader, [ayse, "Pamuk", "Aşılama", "2025-01-10T10:00:00", ctx.VaccineName, "Dr. A", "Tamamlandı"]]),
+            ("Muayene Listesi", [
+                examHeader,
+                ["2025-06-01T11:00:00", ayse, "Pamuk", "Dr. A", "Kusma"],
+                ["2025-06-02T11:00:00", mehmet, "Duman", "Dr. A", "İshal"]]));
+
+        var firstId = await UploadAsync(http, ctx, first);
+        var firstValidation = (await ImportValidationTestRunner.ValidateAsync(_factory.Services, http, firstId)).GetProperty("validationId").GetGuid();
+        (await GetJsonAsync(http, $"/api/v1/imports/batches/{firstId}/preview")).GetProperty("overlap").GetProperty("isUpdate").GetBoolean()
+            .Should().BeFalse("ilk yükleme güncelleme değildir");
+        (await http.PostAsJsonAsync($"/api/v1/imports/batches/{firstId}/commit", new { validationId = firstValidation })).StatusCode
+            .Should().Be(HttpStatusCode.Accepted);
+        await RunCommitWorkerAsync();
+
+        // Bir hafta sonra: Ayşe'nin telefonu değişti, borcu arttı; Mehmet'in adı değişti (telefonu yok), borçlandı; Pamuk'un adı değişti;
+        // yeni müşteri + hasta, yeni muayene ve aşı geldi. Eski kayıtlar yedekte aynen duruyor.
+        var zeynep = $"Zeynep {ctx.Suffix}";
+        var mehmetAli = $"Mehmet Ali {ctx.Suffix}";
+        var second = Workbook(
+            ("Müşteri Listesi", [
+                customerHeader,
+                ["2024-01-01", ayse, "1500", "101", "905339998877", "Aktif"],
+                ["2024-01-01", mehmetAli, "100", "102", null, "Aktif"],
+                ["2026-11-12", zeynep, "0", "103", "905351112233", "Aktif"]]),
+            ("Hasta Listesi", [
+                petHeader,
+                [ayse, "Pamuk Hanım", "201", ctx.SpeciesName, "Aktif"],
+                [mehmetAli, "Duman", "202", ctx.SpeciesName, "Aktif"],
+                [zeynep, "Tarçın", "203", ctx.SpeciesName, "Aktif"]]),
+            ("Randevu Listesi", [
+                taskHeader,
+                [ayse, "Pamuk Hanım", "Aşılama", "2025-01-10T10:00:00", ctx.VaccineName, "Dr. A", "Tamamlandı"],
+                [ayse, "Pamuk Hanım", "Aşılama", "2026-11-14T10:00:00", ctx.VaccineName, "Dr. A", "Tamamlandı"]]),
+            ("Muayene Listesi", [
+                examHeader,
+                ["2025-06-01T11:00:00", ayse, "Pamuk Hanım", "Dr. A", "Kusma"],
+                ["2025-06-02T11:00:00", mehmetAli, "Duman", "Dr. A", "İshal"],
+                ["2026-11-14T11:00:00", ayse, "Pamuk Hanım", "Dr. A", "Kontrol: iyileşmiş"],
+                ["2026-11-13T09:00:00", zeynep, "Tarçın", "Dr. B", "Aşı öncesi muayene"]]));
+
+        var secondId = await UploadAsync(http, ctx, second);
+        var secondValidation = (await ImportValidationTestRunner.ValidateAsync(_factory.Services, http, secondId)).GetProperty("validationId").GetGuid();
+        var preview = await GetJsonAsync(http, $"/api/v1/imports/batches/{secondId}/preview");
+        preview.GetProperty("canCommit").GetBoolean().Should().BeTrue(preview.ToString());
+
+        var overlap = preview.GetProperty("overlap");
+        overlap.GetProperty("isUpdate").GetBoolean().Should().BeTrue(overlap.ToString());
+        overlap.GetProperty("matchedBySourceId").GetInt32().Should().Be(4, "iki müşteri ve iki hasta kaynak numarasıyla eşleşir");
+        overlap.GetProperty("tables").EnumerateArray()
+            .Select(t => (t.GetProperty("table").GetString(), t.GetProperty("willCreate").GetInt32(), t.GetProperty("alreadyExists").GetInt32()))
+            .Should().BeEquivalentTo(new (string?, int, int)[]
+            {
+                ("customers", 1, 2), ("pets", 1, 2), ("vaccinations", 1, 1), ("clinicalRecords", 2, 2),
+            }, overlap.ToString());
+
+        var differences = preview.GetProperty("balanceDifferences");
+        differences.GetProperty("count").GetInt32().Should().Be(2, differences.ToString());
+        differences.GetProperty("items").EnumerateArray()
+            .Select(i => (i.GetProperty("currentBalance").GetDecimal(), i.GetProperty("fileBalance").GetDecimal(), i.GetProperty("difference").GetDecimal()))
+            .Should().BeEquivalentTo(new[] { (1250.50m, 1500m, 249.50m), (0m, 100m, 100m) });
+
+        var commit = await http.PostAsJsonAsync(
+            $"/api/v1/imports/batches/{secondId}/commit", new { validationId = secondValidation, balanceDifferences = "Apply" });
+        commit.StatusCode.Should().Be(HttpStatusCode.Accepted, await commit.Content.ReadAsStringAsync());
+        await RunCommitWorkerAsync();
+
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (await db.ImportBatches.AsNoTracking().SingleAsync(b => b.Id == secondId)).Status.Should().Be(ImportBatchStatus.Committed);
+            var clients = await db.Clients.AsNoTracking().Where(c => c.TenantId == ctx.TenantId).ToListAsync();
+            clients.Select(c => c.FullName).Should().BeEquivalentTo([ayse, mehmet, zeynep], "eşleşen müşterinin adı ezilmez, mükerrer müşteri yok");
+            var pets = await db.Pets.AsNoTracking().Where(p => p.TenantId == ctx.TenantId).ToListAsync();
+            pets.Select(p => p.Name).Should().BeEquivalentTo(["Pamuk", "Duman", "Tarçın"]);
+            (await db.ImportedClinicalRecords.CountAsync(r => r.TenantId == ctx.TenantId)).Should().Be(4, "eski iki muayene ikinci kez yazılmaz");
+            (await db.Vaccinations.CountAsync(v => v.TenantId == ctx.TenantId)).Should().Be(2);
+
+            var ayseId = clients.Single(c => c.FullName == ayse).Id;
+            var mehmetId = clients.Single(c => c.FullName == mehmet).Id;
+            (await db.Charges.AsNoTracking().Where(c => c.ClientId == ayseId).Select(c => c.Amount).ToListAsync())
+                .Should().BeEquivalentTo([1250.50m, 249.50m], "devir + seçimle açılan fark");
+            (await db.Charges.AsNoTracking().Where(c => c.ClientId == mehmetId && c.ImportBatchId == secondId).Select(c => c.Description).SingleAsync())
+                .Should().Be("Devir bakiyesi farkı (eski program)");
+            (await db.ImportSourceLinks.AsNoTracking().Where(l => l.TenantId == ctx.TenantId).Select(l => new { l.Entity, l.SourceKey }).ToListAsync())
+                .Should().BeEquivalentTo(new[]
+                {
+                    new { Entity = ImportSourceEntity.Client, SourceKey = "101" }, new { Entity = ImportSourceEntity.Client, SourceKey = "102" },
+                    new { Entity = ImportSourceEntity.Client, SourceKey = "103" }, new { Entity = ImportSourceEntity.Pet, SourceKey = "201" },
+                    new { Entity = ImportSourceEntity.Pet, SourceKey = "202" }, new { Entity = ImportSourceEntity.Pet, SourceKey = "203" },
+                });
+        }
+
+        var rollbackPreview = await GetJsonAsync(http, $"/api/v1/imports/batches/{secondId}/rollback-preview");
+        rollbackPreview.GetProperty("balanceAdjustments").GetProperty("delete").GetInt32().Should().Be(2, rollbackPreview.ToString());
+        var rollback = await http.PostAsJsonAsync($"/api/v1/imports/batches/{secondId}/rollback",
+            new { requestId = Guid.NewGuid(), reason = "Deneme", blockedPolicy = "Fail" });
+        rollback.StatusCode.Should().Be(HttpStatusCode.Accepted, await rollback.Content.ReadAsStringAsync());
+        await RunRollbackWorkerAsync();
+
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (await db.ImportBatches.AsNoTracking().SingleAsync(b => b.Id == secondId)).Status.Should().Be(ImportBatchStatus.RolledBack);
+            (await db.Clients.AsNoTracking().Where(c => c.TenantId == ctx.TenantId).Select(c => c.FullName).ToListAsync())
+                .Should().BeEquivalentTo([ayse, mehmet], "eşleşen müşteri geri almada silinmez");
+            (await db.Pets.AsNoTracking().Where(p => p.TenantId == ctx.TenantId).Select(p => p.Name).ToListAsync())
+                .Should().BeEquivalentTo(["Pamuk", "Duman"]);
+            (await db.ImportedClinicalRecords.CountAsync(r => r.TenantId == ctx.TenantId)).Should().Be(2, "ilk partinin kayıtları durur");
+            (await db.Vaccinations.CountAsync(v => v.TenantId == ctx.TenantId)).Should().Be(1);
+            (await db.Charges.AsNoTracking().Where(c => c.TenantId == ctx.TenantId).Select(c => c.Amount).ToListAsync())
+                .Should().Equal([1250.50m], "fark hareketleri silinir, ilk devir durur");
+        }
+    }
+
     [Fact]
     public async Task Pet_Without_Species_Should_Take_Species_From_Its_Vaccines_Or_Keep_Them_Unverified()
     {

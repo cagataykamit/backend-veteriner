@@ -5,11 +5,15 @@ namespace Backend.Veteriner.Api.Controllers;
 /// (≤ 100) ve <see cref="ClinicId"/> (aşı tablosu varsa zorunlu) opsiyonel. Dosya: ya <see cref="File"/> (XLSX) ya da
 /// tablo başına CSV alanları; <see cref="Encoding"/>/<see cref="Delimiter"/> CSV algılamasını zorlar.
 /// </summary>
-/// <summary>POST .../commit gövdesi (IMPORT_API_CONTRACT.md §7.9); <see cref="OnErrors"/> verilmezse <c>SkipErrorRows</c>.</summary>
+/// <summary>
+/// POST .../commit gövdesi (IMPORT_API_CONTRACT.md §7.9, §14.3); <see cref="OnErrors"/> verilmezse <c>SkipErrorRows</c>,
+/// <see cref="BalanceDifferences"/> verilmezse <c>Skip</c>.
+/// </summary>
 public sealed class ImportCommitBody
 {
     public Guid ValidationId { get; init; }
     public string? OnErrors { get; init; }
+    public string? BalanceDifferences { get; init; }
 }
 
 /// <summary>POST .../rollback gövdesi (IMPORT_API_CONTRACT.md §7.12); <see cref="BlockedPolicy"/> verilmezse <c>Fail</c>.</summary>

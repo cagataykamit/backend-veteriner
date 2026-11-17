@@ -293,6 +293,64 @@ public static class ImportPreviewAggregator
         };
     }
 
+    /// <summary>Bakiye farkı listesinde en çok gösterilen öğe (kalanı <c>count</c>'tan anlaşılır).</summary>
+    public const int MaxBalanceDifferenceItems = 200;
+
+    /// <summary>
+    /// Güncelleme özeti (ADR-051, §14.4): tablo başına yeni (<c>willCreate</c>) ve zaten var (<c>willMatch</c> + ilk atlama nedeni
+    /// <see cref="ImportRules.AlreadyExistsReasons"/> olan satırlar). Örtüşme payı en az yarıysa <c>isUpdate</c>.
+    /// </summary>
+    public static ImportOverlapDto Overlap(
+        Func<ImportTable, ImportTableCounts> countsOf,
+        IReadOnlyList<ImportNotImportedReasonDto> reasons,
+        IReadOnlyList<ImportIssueCountDto> issueCounts)
+    {
+        var existsCodes = ImportRules.AlreadyExistsReasons.Select(r => r.Code).ToHashSet(StringComparer.Ordinal);
+        var tables = ImportCanonicalNames.Tables
+            .Select(table =>
+            {
+                var key = ImportCanonicalNames.Key(table);
+                var skippedExisting = reasons
+                    .Where(r => r.Table == key && r.Kind == "Skipped" && existsCodes.Contains(r.Code))
+                    .Sum(r => r.RowCount);
+                var counts = countsOf(table);
+                return (Total: counts.Total, Dto: new ImportOverlapTableDto(key, counts.WillCreate, counts.WillMatch + skippedExisting));
+            })
+            .Where(t => t.Total > 0)
+            .Select(t => t.Dto)
+            .ToList();
+
+        var existing = tables.Sum(t => t.AlreadyExists);
+        var all = existing + tables.Sum(t => t.WillCreate);
+        var bySource = issueCounts.FirstOrDefault(c => c.Code == ImportRules.MatchedBySourceId.Code)?.RowCount ?? 0;
+        return new ImportOverlapDto(existing > 0 && existing * 2 >= all, bySource, tables);
+    }
+
+    /// <summary>Bakiye farkı listesi (§14.3): <c>Imports.BalanceDifference</c> kodlu müşteri satırlarının normalize değerlerinden.</summary>
+    public static ImportBalanceDifferencesDto BalanceDifferences(IEnumerable<(int RowNumber, string? NormalizedJson)> customerRows)
+    {
+        var items = customerRows
+            .Select(r => (r.RowNumber, Data: ImportNormalizedJson.Parse(ImportTable.Customers, r.NormalizedJson) as ImportNormalizedCustomer))
+            .Where(r => r.Data is { BalanceDifference: { } d } && d != 0)
+            .Select(r => new ImportBalanceDifferenceDto(
+                r.RowNumber,
+                r.Data!.TargetId,
+                r.Data.FullName,
+                r.Data.ExistingBalance ?? 0m,
+                (r.Data.ExistingBalance ?? 0m) + r.Data.BalanceDifference!.Value,
+                r.Data.BalanceDifference.Value))
+            .ToList();
+        if (items.Count == 0)
+            return ImportBalanceDifferencesDto.None;
+
+        return new ImportBalanceDifferencesDto(
+            items.Count,
+            items.Where(i => i.Difference > 0).Sum(i => i.Difference),
+            -items.Where(i => i.Difference < 0).Sum(i => i.Difference),
+            items.OrderByDescending(i => Math.Abs(i.Difference)).ThenBy(i => i.RowNumber).Take(MaxBalanceDifferenceItems).ToList(),
+            items.Count > MaxBalanceDifferenceItems);
+    }
+
     /// <summary>Bloklayan eşlenmemiş değer kodları (tür/aşı) — yalnız satırı olanlar.</summary>
     public static IReadOnlyList<string> BlockingCodes(IReadOnlyList<ImportUnmappedValueDto> unmapped)
         => unmapped

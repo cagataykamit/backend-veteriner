@@ -37,6 +37,7 @@ public sealed class GetImportRollbackPreviewQueryHandler
     private readonly ImportRollbackPlanLoader _plans;
     private readonly IImportRollbackRecordReader _records;
     private readonly ICurrentUserPermissionChecker _permissions;
+    private readonly IImportRollbackDependencyReader _dependencies;
     private readonly TimeProvider _timeProvider;
 
     public GetImportRollbackPreviewQueryHandler(
@@ -47,6 +48,7 @@ public sealed class GetImportRollbackPreviewQueryHandler
         ImportRollbackPlanLoader plans,
         IImportRollbackRecordReader records,
         ICurrentUserPermissionChecker permissions,
+        IImportRollbackDependencyReader dependencies,
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
@@ -56,6 +58,7 @@ public sealed class GetImportRollbackPreviewQueryHandler
         _plans = plans;
         _records = records;
         _permissions = permissions;
+        _dependencies = dependencies;
         _timeProvider = timeProvider;
     }
 
@@ -85,8 +88,11 @@ public sealed class GetImportRollbackPreviewQueryHandler
             ? await _records.ReadAsync(tenantId, ordered, ct)
             : null;
         var blockedItems = ImportRollbackPlanLoader.BlockedItems(snapshot.Plan, ordered, records);
-        return Result<ImportRollbackPreviewDto>.Success(
-            Build(batch, snapshot, blockedItems, _timeProvider.GetUtcNow().UtcDateTime));
+        var adjustments = await _dependencies.ReadBalanceAdjustmentsAsync(tenantId, batch.Id, ct);
+        return Result<ImportRollbackPreviewDto>.Success(Build(batch, snapshot, blockedItems, _timeProvider.GetUtcNow().UtcDateTime) with
+        {
+            BalanceAdjustments = new ImportBalanceAdjustmentCountsDto(adjustments.Count(a => !a.Changed), adjustments.Count(a => a.Changed)),
+        });
     }
 
     /// <summary>

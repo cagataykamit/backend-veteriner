@@ -83,10 +83,17 @@ public sealed class GetImportBatchPreviewQueryHandler : IRequestHandler<GetImpor
         var blockers = ImportCommitGate.Blockers(batch, unmapped);
         var canCommit = ImportCommitGate.CanCommit(batch, blockers);
         var (candidates, petRows) = await AmbiguousPetsAsync(batch.Id, unmapped, ct);
+        var balanceRows = issueCounts.Any(c => c.Code == ImportRules.BalanceDifference.Code)
+            ? await _rows.ListAsync(new ImportBalanceDifferenceRowsSpec(batch.Id), ct)
+            : [];
 
         return Result<ImportPreviewDto>.Success(new ImportPreviewDto(
             batch.ValidationId, batch.Status, summary, unmapped, impact, issueCounts, canCommit, blockers, PayloadPurged: false,
-            NotImportedReasons: reasons, PetCandidates: candidates, PetRows: petRows));
+            NotImportedReasons: reasons, PetCandidates: candidates, PetRows: petRows)
+        {
+            Overlap = ImportPreviewAggregator.Overlap(batch.CountsOf, reasons, issueCounts),
+            BalanceDifferences = ImportPreviewAggregator.BalanceDifferences(balanceRows.Select(r => (r.RowNumber, r.NormalizedJson))),
+        });
     }
 
     /// <summary>Belirsiz hasta gruplarının adayları ve kayıtları; grup yoksa satırlar okunmaz.</summary>

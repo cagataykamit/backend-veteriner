@@ -22,6 +22,21 @@ public sealed class ImportIssueRowsSpec : Specification<ImportBatchRow, ImportIs
     }
 }
 
+/// <summary>Satır numarası ve normalize değerler.</summary>
+public sealed record ImportNormalizedRowInfo(int RowNumber, string? NormalizedJson);
+
+/// <summary>Bakiye farkı olan müşteri satırları (sorununda <c>Imports.BalanceDifference</c> geçen; ADR-051 önizleme listesi).</summary>
+public sealed class ImportBalanceDifferenceRowsSpec : Specification<ImportBatchRow, ImportNormalizedRowInfo>
+{
+    public ImportBalanceDifferenceRowsSpec(Guid batchId)
+    {
+        var code = ImportRules.BalanceDifference.Code;
+        Query.AsNoTracking();
+        Query.Where(r => r.BatchId == batchId && r.Table == ImportTable.Customers && r.IssuesJson != null && r.IssuesJson.Contains(code));
+        Query.Select(r => new ImportNormalizedRowInfo(r.RowNumber, r.NormalizedJson));
+    }
+}
+
 /// <summary>Bir tablonun hazırlık satırı: satır numarası ve dosyadaki değerler.</summary>
 public sealed record ImportSourceRowInfo(int RowNumber, string? SourceJson);
 

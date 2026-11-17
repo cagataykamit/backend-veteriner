@@ -173,15 +173,39 @@ public sealed class ImportBatchValidationLeaseTests
         row.RowNumber.Should().Be(2);
     }
 
-    // ---------------------------------------------------------------- K9 saklama zamanlaması
+    // ---------------------------------------------------------------- Saklama (ADR-051 eki: geri alma süresi)
 
     [Fact]
-    public void PayloadPurgeDueAt_Should_Be_30_Days_After_Last_Change_For_Retained_Terminal_Statuses()
+    public void PayloadPurgeDueAt_Should_Be_The_Rollback_Deadline_For_Applied_Batches()
     {
         var b = Committed();
 
-        b.PayloadPurgeDueAtUtc.Should().Be(b.UpdatedAtUtc + ImportBatch.PayloadRetention);
-        ImportBatch.PayloadRetention.Should().Be(TimeSpan.FromDays(30));
+        b.PayloadPurgeDueAtUtc.Should().Be(b.RollbackDeadlineUtc).And.Be(b.CommittedAtUtc + ImportBatch.RollbackWindow);
+        b.DeletionDueAtUtc.Should().BeNull("aktarılmış parti kaydı kalır");
+    }
+
+    [Fact]
+    public void Closed_Batch_Should_Be_Deleted_A_Rollback_Window_After_Its_Last_Change()
+    {
+        var b = Mapped();
+        b.Discard(Now).IsSuccess.Should().BeTrue();
+
+        b.PayloadPurgeDueAtUtc.Should().BeNull();
+        b.DeletionDueAtUtc.Should().Be(Now + ImportBatch.RollbackWindow);
+        b.IsDueForDeletion(Now + ImportBatch.RollbackWindow - TimeSpan.FromSeconds(1)).Should().BeFalse();
+        b.IsDueForDeletion(Now + ImportBatch.RollbackWindow).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Rolled_Back_Batch_Should_Be_Deleted_And_Not_Purged()
+    {
+        var b = Committed();
+        b.StartRollback("{}", Now.AddDays(1)).IsSuccess.Should().BeTrue();
+        b.PayloadPurgeDueAtUtc.Should().BeNull("geri alma sürerken satırlar silinmez");
+        b.CompleteRollback(partial: false, Now.AddDays(1)).IsSuccess.Should().BeTrue();
+
+        b.PayloadPurgeDueAtUtc.Should().BeNull();
+        b.DeletionDueAtUtc.Should().Be(Now.AddDays(1) + ImportBatch.RollbackWindow);
     }
 
     [Theory]
@@ -220,7 +244,7 @@ public sealed class ImportBatchValidationLeaseTests
     [Theory]
     [InlineData(ImportBatchStatus.CommitFailed)]
     [InlineData(ImportBatchStatus.RollbackFailed)]
-    public void Failed_Terminal_Statuses_Should_Also_Be_Purgeable_After_30_Days_B5(ImportBatchStatus status)
+    public void Failed_Terminal_Statuses_Should_Also_Be_Purgeable_After_The_Rollback_Window(ImportBatchStatus status)
     {
         var b = Mapped();
         b.StartValidation(Now);
@@ -239,7 +263,7 @@ public sealed class ImportBatchValidationLeaseTests
         }
 
         b.Status.Should().Be(status);
-        b.PayloadPurgeDueAtUtc.Should().Be(Now + ImportBatch.PayloadRetention);
+        b.PayloadPurgeDueAtUtc.Should().Be(Now + ImportBatch.RollbackWindow);
     }
 
     [Fact]

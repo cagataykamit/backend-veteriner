@@ -567,48 +567,107 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
         (await client.GetAsync($"/api/v1/imports/batches/{id}/rows")).StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
+    /// <summary>ADR-051 eki: aktarılmış partinin satırları geri alma süresi dolunca tamamen silinir; parti, özet ve ürün kayıtları kalır.</summary>
     [Fact]
-    public async Task Maintenance_Should_Purge_Payload_Only_After_30_Days_And_Rollback_Should_Still_Work()
+    public async Task Maintenance_Should_Delete_Rows_Of_Applied_Batch_When_Rollback_Window_Closes_And_Keep_The_Batch()
     {
         var ctx = await SeedAsync();
         var client = ClientFor(ctx.Token);
         var (id, validationId) = await UploadValidatedScenarioAsync(client, ctx);
         await CommitAndRunAsync(client, id, validationId);
-        var committedAt = DateTime.UtcNow;
-
-        await MaintenanceAsync(committedAt.AddDays(29));
+        DateTime deadline;
         await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            (await db.ImportBatches.AsNoTracking().SingleAsync(b => b.Id == id)).PayloadPurgedAtUtc.Should().BeNull("30 gün dolmadı");
-            (await db.ImportBatchRows.CountAsync(r => r.BatchId == id && r.SourceJson != null)).Should().Be(13);
+            deadline = (await db.ImportBatches.AsNoTracking().SingleAsync(b => b.Id == id)).RollbackDeadlineUtc!.Value;
         }
 
-        await MaintenanceAsync(committedAt.AddDays(30).AddMinutes(5));
+        await MaintenanceAsync(deadline.AddMinutes(-5));
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (await db.ImportBatches.AsNoTracking().SingleAsync(b => b.Id == id)).PayloadPurgedAtUtc.Should().BeNull("geri alma süresi dolmadı");
+            (await db.ImportBatchRows.CountAsync(r => r.BatchId == id)).Should().Be(13);
+        }
+
+        var result = await MaintenanceAsync(deadline.AddMinutes(5));
+        result.PurgedBatches.Should().BeGreaterThanOrEqualTo(1);
 
         await using (var scope = _factory.Services.CreateSystemScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            (await db.ImportBatches.AsNoTracking().SingleAsync(b => b.Id == id)).PayloadPurgedAtUtc.Should().NotBeNull();
-            var rows = await db.ImportBatchRows.AsNoTracking().Where(r => r.BatchId == id).ToListAsync();
-            rows.Should().HaveCount(13, "satırların kendisi ve sonuçları kalır");
-            rows.Should().OnlyContain(r => r.SourceJson == null && r.NormalizedJson == null && r.IssuesJson == null);
-            rows.Count(r => r.ApplyStatus == ImportRowApplyStatus.Created && r.TargetEntityId != null).Should().Be(7);
+            var batch = await db.ImportBatches.AsNoTracking().SingleAsync(b => b.Id == id);
+            batch.PayloadPurgedAtUtc.Should().NotBeNull();
+            batch.CustomerCounts.Created.Should().Be(2, "özet sayaçları kalır");
+            (await db.ImportBatchRows.CountAsync(r => r.BatchId == id)).Should().Be(0, "satırlar tamamen silinir");
             (await db.AuditLogs.CountAsync(a => a.TargetId == $"ImportBatchId={id}" && a.Action == "ImportBatch.PayloadPurged")).Should().Be(1);
         }
 
+        (await CountsInTenantAsync(ctx.TenantId)).Should().Be((2, 2, 3), "aktarılan kayıtlar kalır");
         var rowsResponse = await client.GetAsync($"/api/v1/imports/batches/{id}/rows");
         rowsResponse.StatusCode.Should().Be(HttpStatusCode.Gone);
         (await CodeAsync(rowsResponse)).Should().Be("Imports.PayloadPurged");
         (await client.GetAsync($"/api/v1/imports/batches/{id}/errors")).StatusCode.Should().Be(HttpStatusCode.Gone);
         (await GetJsonAsync(client, $"/api/v1/imports/batches/{id}/preview")).GetProperty("payloadPurged").GetBoolean().Should().BeTrue();
+        var detail = await GetJsonAsync(client, $"/api/v1/imports/batches/{id}");
+        detail.GetProperty("payloadPurgedAtUtc").ValueKind.Should().Be(JsonValueKind.String, "ekran bununla 'satır ayrıntısı saklanmıyor' der");
+        (await client.GetAsync($"/api/v1/imports/batches/{id}/rollback-preview")).StatusCode.Should().Be(HttpStatusCode.OK, "önizleme bozulmaz");
+    }
 
-        // Geri alma satır verisine değil hedef kimliklere dayanır: temizlenmiş partide de çalışır.
-        Counts(await GetJsonAsync(client, $"/api/v1/imports/batches/{id}/rollback-preview"), "deletable").Should().Equal(2, 2, 3);
-        (await PostRollbackAsync(client, id, Guid.NewGuid(), "30 gün sonra geri alma")).StatusCode.Should().Be(HttpStatusCode.Accepted);
-        await RunRollbackWorkerAsync();
-        (await StatusAsync(id)).Should().Be(ImportBatchStatus.RolledBack);
-        (await CountsInTenantAsync(ctx.TenantId)).Should().Be((0, 0, 0));
+    /// <summary>ADR-051 eki: kapanmış parti (silinmiş taslak) son hareketten geri alma süresi sonra kaydıyla silinir; denetim özeti kalır.</summary>
+    [Fact]
+    public async Task Maintenance_Should_Delete_Closed_Batch_With_Its_Record_After_The_Rollback_Window()
+    {
+        var ctx = await SeedAsync();
+        var client = ClientFor(ctx.Token);
+        var (id, _) = await UploadCustomersAsync(client, ctx, 2);
+        (await client.DeleteAsync($"/api/v1/imports/batches/{id}")).IsSuccessStatusCode.Should().BeTrue();
+        DateTime due;
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            due = (await db.ImportBatches.AsNoTracking().SingleAsync(b => b.Id == id)).DeletionDueAtUtc!.Value;
+        }
+
+        await MaintenanceAsync(due.AddMinutes(-5));
+        (await StatusAsync(id)).Should().Be(ImportBatchStatus.Discarded, "süre dolmadı");
+
+        var result = await MaintenanceAsync(due.AddMinutes(5));
+        result.DeletedBatches.Should().BeGreaterThanOrEqualTo(1);
+
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (await db.ImportBatches.AsNoTracking().AnyAsync(b => b.Id == id)).Should().BeFalse();
+            var audit = await db.AuditLogs.AsNoTracking().SingleAsync(a => a.TargetId == $"ImportBatchId={id}" && a.Action == "ImportBatch.Deleted");
+            audit.RequestPayload.Should().Contain("\"status\":\"Discarded\"").And.Contain("createdByUserId").And.NotContain(ctx.CustomerName);
+        }
+
+        (await client.GetAsync($"/api/v1/imports/batches/{id}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    /// <summary>ADR-051 eki: kapanmış partiye hâlâ başvuran kayıt varsa parti silinmez.</summary>
+    [Fact]
+    public async Task Maintenance_Should_Not_Delete_Closed_Batch_That_Is_Still_Referenced()
+    {
+        var ctx = await SeedAsync();
+        var client = ClientFor(ctx.Token);
+        var (id, _) = await UploadCustomersAsync(client, ctx, 2);
+        (await client.DeleteAsync($"/api/v1/imports/batches/{id}")).IsSuccessStatusCode.Should().BeTrue();
+        DateTime due;
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            due = (await db.ImportBatches.AsNoTracking().SingleAsync(b => b.Id == id)).DeletionDueAtUtc!.Value;
+            db.ImportedAccountEntries.Add(ImportedAccountEntry.Create(
+                ctx.TenantId, ctx.ClinicId, Guid.NewGuid(), id, new DateOnly(2025, 1, 1), ImportedAccountEntryKind.Debit, 10m,
+                null, null, null, null, DateTime.UtcNow).Value!);
+            await db.SaveChangesAsync();
+        }
+
+        await MaintenanceAsync(due.AddMinutes(5));
+
+        (await StatusAsync(id)).Should().Be(ImportBatchStatus.Discarded, "başvuran kayıt varken parti kaydı kalır");
     }
 
     // ================================================================ Yardımcılar

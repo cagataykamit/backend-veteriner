@@ -4563,6 +4563,50 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("ImportBatchRows", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Imports.ImportSourceLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BatchId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Entity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SourceKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("SourceProfile")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "ClinicId", "SourceProfile", "Entity", "SourceKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ImportSourceLinks_Key");
+
+                    b.ToTable("ImportSourceLinks", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Imports.ImportedAccountEntry", b =>
                 {
                     b.Property<Guid>("Id")

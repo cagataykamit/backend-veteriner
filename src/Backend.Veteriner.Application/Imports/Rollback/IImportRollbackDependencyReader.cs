@@ -29,6 +29,12 @@ public sealed record ImportRollbackAppointmentFact(Guid PetId, bool Changed, boo
 public sealed record ImportRollbackOpeningBalanceFact(Guid Id, bool Changed, bool IsCredit = false);
 
 /// <summary>
+/// Partinin <b>eşleşen</b> müşteriye açtığı bakiye farkı hareketi (ADR-051): devir ücreti ya da alacağı. "Değişti" kuralı devir
+/// bakiyesiyle aynıdır; değişmemiş olan geri almada silinir, değişen kalır. Eşleşen müşteri hiçbir zaman silinmez.
+/// </summary>
+public sealed record ImportBalanceAdjustmentFact(Guid Id, bool IsCredit, bool Changed);
+
+/// <summary>
 /// Bağımlılık okuması (IMPORT_API_CONTRACT.md §9). Yalnız <b>var olan</b> hedef kayıtlar sözlüklerde bulunur; olmayan
 /// (önceki denemede silinmiş) kayıt planlayıcıda "zaten yok" sayılır. Bağlar neden koduyla gelir
 /// (<see cref="ImportRollbackReasons"/>); "başka aşı/hasta" bağı planlayıcıda hesaplanır.
@@ -77,4 +83,7 @@ public interface IImportRollbackDependencyReader
     /// devir ücreti hasta/müşteri bağına (<c>HasAppointments</c>, <c>HasCharges</c>) girmez; ayrı olgu olarak gelir.
     /// </remarks>
     Task<ImportRollbackFacts> ReadAsync(Guid tenantId, ImportRollbackTargets targets, CancellationToken ct);
+
+    /// <summary>Partinin eşleşen müşterilere (uygulama durumu <c>Matched</c> müşteri satırları) açtığı bakiye farkı hareketleri.</summary>
+    Task<IReadOnlyList<ImportBalanceAdjustmentFact>> ReadBalanceAdjustmentsAsync(Guid tenantId, Guid batchId, CancellationToken ct);
 }
