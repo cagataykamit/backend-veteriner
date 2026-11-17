@@ -281,6 +281,7 @@ public sealed class ImportBatchesEndpointTests : IClassFixture<CustomWebApplicat
         var committedItem = current.GetProperty("items").EnumerateArray().Single(i => i.GetProperty("id").GetGuid() == committed);
         committedItem.GetProperty("canRollback").GetBoolean().Should().BeTrue();
         committedItem.GetProperty("rollbackDeadlineUtc").ValueKind.Should().Be(JsonValueKind.String);
+        committedItem.GetProperty("rollbackWindowDays").GetInt32().Should().Be(15);
 
         var all = await client.GetFromJsonAsync<JsonElement>("/api/v1/imports/batches?includeClosed=true");
         Ids(all).Should().BeEquivalentTo([draft, committed, discarded, expired, rolledBack]);

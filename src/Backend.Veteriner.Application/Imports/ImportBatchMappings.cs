@@ -37,7 +37,8 @@ internal static class ImportBatchMappings
             warnings ?? (tables is null ? null : ImportWarningsDocument.Parse(b.WarningsJson)),
             b.SourceProfile,
             b.CanStartRollback(nowUtc),
-            b.RollbackDeadlineUtc);
+            b.RollbackDeadlineUtc,
+            (int)ImportBatch.RollbackWindow.TotalDays);
 
     public static ImportIssueDto ToDto(this ImportIssue i)
         => new(i.Severity.ToString(), i.Code, i.Field, i.Message, i.Value);
