@@ -66,20 +66,6 @@ public static class ImportBatchStatusSets
         ImportBatchStatus.RollbackFailed,
     ];
 
-    /// <summary>
-    /// Satır verisi saklama süresi (K9) sonunda temizlenen, işi bitmiş durumlar. <c>Discarded</c> ve <c>Expired</c>
-    /// partinin satırları durum değişirken silinir; geri alınabilir başarısız durumlar da işlem bittiği için sayılır
-    /// (geri alma yalnız satır durumu ve hedef kimliği kullanır, temizlenmiş partide de çalışır).
-    /// </summary>
-    public static readonly IReadOnlyList<ImportBatchStatus> PayloadRetained =
-    [
-        ImportBatchStatus.Committed,
-        ImportBatchStatus.CommitFailed,
-        ImportBatchStatus.RolledBack,
-        ImportBatchStatus.PartiallyRolledBack,
-        ImportBatchStatus.RollbackFailed,
-    ];
-
     /// <summary>Geri almanın başlatılabildiği durumlar (geçiş tablosu); başarısız geri alma yeniden denenebilir.</summary>
     public static readonly IReadOnlyList<ImportBatchStatus> RollbackableFrom =
     [
@@ -100,7 +86,7 @@ public static class ImportBatchStatusSets
 
     /// <summary>
     /// Kapanmış partiler: verisi üründe kalmayan (tamamen geri alınmış) veya hiç uygulanmamış (silinmiş, süresi dolmuş
-    /// taslak). Parti listesi bunları yalnız istenince gösterir.
+    /// taslak). Parti listesi bunları yalnız istenince gösterir; bakım işi son hareketten geri alma süresi sonra kaydıyla siler (ADR-051 eki).
     /// </summary>
     public static readonly IReadOnlyList<ImportBatchStatus> Closed =
     [
