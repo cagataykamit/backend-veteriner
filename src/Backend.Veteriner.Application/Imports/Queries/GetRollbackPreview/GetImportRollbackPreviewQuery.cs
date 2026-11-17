@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Imports.Access;
@@ -34,6 +35,8 @@ public sealed class GetImportRollbackPreviewQueryHandler
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<ImportBatch> _batches;
     private readonly ImportRollbackPlanLoader _plans;
+    private readonly IImportRollbackRecordReader _records;
+    private readonly ICurrentUserPermissionChecker _permissions;
     private readonly TimeProvider _timeProvider;
 
     public GetImportRollbackPreviewQueryHandler(
@@ -42,6 +45,8 @@ public sealed class GetImportRollbackPreviewQueryHandler
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<ImportBatch> batches,
         ImportRollbackPlanLoader plans,
+        IImportRollbackRecordReader records,
+        ICurrentUserPermissionChecker permissions,
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
@@ -49,6 +54,8 @@ public sealed class GetImportRollbackPreviewQueryHandler
         _clinicScopeResolver = clinicScopeResolver;
         _batches = batches;
         _plans = plans;
+        _records = records;
+        _permissions = permissions;
         _timeProvider = timeProvider;
     }
 
@@ -73,10 +80,27 @@ public sealed class GetImportRollbackPreviewQueryHandler
         }
 
         var snapshot = await _plans.LoadAsync(tenantId, batch.Id, rowIds: null, ct);
-        return Result<ImportRollbackPreviewDto>.Success(Build(batch, snapshot, _timeProvider.GetUtcNow().UtcDateTime));
+        var ordered = ImportRollbackPlanLoader.OrderedBlocked(snapshot.Plan, MaxBlockedItems);
+        var records = ordered.Count > 0 && CanSeeRecords()
+            ? await _records.ReadAsync(tenantId, ordered, ct)
+            : null;
+        var blockedItems = ImportRollbackPlanLoader.BlockedItems(snapshot.Plan, ordered, records);
+        return Result<ImportRollbackPreviewDto>.Success(
+            Build(batch, snapshot, blockedItems, _timeProvider.GetUtcNow().UtcDateTime));
     }
 
-    private static ImportRollbackPreviewDto Build(ImportBatch batch, ImportRollbackSnapshot snapshot, DateTime nowUtc)
+    /// <summary>
+    /// Kaydı tanıtan bilgiler (müşteri ve hasta adı, sahip) kişisel veridir: <c>Imports.Commit</c> yanında müşteri ve hasta
+    /// okuma izni de gerekir. İzin yoksa liste satır numarasıyla kalır.
+    /// </summary>
+    private bool CanSeeRecords()
+        => _permissions.HasPermission(PermissionCatalog.Clients.Read) && _permissions.HasPermission(PermissionCatalog.Pets.Read);
+
+    private static ImportRollbackPreviewDto Build(
+        ImportBatch batch,
+        ImportRollbackSnapshot snapshot,
+        IReadOnlyList<ImportRollbackBlockedItemDto> blockedItems,
+        DateTime nowUtc)
     {
         var plan = snapshot.Plan;
         var deletable = ImportRollbackPlanLoader.Counts(plan, ImportRollbackDecision.Delete);
@@ -95,7 +119,7 @@ public sealed class GetImportRollbackPreviewQueryHandler
             CanDeleteUnblockedOnly: rollbackable && blocked.Total > 0 && deletable.Total > 0,
             deletable,
             blocked,
-            ImportRollbackPlanLoader.BlockedItems(plan, MaxBlockedItems),
+            blockedItems,
             BlockedItemsTruncated: blocked.Total > MaxBlockedItems,
             new ImportRollbackKeptDto(
                 snapshot.CountRows(ImportTable.Customers, ImportRowApplyStatus.Matched),

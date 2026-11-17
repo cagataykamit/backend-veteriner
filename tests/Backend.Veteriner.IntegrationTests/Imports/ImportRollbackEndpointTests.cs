@@ -186,6 +186,24 @@ public sealed class ImportRollbackEndpointTests : IClassFixture<CustomWebApplica
         items.Single(i => i.GetProperty("id").GetGuid() == targets[(ImportTable.Customers, 2)])
             .GetProperty("reasons").EnumerateArray().Select(r => r.GetString()).Should().Equal(ImportRollbackReasons.HasKeptPets);
 
+        // Müşteri/hasta okuma izni yoksa kayıt tanıtımı (kişisel veri) dönmez; zincir yine aynı grupta, müşteri önde.
+        items.Should().OnlyContain(i => i.GetProperty("record").ValueKind == JsonValueKind.Null);
+        items.Select(i => i.GetProperty("id").GetGuid()).Take(2)
+            .Should().Equal(targets[(ImportTable.Customers, 2)], targets[(ImportTable.Pets, 2)]);
+        var m1 = targets[(ImportTable.Customers, 2)];
+        items.Take(2).Should().OnlyContain(i => i.GetProperty("groupId").GetGuid() == m1);
+
+        var reader = ClientFor(await TokenAsync(ctx, [.. AdminPermissions, "Clients.Read", "Pets.Read"]));
+        var named = (await GetJsonAsync(reader, $"/api/v1/imports/batches/{id}/rollback-preview"))
+            .GetProperty("blockedItems").EnumerateArray().ToList();
+        var petRecord = named.Single(i => i.GetProperty("entity").GetString() == "Pet").GetProperty("record");
+        petRecord.GetProperty("name").GetString().Should().Be("Pamuk");
+        petRecord.GetProperty("species").GetString().Should().Be(ctx.SpeciesName);
+        petRecord.GetProperty("ownerName").GetString().Should().Be(ctx.CustomerName);
+        petRecord.GetProperty("clientId").GetGuid().Should().Be(targets[(ImportTable.Customers, 2)]);
+        named.Single(i => i.GetProperty("id").GetGuid() == targets[(ImportTable.Customers, 3)])
+            .GetProperty("record").GetProperty("name").GetString().Should().Be($"Veli {ctx.Suffix}");
+
         // Varsayılan Fail: 409 + liste, hiçbir şey silinmez.
         var refused = await PostRollbackAsync(client, id, Guid.NewGuid(), "Deneme");
         refused.StatusCode.Should().Be(HttpStatusCode.Conflict);

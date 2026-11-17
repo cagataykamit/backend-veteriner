@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Imports.Contracts.Dtos;
 using Backend.Veteriner.Application.Imports.Rollback;
 using Backend.Veteriner.Domain.Imports;
 using AwesomeAssertions;
@@ -201,5 +202,25 @@ public sealed class ImportRollbackPlannerTests
         targets.ClientIds.Should().BeEquivalentTo([Client1, Client2]);
         targets.PetIds.Should().BeEquivalentTo([Pet1, Pet2, PetOfMatched]);
         targets.VaccinationIds.Should().BeEquivalentTo([Vac1, Vac2, VacOnExisting]);
+    }
+
+    [Fact]
+    public void Blocked_Items_Should_Be_Grouped_By_Owner_Unit_With_Chain_Order_And_Records()
+    {
+        var facts = new Facts();
+        facts.Vaccinations[Vac1] = new(Pet1, LinkedToExamination: true, false, false);
+        facts.Vaccinations[Vac2] = new(Pet2, false, false, Modified: true);
+        var plan = ImportRollbackPlanner.Build(Rows(), facts.Build());
+        var records = new Dictionary<Guid, ImportRollbackRecordDto> { [Pet1] = new(Name: "Pamuk") };
+
+        var items = ImportRollbackPlanLoader.BlockedItems(plan, max: 10, records);
+
+        // Tablo sırası (müşteriler, hastalar, aşılar) yerine zincir: M1 → H1 → A1, sonra M2 → H2 → A2.
+        items.Select(i => i.Id).Should().Equal(Client1, Pet1, Vac1, Client2, Pet2, Vac2);
+        items.Take(3).Should().OnlyContain(i => i.GroupId == Client1);
+        items.Skip(3).Should().OnlyContain(i => i.GroupId == Client2);
+        items.Single(i => i.Id == Pet1).Record!.Name.Should().Be("Pamuk");
+        items.Where(i => i.Id != Pet1).Should().OnlyContain(i => i.Record == null);
+        ImportRollbackPlanLoader.BlockedItems(plan, max: 4).Select(i => i.Id).Should().Equal(Client1, Pet1, Vac1, Client2);
     }
 }
