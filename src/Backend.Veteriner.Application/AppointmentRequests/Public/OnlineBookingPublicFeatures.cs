@@ -53,7 +53,7 @@ public sealed record CreateOnlineBookingRequestCommand(
     DateTime RequestedStartUtc,
     string? Note,
     string? Channel)
-    : IRequest<Result<AppointmentRequestCreatedDto>>, IAuditableRequest
+    : IRequest<Result<AppointmentRequestCreatedDto>>, IAuditableRequest, ITransactionalRequest
 {
     public string AuditAction => "AppointmentRequest.Create.Link";
     public string? AuditTarget => null;

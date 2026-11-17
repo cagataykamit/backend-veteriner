@@ -32,7 +32,7 @@ public sealed record CreatedApiKeyDto(ApiKeyDto Key, string PlainTextKey);
 public sealed record GetApiKeysQuery : IRequest<Result<ApiKeyListDto>>;
 
 public sealed record CreateApiKeyCommand(string? Name, IReadOnlyList<string>? Scopes)
-    : IRequest<Result<CreatedApiKeyDto>>, IAuditableRequest
+    : IRequest<Result<CreatedApiKeyDto>>, IAuditableRequest, ITransactionalRequest
 {
     public string AuditAction => "ApiKey.Create";
     public string? AuditTarget => $"Name={Name?.Trim()};Scopes={string.Join(ApiKeyScopes.Separator, Scopes ?? [])}";
@@ -144,6 +144,7 @@ public sealed class CreateApiKeyCommandHandler : IRequestHandler<CreateApiKeyCom
     private readonly TenantPlanFeatureEvaluator _planFeatures;
     private readonly IRepository<ApiKey> _keys;
     private readonly IReadRepository<User> _users;
+    private readonly ITransactionLock _locks;
     private readonly TimeProvider _timeProvider;
 
     public CreateApiKeyCommandHandler(
@@ -152,6 +153,7 @@ public sealed class CreateApiKeyCommandHandler : IRequestHandler<CreateApiKeyCom
         TenantPlanFeatureEvaluator planFeatures,
         IRepository<ApiKey> keys,
         IReadRepository<User> users,
+        ITransactionLock locks,
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
@@ -159,6 +161,7 @@ public sealed class CreateApiKeyCommandHandler : IRequestHandler<CreateApiKeyCom
         _planFeatures = planFeatures;
         _keys = keys;
         _users = users;
+        _locks = locks;
         _timeProvider = timeProvider;
     }
 
@@ -173,6 +176,8 @@ public sealed class CreateApiKeyCommandHandler : IRequestHandler<CreateApiKeyCom
         if (!planAllows.IsSuccess)
             return Result<CreatedApiKeyDto>.Failure(planAllows.Error);
 
+        // Sınır sayımı kiracı kilidi altında: eşzamanlı iki oluşturma sınırı aşamaz (kilit commit'e dek sürer).
+        await _locks.AcquireAsync($"api-keys:{tenantId:N}", ct);
         if (await _keys.CountAsync(new ActiveApiKeysByTenantSpec(tenantId), ct) >= ApiKey.MaxActivePerTenant)
         {
             return Result<CreatedApiKeyDto>.Failure(

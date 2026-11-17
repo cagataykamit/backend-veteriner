@@ -28,6 +28,7 @@ public sealed class AppointmentRequestIntake
     private readonly AppointmentRequestEmailComposer _emails;
     private readonly IUserNotificationPublisher _notifications;
     private readonly TimeProvider _timeProvider;
+    private readonly ITransactionLock _locks;
 
     public AppointmentRequestIntake(
         IReadRepository<AppointmentReason> reasons,
@@ -36,7 +37,8 @@ public sealed class AppointmentRequestIntake
         AppointmentAvailabilityService availability,
         AppointmentRequestEmailComposer emails,
         IUserNotificationPublisher notifications,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ITransactionLock locks)
     {
         _reasons = reasons;
         _requestsRead = requestsRead;
@@ -45,6 +47,7 @@ public sealed class AppointmentRequestIntake
         _emails = emails;
         _notifications = notifications;
         _timeProvider = timeProvider;
+        _locks = locks;
     }
 
     /// <summary>
@@ -119,7 +122,10 @@ public sealed class AppointmentRequestIntake
             : Result<AppointmentReason?>.Failure("AppointmentReasons.NotFound", "Randevu nedeni bulunamadı.");
     }
 
-    /// <summary>Bekleyen talep sınırı ve saatin müsaitliği (talep kaydından önce).</summary>
+    /// <summary>
+    /// Bekleyen talep sınırı ve saatin müsaitliği (talep kaydından önce). Sayım klinik kilidi altında yapılır, kilit
+    /// <see cref="SubmitAsync"/> kaydı commit edilene dek sürer: eşzamanlı talepler sırayla sayılır, sınır aşılamaz. Komut transaction içinde olmalı.
+    /// </summary>
     public async Task<Result> EnsureBookableAsync(
         OnlineBookingScope scope,
         AppointmentReason? reason,
@@ -127,6 +133,7 @@ public sealed class AppointmentRequestIntake
         string normalizedEmail,
         CancellationToken ct)
     {
+        await _locks.AcquireAsync($"appointment-requests:{scope.TenantId:N}:{scope.ClinicId:N}", ct);
         var pending = await _requestsRead.CountAsync(
             new PendingAppointmentRequestsByEmailSpec(scope.TenantId, scope.ClinicId, normalizedEmail), ct);
         if (pending >= AppointmentRequest.MaxPendingPerEmailAndClinic)

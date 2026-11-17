@@ -50,6 +50,20 @@ public sealed class ExternalApiIntegrationTests : IClassFixture<CustomWebApplica
     public ExternalApiIntegrationTests(CustomWebApplicationFactory factory) => _factory = factory;
 
     [Fact]
+    public async Task Concurrent_Key_Creates_Should_Not_Exceed_Active_Limit()
+    {
+        var env = await SeedTenantAsync(SubscriptionPlanCode.Premium);
+        var attempts = ApiKey.MaxActivePerTenant + 3;
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, attempts)
+            .Select(i => env.Http.PostAsJsonAsync(Keys, new { name = $"Eşzamanlı {i}", scopes = AllScopes })));
+
+        responses.Count(r => r.StatusCode == HttpStatusCode.OK).Should().Be(ApiKey.MaxActivePerTenant);
+        foreach (var rejected in responses.Where(r => r.StatusCode != HttpStatusCode.OK))
+            (await IntegrationTestProblemDetails.ReadCodeAsync(rejected)).Should().Be("ApiKeys.LimitReached");
+    }
+
+    [Fact]
     public async Task Key_Should_Only_See_Its_Own_Tenant_And_Reject_Tenant_Parameter()
     {
         var a = await SeedTenantAsync(SubscriptionPlanCode.Premium);

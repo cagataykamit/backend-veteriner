@@ -10,6 +10,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Mediator;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Diagnostics;
@@ -220,7 +221,18 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
 
         user.AddRefreshToken(newRefresh, utcNow);
         await _refreshRepo.AddAsync(newRefresh, ct);
-        await _refreshRepo.SaveChangesAsync(ct);
+        try
+        {
+            await _refreshRepo.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Aynı jetonla eşzamanlı yenileme kazandı (RevokedAtUtc eşzamanlılık belirteci); bu istek yeni jeton almaz.
+            // Diğer oturumlar kapatılmaz: çoğunlukla aynı tarayıcının iki sekmesidir, kazanan oturum sürer.
+            return Result<LoginResultDto>.Failure(
+                "Auth.Unauthorized.RefreshTokenReused",
+                "Refresh token aynı anda başka bir istekte kullanıldı.");
+        }
 
         _logger.LogInformation(
             "Refresh succeeded. UserId={UserId} TenantId={TenantId} ClinicId={ClinicId} QuerySteps={QuerySteps} SlowestStep={SlowestStep} SlowestStepMs={SlowestStepMs} TotalElapsedMs={TotalElapsedMs}",

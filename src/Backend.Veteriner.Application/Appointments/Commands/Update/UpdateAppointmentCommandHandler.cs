@@ -138,6 +138,7 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
             if (!reasonResult.IsSuccess)
                 return Result.Failure(reasonResult.Error);
 
+            await _assignment.LockScheduleAsync(tenantId, ct);
             var conflicts = await AppointmentSlotRules.EnsureNoConflictAsync(
                 _appointmentsRead,
                 _assignment,

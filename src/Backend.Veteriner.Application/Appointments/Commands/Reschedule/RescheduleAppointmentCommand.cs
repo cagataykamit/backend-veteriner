@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Shared;
 using Mediator;
 
@@ -6,4 +7,4 @@ namespace Backend.Veteriner.Application.Appointments.Commands.Reschedule;
 public sealed record RescheduleAppointmentCommand(
     Guid AppointmentId,
     DateTime ScheduledAtUtc)
-    : IRequest<Result>;
+    : IRequest<Result>, ITransactionalRequest;

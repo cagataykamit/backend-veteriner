@@ -16,7 +16,7 @@ public sealed record CreateAppointmentCommand(
     int? DurationMinutes = null,
     Guid? ReasonId = null,
     Guid? VeterinarianUserId = null)
-    : IRequest<Result<Guid>>, IActivationSignalRequest
+    : IRequest<Result<Guid>>, IActivationSignalRequest, ITransactionalRequest
 {
     public ActivationSignalKind ActivationSignal => ActivationSignalKind.AppointmentCreated;
 }

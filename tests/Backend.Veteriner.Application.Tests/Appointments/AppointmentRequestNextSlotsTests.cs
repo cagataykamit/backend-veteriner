@@ -67,7 +67,8 @@ public sealed class AppointmentRequestNextSlotsTests
             availability,
             emails,
             new Mock<IUserNotificationPublisher>().Object,
-            new FakeTimeProvider(new DateTimeOffset(utcNow, TimeSpan.Zero)));
+            new FakeTimeProvider(new DateTimeOffset(utcNow, TimeSpan.Zero)),
+            new Mock<ITransactionLock>().Object);
     }
 
     private static OnlineBookingScope Scope(int minLeadMinutes = 0, bool show = true)

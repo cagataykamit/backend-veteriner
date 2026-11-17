@@ -10,6 +10,7 @@ using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Mediator;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Diagnostics;
@@ -229,7 +230,17 @@ public sealed class SelectClinicCommandHandler : IRequestHandler<SelectClinicCom
 
         user.AddRefreshToken(newRefresh, utcNow);
         await _refreshRepo.AddAsync(newRefresh, ct);
-        await _refreshRepo.SaveChangesAsync(ct);
+        try
+        {
+            await _refreshRepo.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Aynı jetonla eşzamanlı yenileme ya da klinik seçimi kazandı; bu istek yeni jeton almaz.
+            return Result<LoginResultDto>.Failure(
+                "Auth.Unauthorized.RefreshTokenReused",
+                "Refresh token aynı anda başka bir istekte kullanıldı.");
+        }
         MarkStep("saveRefreshToken");
 
         _logger.LogInformation(

@@ -33,7 +33,8 @@ public sealed class AppointmentConcurrencyCommandHandlerTests
         _appointmentsRead.Object,
         new Mock<IClinicVeterinarianReader>().Object,
         new Mock<IUserNotificationPublisher>().Object,
-        new Mock<IClientContext>().Object);
+        new Mock<IClientContext>().Object,
+        new Mock<ITransactionLock>().Object);
 
     public AppointmentConcurrencyCommandHandlerTests()
     {

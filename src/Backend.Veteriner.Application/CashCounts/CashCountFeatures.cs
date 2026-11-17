@@ -400,6 +400,7 @@ public sealed class CreateCashCountCommandHandler : IRequestHandler<CreateCashCo
     private readonly IRepository<CashRegister> _registers;
     private readonly IReadRepository<CashMovement> _movements;
     private readonly IReadRepository<User> _users;
+    private readonly ITransactionLock _locks;
     private readonly TimeProvider _timeProvider;
 
     public CreateCashCountCommandHandler(
@@ -414,6 +415,7 @@ public sealed class CreateCashCountCommandHandler : IRequestHandler<CreateCashCo
         IRepository<CashRegister> registers,
         IReadRepository<CashMovement> movements,
         IReadRepository<User> users,
+        ITransactionLock locks,
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
@@ -427,6 +429,7 @@ public sealed class CreateCashCountCommandHandler : IRequestHandler<CreateCashCo
         _registers = registers;
         _movements = movements;
         _users = users;
+        _locks = locks;
         _timeProvider = timeProvider;
     }
 
@@ -451,7 +454,7 @@ public sealed class CreateCashCountCommandHandler : IRequestHandler<CreateCashCo
         CashRegister register;
         if (request.CashRegisterId is null)
         {
-            register = await CashRegisterRules.EnsureMainAsync(_registers, tenantId, clinicId, nowUtc, ct);
+            register = await CashRegisterRules.EnsureMainAsync(_registers, _locks, tenantId, clinicId, nowUtc, ct);
         }
         else
         {

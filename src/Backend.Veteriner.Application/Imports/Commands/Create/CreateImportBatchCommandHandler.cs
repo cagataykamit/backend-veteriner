@@ -32,6 +32,7 @@ public sealed class CreateImportBatchCommandHandler
     private readonly TimeProvider _timeProvider;
     private readonly ITrialLimitPolicy _trialLimitPolicy;
     private readonly UploadMalwareGuard _malwareGuard;
+    private readonly ITransactionLock _locks;
 
     public CreateImportBatchCommandHandler(
         ITenantContext tenantContext,
@@ -46,7 +47,8 @@ public sealed class CreateImportBatchCommandHandler
         ImportTableInfoLoader tableInfo,
         TimeProvider timeProvider,
         ITrialLimitPolicy trialLimitPolicy,
-        UploadMalwareGuard malwareGuard)
+        UploadMalwareGuard malwareGuard,
+        ITransactionLock locks)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -61,6 +63,7 @@ public sealed class CreateImportBatchCommandHandler
         _timeProvider = timeProvider;
         _trialLimitPolicy = trialLimitPolicy;
         _malwareGuard = malwareGuard;
+        _locks = locks;
     }
 
     public async ValueTask<Result<ImportBatchCreateResultDto>> Handle(CreateImportBatchCommand request, CancellationToken ct)
@@ -118,13 +121,8 @@ public sealed class CreateImportBatchCommandHandler
         if (duplicate is not null)
             return duplicate.Value;
 
-        var openDrafts = await _batchesRead.CountAsync(new OpenImportDraftsSpec(tenantId), ct);
-        if (openDrafts >= ImportBatch.MaxOpenDraftsPerTenant)
-        {
-            return Fail(
-                "Imports.TooManyOpenDrafts",
-                $"Kiracıda en fazla {ImportBatch.MaxOpenDraftsPerTenant} açık taslak parti olabilir; önce birini tamamlayın veya silin.");
-        }
+        if (await EnsureDraftCapacityAsync(tenantId, ct) is { } tooManyDrafts)
+            return tooManyDrafts;
 
         // Deneme kiracısında tablo başına satır tavanı düşüktür (TRIAL-004); aşım Trial.ImportLimitExceeded (422).
         var read = _reader.Read(upload, trialTenant: await _trialLimitPolicy.IsTrialAsync(tenantId, ct));
@@ -158,6 +156,12 @@ public sealed class CreateImportBatchCommandHandler
             ImportWarningsDocument.Serialize(warnings));
         if (!attached.IsSuccess)
             return Result<ImportBatchCreateResultDto>.Failure(attached.Error);
+
+        // Eşzamanlı yüklemeler sınırı aşmasın: sayım kiracı kilidi altında yinelenir, kilit commit'e dek sürer. Ayrıştırma kilit
+        // dışında kalsın diye kilit burada alınır; yukarıdaki kilitsiz sayım yalnız boşa ayrıştırmayı önler.
+        await _locks.AcquireAsync($"imports:{tenantId:N}", ct);
+        if (await EnsureDraftCapacityAsync(tenantId, ct) is { } tooManyAfterParse)
+            return tooManyAfterParse;
 
         try
         {
@@ -193,6 +197,16 @@ public sealed class CreateImportBatchCommandHandler
         var headers = tables.ToDictionary(t => t.Table, t => t.Headers);
         return Result<ImportBatchCreateResultDto>.Success(
             new ImportBatchCreateResultDto(true, batch.ToDto(_timeProvider.GetUtcNow().UtcDateTime, ImportTableInfoLoader.Build(batch, headers), warnings)));
+    }
+
+    private async Task<Result<ImportBatchCreateResultDto>?> EnsureDraftCapacityAsync(Guid tenantId, CancellationToken ct)
+    {
+        var openDrafts = await _batchesRead.CountAsync(new OpenImportDraftsSpec(tenantId), ct);
+        return openDrafts >= ImportBatch.MaxOpenDraftsPerTenant
+            ? Fail(
+                "Imports.TooManyOpenDrafts",
+                $"Kiracıda en fazla {ImportBatch.MaxOpenDraftsPerTenant} açık taslak parti olabilir; önce birini tamamlayın veya silin.")
+            : null;
     }
 
     private async Task<Result<ImportBatchCreateResultDto>> ReplayAsync(

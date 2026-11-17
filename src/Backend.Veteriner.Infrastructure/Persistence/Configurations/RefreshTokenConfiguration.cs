@@ -29,6 +29,11 @@ public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refresh
         e.Property(x => x.LastUsedAtUtc)
             .IsRequired(false);
 
+        // Tek kullanımlık döndürme: kapatma yalnız hâlâ açık satıra yazılır; aynı jetonla eşzamanlı ikinci yenileme
+        // DbUpdateConcurrencyException alır ve yeni jeton üretmez.
+        e.Property(x => x.RevokedAtUtc)
+            .IsConcurrencyToken();
+
         // RevokeReason: iki seçenek
         // 1) Kurumsal/operasyonel metin => Unicode gerekmez diyorsanız varchar yapın:
         e.Property(x => x.RevokeReason)

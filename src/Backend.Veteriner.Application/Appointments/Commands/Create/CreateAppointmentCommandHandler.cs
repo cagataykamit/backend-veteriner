@@ -157,6 +157,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
         if (effectiveStatus == AppointmentStatus.Scheduled)
         {
             // Slot, çakışma ve çalışma saati kuralları tek yerde (bekleme listesi kabulü de kullanır).
+            await _assignment.LockScheduleAsync(tenantId, ct);
             var bookable = await AppointmentSlotRules.EnsureBookableAsync(
                 _appointmentsRead,
                 _clinicWorkingHoursRead,

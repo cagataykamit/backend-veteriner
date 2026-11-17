@@ -21,20 +21,31 @@ public sealed class AppointmentAssignment
     private readonly IClinicVeterinarianReader _veterinarians;
     private readonly IUserNotificationPublisher _notifications;
     private readonly IClientContext _clientContext;
+    private readonly ITransactionLock _locks;
 
     public AppointmentAssignment(
         IReadRepository<AppointmentReason> reasons,
         IReadRepository<Appointment> appointments,
         IClinicVeterinarianReader veterinarians,
         IUserNotificationPublisher notifications,
-        IClientContext clientContext)
+        IClientContext clientContext,
+        ITransactionLock locks)
     {
         _reasons = reasons;
         _appointments = appointments;
         _veterinarians = veterinarians;
         _notifications = notifications;
         _clientContext = clientContext;
+        _locks = locks;
     }
+
+    /// <summary>
+    /// Randevuyu yazan komut çakışma denetiminden (<see cref="AppointmentSlotRules"/>) hemen önce çağırır: kiracının takvim yazımları
+    /// transaction sonuna dek sıraya girer, eşzamanlı iki istek aynı boş saati göremez (hayvan ve hekim çakışması klinikler arası olduğundan
+    /// kilit kiracı başınadır). Yalnız denetleyen yollar (bekleme listesi teklifi gönderme) çağırmaz. Komut transaction içinde olmalı.
+    /// </summary>
+    public Task LockScheduleAsync(Guid tenantId, CancellationToken ct)
+        => _locks.AcquireAsync($"appointments:{tenantId:N}", ct);
 
     /// <summary>Hekim yeni atandıysa ya da değiştiyse hekime bildirim (kaydı çağıran randevuyla birlikte yapar).</summary>
     public Task NotifyIfAssignedAsync(Appointment appointment, Guid? previousVeterinarianUserId, CancellationToken ct)

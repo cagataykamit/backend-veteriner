@@ -25,7 +25,7 @@ public sealed record GetCashRegistersQuery(Guid? ClinicId, bool IncludeInactive)
 
 /// <summary>POST /api/v1/cash-registers. Kasa yönetimi paketi (Profesyonel, Kurumsal). Klinikte Ana kasa yoksa önce o açılır.</summary>
 public sealed record CreateCashRegisterCommand(Guid? ClinicId, string? Code, string? Name)
-    : IRequest<Result<CashRegisterDto>>, IAuditableRequest
+    : IRequest<Result<CashRegisterDto>>, IAuditableRequest, ITransactionalRequest
 {
     public string AuditAction => "CashRegister.Create";
     public string? AuditTarget => $"ClinicId={ClinicId}";
@@ -154,6 +154,7 @@ public sealed class CreateCashRegisterCommandHandler : IRequestHandler<CreateCas
     private readonly IReadRepository<Tenant> _tenants;
     private readonly TenantPlanFeatureEvaluator _planFeatures;
     private readonly IRepository<CashRegister> _registers;
+    private readonly ITransactionLock _locks;
     private readonly TimeProvider _timeProvider;
 
     public CreateCashRegisterCommandHandler(
@@ -164,6 +165,7 @@ public sealed class CreateCashRegisterCommandHandler : IRequestHandler<CreateCas
         IReadRepository<Tenant> tenants,
         TenantPlanFeatureEvaluator planFeatures,
         IRepository<CashRegister> registers,
+        ITransactionLock locks,
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
@@ -173,6 +175,7 @@ public sealed class CreateCashRegisterCommandHandler : IRequestHandler<CreateCas
         _tenants = tenants;
         _planFeatures = planFeatures;
         _registers = registers;
+        _locks = locks;
         _timeProvider = timeProvider;
     }
 
@@ -199,7 +202,7 @@ public sealed class CreateCashRegisterCommandHandler : IRequestHandler<CreateCas
         if (!created.IsSuccess)
             return Result<CashRegisterDto>.Failure(created.Error);
 
-        await CashRegisterRules.EnsureMainAsync(_registers, tenantId, clinicId, nowUtc, ct);
+        await CashRegisterRules.EnsureMainAsync(_registers, _locks, tenantId, clinicId, nowUtc, ct);
         await _registers.AddAsync(created.Value!, ct);
         try
         {

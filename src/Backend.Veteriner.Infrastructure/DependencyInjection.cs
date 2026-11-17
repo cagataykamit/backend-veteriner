@@ -166,6 +166,7 @@ public static class DependencyInjection
         services.AddScoped<ChangeTrackedSaveChangesInterceptor>();
         services.AddScoped<RecordHistorySaveChangesInterceptor>();
         services.AddScoped<ExpectedRowVersionSaveChangesInterceptor>();
+        services.AddSingleton<RefreshTokenRevokeConflictInterceptor>();
         services.AddScoped<SlowQueryLoggingInterceptor>();
         services.AddScoped<DbConnectionSlowOpenInterceptor>();
 
@@ -178,6 +179,7 @@ public static class DependencyInjection
                 sp.GetRequiredService<OutboxSaveChangesInterceptor>(),
                 sp.GetRequiredService<RecordHistorySaveChangesInterceptor>(),
                 sp.GetRequiredService<ExpectedRowVersionSaveChangesInterceptor>(),
+                sp.GetRequiredService<RefreshTokenRevokeConflictInterceptor>(),
                 sp.GetRequiredService<SlowQueryLoggingInterceptor>(),
                 sp.GetRequiredService<DbConnectionSlowOpenInterceptor>());
         });
@@ -498,6 +500,7 @@ public static class DependencyInjection
 
         /// ===== Unit of Work =====
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
+        services.AddScoped<ITransactionLock, SqlTransactionLock>();
 
 
         return services;

@@ -82,7 +82,7 @@ public sealed class CashCountHandlerTests
 
     private CreateCashCountCommandHandler CreateHandler(SubscriptionPlanCode plan)
         => new(_tenant.Object, _clinic.Object, _client.Object, _scope.Object, _tenants.Object, PlanFeatureTestFactory.ForPlan(plan),
-            _cashEvents.Object, _counts.Object, _registers.Object, _movements.Object, _users.Object, TimeProvider.System);
+            _cashEvents.Object, _counts.Object, _registers.Object, _movements.Object, _users.Object, new Mock<ITransactionLock>().Object, TimeProvider.System);
 
     [Fact]
     public async Task Day_Should_Take_Expected_Cash_From_Cash_Summary_Cash_Row_For_One_Istanbul_Day()

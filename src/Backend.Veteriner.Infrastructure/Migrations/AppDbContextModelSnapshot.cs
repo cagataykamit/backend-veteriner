@@ -5235,6 +5235,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("nvarchar(50)");
 
                     b.Property<DateTime?>("RevokedAtUtc")
+                        .IsConcurrencyToken()
                         .HasColumnType("datetime2");
 
                     b.Property<string>("TokenHash")
@@ -7346,6 +7347,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("varchar(128)");
 
                     b.Property<DateTime?>("RevokedAtUtc")
+                        .IsConcurrencyToken()
                         .HasColumnType("datetime2");
 
                     b.Property<Guid?>("TenantId")
