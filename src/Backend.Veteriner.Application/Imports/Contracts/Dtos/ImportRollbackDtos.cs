@@ -44,7 +44,14 @@ public sealed record ImportRollbackPreviewDto(
     ImportRollbackKeptDto Kept,
     ImportRollbackCountsDto RolledBack,
     bool RemindersAlreadyReleased,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings)
+{
+    /// <summary>Partinin eşleşen müşterilere açtığı bakiye farkı hareketleri (ADR-051, §14.5): silinecek ve kalacak (değişmiş) sayısı.</summary>
+    public ImportBalanceAdjustmentCountsDto BalanceAdjustments { get; init; } = new(0, 0);
+}
+
+/// <summary>Bakiye farkı hareketi sayıları: <see cref="Delete"/> değişmemiş (geri almada silinir), <see cref="Keep"/> tahsis/mahsup görmüş.</summary>
+public sealed record ImportBalanceAdjustmentCountsDto(int Delete, int Keep);
 
 /// <summary>POST .../rollback sonucu; <see cref="Started"/> false ise aynı <c>requestId</c> ile tekrar istektir (200).</summary>
 public sealed record ImportRollbackResultDto(bool Started, ImportBatchDto Batch);

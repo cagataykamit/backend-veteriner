@@ -34,6 +34,7 @@ public sealed class GetImportRollbackPreviewQueryHandler
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<ImportBatch> _batches;
     private readonly ImportRollbackPlanLoader _plans;
+    private readonly IImportRollbackDependencyReader _dependencies;
     private readonly TimeProvider _timeProvider;
 
     public GetImportRollbackPreviewQueryHandler(
@@ -42,6 +43,7 @@ public sealed class GetImportRollbackPreviewQueryHandler
         IClinicReadScopeResolver clinicScopeResolver,
         IReadRepository<ImportBatch> batches,
         ImportRollbackPlanLoader plans,
+        IImportRollbackDependencyReader dependencies,
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
@@ -49,6 +51,7 @@ public sealed class GetImportRollbackPreviewQueryHandler
         _clinicScopeResolver = clinicScopeResolver;
         _batches = batches;
         _plans = plans;
+        _dependencies = dependencies;
         _timeProvider = timeProvider;
     }
 
@@ -73,7 +76,11 @@ public sealed class GetImportRollbackPreviewQueryHandler
         }
 
         var snapshot = await _plans.LoadAsync(tenantId, batch.Id, rowIds: null, ct);
-        return Result<ImportRollbackPreviewDto>.Success(Build(batch, snapshot, _timeProvider.GetUtcNow().UtcDateTime));
+        var adjustments = await _dependencies.ReadBalanceAdjustmentsAsync(tenantId, batch.Id, ct);
+        return Result<ImportRollbackPreviewDto>.Success(Build(batch, snapshot, _timeProvider.GetUtcNow().UtcDateTime) with
+        {
+            BalanceAdjustments = new ImportBalanceAdjustmentCountsDto(adjustments.Count(a => !a.Changed), adjustments.Count(a => a.Changed)),
+        });
     }
 
     private static ImportRollbackPreviewDto Build(ImportBatch batch, ImportRollbackSnapshot snapshot, DateTime nowUtc)
