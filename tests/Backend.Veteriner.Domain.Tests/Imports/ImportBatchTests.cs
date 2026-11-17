@@ -12,8 +12,8 @@ public sealed class ImportBatchTests
     private static readonly Guid ValidationId = Guid.NewGuid();
     private static readonly DateTime Now = new(2026, 10, 14, 9, 0, 0, DateTimeKind.Utc);
 
-    /// <summary>Geçiş tablosu anı: taslak süresinden (7 gün) sonra, geri alma süresinden (30 gün) önce.</summary>
-    private static readonly DateTime Later = Now.AddDays(29);
+    /// <summary>Geçiş tablosu anı: taslak süresinden (7 gün) sonra, geri alma süresinden önce.</summary>
+    private static readonly DateTime Later = Now + ImportBatch.DraftLifetime + TimeSpan.FromDays(1);
     private static readonly string Hash = new('a', ImportBatch.ContentHashLength);
     private static readonly ImportTableCounts Counts = new() { Total = 3, Valid = 2, Error = 1, WillCreate = 2 };
     private const string RollbackOptions = "{\"onDuplicateClient\":\"Match\",\"rollback\":{\"requestId\":\"7d0b7c3e-0000-4000-8000-000000000001\",\"policy\":\"Fail\"}}";
@@ -412,6 +412,13 @@ public sealed class ImportBatchTests
         b.LeaseOwner.Should().BeNull();
         b.CanStartRollback(Now).Should().BeTrue();
         b.StartRollback(RollbackOptions, Now).IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Rollback_Window_Should_Be_15_Days_And_Separate_From_Payload_Retention()
+    {
+        ImportBatch.RollbackWindow.Should().Be(TimeSpan.FromDays(15), "kullanıcı kararı 2026-11-17");
+        ImportBatch.PayloadRetention.Should().Be(TimeSpan.FromDays(30), "satır verisi saklaması ayrı kuraldır");
     }
 
     [Fact]

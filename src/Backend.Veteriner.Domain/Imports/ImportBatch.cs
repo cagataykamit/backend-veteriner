@@ -43,8 +43,9 @@ public sealed class ImportBatch : AggregateRoot, ITenantOwned
     /// <summary>
     /// Uygulanan partinin geri alınabildiği süre; uygulama anından sayılır (<see cref="RollbackDeadlineUtc"/>). Süre dolunca
     /// aktarma kesinleşir: hiçbir geri alınabilir durumdan (yarım kalmış geri alma dahil) yeni geri alma başlatılamaz.
+    /// 15 gün (kullanıcı kararı 2026-11-17; önce 30). Satır verisi saklaması (<see cref="PayloadRetention"/>) ayrı kuraldır.
     /// </summary>
-    public static readonly TimeSpan RollbackWindow = TimeSpan.FromDays(30);
+    public static readonly TimeSpan RollbackWindow = TimeSpan.FromDays(15);
 
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid TenantId { get; private set; }
