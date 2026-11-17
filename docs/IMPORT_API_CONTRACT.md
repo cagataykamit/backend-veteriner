@@ -24,6 +24,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 | Dosya notları (2026-11-16) | `warnings[]` öğesine isteğe bağlı satır alanları (`severity`, `count`, `unit`, `title`, `source`, `parts`, `outcome`, `example`, `target`); E-vet notlarına tür başına kod; notlar partiye yazılır ve parti ayrıntısıyla döner (bölüm 7.2.1) | **Uygulandı** (migration `AddImportBatchWarnings`) |
 | Geri alma süresi ve sade liste (2026-11-16) | Geri alma uygulamadan sonra 30 gün açık, sonra aktarma kesinleşir (`409 Imports.RollbackWindowClosed`); parti nesnesinde `canRollback`, `rollbackDeadlineUtc`; liste varsayılan olarak kapanmış partileri (`RolledBack`, `Discarded`, `Expired`) göstermez, `includeClosed=true` ile gelir (bölüm 7.5, 7.11, 7.12, 9.1) | **Uygulandı** (migration yok) |
 | Kalan kayıtların tanıtımı (2026-11-17) | `rollback-preview` `blockedItems` öğesine `groupId` (geri alma birimi) ve `record` (ad, tür, hasta, sahip, tarih; yalnız `Clients.Read` + `Pets.Read` ile); liste zincir sırasıyla gruplu (bölüm 7.11) | **Uygulandı** (migration yok; geriye uyumlu ekleme, sıralama değişti) |
+| Geri alma süresi 15 gün (2026-11-17) | `ImportBatch.RollbackWindow` 30 → 15 gün; parti nesnesine `rollbackWindowDays` (süre, gün). Satır verisi saklaması (30 gün, K9) değişmedi (bölüm 7.5, 9.1) | **Uygulandı** (migration yok) |
 
 **Frontend için değişenler (geri alma süresi ve sade liste, 2026-11-16; bölüm 7.5, 9.1):**
 - Parti nesnesine (ayrıntı, liste ve bütün parti yanıtları) `canRollback` (bool) ve `rollbackDeadlineUtc` (UTC, geri alınabilir durumda olmayan partide `null`) eklendi. "Geri al" düğmesi `canRollback` ile gösterilir; son tarih `rollbackDeadlineUtc`'den yazılır. `rollbackDeadlineUtc` geçmişse aktarma kesinleşmiştir. İstemci süreyi kendisi hesaplamaz.
@@ -568,6 +569,7 @@ Durum geçişi domain'dedir (`Uploaded|Mapped|Validated|ValidationFailed` → `M
 ```
 
 - `progress` parti nesnesine **eklenmedi**; B4'te ayrı uçtur (bölüm 7.14). `updatedAtUtc` son durum değişikliğidir (7 günlük süre bunun üzerinden, yoksa `createdAtUtc`).
+- `rollbackWindowDays` (2026-11-17): geri alma süresi, gün (şu an 15). Her parti nesnesinde dolu; uygulamadan önce bilgi metni bunu kullanır.
 - `canRollback`, `rollbackDeadlineUtc` (2026-11-16): geri almanın şu an başlatılabildiği ve son anı (bölüm 9.1). `rollbackDeadlineUtc` yalnız geri alınabilir durumda (`Committed|CommitFailed|PartiallyRolledBack|RollbackFailed`) doludur; geçmişse aktarma kesinleşmiştir ve `canRollback = false`.
 - Liste: `GET /imports/batches?page=1&pageSize=20&status=Uploaded&includeClosed=false` → `{ items, page, pageSize, totalItems, totalPages }`; `pageSize` 1–100, `status` geçersizse `400`. Sıralama `createdAtUtc` azalan. `status` verilmezse kapanmış partiler (`RolledBack`, `Discarded`, `Expired`; kodda `ImportBatchStatusSets.Closed`) yalnız `includeClosed=true` ile gelir; verilen `status` her zaman uygulanır. Filtre sorguda uygulanır, `totalItems` ve sayfalama buna göre hesaplanır.
 - Görünürlük: yalnız çağıranın kiracısı. Klinik bağlı parti (`clinicId` dolu) yalnız o kliniğe erişebilen kullanıcıya görünür; erişemeyen için ayrıntı `404 Imports.BatchNotFound`, listede görünmez. Klinik bağsız parti kiracıdaki `Imports.Read` sahiplerine görünür (müşteri/hasta kiracı genelidir).
@@ -763,7 +765,7 @@ Uygulama (arka plan): müşteri → hasta → aşı sırası; **sahip bazlı** i
 | 403 | `Imports.AccessDenied` | Commit için ek `Clients.Create` / `Pets.Create` / `Vaccinations.Create` izni yok |
 | 409 | `Imports.RollbackBlocked` | `Fail` politikasında engelli kayıt var, ya da silinebilir kayıt yokken engelli kayıt var (`extensions.blocked` sayılar, `extensions.blockedItems` en çok 50 öğe; bölüm 7.12) |
 | 409 | `Imports.RequestIdConflict` | (geri alma) Aynı `requestId` farklı `blockedPolicy` ile |
-| 409 | `Imports.RollbackWindowClosed` | Geri alma süresi (uygulamadan sonra 30 gün) doldu; aktarma kesinleşti (bölüm 9.1) |
+| 409 | `Imports.RollbackWindowClosed` | Geri alma süresi (uygulamadan sonra 15 gün) doldu; aktarma kesinleşti (bölüm 9.1) |
 | 403/409 | `Tenants.TenantInactive` / abonelik yazma koruması | Mevcut kiracı kodları |
 | 500 | — | Beklenmeyen; parti `CommitFailed` olur, uygulanmış satırlar korunur ve geri alınabilir |
 
@@ -802,7 +804,7 @@ Silinmeyen kayıt `Kept` ve nedeni (kodlar aşağıdaki B5 tablosunda; taslaktak
 
 ### 9.1 Geri alma süresi (2026-11-16, kullanıcı kararı)
 
-Geri alma uygulamadan sonra **30 gün** açıktır; süre dolunca aktarma **kesinleşir**. Amaç: aylar sonra, klinikte dokunulmamış binlerce kaydın tek tıkla silinememesi. Kural tek yerde: `ImportBatch.RollbackWindow`, `RollbackDeadlineUtc`, `CheckRollbackAllowed` (domain). Geri alma isteği, `rollback-preview` ve parti nesnesi (`canRollback`, `rollbackDeadlineUtc`) aynı kuralı okur.
+Geri alma uygulamadan sonra **15 gün** açıktır (2026-11-17 kullanıcı kararı; ilk sürümde 30 gündü); süre dolunca aktarma **kesinleşir**. Amaç: aylar sonra, klinikte dokunulmamış binlerce kaydın tek tıkla silinememesi. Kural tek yerde: `ImportBatch.RollbackWindow`, `RollbackDeadlineUtc`, `CheckRollbackAllowed` (domain). Geri alma isteği, `rollback-preview` ve parti nesnesi (`canRollback`, `rollbackDeadlineUtc`) aynı kuralı okur. Parti nesnesindeki `rollbackWindowDays` süreyi gün olarak verir (uygulamadan önce "15 gün içinde geri alabilirsiniz" bilgisi için); istemci sayıyı sabit yazmaz.
 
 - **Sayım:** `committedAtUtc`'den. Uygulaması yarıda kalan (`CommitFailed`) partiye uygulama anı yazılmaz; onda uygulamanın kabul edildiği son doğrulama anından (`validatedAtUtc`) sayılır. Uygulama doğrulamadan önce başlayamadığından süre en fazla o aradaki gün kadar erken kapanır, hiçbir zaman uzamaz.
 - **Kapsam:** bütün geri alınabilir durumlar (`Committed`, `CommitFailed`, `PartiallyRolledBack`, `RollbackFailed`). Süre geçince `409 Imports.RollbackWindowClosed`; durum ve kayıtlar değişmez.
