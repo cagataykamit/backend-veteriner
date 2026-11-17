@@ -23,6 +23,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 | Eksik alanlar (2026-11-12) | Müşteri `Not`; ürün `KdvOrani`, `AlisFiyati`; E-vet müşteri açıklaması/meslek/doğum tarihi/ikinci telefon/kayıt tarihi, hasta kayıt tarihi ve işaretleri, aşı SKT'si, ürün KDV'si ve alış fiyatı (bölüm 4.3, 13.2) | **Uygulandı** (migration `AddProductTaxAndClientNotes`) |
 | Dosya notları (2026-11-16) | `warnings[]` öğesine isteğe bağlı satır alanları (`severity`, `count`, `unit`, `title`, `source`, `parts`, `outcome`, `example`, `target`); E-vet notlarına tür başına kod; notlar partiye yazılır ve parti ayrıntısıyla döner (bölüm 7.2.1) | **Uygulandı** (migration `AddImportBatchWarnings`) |
 | Geri alma süresi ve sade liste (2026-11-16) | Geri alma uygulamadan sonra 30 gün açık, sonra aktarma kesinleşir (`409 Imports.RollbackWindowClosed`); parti nesnesinde `canRollback`, `rollbackDeadlineUtc`; liste varsayılan olarak kapanmış partileri (`RolledBack`, `Discarded`, `Expired`) göstermez, `includeClosed=true` ile gelir (bölüm 7.5, 7.11, 7.12, 9.1) | **Uygulandı** (migration yok) |
+| Kalan kayıtların tanıtımı (2026-11-17) | `rollback-preview` `blockedItems` öğesine `groupId` (geri alma birimi) ve `record` (ad, tür, hasta, sahip, tarih; yalnız `Clients.Read` + `Pets.Read` ile); liste zincir sırasıyla gruplu (bölüm 7.11) | **Uygulandı** (migration yok; geriye uyumlu ekleme, sıralama değişti) |
 
 **Frontend için değişenler (geri alma süresi ve sade liste, 2026-11-16; bölüm 7.5, 9.1):**
 - Parti nesnesine (ayrıntı, liste ve bütün parti yanıtları) `canRollback` (bool) ve `rollbackDeadlineUtc` (UTC, geri alınabilir durumda olmayan partide `null`) eklendi. "Geri al" düğmesi `canRollback` ile gösterilir; son tarih `rollbackDeadlineUtc`'den yazılır. `rollbackDeadlineUtc` geçmişse aktarma kesinleşmiştir. İstemci süreyi kendisi hesaplamaz.
@@ -659,7 +660,10 @@ Uygulama (arka plan): müşteri → hasta → aşı sırası; **sahip bazlı** i
   "canRollback": false, "canDeleteUnblockedOnly": true,
   "deletable": { "clients": 1199, "pets": 1898, "vaccinations": 3100 },
   "blocked":   { "clients": 1, "pets": 2, "vaccinations": 0 },
-  "blockedItems": [ { "entity": "Pet", "id": "guid", "table": "pets", "rowNumber": 12, "reasons": ["HasVisits"] } ],
+  "blockedItems": [ { "entity": "Pet", "id": "guid", "table": "pets", "rowNumber": 12, "reasons": ["HasVisits"],
+                      "groupId": "guid",
+                      "record": { "name": "Pamuk", "species": "Kedi", "petId": "guid", "petName": "Pamuk",
+                                  "clientId": "guid", "ownerName": "Ayşe Yılmaz", "atUtc": null, "on": null, "kind": null } } ],
   "blockedItemsTruncated": false,
   "kept": { "matchedClients": 150, "matchedPets": 80 },
   "rolledBack": { "clients": 0, "pets": 0, "vaccinations": 0 },
@@ -667,7 +671,21 @@ Uygulama (arka plan): müşteri → hasta → aşı sırası; **sahip bazlı** i
   "warnings": [ "Imports.PetEditsNotTracked" ] }
 ```
 - Hesap yalnız uygulama sonucu `Created` (veya önceki kısmi geri almada `Kept`) satırların hedef kayıtları üzerindendir; kural ve neden kodları bölüm 9 (kodda tek yer: `ImportRollbackPlanner`; geri alma işi aynı kuralı birim işleminde yeniden çalıştırır).
-- `deletable` / `blocked`: tablo başına kayıt sayısı. `blockedItems`: engelli kayıtlar (`entity` = `Client|Pet|Vaccination`, kaydı oluşturan satırın `table`/`rowNumber`'ı, `reasons` neden kodları); en çok 200 öğe, fazlası varsa `blockedItemsTruncated = true`. Kişisel veri (ad, telefon) dönmez; satır ayrıntısı `rows` ucundan okunur.
+- `deletable` / `blocked`: tablo başına kayıt sayısı. `blockedItems`: engelli kayıtlar (`entity` = `Client|Pet|Vaccination`, kaydı oluşturan satırın `table`/`rowNumber`'ı, `reasons` neden kodları); en çok 200 öğe, fazlası varsa `blockedItemsTruncated = true`. `entity` ayrıca `ClinicalRecord|AccountEntry|Appointment|Product` olabilir (bölüm 12.9).
+- **Gruplama (2026-11-17):** `groupId` geri alma birimidir (müşteri kimliği; ürün kendi grubudur). Liste grup grup sıralıdır (birim sırası); grup içinde müşteri, hasta, randevu, aşı, klinik kayıt, hesap hareketi, sonra satır numarası. Böylece müşteri → hasta → randevu zinciri bir aradadır; 200 sınırı yalnız son grubu bölebilir. Zincir nedenleri (`HasKeptPets`, `HasKeptAppointments`, `HasKeptVaccinations`) aynı gruptaki kalan kayda işaret eder.
+- **Kayıt tanıtımı (2026-11-17):** `record` kaydı kullanıcıya tanıtır; alanlar türe göre dolar, diğerleri `null`:
+
+  | `entity` | `name` | Diğer alanlar |
+  |---|---|---|
+  | `Client` | ad soyad | `clientId` |
+  | `Pet` | hasta adı | `species`, `petId`, `petName`, `clientId`, `ownerName` |
+  | `Appointment` | — | `atUtc` (randevu anı), `kind` (randevu türü kodu), hasta ve sahip alanları |
+  | `Vaccination` | aşı adı | `atUtc` (uygulama, yoksa sonraki tarih), hasta ve sahip alanları |
+  | `ClinicalRecord` | kayıt türü | `on` (gün), hasta ve sahip alanları |
+  | `AccountEntry` | açıklama | `on` (gün), `kind` (hareket türü kodu), `clientId`, `ownerName` |
+  | `Product` | ürün adı | — |
+
+  `record` kişisel veridir: yalnız önizlemede ve çağıranda `Imports.Commit` yanında **`Clients.Read` ve `Pets.Read`** izni varsa döner; yoksa ya da kayıt artık yoksa `null` (arayüz satır numarasına düşer). Günlüğe yazılmaz. `POST .../rollback` hatasındaki `extensions.blockedItems` `record` taşımaz (`groupId` taşır).
 - `kept`: mevcut kayıtla eşleşen (`Matched`) satırlar; bunlar **hiçbir zaman** silinmez.
 - `rolledBack`: daha önce geri alınmış (`RolledBack`) satır sayıları.
 - `canRollback`: geri alma başlatılabilir (durum `Committed|CommitFailed|PartiallyRolledBack|RollbackFailed` **ve** geri alma süresi dolmamış, bölüm 9.1) ve `blocked` toplamı 0 (varsayılan `Fail` politikası). `canDeleteUnblockedOnly`: geri alma başlatılabilir, `blocked` > 0 ve `deletable` > 0. Süresi dolmuş partide ikisi de `false`; önizleme okunabilir kalır.

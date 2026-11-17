@@ -463,6 +463,7 @@ public static class DependencyInjection
 
         // Geri alma işi (ADR-019 K7; uygulama işiyle aynı ayarlar ve desen) ve bakım işi (K9: Expired + 30 gün temizlik).
         services.AddScoped<IImportRollbackDependencyReader, ImportRollbackDependencyReader>();
+        services.AddScoped<IImportRollbackRecordReader, ImportRollbackRecordReader>();
         services.AddScoped<IImportBatchRowBulkWriter, ImportBatchRowBulkWriter>();
         services.AddSingleton(sp => new ImportRollbackProcessor(
             sp.GetRequiredService<IServiceScopeFactory>(),
