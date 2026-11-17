@@ -189,6 +189,7 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<ImportBatchRow> ImportBatchRows => Set<ImportBatchRow>();
     public DbSet<ImportedClinicalRecord> ImportedClinicalRecords => Set<ImportedClinicalRecord>();
     public DbSet<ImportedAccountEntry> ImportedAccountEntries => Set<ImportedAccountEntry>();
+    public DbSet<ImportSourceLink> ImportSourceLinks => Set<ImportSourceLink>();
     public DbSet<DataExportJob> DataExportJobs => Set<DataExportJob>();
 
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
