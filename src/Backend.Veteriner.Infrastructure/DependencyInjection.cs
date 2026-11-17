@@ -461,7 +461,7 @@ public static class DependencyInjection
             ImportCommitProcessor.NewWorkerId()));
         services.AddHostedService<ImportValidationHostedService>();
 
-        // Geri alma işi (ADR-019 K7; uygulama işiyle aynı ayarlar ve desen) ve bakım işi (K9: Expired + 30 gün temizlik).
+        // Geri alma işi (ADR-019 K7; uygulama işiyle aynı ayarlar ve desen) ve bakım işi (K9: Expired; satır ve kapanmış parti saklaması geri alma süresiyle, ADR-051 eki).
         services.AddScoped<IImportRollbackDependencyReader, ImportRollbackDependencyReader>();
         services.AddScoped<IImportRollbackRecordReader, ImportRollbackRecordReader>();
         services.AddScoped<IImportBatchRowBulkWriter, ImportBatchRowBulkWriter>();

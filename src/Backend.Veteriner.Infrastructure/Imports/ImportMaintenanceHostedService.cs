@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 namespace Backend.Veteriner.Infrastructure.Imports;
 
 /// <summary>
-/// İçe aktarma bakım işçisi (ADR-019 K9): süresi dolan taslaklar ve 30 günlük satır verisi temizliği. Açılıştan kısa süre
+/// İçe aktarma bakım işçisi (ADR-019 K9): süresi dolan taslaklar, geri alma süresi dolan satırların ve kapanmış partilerin silinmesi (ADR-051 eki). Açılıştan kısa süre
 /// sonra ilk tur, sonra <see cref="ImportMaintenanceOptions.IntervalMinutes"/> aralıkla çalışır; tur hatası işçiyi durdurmaz.
 /// </summary>
 public sealed class ImportMaintenanceHostedService : BackgroundService
