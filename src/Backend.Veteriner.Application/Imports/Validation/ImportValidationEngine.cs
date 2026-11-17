@@ -57,11 +57,13 @@ public sealed partial class ImportValidationEngine
     private readonly Dictionary<(string Name, string Email), ImportExistingClient> _dbClientByNameEmail = new();
     private readonly Dictionary<string, List<ImportExistingClient>> _dbClientsByPhone = new(StringComparer.Ordinal);
     private readonly HashSet<string> _dbClientNames = new(StringComparer.Ordinal);
+    private readonly Dictionary<Guid, ImportExistingClient> _dbClientsById = new();
 
     // Mevcut hayvan / aşı dizinleri.
     private readonly Dictionary<(Guid ClientId, string Name, Guid SpeciesId), ImportExistingPet> _dbPetByIdentity = new();
     private readonly Dictionary<(Guid ClientId, string Name), List<ImportExistingPet>> _dbPetsByOwnerName = new();
     private readonly Dictionary<string, List<ImportExistingPet>> _dbPetsByChip = new(StringComparer.Ordinal);
+    private readonly Dictionary<Guid, ImportExistingPet> _dbPetsById = new();
     private readonly HashSet<(Guid PetId, Guid DefinitionId, DateOnly Date)> _dbVaccinations = new();
 
     private readonly List<ImportRowResult> _results = new();
@@ -161,6 +163,7 @@ public sealed partial class ImportValidationEngine
     {
         foreach (var client in existing.Clients.OrderBy(c => c.Id))
         {
+            _dbClientsById.TryAdd(client.Id, client);
             var nameKey = NameKey(client.FullName);
             _dbClientNames.Add(nameKey);
 
@@ -178,6 +181,7 @@ public sealed partial class ImportValidationEngine
 
         foreach (var pet in existing.Pets.OrderBy(p => p.Id))
         {
+            _dbPetsById.TryAdd(pet.Id, pet);
             _dbPetByIdentity.TryAdd((pet.ClientId, PetNameKey(pet.Name), pet.SpeciesId), pet);
             if (!_dbPetsByOwnerName.TryGetValue((pet.ClientId, PetNameKey(pet.Name)), out var sameName))
                 _dbPetsByOwnerName[(pet.ClientId, PetNameKey(pet.Name))] = sameName = [];
@@ -199,13 +203,7 @@ public sealed partial class ImportValidationEngine
 
         // Tam geçiş tabloları (ADR-048).
         foreach (var record in existing.ClinicalRecords)
-        {
-            _dbClinicalRecords.Add((record.PetId, record.RecordedOn, ClinicalRecordKey(
-            [
-                record.Complaint, record.History, record.Findings, record.Diagnosis, record.Treatment, record.Prescription,
-                record.LabResults, record.Notes,
-            ], record.VeterinarianName, record.WeightKg, record.TemperatureC)));
-        }
+            _dbClinicalRecords.Add((record.PetId, record.RecordedOn, ClinicalRecordKey(record)));
 
         foreach (var entry in existing.AccountEntries)
         {

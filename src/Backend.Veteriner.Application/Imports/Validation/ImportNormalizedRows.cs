@@ -36,7 +36,8 @@ public abstract record ImportNormalizedRow
 /// Müşteri satırı. <see cref="OpeningBalance"/> aktarılacak sıfır dışı devir bakiyesidir (ADR-048 T3): müşteri oluşturulursa
 /// artı tutar devir ücreti, eksi tutar devir alacağı açar; eşleşen/mükerrer satırda null'dır. <see cref="NationalId"/> (bireysel) veya
 /// <see cref="TaxNumber"/> (kurumsal) geçerli fatura kimliğidir; <see cref="RemindersOptedOut"/> eski programda pasif müşteridir.
-/// <see cref="Notes"/> yalnız oluşturulan müşteriye yazılır.
+/// <see cref="Notes"/> yalnız oluşturulan müşteriye yazılır. <see cref="BalanceDifference"/> (ADR-051): eşleşen müşteride dosyadaki
+/// bakiye − Vetinity'deki net bakiye (<see cref="ExistingBalance"/>); yalnız fark varsa dolu, commit seçimi <c>Apply</c> ise devir açar.
 /// </summary>
 public sealed record ImportNormalizedCustomer(
     string? Reference,
@@ -50,7 +51,9 @@ public sealed record ImportNormalizedCustomer(
     string? TaxNumber = null,
     string? TaxOffice = null,
     bool RemindersOptedOut = false,
-    string? Notes = null)
+    string? Notes = null,
+    decimal? ExistingBalance = null,
+    decimal? BalanceDifference = null)
     : ImportNormalizedRow;
 
 /// <summary>

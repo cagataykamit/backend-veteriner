@@ -280,9 +280,13 @@ public sealed partial class ImportValidationEngine
                 ImportTable.Pets, reader.RowNumber, issues, normalized, ImportRowAction.Skip, mergedIntoRow: canonical.Row));
         }
 
-        // Kiracıda mevcut hayvan (aynı müşteri + küçük harf ad + tür).
-        ImportExistingPet? existing = null;
-        if (owner.ClientId is { } clientId)
+        // Kiracıda mevcut hayvan: önce kaynak kimliği (ADR-051; adı, türü ya da sahibi değişmiş olabilir; mevcut bilgi ezilmez), sonra
+        // aynı müşteri + küçük harf ad + tür.
+        var bySource = reference is not null && _input.Existing.PetLinks.TryGetValue(reference, out var linkedId)
+            ? _dbPetsById.GetValueOrDefault(linkedId)
+            : null;
+        var existing = bySource;
+        if (existing is null && owner.ClientId is { } clientId)
             _dbPetByIdentity.TryGetValue((clientId, nameKey, speciesId.Value), out existing);
 
         // Mikroçip çakışması (K10): başka hayvanda dosyada veya kiracıda.
@@ -307,7 +311,7 @@ public sealed partial class ImportValidationEngine
 
         if (existing is not null)
         {
-            issues.Add(ImportRules.MatchedExisting.At());
+            issues.Add(bySource is not null ? ImportRules.MatchedBySourceId.At("HayvanNo", value: reference) : ImportRules.MatchedExisting.At());
             return Complete(node, Finish(ImportTable.Pets, reader.RowNumber, issues, normalized, ImportRowAction.Match, existing.Id));
         }
 

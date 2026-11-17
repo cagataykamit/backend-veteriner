@@ -143,8 +143,9 @@ public sealed partial class ImportValidationEngine
                 mergedIntoRow: canonical.Row));
         }
 
-        // Kiracıda mevcut müşteri (K4).
-        var existing = FindExistingClient(nameKey, phone, email);
+        // Kiracıda mevcut müşteri: önce kaynak kimliği (ADR-051; adı ya da telefonu değişmiş olabilir), sonra ad + telefon / e-posta (K4).
+        var bySource = FindLinkedClient(reference);
+        var existing = bySource ?? FindExistingClient(nameKey, phone, email);
         if (existing is not null)
         {
             if (_onDuplicateClient == ImportOptionsDocument.Error)
@@ -155,10 +156,16 @@ public sealed partial class ImportValidationEngine
 
             node.Owner = new OwnerRef($"db:{existing.Id}", existing.Id, existing.Email is not null);
             RegisterFileCustomer(node, nameKey, phone, email);
-            issues.Add(ImportRules.MatchedExisting.At());
-            var action = _onDuplicateClient == ImportOptionsDocument.Skip ? ImportRowAction.Skip : ImportRowAction.Match;
+            issues.Add(bySource is not null ? ImportRules.MatchedBySourceId.At("MusteriNo", value: reference) : ImportRules.MatchedExisting.At());
+            if (_onDuplicateClient == ImportOptionsDocument.Skip)
+            {
+                return Complete(node, Finish(
+                    ImportTable.Customers, reader.RowNumber, issues, WithoutBalance(normalized, issues), ImportRowAction.Skip, existing.Id));
+            }
+
             return Complete(node, Finish(
-                ImportTable.Customers, reader.RowNumber, issues, WithoutBalance(normalized, issues), action, existing.Id));
+                ImportTable.Customers, reader.RowNumber, issues, WithBalanceDifference(normalized, issues, existing.Id), ImportRowAction.Match,
+                existing.Id));
         }
 
         // Yeni müşteri: ayırt edilemeyen/benzer kayıtlar için bilgi ve uyarı.
@@ -259,6 +266,43 @@ public sealed partial class ImportValidationEngine
         issues.Add(ImportRules.BalanceNotAppliedToExisting.At("AcikBakiye"));
         return normalized with { OpeningBalance = null, BalanceDate = null };
     }
+
+    /// <summary>
+    /// Eşleşen müşteride bakiye farkı (ADR-051): dosyadaki bakiye (boş = 0) Vetinity'deki net bakiyeden farklıysa fark satıra yazılır
+    /// ve uyarı eklenir; otomatik uygulanmaz (commit seçimi <c>balanceDifferences</c>). Bakiye okunmadıysa (açık bakiye eşlenmemiş)
+    /// eski kural (<see cref="WithoutBalance"/>), okunamayan tutarda fark hesaplanmaz.
+    /// </summary>
+    private ImportNormalizedCustomer WithBalanceDifference(ImportNormalizedCustomer normalized, List<ImportIssue> issues, Guid clientId)
+    {
+        if (_input.Existing.ClientBalances is not { } balances)
+            return WithoutBalance(normalized, issues);
+
+        var stripped = normalized with { OpeningBalance = null, BalanceDate = null };
+        if (issues.Any(i => i.Code == ImportRules.AmountInvalid.Code && i.Field == "AcikBakiye"))
+            return stripped;
+
+        var current = balances.GetValueOrDefault(clientId);
+        var file = normalized.OpeningBalance ?? 0m;
+        if (file == current)
+            return stripped;
+
+        issues.Add(ImportRules.BalanceDifference.At(
+            "AcikBakiye",
+            $"Dosyadaki bakiye {Money(file)}, Vetinity'de {Money(current)}; fark {Money(file - current)}. Uygularken farkı devir olarak açabilir ya da atlayabilirsiniz."));
+        return stripped with { BalanceDate = normalized.BalanceDate, ExistingBalance = current, BalanceDifference = file - current };
+    }
+
+    private static string Money(decimal amount) => amount.ToString("N2", TurkishCulture) + " TL";
+
+    private static readonly System.Globalization.CultureInfo TurkishCulture = System.Globalization.CultureInfo.GetCultureInfo("tr-TR");
+
+    /// <summary>Kaynak kimliğiyle bağlı mevcut müşteri (ADR-051); bağ yoksa ya da hedefi okunmadıysa null.</summary>
+    private ImportExistingClient? FindLinkedClient(string? reference)
+        => reference is not null
+           && _input.Existing.ClientLinks.TryGetValue(reference, out var clientId)
+           && _dbClientsById.TryGetValue(clientId, out var client)
+            ? client
+            : null;
 
     private static ImportRowResult Complete(CustomerNode node, ImportRowResult result)
     {

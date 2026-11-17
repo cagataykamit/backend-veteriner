@@ -82,13 +82,27 @@ public sealed partial class ImportValidationEngine
     }
 
     /// <summary>
-    /// Mükerrer kayıt anahtarı: içerik alanları ve hekim (katlanmış; yazım/boşluk farkı yok sayılır), kilo ve ateş (saklanan
-    /// hassasiyetle; kilo 0 ölçüm değildir). Yalnız kilo taşıyan iki kayıt kilo farklıysa ayrı kayıttır.
+    /// Mükerrer kayıt anahtarı (hasta ve günle birlikte): içerik alanları ve hekim (katlanmış; yazım/boşluk farkı yok sayılır), kilo ve
+    /// ateş (saklanan hassasiyetle; kilo 0 ölçüm değildir). Yalnız kilo taşıyan iki kayıt kilo farklıysa ayrı kayıttır. Kayıt türü
+    /// bilerek anahtarda yoktur: aynı gün aynı içerikli türsüz ve türlü satır tek kayıttır. Önizleme ve uygulama anı denetimi (ADR-051)
+    /// aynı anahtarı kullanır.
     /// </summary>
     internal static string ClinicalRecordKey(IEnumerable<string?> texts, string? veterinarian, decimal? weightKg, decimal? temperatureC)
         => string.Join('|', texts.Append(veterinarian).Select(p => ImportTextFolding.Fold(p))
             .Append(weightKg > 0 ? Math.Round(weightKg.Value, 2).ToString("0.##", CultureInfo.InvariantCulture) : string.Empty)
             .Append(temperatureC is { } t ? Math.Round(t, 1).ToString("0.#", CultureInfo.InvariantCulture) : string.Empty));
+
+    /// <summary>Daha önce içe aktarılmış kaydın anahtarı.</summary>
+    internal static string ClinicalRecordKey(ImportExistingClinicalRecord r)
+        => ClinicalRecordKey(
+            [r.Complaint, r.History, r.Findings, r.Diagnosis, r.Treatment, r.Prescription, r.LabResults, r.Notes],
+            r.VeterinarianName, r.WeightKg, r.TemperatureC);
+
+    /// <summary>Uygulanacak satırın anahtarı (normalize satır).</summary>
+    internal static string ClinicalRecordKey(ImportNormalizedClinicalRecord r)
+        => ClinicalRecordKey(
+            [r.Complaint, r.History, r.Findings, r.Diagnosis, r.Treatment, r.Prescription, r.LabResults, r.Notes],
+            r.VeterinarianName, r.WeightKg, r.TemperatureC);
 
     private ImportRowResult ProcessClinicalRecord(ImportRowReader reader)
     {
@@ -135,7 +149,7 @@ public sealed partial class ImportValidationEngine
             if (!HasError(issues) && petSkip is null && pet is not null && recordedOn is { } day)
             {
                 var arrival = normalized with { RecordType = ImportedClinicalRecord.ArrivalRecordType };
-                if (pet.PetId is { } existingPetId && _dbClinicalRecords.Contains((existingPetId, day, ClinicalRecordKey(content, veterinarian, null, null))))
+                if (pet.PetId is { } existingPetId && _dbClinicalRecords.Contains((existingPetId, day, ClinicalRecordKey(arrival))))
                 {
                     issues.Add(ImportRules.ClinicalRecordImportedBefore.At());
                     return Finish(ImportTable.ClinicalRecords, reader.RowNumber, issues, arrival, ImportRowAction.Skip);
@@ -163,7 +177,7 @@ public sealed partial class ImportValidationEngine
         }
 
         // Mükerrer: aynı hasta + aynı tarih + aynı içerik, hekim ve ölçüm; neden ayrı: daha önce içe aktarılmış ya da dosyada tekrar.
-        var contentKey = ClinicalRecordKey(content, veterinarian, weight, temperature);
+        var contentKey = ClinicalRecordKey(normalized);
         if (pet!.PetId is { } petId && _dbClinicalRecords.Contains((petId, recordedOn!.Value, contentKey)))
         {
             issues.Add(ImportRules.ClinicalRecordImportedBefore.At());

@@ -66,16 +66,24 @@ public sealed record ImportRollbackRequest(Guid RequestId, string Policy);
 /// <summary>
 /// Parti seçenekleri (<c>OptionsJson</c>). <see cref="OnDuplicateClient"/> ADR-019 K4; <see cref="Rollback"/> son geri alma
 /// isteği (B5; geri alma işi politikayı buradan okur); <see cref="CommittedByUserId"/> uygulamayı başlatan kullanıcı (devir
-/// ücretini açan kullanıcı sayılır, ADR-048 T3; yoksa partiyi oluşturan).
+/// ücretini açan kullanıcı sayılır, ADR-048 T3; yoksa partiyi oluşturan); <see cref="BalanceDifferences"/> eşleşen müşterilerin bakiye
+/// farkı seçimi (ADR-051; commit gövdesinden, <see cref="Skip"/> | <see cref="Apply"/>).
 /// </summary>
 public sealed record ImportOptionsDocument(
     string OnDuplicateClient,
     ImportRollbackRequest? Rollback = null,
-    Guid? CommittedByUserId = null)
+    Guid? CommittedByUserId = null,
+    string? BalanceDifferences = null)
 {
     public const string Match = "Match";
     public const string Skip = "Skip";
     public const string Error = "Error";
+    public const string Apply = "Apply";
+
+    public static readonly IReadOnlyList<string> AllowedBalanceDifferenceModes = [Skip, Apply];
+
+    /// <summary>Bakiye farkları devir olarak açılacak mı (varsayılan atla).</summary>
+    public bool AppliesBalanceDifferences => BalanceDifferences == Apply;
 
     public static readonly IReadOnlyList<string> AllowedDuplicateClientModes = [Match, Skip, Error];
 

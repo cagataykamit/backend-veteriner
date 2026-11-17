@@ -20,7 +20,36 @@ public sealed record ImportPreviewDto(
     bool PayloadPurged,
     IReadOnlyList<ImportNotImportedReasonDto> NotImportedReasons,
     IReadOnlyList<ImportPetCandidateDto> PetCandidates,
-    IReadOnlyList<ImportPetRowDto> PetRows);
+    IReadOnlyList<ImportPetRowDto> PetRows)
+{
+    /// <summary>Güncelleme özeti (ADR-051, §14.4).</summary>
+    public ImportOverlapDto Overlap { get; init; } = ImportOverlapDto.None;
+
+    /// <summary>Eşleşen müşterilerin bakiye farkları (ADR-051, §14.3).</summary>
+    public ImportBalanceDifferencesDto BalanceDifferences { get; init; } = ImportBalanceDifferencesDto.None;
+}
+
+/// <summary>
+/// Güncelleme özeti (§14.4): <see cref="IsUpdate"/> "zaten var" satırları yeni + zaten var toplamının en az yarısıysa; tablo başına
+/// <c>willCreate</c> (tablo sayacı) ve <c>alreadyExists</c>.
+/// </summary>
+public sealed record ImportOverlapDto(bool IsUpdate, int MatchedBySourceId, IReadOnlyList<ImportOverlapTableDto> Tables)
+{
+    public static readonly ImportOverlapDto None = new(false, 0, []);
+}
+
+public sealed record ImportOverlapTableDto(string Table, int WillCreate, int AlreadyExists);
+
+/// <summary>Bakiye farkı listesi (§14.3); <see cref="Items"/> mutlak farka göre azalan, en çok 200.</summary>
+public sealed record ImportBalanceDifferencesDto(
+    int Count, decimal TotalIncrease, decimal TotalDecrease, IReadOnlyList<ImportBalanceDifferenceDto> Items, bool Truncated)
+{
+    public static readonly ImportBalanceDifferencesDto None = new(0, 0m, 0m, [], false);
+}
+
+/// <summary>Eşleşen müşterinin bakiye farkı: <see cref="Difference"/> = dosyadaki − Vetinity'deki (artı borç artar).</summary>
+public sealed record ImportBalanceDifferenceDto(
+    int RowNumber, Guid? ClientId, string? ClientName, decimal CurrentBalance, decimal FileBalance, decimal Difference);
 
 /// <summary>
 /// Belirsiz hasta grubunun kaydı (bölüm 13.4; grup başına ilk birkaç satır): kullanıcı "hangisine ait?" sorusunu bu bilgiyle

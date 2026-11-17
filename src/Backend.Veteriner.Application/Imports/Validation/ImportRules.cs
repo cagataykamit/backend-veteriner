@@ -120,6 +120,8 @@ public static class ImportRules
         "Aynı ad ve telefon/e-posta ile kayıtlı müşteri var (seçenek: mükerrerde hata).");
     public static readonly ImportRule MatchedExisting = new("Imports.MatchedExisting", ImportIssueSeverity.Info,
         "Mevcut kayıtla eşleşti; yeni kayıt oluşmayacak, mevcut bilgiler değişmeyecek.");
+    public static readonly ImportRule MatchedBySourceId = new("Imports.MatchedBySourceId", ImportIssueSeverity.Info,
+        "Önceki aktarmadaki kayıtla (eski programdaki numarasıyla) eşleşti; yeni kayıt oluşmayacak, mevcut bilgiler değişmeyecek.");
     public static readonly ImportRule SharedPhone = new("Imports.SharedPhone", ImportIssueSeverity.Info,
         "Aynı telefon başka bir müşteride de kayıtlı (aile bireyi olabilir); yeni müşteri oluşacak.");
     public static readonly ImportRule PossibleDuplicate = new("Imports.PossibleDuplicate", ImportIssueSeverity.Warning,
@@ -155,6 +157,8 @@ public static class ImportRules
         "Müşteri mevcut bir kayıtla eşleşti veya dosyada tekrar ediyor; bakiye eklenmeyecek (mevcut bilgi değişmez).");
     public static readonly ImportRule BalanceDateIgnored = new("Imports.BalanceDateIgnored", ImportIssueSeverity.Warning,
         "Bakiye tarihi okunamadı veya gelecekte; devir açıklamasına yazılmayacak.");
+    public static readonly ImportRule BalanceDifference = new("Imports.BalanceDifference", ImportIssueSeverity.Warning,
+        "Dosyadaki bakiye Vetinity'dekinden farklı; uygularken farkı devir olarak açabilir ya da atlayabilirsiniz.");
 
     // Fatura kimliği ve durum (E-vet yedeği ile; IMPORT_API_CONTRACT.md §13)
     public static readonly ImportRule TaxIdInvalid = new("Imports.TaxIdInvalid", ImportIssueSeverity.Warning,
@@ -263,6 +267,13 @@ public static class ImportRules
         DuplicateInFile, DuplicateVaccination, DuplicateClinicalRecord, ClinicalRecordImportedBefore, DuplicateAccountEntry, DuplicateAppointment,
         PastAppointmentSkipped,
     ];
+
+    /// <summary>
+    /// "Zaten var" atlama nedenleri (ADR-051 güncelleme özeti): satır daha önce aktarılmış ya da Vetinity'de aynı kayıt var. Önizlemedeki
+    /// <c>overlap.alreadyExists</c>, <c>Match</c> eylemli satırlara ilk atlama nedeni bunlardan biri olan satırları ekler.
+    /// </summary>
+    public static IReadOnlyList<ImportRule> AlreadyExistsReasons { get; } =
+        [DuplicateVaccination, ClinicalRecordImportedBefore, DuplicateAccountEntry, DuplicateAppointment];
 }
 
 /// <summary>Satır sorunları listesinin (<c>IssuesJson</c>) serileştirilmesi; tek yer.</summary>

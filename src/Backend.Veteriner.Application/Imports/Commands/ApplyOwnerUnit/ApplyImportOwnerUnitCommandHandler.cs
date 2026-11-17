@@ -35,8 +35,11 @@ namespace Backend.Veteriner.Application.Imports.Commands.ApplyOwnerUnit;
 /// <see cref="CreateImportedAppointmentCommand"/>, ürün <see cref="CreateProductCommand"/>; devir bakiyesi
 /// <see cref="Charge.CreateOpeningBalance"/>, devir alacağı <see cref="ClientCredit.FromImport"/> (ADR-048). Önizlemedeki eşleşmeler uygulama
 /// anında yeniden çözülür (K4: arada eklenen müşteri/hasta <c>Matched</c>; K10: arada çipi kaydedilen hasta hata; aynı
-/// gün aşısı <c>Skipped</c>). Satır sonuçları ve parti kirası birimin sonunda aynı <c>SaveChanges</c>'te yazılır: kira
-/// başka işçiye geçtiyse rowversion çakışması birimi geri aldırır (aynı satır iki kez yazılmaz).
+/// gün aşısı ve aynı anahtarlı klinik kayıt <c>Skipped</c>). Güncelleme aktarması (ADR-051): oluşturulacak müşteri/hasta önce
+/// kaynak kimliği bağıyla aranır; oluşan ya da eşleşen müşteri/hastanın kaynak numarası bağ olarak yazılır; eşleşen müşterinin
+/// bakiye farkı yalnız commit seçimi <c>Apply</c> ise devir ücreti/alacağı olarak açılır. Satır sonuçları, bağlar ve parti kirası
+/// birimin sonunda aynı <c>SaveChanges</c>'te yazılır: kira başka işçiye geçtiyse rowversion çakışması birimi geri aldırır (aynı
+/// satır iki kez yazılmaz).
 /// </summary>
 public sealed class ApplyImportOwnerUnitCommandHandler
     : IRequestHandler<ApplyImportOwnerUnitCommand, Result<ImportOwnerUnitResult>>
@@ -49,6 +52,7 @@ public sealed class ApplyImportOwnerUnitCommandHandler
     private const string AppointmentEntity = "Appointment";
     private const string ProductEntity = "Product";
     private const string OpeningBalanceDescription = "Devir bakiyesi (eski program)";
+    private const string BalanceDifferenceDescription = "Devir bakiyesi farkı (eski program)";
 
     private readonly ITenantContext _tenantContext;
     private readonly IRepository<ImportBatch> _batches;
@@ -61,6 +65,8 @@ public sealed class ApplyImportOwnerUnitCommandHandler
     private readonly IReadRepository<Product> _products;
     private readonly IRepository<Charge> _charges;
     private readonly IRepository<ClientCredit> _credits;
+    private readonly IRepository<ImportSourceLink> _links;
+    private readonly IReadRepository<ImportedClinicalRecord> _clinicalRecords;
     private readonly ISender _sender;
     private readonly TimeProvider _timeProvider;
 
@@ -76,9 +82,13 @@ public sealed class ApplyImportOwnerUnitCommandHandler
         IReadRepository<Product> products,
         IRepository<Charge> charges,
         IRepository<ClientCredit> credits,
+        IRepository<ImportSourceLink> links,
+        IReadRepository<ImportedClinicalRecord> clinicalRecords,
         ISender sender,
         TimeProvider timeProvider)
     {
+        _links = links;
+        _clinicalRecords = clinicalRecords;
         _tenantContext = tenantContext;
         _batches = batches;
         _rows = rows;
@@ -120,6 +130,8 @@ public sealed class ApplyImportOwnerUnitCommandHandler
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         if (!batch.RenewCommitLease(request.LeaseOwner, now).IsSuccess)
             return Result<ImportOwnerUnitResult>.Failure(ImportOwnerUnitErrors.LeaseLost());
+
+        await WriteSourceLinksAsync(unit, now, ct);
 
         foreach (var outcome in unit.Outcomes)
         {
@@ -193,6 +205,16 @@ public sealed class ApplyImportOwnerUnitCommandHandler
             // Mevcutla eşleşen (Match / Skip modu) veya dosya içi mükerrer satır: birimin müşterisine işaret eder.
             var status = data.Action == ImportRowAction.Match ? ImportRowApplyStatus.Matched : ImportRowApplyStatus.Skipped;
             unit.Add(row, status, ClientEntity, unit.ClientId, matched: data.TargetId is not null);
+            if (status != ImportRowApplyStatus.Matched || unit.ClientId is not { } matchedId)
+                continue;
+
+            unit.Link(ImportSourceEntity.Client, data.Reference, matchedId);
+            if (unit.Options.AppliesBalanceDifferences && data.BalanceDifference is { } difference and not 0)
+            {
+                var adjusted = await CreateBalanceAsync(unit, row, difference, data.BalanceDate, BalanceDifferenceDescription, ct);
+                if (!adjusted.IsSuccess)
+                    return adjusted;
+            }
         }
 
         if (unit.ClientId is null)
@@ -201,11 +223,17 @@ public sealed class ApplyImportOwnerUnitCommandHandler
         return Result.Success();
     }
 
-    /// <summary>K4: oluşturmadan önce oluşturma yolunun aynı kuralıyla (ad + telefon, sonra ad + e-posta) mevcutu arar.</summary>
+    /// <summary>
+    /// K4: oluşturmadan önce mevcutu arar: kaynak kimliği bağı (ADR-051), sonra oluşturma yolunun aynı kuralı (ad + telefon, sonra ad +
+    /// e-posta).
+    /// </summary>
     private async Task<Result> CreateOrMatchClientAsync(
         UnitState unit, ImportBatchRow row, ImportNormalizedCustomer data, CancellationToken ct)
     {
-        var existing = await FindExistingClientAsync(unit.TenantId, data, ct);
+        var existing = await FindLinkedAsync(unit, ImportSourceEntity.Client, data.Reference, ct) is { } linkedId
+            ? await _clients.FirstOrDefaultAsync(new ClientByIdSpec(unit.TenantId, linkedId), ct)
+            : null;
+        existing ??= await FindExistingClientAsync(unit.TenantId, data, ct);
         if (existing is not null)
         {
             if (unit.Options.OnDuplicateClient == ImportOptionsDocument.Error)
@@ -216,6 +244,8 @@ public sealed class ApplyImportOwnerUnitCommandHandler
                 ? ImportRowApplyStatus.Skipped
                 : ImportRowApplyStatus.Matched;
             unit.Add(row, status, ClientEntity, existing.Id, matched: true, ImportRules.MatchedAtCommit.At());
+            if (status == ImportRowApplyStatus.Matched)
+                unit.Link(ImportSourceEntity.Client, data.Reference, existing.Id);
             return Result.Success();
         }
 
@@ -234,13 +264,22 @@ public sealed class ApplyImportOwnerUnitCommandHandler
 
         unit.ClientId = created.Value!.Id;
         unit.Add(row, ImportRowApplyStatus.Created, ClientEntity, unit.ClientId, matched: false);
-        return data.OpeningBalance switch
-        {
-            > 0 => await CreateOpeningBalanceAsync(unit, row, data, ct),
-            < 0 => await CreateOpeningCreditAsync(unit, row, data, ct),
-            _ => Result.Success(),
-        };
+        unit.Link(ImportSourceEntity.Client, data.Reference, unit.ClientId.Value);
+        return data.OpeningBalance is { } balance and not 0
+            ? await CreateBalanceAsync(unit, row, balance, data.BalanceDate, OpeningBalanceDescription, ct)
+            : Result.Success();
     }
+
+    /// <summary>
+    /// Devir hareketi: artı tutar devir ücreti (<see cref="CreateOpeningBalanceAsync"/>), eksi tutar devir alacağı
+    /// (<see cref="CreateOpeningCreditAsync"/>). Yeni müşterinin açık bakiyesi ve eşleşen müşterinin bakiye farkı (ADR-051) aynı yoldan
+    /// açılır; açıklama yalnız ücrete yazılır.
+    /// </summary>
+    private Task<Result> CreateBalanceAsync(
+        UnitState unit, ImportBatchRow row, decimal amount, DateOnly? asOf, string description, CancellationToken ct)
+        => amount > 0
+            ? CreateOpeningBalanceAsync(unit, row, amount, asOf, description, ct)
+            : CreateOpeningCreditAsync(unit, row, -amount, ct);
 
     /// <summary>Doğrulanmış fatura kimliği: TCKN → bireysel; VKN → kurumsal (unvan müşteri adı, vergi dairesiyle).</summary>
     private static ClientInvoicingIdentityDto? InvoicingIdentityOf(ImportNormalizedCustomer data)
@@ -255,24 +294,24 @@ public sealed class ApplyImportOwnerUnitCommandHandler
     }
 
     /// <summary>
-    /// Devir bakiyesi (ADR-048 T3): yalnız oluşturulan müşteriye tek ücret; ciro/gün sonu/e-belge dışıdır (<c>ImportBatchId</c>).
-    /// İstek anahtarı satır kimliğidir; kaydı uygulamayı başlatan kullanıcı açmış sayılır.
+    /// Devir bakiyesi (ADR-048 T3): müşteri satırı başına tek ücret (oluşturulan müşterinin bakiyesi ya da eşleşen müşterinin bakiye
+    /// farkı); ciro/gün sonu/e-belge dışıdır (<c>ImportBatchId</c>). İstek anahtarı satır kimliğidir; kaydı uygulamayı başlatan kullanıcı
+    /// açmış sayılır. Bakiye tarihi açıklamanın parantezine eklenir.
     /// </summary>
     private async Task<Result> CreateOpeningBalanceAsync(
-        UnitState unit, ImportBatchRow row, ImportNormalizedCustomer data, CancellationToken ct)
+        UnitState unit, ImportBatchRow row, decimal amount, DateOnly? asOf, string description, CancellationToken ct)
     {
         if (unit.Batch.ClinicId is not { } clinicId)
             return Fail(row, ImportRules.ClinicRequired.Code, ImportRules.ClinicRequired.Message);
 
-        var description = data.BalanceDate is { } asOf
-            ? $"Devir bakiyesi (eski program, {asOf:dd.MM.yyyy})"
-            : OpeningBalanceDescription;
+        if (asOf is { } date)
+            description = description.Replace(")", $", {date:dd.MM.yyyy})", StringComparison.Ordinal);
         var charge = Charge.CreateOpeningBalance(
             unit.TenantId,
             clinicId,
             unit.ClientId!.Value,
             description,
-            data.OpeningBalance!.Value,
+            amount,
             unit.Options.CommittedByUserId ?? unit.Batch.CreatedByUserId,
             _timeProvider.GetUtcNow().UtcDateTime,
             row.Id,
@@ -286,11 +325,10 @@ public sealed class ApplyImportOwnerUnitCommandHandler
     }
 
     /// <summary>
-    /// Devir alacağı (ADR-048 T3): eksi bakiyenin mutlak değeri kadar, yalnız oluşturulan müşteriye tek müşteri kredisi; ödeme
+    /// Devir alacağı (ADR-048 T3): eksi bakiyenin (ya da eksi bakiye farkının) mutlak değeri kadar tek müşteri kredisi; ödeme
     /// yazılmaz, bu yüzden ciroya, gün sonuna, kasaya ve e-belgeye girmez. Açanı devir ücretiyle aynı kuraldır.
     /// </summary>
-    private async Task<Result> CreateOpeningCreditAsync(
-        UnitState unit, ImportBatchRow row, ImportNormalizedCustomer data, CancellationToken ct)
+    private async Task<Result> CreateOpeningCreditAsync(UnitState unit, ImportBatchRow row, decimal amount, CancellationToken ct)
     {
         if (unit.Batch.ClinicId is not { } clinicId)
             return Fail(row, ImportRules.ClinicRequired.Code, ImportRules.ClinicRequired.Message);
@@ -299,7 +337,7 @@ public sealed class ApplyImportOwnerUnitCommandHandler
             unit.TenantId,
             clinicId,
             unit.ClientId!.Value,
-            -data.OpeningBalance!.Value,
+            amount,
             unit.Options.CommittedByUserId ?? unit.Batch.CreatedByUserId,
             _timeProvider.GetUtcNow().UtcDateTime,
             unit.Batch.Id);
@@ -356,6 +394,7 @@ public sealed class ApplyImportOwnerUnitCommandHandler
                     unit.PetIds[key!] = pet.Id;
                     unit.ExistingPetIds.Add(pet.Id);
                     unit.Add(row, ImportRowApplyStatus.Matched, PetEntity, pet.Id, matched: true);
+                    unit.Link(ImportSourceEntity.Pet, data.Reference, pet.Id);
                     break;
                 }
 
@@ -373,13 +412,18 @@ public sealed class ApplyImportOwnerUnitCommandHandler
     private async Task<Result<Guid>> CreateOrMatchPetAsync(
         UnitState unit, ImportBatchRow row, ImportNormalizedPet data, Guid clientId, CancellationToken ct)
     {
-        // Mevcut hayvan mükerrer kuralı (CreatePetCommand ile aynı anahtar): aynı müşteri + Türkçe duyarlı ad anahtarı + tür.
+        // Önce kaynak kimliği bağı (ADR-051), sonra mevcut hayvan mükerrer kuralı (CreatePetCommand ile aynı anahtar): aynı müşteri +
+        // Türkçe duyarlı ad anahtarı + tür.
+        var existing = await FindLinkedAsync(unit, ImportSourceEntity.Pet, data.Reference, ct) is { } linkedId
+            ? await _pets.FirstOrDefaultAsync(new PetByIdSpec(unit.TenantId, linkedId), ct)
+            : null;
         var nameKey = Pet.NormalizeNameForDuplicateCheck(data.Name!);
-        var existing = await _pets.FirstOrDefaultAsync(new PetByClientNameAndSpeciesIdSpec(clientId, nameKey, data.SpeciesId!.Value), ct);
+        existing ??= await _pets.FirstOrDefaultAsync(new PetByClientNameAndSpeciesIdSpec(clientId, nameKey, data.SpeciesId!.Value), ct);
         if (existing is not null)
         {
             unit.ExistingPetIds.Add(existing.Id);
             unit.Add(row, ImportRowApplyStatus.Matched, PetEntity, existing.Id, matched: true, ImportRules.MatchedAtCommit.At());
+            unit.Link(ImportSourceEntity.Pet, data.Reference, existing.Id);
             return Result<Guid>.Success(existing.Id);
         }
 
@@ -414,6 +458,7 @@ public sealed class ApplyImportOwnerUnitCommandHandler
             return Result<Guid>.Failure(ImportOwnerUnitErrors.ForRow(row.Id, created.Error));
 
         unit.Add(row, ImportRowApplyStatus.Created, PetEntity, created.Value, matched: false);
+        unit.Link(ImportSourceEntity.Pet, data.Reference, created.Value);
         if (data.Deceased)
             unit.DeceasedPets.Add((row, created.Value, data.DeceasedOn));
         return Result<Guid>.Success(created.Value);
@@ -532,6 +577,14 @@ public sealed class ApplyImportOwnerUnitCommandHandler
             if (unit.Batch.ClinicId is not { } clinicId)
                 return Fail(row, ImportRules.ClinicRequired.Code, ImportRules.ClinicRequired.Message);
 
+            // Önizlemeden sonra (ör. eşzamanlı başka parti) aynı kayıt gelmiş olabilir: aynı hasta + gün + tür + içerik (ADR-051).
+            if (unit.ExistingPetIds.Contains(petId)
+                && (await ExistingClinicalRecordKeysAsync(unit, petId, ct)).Contains((data.RecordedOn!.Value, ImportValidationEngine.ClinicalRecordKey(data))))
+            {
+                unit.Add(row, ImportRowApplyStatus.Skipped, ClinicalRecordEntity, null, matched: false, ImportRules.ClinicalRecordImportedBefore.At());
+                continue;
+            }
+
             var content = new ImportedClinicalRecord.Content(
                 data.RecordType, data.Complaint, data.History, data.Findings, data.Diagnosis, data.Treatment,
                 data.Prescription, data.LabResults, data.Notes, data.VeterinarianName, data.WeightKg, data.TemperatureC);
@@ -544,6 +597,18 @@ public sealed class ApplyImportOwnerUnitCommandHandler
         }
 
         return Result.Success();
+    }
+
+    /// <summary>Mevcut hastanın daha önce içe aktarılmış klinik kayıt anahtarları (gün + anahtar); hasta başına bir sorgu.</summary>
+    private async Task<HashSet<(DateOnly Day, string Key)>> ExistingClinicalRecordKeysAsync(UnitState unit, Guid petId, CancellationToken ct)
+    {
+        if (unit.ClinicalRecordKeys.TryGetValue(petId, out var keys))
+            return keys;
+
+        var existing = await _clinicalRecords.ListAsync(new ImportExistingClinicalRecordsSpec(unit.TenantId, [petId]), ct);
+        keys = existing.Select(r => (r.RecordedOn, ImportValidationEngine.ClinicalRecordKey(r))).ToHashSet();
+        unit.ClinicalRecordKeys[petId] = keys;
+        return keys;
     }
 
     private async Task<Result> ApplyAccountEntriesAsync(UnitState unit, CancellationToken ct)
@@ -694,6 +759,48 @@ public sealed class ApplyImportOwnerUnitCommandHandler
         return sameName.FirstOrDefault(p => ImportTextFolding.Fold(p.Name) == nameKey);
     }
 
+    // ---------------------------------------------------------------- Kaynak kimliği (ADR-051)
+
+    /// <summary>Kaynak numarasının bağlı olduğu kayıt (yoksa, profil genel ya da numara kalıcı değilse null); hedefin varlığını çağıran denetler.</summary>
+    private async Task<Guid?> FindLinkedAsync(UnitState unit, ImportSourceEntity entity, string? reference, CancellationToken ct)
+    {
+        if (unit.Batch.ClinicId is not { } clinicId || ImportSourceLink.StableKey(unit.Batch.SourceProfile, reference) is not { } key)
+            return null;
+
+        var links = await _links.ListAsync(
+            new ImportSourceLinksSpec(unit.TenantId, clinicId, unit.Batch.SourceProfile, entity, [key]), ct);
+        return links.Count == 0 ? null : links[0].TargetId;
+    }
+
+    /// <summary>
+    /// Birimde oluşan/eşleşen kayıtların bağlarını yazar (tek sorguda mevcutları okur; varsa yeni hedefe taşır, yoksa ekler). Kaydetme
+    /// satır sonuçlarıyla aynı <c>SaveChanges</c>'tedir.
+    /// </summary>
+    private async Task WriteSourceLinksAsync(UnitState unit, DateTime now, CancellationToken ct)
+    {
+        if (unit.Batch.ClinicId is not { } clinicId || unit.Links.Count == 0)
+            return;
+
+        foreach (var group in unit.Links.GroupBy(l => l.Key.Entity))
+        {
+            var existing = (await _links.ListAsync(
+                    new ImportSourceLinksSpec(
+                        unit.TenantId, clinicId, unit.Batch.SourceProfile, group.Key, group.Select(l => l.Key.SourceKey).ToArray(), tracking: true),
+                    ct))
+                .ToDictionary(l => l.SourceKey, StringComparer.Ordinal);
+
+            foreach (var (key, targetId) in group)
+            {
+                if (existing.TryGetValue(key.SourceKey, out var link))
+                    link.Retarget(targetId, unit.Batch.Id, now);
+                else
+                    await _links.AddAsync(
+                        ImportSourceLink.Create(unit.TenantId, clinicId, unit.Batch.SourceProfile, group.Key, key.SourceKey, targetId, unit.Batch.Id, now),
+                        ct);
+            }
+        }
+    }
+
     // ---------------------------------------------------------------- Ortak
 
     /// <summary>Komut doğrulaması (FluentValidation) istisnası satır hatasına çevrilir; mesajlar değer içermez.</summary>
@@ -747,6 +854,17 @@ public sealed class ApplyImportOwnerUnitCommandHandler
         public HashSet<Guid> ExistingPetIds { get; } = new();
         public Dictionary<Guid, HashSet<(Guid DefinitionId, DateOnly Day)>> VaccinationDays { get; } = new();
         public Dictionary<Guid, HashSet<DateTime>> AppointmentStarts { get; } = new();
+        public Dictionary<Guid, HashSet<(DateOnly Day, string Key)>> ClinicalRecordKeys { get; } = new();
+
+        /// <summary>Yazılacak kaynak kimliği bağları (kayıt türü + kalıcı anahtar → hedef; ADR-051).</summary>
+        public Dictionary<(ImportSourceEntity Entity, string SourceKey), Guid> Links { get; } = new();
+
+        /// <summary>Oluşan/eşleşen kaydın kaynak numarasını bağlar; numara kalıcı değilse ya da profil genelse yok sayılır.</summary>
+        public void Link(ImportSourceEntity entity, string? reference, Guid targetId)
+        {
+            if (ImportSourceLink.StableKey(Batch.SourceProfile, reference) is { } key)
+                Links[(entity, key)] = targetId;
+        }
 
         /// <summary>Birimde oluşturulan ve vefat olarak işaretlenecek hastalar (birimin son adımı).</summary>
         public List<(ImportBatchRow Row, Guid PetId, DateOnly? DeceasedOn)> DeceasedPets { get; } = new();

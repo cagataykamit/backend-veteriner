@@ -334,7 +334,7 @@ public sealed class ImportsController : ControllerBase
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new CommitImportBatchCommand(id, body.ValidationId, body.OnErrors), ct);
+        var result = await _mediator.Send(new CommitImportBatchCommand(id, body.ValidationId, body.OnErrors, body.BalanceDifferences), ct);
         if (!result.IsSuccess)
             return result.ToActionResult(this);
 

@@ -64,6 +64,21 @@ public sealed record ImportExistingData(
 
     /// <summary>Partinin kliniğinin aktif hekimleri (<c>IClinicVeterinarianReader</c>; ad = görünen ad).</summary>
     public IReadOnlyList<ImportCatalogEntry> Veterinarians { get; init; } = [];
+
+    /// <summary>
+    /// Kaynak kimliği bağları (ADR-051): dosyadaki müşteri no → mevcut müşteri. Yalnız hedefi hâlâ duran bağlar; hedefleri
+    /// <see cref="Clients"/> içindedir.
+    /// </summary>
+    public IReadOnlyDictionary<string, Guid> ClientLinks { get; init; } = new Dictionary<string, Guid>();
+
+    /// <summary>Kaynak kimliği bağları: dosyadaki hasta no → mevcut hasta (hedefleri <see cref="Pets"/> içinde).</summary>
+    public IReadOnlyDictionary<string, Guid> PetLinks { get; init; } = new Dictionary<string, Guid>();
+
+    /// <summary>
+    /// Bulunan müşterilerin partinin kliniğindeki net bakiyesi (artı borç, eksi alacak; ADR-051 bakiye farkı). Yalnız müşteri tablosunda
+    /// açık bakiye eşlenmiş ve partinin kliniği varsa dolar; bakiyesi olmayan müşteri sözlükte yoktur (0).
+    /// </summary>
+    public IReadOnlyDictionary<Guid, decimal>? ClientBalances { get; init; }
 }
 
 /// <summary>Mevcut kayıt sorgularının anahtar kümeleri (dosyadaki ad, telefon, e-posta, mikroçip).</summary>
@@ -73,6 +88,15 @@ public sealed record ImportLookupKeys(
     IReadOnlyList<string> Names,
     IReadOnlyList<string> Microchips)
 {
+    /// <summary>Müşteri tablosundaki müşteri no'lar (kaynak kimliği bağı için; ADR-051).</summary>
+    public IReadOnlyList<string> CustomerReferences { get; init; } = [];
+
+    /// <summary>Hasta tablosundaki hasta no'lar (kaynak kimliği bağı için).</summary>
+    public IReadOnlyList<string> PetReferences { get; init; } = [];
+
+    /// <summary>Müşteri tablosunda açık bakiye eşlenmiş mi (bakiye farkı için mevcut bakiye okunur).</summary>
+    public bool BalanceMapped { get; init; }
+
     /// <summary>
     /// Satırlardan anahtarları toplar. Telefon/e-posta/çip ayrıştırması motorla aynı fonksiyonlardan geçer
     /// (<see cref="ImportValueParsers"/>); kümeler tekildir.
@@ -85,16 +109,30 @@ public sealed record ImportLookupKeys(
         var emails = new HashSet<string>(StringComparer.Ordinal);
         var names = new HashSet<string>(StringComparer.Ordinal);
         var chips = new HashSet<string>(StringComparer.Ordinal);
+        var customerRefs = new HashSet<string>(StringComparer.Ordinal);
+        var petRefs = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var (table, rows) in tables)
         {
             var columns = mapping.ColumnsOf(table);
             var nameField = table == ImportTable.Customers ? "AdSoyad" : "SahipAdSoyad";
             var phoneField = table == ImportTable.Customers ? "Telefon" : "SahipTelefon";
+            var references = table switch
+            {
+                ImportTable.Customers => (Set: customerRefs, Field: "MusteriNo"),
+                ImportTable.Pets => (Set: petRefs, Field: "HayvanNo"),
+                _ => (Set: null, Field: null),
+            };
 
             foreach (var row in rows)
             {
                 var reader = new ImportRowReader(columns, row);
+
+                if (references is { Set: { } refSet, Field: { } refField }
+                    && ImportValueParsers.NormalizeText(reader.Raw(refField)) is { } reference)
+                {
+                    refSet.Add(reference);
+                }
 
                 if (ImportValueParsers.NormalizeText(reader.Raw(nameField)) is { } name)
                     names.Add(name);
@@ -117,7 +155,12 @@ public sealed record ImportLookupKeys(
             }
         }
 
-        return new ImportLookupKeys([.. phones], [.. emails], [.. names], [.. chips]);
+        return new ImportLookupKeys([.. phones], [.. emails], [.. names], [.. chips])
+        {
+            CustomerReferences = [.. customerRefs],
+            PetReferences = [.. petRefs],
+            BalanceMapped = mapping.ColumnsOf(ImportTable.Customers).ContainsKey("AcikBakiye"),
+        };
     }
 }
 
