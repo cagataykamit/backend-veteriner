@@ -44,7 +44,7 @@ public static class ImportSourceProfiles
             []),
         new(ImportSourceProfile.EVet, "E-vet",
             "E-vet'in Genel > Yedek Al Excel dosyası (müşteri, hasta, randevu, muayene) doğrudan okunur. Rapor > Genel > Hasta Listesi sahip "
-            + "bağlantısını, Rapor > Resmi > Aşı Bilgisi aşı seri numarasını tamamlar; Rapor > Depo > Ürün Listesi ürünleri getirir. "
+            + "bağlantısını, Rapor > Resmi > Aşı Bilgi aşı seri numarasını tamamlar; Rapor > Depo > Ürün Listesi ürünleri getirir. "
             + "Gerçek E-vet dosyalarıyla doğrulandı.",
             [
                 new(ImportTable.Customers, "Müşteriler", "AdSoyad", EVetBackup, Verified: true),
