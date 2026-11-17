@@ -563,11 +563,8 @@ public sealed class ImportBatchTests
         ImportBatchStatusSets.ContentHashReleased.Should().BeEquivalentTo(
             [ImportBatchStatus.CommitFailed, ImportBatchStatus.RolledBack, ImportBatchStatus.Discarded, ImportBatchStatus.Expired]);
         ImportBatchStatusSets.Draft.Should().Contain(ImportBatchStatusSets.IdleDraft).And.Contain(ImportBatchStatus.Validating);
-        ImportBatchStatusSets.PayloadRetained.Should().BeEquivalentTo(
-        [
-            ImportBatchStatus.Committed, ImportBatchStatus.CommitFailed, ImportBatchStatus.RolledBack,
-            ImportBatchStatus.PartiallyRolledBack, ImportBatchStatus.RollbackFailed,
-        ]);
+        ImportBatchStatusSets.Closed.Should().BeEquivalentTo(
+            [ImportBatchStatus.RolledBack, ImportBatchStatus.Discarded, ImportBatchStatus.Expired]);
     }
 
     [Fact]

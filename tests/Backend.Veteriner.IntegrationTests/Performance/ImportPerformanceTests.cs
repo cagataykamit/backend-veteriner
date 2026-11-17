@@ -341,17 +341,17 @@ public sealed class ImportPerformanceTests
                 && dbAfter.Vaccinations == 1 + blockedAfter.GetProperty("vaccinations").GetInt32(),
                 $"kiracı {dbAfter}, mevcut {ctx.ExistingClients}/{ctx.ExistingPets}/1, engelli {blockedAfter}");
 
-            // ------------------------------------------------------------ Temizlik işi (30 gün sonrası)
-            var purge = await meter.RunAsync("Bakım işi: 30 gün sonrası satır verisi temizliği", async () =>
+            // ------------------------------------------------------------ Bakım işi (geri alma süresi sonrası satır silme; ADR-051 eki)
+            var purge = await meter.RunAsync("Bakım işi: geri alma süresi sonrası satır silme", async () =>
             {
                 var processor = new ImportMaintenanceProcessor(
                     scopes, Options.Create(new ImportMaintenanceOptions { BatchSize = 100 }),
-                    new FakeTimeProvider(DateTime.UtcNow.AddDays(30).AddMinutes(5)), NullLogger<ImportMaintenanceProcessor>.Instance);
+                    new FakeTimeProvider(DateTime.UtcNow.Add(ImportBatch.RollbackWindow).AddMinutes(5)), NullLogger<ImportMaintenanceProcessor>.Instance);
                 return await processor.RunOnceAsync(CancellationToken.None);
             });
             var purgedRows = await PurgedRowCountAsync(factory.Services, idA, idB);
             meter.Note($"süresi dolan {purge.ExpiredBatches}, temizlenen parti {purge.PurgedBatches}; kişisel verisi kalan satır {purgedRows.Remaining} / {purgedRows.Total}");
-            Check("30 gün temizliği: A ve B satır verisi boşaltıldı", purgedRows.Remaining == 0 && purge.PurgedBatches >= 2, $"{purge}, {purgedRows}");
+            Check("Geri alma süresi sonrası: A ve B satırları silindi", purgedRows.Total == 0 && purge.PurgedBatches >= 2, $"{purge}, {purgedRows}");
         }
         finally
         {
