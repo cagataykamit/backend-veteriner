@@ -24,5 +24,17 @@ public sealed class GetAppointmentsCalendarQueryValidator : AbstractValidator<Ge
         RuleFor(x => x)
             .Must(q => !q.DateFromUtc.HasValue || !q.DateToUtc.HasValue || (q.DateToUtc.Value - q.DateFromUtc.Value) <= MaxWindow)
             .WithMessage("Tarih aralığı en fazla 45 gün olabilir.");
+
+        RuleFor(x => x)
+            .Must(q => q.VeterinarianUserId is null || !q.WithoutVeterinarian)
+            .WithMessage("veterinarianUserId ve withoutVeterinarian birlikte verilemez.");
+
+        RuleForEach(x => x.AppointmentTypes)
+            .IsInEnum()
+            .WithMessage("Geçersiz randevu türü.");
+
+        RuleForEach(x => x.States)
+            .IsInEnum()
+            .WithMessage("Geçersiz takvim durumu.");
     }
 }

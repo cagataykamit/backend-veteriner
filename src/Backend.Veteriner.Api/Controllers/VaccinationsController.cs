@@ -7,6 +7,7 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
+using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Vaccinations.Commands.Cancel;
 using Backend.Veteriner.Application.Vaccinations.Commands.Create;
 using Backend.Veteriner.Application.Vaccinations.Commands.Update;
@@ -16,6 +17,7 @@ using Backend.Veteriner.Application.Hbs.Contracts;
 using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Application.Vaccinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Vaccinations.Queries.GetById;
+using Backend.Veteriner.Application.Vaccinations.Queries.GetCalendar;
 using Backend.Veteriner.Application.Vaccinations.Queries.GetList;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Vaccinations;
@@ -215,6 +217,48 @@ public sealed class VaccinationsController : ControllerBase
 
         var result = await _mediator.Send(
             new UpdateVaccinationHbsCommand(id, body.Status, body.ReferenceNumber, body.NotRequiredReason), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Randevu takviminin aşı katmanı (APPOINTMENT_CALENDAR_API_CONTRACT.md §5): <c>[dateFromUtc, dateToUtc)</c> aralığında (en çok 45 gün)
+    /// planlı aşılar, sonraki uygulama tarihleri ve uygulanan aşılar; durum (bugün, gelecek, gecikmiş, tamamlanan) İstanbul gününe göre.
+    /// <c>states</c> (tekrarlı) durum filtresidir (§6). Klinik kapsamı randevu takvimiyle aynı. Aşı randevu sayılmaz.
+    /// </summary>
+    [HttpGet("calendar")]
+    [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
+    [ProducesResponseType(typeof(IReadOnlyList<VaccinationCalendarItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetCalendar(
+        [FromQuery] DateTime? dateFromUtc,
+        [FromQuery] DateTime? dateToUtc,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] CalendarItemState[]? states = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetVaccinationsCalendarQuery(dateFromUtc, dateToUtc, clinicId, states), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>Takvim ay görünümünde aşı katmanı: <c>calendar</c> ile aynı kurallar, gün başına sayı (APPOINTMENT_CALENDAR_API_CONTRACT.md §7).</summary>
+    [HttpGet("calendar/summary")]
+    [Authorize(Policy = PermissionCatalog.Vaccinations.Read)]
+    [ProducesResponseType(typeof(IReadOnlyList<CalendarDaySummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetCalendarSummary(
+        [FromQuery] DateTime? dateFromUtc,
+        [FromQuery] DateTime? dateToUtc,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] CalendarItemState[]? states = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetVaccinationsCalendarSummaryQuery(dateFromUtc, dateToUtc, clinicId, states), ct);
         return result.ToActionResult(this);
     }
 

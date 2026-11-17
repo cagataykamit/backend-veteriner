@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Appointments.Calendar;
 using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Appointments.ReadModels;
 using Backend.Veteriner.Application.Appointments.Specs;
@@ -30,6 +31,8 @@ public sealed class GetAppointmentsCalendarQueryHandler
     private readonly IAppointmentReadModelReader _readModelReader;
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly IClinicVeterinarianReader _veterinarians;
+    private readonly IReadRepository<AppointmentReason> _reasons;
+    private readonly TimeProvider _timeProvider;
 
     public GetAppointmentsCalendarQueryHandler(
         ITenantContext tenantContext,
@@ -40,7 +43,9 @@ public sealed class GetAppointmentsCalendarQueryHandler
         IReadRepository<Client> clients,
         IAppointmentReadModelReader readModelReader,
         IOptions<QueryReadModelsOptions> queryReadModelsOptions,
-        IClinicVeterinarianReader veterinarians)
+        IClinicVeterinarianReader veterinarians,
+        IReadRepository<AppointmentReason> reasons,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -51,6 +56,8 @@ public sealed class GetAppointmentsCalendarQueryHandler
         _readModelReader = readModelReader;
         _queryReadModelsOptions = queryReadModelsOptions.Value;
         _veterinarians = veterinarians;
+        _reasons = reasons;
+        _timeProvider = timeProvider;
     }
 
     public async ValueTask<Result<IReadOnlyList<AppointmentCalendarItemDto>>> Handle(GetAppointmentsCalendarQuery request, CancellationToken ct)
@@ -103,6 +110,8 @@ public sealed class GetAppointmentsCalendarQueryHandler
             return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Failure(scopeResult.Error);
 
         var effectiveClinicId = scopeResult.Value!.SingleClinicId ?? requestedClinicId.Value;
+        var filter = new AppointmentCalendarFilter(request.VeterinarianUserId, request.WithoutVeterinarian, request.AppointmentTypes, request.States);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
 
         if (_queryReadModelsOptions.AppointmentsEnabled)
         {
@@ -114,7 +123,10 @@ public sealed class GetAppointmentsCalendarQueryHandler
                     request.Status),
                 ct);
 
-            return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Success(await WithVeterinariansFromCommandDbAsync(tenantId, items, ct));
+            var detailed = await WithDetailsFromCommandDbAsync(tenantId, items, ct);
+            return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Success(filter.IsEmpty
+                ? detailed
+                : detailed.Where(i => filter.Matches(i.VeterinarianUserId, i.AppointmentType, i.Status, i.ScheduledAtUtc, utcNow)).ToList());
         }
 
         return await HandleFromCommandDbAsync(
@@ -123,6 +135,8 @@ public sealed class GetAppointmentsCalendarQueryHandler
             dateFromUtc,
             dateToUtc,
             request.Status,
+            filter,
+            utcNow,
             ct);
     }
 
@@ -132,9 +146,11 @@ public sealed class GetAppointmentsCalendarQueryHandler
         DateTime dateFromUtc,
         DateTime dateToUtc,
         AppointmentStatus? status,
+        AppointmentCalendarFilter filter,
+        DateTime utcNow,
         CancellationToken ct)
     {
-        var rows = await _appointments.ListAsync(
+        var all = await _appointments.ListAsync(
             new AppointmentsCalendarSpec(
                 tenantId,
                 effectiveClinicId,
@@ -142,6 +158,9 @@ public sealed class GetAppointmentsCalendarQueryHandler
                 dateToUtc,
                 status),
             ct);
+        var rows = filter.IsEmpty
+            ? all
+            : all.Where(r => filter.Matches(r.VeterinarianUserId, r.AppointmentType, r.Status, r.ScheduledAtUtc, utcNow)).ToList();
 
         if (rows.Count == 0)
             return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Success(Array.Empty<AppointmentCalendarItemDto>());
@@ -176,14 +195,18 @@ public sealed class GetAppointmentsCalendarQueryHandler
                 r.AppointmentType,
                 pet?.Name ?? string.Empty,
                 clientName,
-                r.VeterinarianUserId);
+                r.VeterinarianUserId,
+                ReasonId: r.ReasonId,
+                Notes: r.Notes);
         }).ToList();
 
-        return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Success(await WithVeterinarianNamesAsync(items, ct));
+        return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Success(await WithNamesAsync(tenantId, items, ct));
     }
 
-    /// <summary>Okuma modeli hekim taşımaz: hekim kimlikleri komut veritabanından tamamlanır (Query DB şeması değişmez).</summary>
-    private async Task<IReadOnlyList<AppointmentCalendarItemDto>> WithVeterinariansFromCommandDbAsync(
+    /// <summary>
+    /// Okuma modeli hekim, neden ve not taşımaz: bunlar komut veritabanından tamamlanır (Query DB şeması değişmez).
+    /// </summary>
+    private async Task<IReadOnlyList<AppointmentCalendarItemDto>> WithDetailsFromCommandDbAsync(
         Guid tenantId,
         IReadOnlyList<AppointmentCalendarItemDto> items,
         CancellationToken ct)
@@ -191,26 +214,41 @@ public sealed class GetAppointmentsCalendarQueryHandler
         if (items.Count == 0)
             return items;
 
-        var vetByAppointment = (await _appointments.ListAsync(
-                new AppointmentVeterinariansByIdsSpec(tenantId, items.Select(i => i.Id).ToArray()), ct))
-            .ToDictionary(r => r.AppointmentId, r => r.VeterinarianUserId);
+        var details = (await _appointments.ListAsync(
+                new AppointmentCalendarDetailsByIdsSpec(tenantId, items.Select(i => i.Id).ToArray()), ct))
+            .ToDictionary(r => r.AppointmentId);
 
-        return await WithVeterinarianNamesAsync(
-            items.Select(i => i with { VeterinarianUserId = vetByAppointment.TryGetValue(i.Id, out var v) ? v : null }).ToList(),
+        return await WithNamesAsync(
+            tenantId,
+            items.Select(i => details.TryGetValue(i.Id, out var d)
+                    ? i with { VeterinarianUserId = d.VeterinarianUserId, ReasonId = d.ReasonId, Notes = d.Notes }
+                    : i with { VeterinarianUserId = null })
+                .ToList(),
             ct);
     }
 
-    private async Task<IReadOnlyList<AppointmentCalendarItemDto>> WithVeterinarianNamesAsync(
+    /// <summary>Hekim ve randevu nedeni adları.</summary>
+    private async Task<IReadOnlyList<AppointmentCalendarItemDto>> WithNamesAsync(
+        Guid tenantId,
         IReadOnlyList<AppointmentCalendarItemDto> items,
         CancellationToken ct)
     {
         var vetIds = items.Where(i => i.VeterinarianUserId is not null).Select(i => i.VeterinarianUserId!.Value).Distinct().ToArray();
-        if (vetIds.Length == 0)
+        var reasonIds = items.Where(i => i.ReasonId is not null).Select(i => i.ReasonId!.Value).Distinct().ToArray();
+        if (vetIds.Length == 0 && reasonIds.Length == 0)
             return items;
 
-        var names = await _veterinarians.GetNamesAsync(vetIds, ct);
+        IReadOnlyDictionary<Guid, string?> vetNames = vetIds.Length == 0 ? new Dictionary<Guid, string?>() : await _veterinarians.GetNamesAsync(vetIds, ct);
+        var reasonNames = reasonIds.Length == 0
+            ? new Dictionary<Guid, string>()
+            : (await _reasons.ListAsync(new AppointmentReasonNamesByIdsSpec(tenantId, reasonIds), ct)).ToDictionary(r => r.Id, r => r.Name);
+
         return items
-            .Select(i => i.VeterinarianUserId is { } v && names.TryGetValue(v, out var name) ? i with { VeterinarianName = name } : i)
+            .Select(i => i with
+            {
+                VeterinarianName = i.VeterinarianUserId is { } v && vetNames.TryGetValue(v, out var vetName) ? vetName : i.VeterinarianName,
+                ReasonName = i.ReasonId is { } r && reasonNames.TryGetValue(r, out var reasonName) ? reasonName : i.ReasonName,
+            })
             .ToList();
     }
 
