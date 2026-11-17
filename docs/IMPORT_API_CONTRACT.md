@@ -23,6 +23,13 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 | Eksik alanlar (2026-11-12) | Müşteri `Not`; ürün `KdvOrani`, `AlisFiyati`; E-vet müşteri açıklaması/meslek/doğum tarihi/ikinci telefon/kayıt tarihi, hasta kayıt tarihi ve işaretleri, aşı SKT'si, ürün KDV'si ve alış fiyatı (bölüm 4.3, 13.2) | **Uygulandı** (migration `AddProductTaxAndClientNotes`) |
 | Dosya notları (2026-11-16) | `warnings[]` öğesine isteğe bağlı satır alanları (`severity`, `count`, `unit`, `title`, `source`, `parts`, `outcome`, `example`, `target`); E-vet notlarına tür başına kod; notlar partiye yazılır ve parti ayrıntısıyla döner (bölüm 7.2.1) | **Uygulandı** (migration `AddImportBatchWarnings`) |
 | Geri alma süresi ve sade liste (2026-11-16) | Geri alma uygulamadan sonra 30 gün açık, sonra aktarma kesinleşir (`409 Imports.RollbackWindowClosed`); parti nesnesinde `canRollback`, `rollbackDeadlineUtc`; liste varsayılan olarak kapanmış partileri (`RolledBack`, `Discarded`, `Expired`) göstermez, `includeClosed=true` ile gelir (bölüm 7.5, 7.11, 7.12, 9.1) | **Uygulandı** (migration yok) |
+| Güncelleme aktarması (ADR-051, 2026-11-17) | Kaynak kimliği (`MusteriNo`, `HayvanNo`) kalıcı eşleme tablosunda; ikinci yedekte önce kaynak kimliğiyle eşleşme; klinik kayıt anahtarına kayıt türü ve uygulama anı denetimi; bakiye farkı listesi ve commit seçimi `balanceDifferences`; önizlemede `overlap` özeti; geri almada fark hareketi (bölüm 14) | **Uygulandı** (migration `AddImportSourceLinks`) |
+
+**Frontend için değişenler (güncelleme aktarması, 2026-11-17; geriye uyumlu, bölüm 14):**
+- Önizlemeye `overlap` (güncelleme özeti) ve `balanceDifferences` (bakiye farkı listesi) eklendi. `overlap.isUpdate = true` iken sayfanın en üstünde "Bu dosya önceki aktarmayla büyük ölçüde örtüşüyor: X yeni müşteri, Y yeni hasta, Z yeni aşı… gelecek; geri kalanı zaten var" özeti gösterilir.
+- Commit gövdesine isteğe bağlı `balanceDifferences: "Skip" | "Apply"` (varsayılan `Skip`). Bakiye farkı varsa ekran farkları listeler ve tek seçimle "farkları devir olarak aç" ya da "atla" sunar.
+- Yeni satır kodları: `Imports.MatchedBySourceId` (bilgi), `Imports.BalanceDifference` (uyarı). `Imports.BalanceNotAppliedToExisting` artık yalnız dosya içi mükerrer müşteride çıkar.
+- `rollback-preview` yanıtına `balanceAdjustments: { delete, keep }`.
 
 **Frontend için değişenler (geri alma süresi ve sade liste, 2026-11-16; bölüm 7.5, 9.1):**
 - Parti nesnesine (ayrıntı, liste ve bütün parti yanıtları) `canRollback` (bool) ve `rollbackDeadlineUtc` (UTC, geri alınabilir durumda olmayan partide `null`) eklendi. "Geri al" düğmesi `canRollback` ile gösterilir; son tarih `rollbackDeadlineUtc`'den yazılır. `rollbackDeadlineUtc` geçmişse aktarma kesinleşmiştir. İstemci süreyi kendisi hesaplamaz.
@@ -1088,3 +1095,69 @@ Dönüştürücü bir kaydı (aşı, klinik geçmiş, randevu) tek hastaya bağl
 - Yedekte hesap hareketi yok; bakiye müşteri listesindeki `Bakiye` sütunundan gelir (ADR-048 T3). Rapor > Bakiyesi Olan Müşteriler yalnız karşılaştırma içindir, yüklenmez.
 - Hasta yaş grubu aktarılmaz (doğum tarihinden türer); müşterinin "sahiplenmek ister" işareti ve görevin `Bölüm` alanı aktarılmaz. Ücret ve ödeme geçmişi yedekte yoktur (yalnız müşterinin net bakiyesi); Aşı Bilgisi raporundaki aşı fiyatı tek başına ücret geçmişi sayılmadığı için aktarılmaz.
 - Seri numarası yalnız Aşı Bilgisi raporundaki aşılar için gelir (rapor ticari aşıları içerir; parazit ilaçlarını içermez).
+
+## 14) Güncelleme aktarması: aynı programdan ikinci yedek (ADR-051, 2026-11-17; geriye uyumlu ekleme)
+
+Klinik eski programdan bir yedekle geçer, birkaç gün daha eski programda çalışır ve yeni bir tam yedek yükler. İkinci yedek mükerrer kayıt üretmez; yalnız yenisi gelir.
+
+### 14.1 Kaynak kimliği
+
+- Uygulanan aktarmada **oluşan ya da eşleşen** müşteri ve hasta, dosyadaki kaynak numarasıyla (`MusteriNo`, `HayvanNo`) kalıcı eşleme tablosuna (`ImportSourceLinks`) bağlanır. Anahtar: kiracı + partinin kliniği + kaynak program (`sourceProfile`) + kayıt türü (`Client` | `Pet`) + kaynak numarası. Satır verisinin 30 gün sonra temizlenmesi bağı silmez.
+- Yalnız program profillerinde (`EVet`, `Kolayvet`) yazılır ve okunur; `Generic` şablonda kaynak numarası kalıcı kimlik sayılmaz. E-vet'te tekrar eden protokol no (`no#satır`, bölüm 13.2) için bağ yazılmaz.
+- Eşleşme sırası: **önce kaynak kimliği**, bulunamazsa bugünkü kural (müşteri ad + telefon / ad + e-posta; hasta sahip + ad + tür). Kaynak kimliğiyle eşleşen kayıt adı, telefonu ya da sahibi değişmiş olsa da eşleşir; mevcut bilgiler değişmez. Bağın kaydı Vetinity'de yoksa (geri alınmış, silinmiş) bağ yok sayılır ve uygulamada yenilenir.
+- `onDuplicateClient` seçeneği kaynak kimliğiyle eşleşmeye de uygulanır (`Match` varsayılan).
+- Satır kodu: **`Imports.MatchedBySourceId`** (bilgi; `Imports.MatchedExisting` yerine): "Önceki aktarmadaki kayıtla (kaynak no) eşleşti; yeni kayıt oluşmayacak." Eylem `Match`, `targetId` eşleşen kayıt.
+- Uygulama anında yeniden çözüm: oluşturulacak müşteri ve hasta önce kaynak kimliğiyle, sonra bugünkü kuralla yeniden aranır (`Imports.MatchedAtCommit`).
+- Klinik kayıt, aşı ve randevu için yedekte kalıcı numara yoktur; içerik anahtarı kullanılır (14.2).
+- Geriye dönük doldurma: migration `AddImportSourceLinks`, satır verisi temizlenmemiş partilerin `Created`/`Matched`/`Kept` müşteri ve hasta satırlarından bağ yazar.
+
+### 14.2 Klinik kayıt mükerrer anahtarı
+
+- Anahtar: hasta + gün + **kayıt türü** (`KayitTuru`, katlanmış) + içerik (bölüm 12.3: içerik alanları, hekim, kilo, ateş). Kayıt türü anahtara bu sürümde eklendi.
+- Önizleme: daha önce içe aktarılmış kayıt `Imports.ClinicalRecordImportedBefore` ile atlanır (değişmedi; artık kaynak kimliğiyle eşleşen hastalarda da çalışır). Sayısı `notImportedReasons` ve `overlap` içinde görünür.
+- Uygulama: eşleşen hastada aynı anahtarlı kayıt uygulama anında da aranır; varsa satır `Skipped` + `Imports.ClinicalRecordImportedBefore` (aşıdaki `DuplicateVaccination` ile aynı desen).
+
+### 14.3 Bakiye farkı
+
+- Eşleşen müşteride (kaynak kimliği ya da bugünkü kural) `AcikBakiye` eşlenmişse dosyadaki bakiye (boş = 0) Vetinity'deki **net bakiye** ile karşılaştırılır. Net bakiye partinin kliniğinde: kalan ücret (ücret − tahsis) − bağlanmamış TRY ödeme − açık müşteri alacağı. Artı borç, eksi alacaktır (dosyadaki işaretle aynı).
+- Fark varsa satır kodu **`Imports.BalanceDifference`** (uyarı): "Dosyadaki bakiye Vetinity'dekinden farklı; uygularken farkı devir olarak açabilir ya da atlayabilirsiniz." Fark yoksa kod yazılmaz. `Imports.BalanceNotAppliedToExisting` artık yalnız dosya içi mükerrer müşteri satırında çıkar.
+- Önizleme yeni alan `balanceDifferences`:
+
+```json
+"balanceDifferences": {
+  "count": 12,
+  "totalIncrease": 4350.00,
+  "totalDecrease": 820.50,
+  "items": [ { "rowNumber": 41, "clientId": "guid", "clientName": "Ayşe Yılmaz", "currentBalance": 1200.00, "fileBalance": 1450.00, "difference": 250.00 } ],
+  "truncated": false
+}
+```
+  `items` en çok 200 öğe, `difference` azalan mutlak değere göre; `truncated` kesildiyse `true`. Fark yoksa `count = 0`, `items = []`. Satır verisi temizlenmiş partide boş.
+- Commit gövdesine isteğe bağlı alan **`balanceDifferences`**: `"Skip"` (varsayılan) | `"Apply"`. İzinli küme dışı `400 Validation.FluentValidation`. Seçim parti seçeneklerinde saklanır; tekrar çağrı (aynı `validationId`) seçimi değiştirmez.
+- `Apply`: her farklı müşteri için önizlemedeki fark tutarı açılır: fark artıysa devir ücreti (`Devir bakiyesi farkı (eski program[, gg.aa.yyyy])`), eksiyse devir alacağı. Yalıtım devir bakiyesiyle aynıdır (bölüm 12.7: ciro, gün sonu, kasa, e-belge dışı; `isImported = true`). Satır durumu `Matched` kalır.
+- Audit `ImportBatch.Commit` payload'ına `balanceDifferences` eklenir.
+
+### 14.4 Güncelleme özeti (önizleme)
+
+Önizleme yeni alan `overlap`:
+
+```json
+"overlap": {
+  "isUpdate": true,
+  "matchedBySourceId": 4310,
+  "tables": [
+    { "table": "customers", "willCreate": 12, "alreadyExists": 4365 },
+    { "table": "clinicalRecords", "willCreate": 140, "alreadyExists": 17233 }
+  ]
+}
+```
+- `alreadyExists`: `Match` eylemli satırlar + daha önce aktarıldığı için atlanacak satırlar (ilk atlama nedeni `DuplicateVaccination`, `ClinicalRecordImportedBefore`, `DuplicateAccountEntry`, `DuplicateAppointment` ya da `onDuplicateClient = Skip` ile eşleşen müşteri). `willCreate` tablo sayacıyla aynıdır.
+- `isUpdate`: `alreadyExists` toplamı > 0 ve (`willCreate` + `alreadyExists`) toplamının en az yarısı. Ekran `true` iken en üstte "Bu dosya önceki aktarmayla büyük ölçüde örtüşüyor: X yeni müşteri, Y yeni hasta, Z yeni aşı… gelecek; geri kalanı zaten var" özetini gösterir.
+- `matchedBySourceId`: `Imports.MatchedBySourceId` kodlu satır sayısı.
+- `tables` yalnız satırı olan tablolar, doğrulama sırasıyla. Satır verisi temizlenmiş partide `isUpdate = false`, `tables = []`.
+
+### 14.5 Geri alma
+
+- Eşleşen kayıt (müşteri, hasta) geri almada **hiçbir zaman silinmez** (değişmedi).
+- Partinin eşleşen müşteriye açtığı bakiye farkı hareketi (ücret ya da alacak) geri almada silinir; ücrete tahsis yapılmışsa ya da alacaktan mahsup edilmişse kalır. `rollback-preview` yanıtına `balanceAdjustments: { delete, keep }` eklendi (yalnız sayı).
+- Kaynak bağları geri almada silinmez; hedefi silinen bağ sonraki aktarmada yok sayılır (14.1).
