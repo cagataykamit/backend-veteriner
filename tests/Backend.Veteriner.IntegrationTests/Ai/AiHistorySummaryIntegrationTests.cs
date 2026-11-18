@@ -264,8 +264,8 @@ public sealed class AiHistorySummaryIntegrationTests : IClassFixture<CustomWebAp
         usage.GetProperty("limits").GetProperty("systemMonthlyCostLimitUsd").GetDecimal().Should().Be(10m);
         var row = usage.GetProperty("clinics").EnumerateArray().Single(c => c.GetProperty("clinicId").GetGuid() == ctx.ClinicId);
         row.GetProperty("isEnabled").GetBoolean().Should().BeTrue();
-        row.GetProperty("requests").GetInt32().Should().Be(1);
-        row.GetProperty("tokens").GetInt64().Should().Be(1_100);
+        row.GetProperty("usage").GetProperty("requests").GetInt32().Should().Be(1);
+        row.GetProperty("usage").GetProperty("tokens").GetInt64().Should().Be(1_100);
         (await ctx.Http.GetAsync("/api/v1/admin/ai/usage")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
         await JsonAsync(await admin.PutAsJsonAsync(url, new { isEnabled = false }), HttpStatusCode.OK);
@@ -381,7 +381,7 @@ public sealed class AiHistorySummaryIntegrationTests : IClassFixture<CustomWebAp
         {
             var record = AiUsageRecord.Create(
                 TenantId, ClinicId, Guid.NewGuid(), AiFeature.PetHistorySummary, PetId, null, null, "claude-haiku-5-5", "test/1",
-                1_000, 100, costUsd, 500, AiUsageOutcome.Succeeded, DateTime.UtcNow);
+                1_000, 100, costUsd, new AiOptions().CreditsOf(costUsd), 0m, 500, AiUsageOutcome.Succeeded, DateTime.UtcNow);
             return SaveAsync(record, record.Id);
         }
 

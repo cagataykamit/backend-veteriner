@@ -2,7 +2,9 @@ using Ardalis.Specification;
 using AwesomeAssertions;
 using Backend.Veteriner.Application.Ai;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Notifications;
 using Backend.Veteriner.Domain.Ai;
+using Backend.Veteriner.Domain.Tenants;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Moq;
@@ -18,19 +20,26 @@ public sealed class AiUsageGuardTests
     private readonly Mock<IAiTextGenerator> _generator = new();
     private readonly Mock<IReadRepository<ClinicAiSettings>> _settings = new();
     private readonly Mock<IAiUsageReader> _usage = new();
+    private readonly Mock<IReadRepository<TenantSubscription>> _subscriptions = new();
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 11, 19, 10, 0, 0, TimeSpan.Zero));
 
     public AiUsageGuardTests()
     {
         _generator.SetupGet(g => g.IsConfigured).Returns(true);
         SetClinicEnabled(true);
-        SetClinicUsage(AiUsageTotals.Zero);
+        SetPlan(SubscriptionPlanCode.Premium);
+        SetClinicUsage(AiClinicCreditTotals.Zero);
         SetSystemUsage(AiUsageTotals.Zero);
         SetUserRequests(0);
     }
 
     private AiUsageGuard Guard(AiOptions? options = null)
-        => new(Microsoft.Extensions.Options.Options.Create(options ?? new AiOptions()), _generator.Object, _settings.Object, _usage.Object, _time);
+    {
+        var opts = Microsoft.Extensions.Options.Options.Create(options ?? new AiOptions());
+        var credits = new AiCreditAccount(
+            opts, _usage.Object, _subscriptions.Object, Mock.Of<IRepository<ClinicAiSettings>>(), Mock.Of<IUserNotificationPublisher>(), _time);
+        return new(opts, _generator.Object, _settings.Object, _usage.Object, credits, _time);
+    }
 
     private void SetClinicEnabled(bool enabled)
     {
@@ -40,8 +49,12 @@ public sealed class AiUsageGuardTests
             .ReturnsAsync(row);
     }
 
-    private void SetClinicUsage(AiUsageTotals totals)
-        => _usage.Setup(u => u.ClinicTotalsAsync(ClinicId, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+    private void SetPlan(SubscriptionPlanCode plan)
+        => _subscriptions.Setup(s => s.FirstOrDefaultAsync(It.IsAny<ISpecification<TenantSubscription>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(TenantSubscription.StartTrial(TenantId, plan, DateTime.UtcNow, 14));
+
+    private void SetClinicUsage(AiClinicCreditTotals totals)
+        => _usage.Setup(u => u.ClinicCreditTotalsAsync(ClinicId, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(totals);
 
     private void SetSystemUsage(AiUsageTotals totals)
@@ -94,12 +107,44 @@ public sealed class AiUsageGuardTests
         result.Error.Code.Should().Be("Ai.ClinicNotEnabled");
     }
 
-    [Theory]
-    [InlineData(5_000_000L, 0.5)]
-    [InlineData(10L, 2.0)]
-    public async Task Clinic_Monthly_Token_Or_Cost_Limit_Stops_Requests(long tokens, double cost)
+    [Fact]
+    public async Task Used_Monthly_Credits_Without_Fund_Stop_Requests()
     {
-        SetClinicUsage(new AiUsageTotals(10, tokens, (decimal)cost));
+        SetClinicUsage(new AiClinicCreditTotals(1_000, 0.9m, 2_000m, 0m, 0m, 0m));
+
+        var result = await Guard().CheckAsync(TenantId, ClinicId, UserId, CancellationToken.None);
+
+        result.Error.Code.Should().Be("Ai.ClinicQuotaExceeded");
+    }
+
+    [Fact]
+    public async Task Fund_Keeps_Ai_Running_After_Monthly_Credits_Are_Used()
+    {
+        SetClinicUsage(new AiClinicCreditTotals(1_000, 0.9m, 2_000m, 0m, FundGranted: 100m, FundUsed: 0m));
+
+        var availability = await Guard().GetAvailabilityAsync(TenantId, ClinicId, CancellationToken.None);
+
+        availability.Blocker.Should().BeNull();
+        availability.Quota.CreditsRemaining.Should().Be(100m);
+        availability.ClinicMonthUsedPercent.Should().Be(95);
+    }
+
+    [Fact]
+    public async Task Basic_Plan_Has_No_Monthly_Gift_So_Ai_Needs_Fund()
+    {
+        SetPlan(SubscriptionPlanCode.Basic);
+
+        var result = await Guard().CheckAsync(TenantId, ClinicId, UserId, CancellationToken.None);
+
+        result.Error.Code.Should().Be("Ai.ClinicQuotaExceeded");
+    }
+
+    [Theory]
+    [InlineData(20_000_000L, 0.5)]
+    [InlineData(10L, 2.0)]
+    public async Task Token_And_Cost_Insurance_Limits_Still_Stop_Requests(long tokens, double cost)
+    {
+        SetClinicUsage(new AiClinicCreditTotals(tokens, (decimal)cost, 10m, 0m, 0m, 0m));
 
         var result = await Guard().CheckAsync(TenantId, ClinicId, UserId, CancellationToken.None);
 
@@ -133,7 +178,7 @@ public sealed class AiUsageGuardTests
     [Fact]
     public async Task Availability_Reports_Used_Percent_From_The_Larger_Ratio_Without_Rate_Limit()
     {
-        SetClinicUsage(new AiUsageTotals(5, 1_000_000, 1.7m));
+        SetClinicUsage(new AiClinicCreditTotals(1_000_000, 1.7m, 500m, 0m, 0m, 0m)); // kredi %25, maliyet %85
         SetUserRequests(99);
 
         var availability = await Guard().GetAvailabilityAsync(TenantId, ClinicId, CancellationToken.None);
@@ -149,13 +194,14 @@ public sealed class AiUsageGuardTests
     {
         _time.SetUtcNow(new DateTimeOffset(2026, 11, 30, 22, 0, 0, TimeSpan.Zero)); // İstanbul: 1 Aralık 01:00
         DateTime? from = null;
-        _usage.Setup(u => u.ClinicTotalsAsync(ClinicId, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        _usage.Setup(u => u.ClinicCreditTotalsAsync(ClinicId, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .Callback<Guid, DateTime, DateTime, CancellationToken>((_, f, _, _) => from = f)
-            .ReturnsAsync(AiUsageTotals.Zero);
+            .ReturnsAsync(AiClinicCreditTotals.Zero);
 
-        await Guard().GetAvailabilityAsync(TenantId, ClinicId, CancellationToken.None);
+        var availability = await Guard().GetAvailabilityAsync(TenantId, ClinicId, CancellationToken.None);
 
         from.Should().Be(new DateTime(2026, 11, 30, 21, 0, 0, DateTimeKind.Utc));
+        availability.Quota.ResetsAtUtc.Should().Be(new DateTime(2026, 12, 31, 21, 0, 0, DateTimeKind.Utc));
     }
 
     [Fact]
