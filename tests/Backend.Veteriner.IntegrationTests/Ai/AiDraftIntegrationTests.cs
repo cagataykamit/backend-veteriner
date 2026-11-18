@@ -61,6 +61,8 @@ public sealed class AiDraftIntegrationTests : IClassFixture<CustomWebApplication
         {
             services.RemoveAll<IAiTextGenerator>();
             services.AddSingleton<IAiTextGenerator>(_ai);
+            // Akışın kendisi denenir: gerçek özellik uygulayıcıları (AiClinicalDraftIntegrationTests) yerine yalnız test uygulayıcısı.
+            services.RemoveAll<IAiDraftApplier>();
             services.AddScoped<IAiDraftApplier, TestExaminationNoteApplier>();
         }));
 
