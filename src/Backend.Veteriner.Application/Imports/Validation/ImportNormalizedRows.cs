@@ -97,7 +97,8 @@ public sealed record ImportNormalizedVaccination(
     DateTime? AppliedAtUtc,
     DateTime? DueAtUtc,
     string? Notes,
-    bool SpeciesUnverified = false)
+    bool SpeciesUnverified = false,
+    bool DueTimeSpecified = false)
     : ImportNormalizedRow;
 
 /// <summary>Klinik geçmiş satırı (salt okunur eski program kaydı; ADR-048 T1). Sahip anahtarı hastanın sahibidir.</summary>

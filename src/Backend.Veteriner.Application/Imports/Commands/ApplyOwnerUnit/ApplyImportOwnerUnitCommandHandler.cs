@@ -519,7 +519,7 @@ public sealed class ApplyImportOwnerUnitCommandHandler
             var created = await SendAsync(
                 new CreateImportedVaccinationCommand(
                     unit.Batch.Id, clinicId, petId, data.VaccineDefinitionId!.Value, data.AppliedAtUtc.Value, data.DueAtUtc, data.Notes,
-                    data.SpeciesUnverified),
+                    data.SpeciesUnverified, data.DueTimeSpecified),
                 ct);
             if (!created.IsSuccess)
                 return Fail(row, created.Error);
