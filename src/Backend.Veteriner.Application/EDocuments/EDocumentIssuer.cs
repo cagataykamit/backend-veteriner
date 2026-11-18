@@ -151,7 +151,8 @@ public sealed class EDocumentIssuer
         if (!lookup.IsSuccess)
             return Result<EDocumentType>.Failure(EDocumentErrors.FromProvider(lookup.Error!));
 
-        return Result<EDocumentType>.Success(EDocumentTypeRule.Resolve(draft.TaxpayerType, group.Lines[0].LineKind, lookup.Value is not null));
+        // Grup yalnız mükellef türü bilinirken kurulur (kesme kipi türsüz taslağı reddeder).
+        return Result<EDocumentType>.Success(EDocumentTypeRule.Resolve(draft.TaxpayerType.Value, group.Lines[0].LineKind, lookup.Value is not null));
     }
 
     /// <summary>Kaynak + not özeti; aynı requestId farklı içerikle gelirse ayırt eder.</summary>

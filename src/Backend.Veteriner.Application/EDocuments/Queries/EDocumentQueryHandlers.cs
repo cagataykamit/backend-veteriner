@@ -203,7 +203,7 @@ public sealed class PreviewEDocumentQueryHandler : IRequestHandler<PreviewEDocum
 
         var caller = access.Value!;
         var draftResult = await _drafts.BuildAsync(
-            caller.TenantId, caller.ClinicId, new EDocumentSelection(request.ChargeIds, request.SaleId, request.VisitId), trackCharges: false, ct);
+            caller.TenantId, caller.ClinicId, new EDocumentSelection(request.ChargeIds, request.SaleId, request.VisitId), EDocumentDraftMode.Preview, ct);
         if (!draftResult.IsSuccess)
             return Result<EDocumentPreviewDto>.Failure(draftResult.Error);
         var draft = draftResult.Value!;
@@ -245,7 +245,9 @@ public sealed class PreviewEDocumentQueryHandler : IRequestHandler<PreviewEDocum
             draft.MissingBuyerFields,
             connectionDto,
             groups,
-            draft.Skipped.Select(s => new EDocumentSkippedChargeDto(s.ChargeId, s.Reason)).ToList()));
+            draft.Skipped.Select(s => new EDocumentSkippedChargeDto(s.ChargeId, s.Reason)).ToList(),
+            draft.TaxpayerType,
+            EDocumentClinicSetup.Issues(draft, opened).Select(code => new EDocumentSetupIssueDto(code)).ToList()));
     }
 }
 

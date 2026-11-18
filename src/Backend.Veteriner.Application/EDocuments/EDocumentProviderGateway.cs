@@ -74,6 +74,8 @@ public sealed class EDocumentProviderGateway
 
     public const string ProviderMismatchCode = "EDocuments.ProviderMismatch";
 
+    public const string NotConnectedCode = "EDocuments.NotConnected";
+
     /// <summary>Sağlayıcı sonucunu bağlantıya yansıtır: yenilenen belirteci saklar, yetki reddinde bağlantıyı düşürür.</summary>
     public void Absorb<T>(EDocumentConnection connection, ProviderResult<T> result)
     {
@@ -90,8 +92,8 @@ public sealed class EDocumentProviderGateway
 
     public static Error NotConnected(EDocumentConnection? connection)
         => connection?.Status == EDocumentConnectionStatus.ReauthorizationRequired
-            ? new Error("EDocuments.NotConnected", "Entegratör hesabının yetkisi sona erdi; Ayarlar'dan hesabı yeniden bağlayın.")
-            : new Error("EDocuments.NotConnected", "Klinik için e-belge entegratörü bağlı değil; Ayarlar'dan hesabı bağlayın.");
+            ? new Error(NotConnectedCode, "Entegratör hesabının yetkisi sona erdi; Ayarlar'dan hesabı yeniden bağlayın.")
+            : new Error(NotConnectedCode, "Klinik için e-belge entegratörü bağlı değil; Ayarlar'dan hesabı bağlayın.");
 
     public static Error ProviderNotConfigured()
         => new("EDocuments.ProviderNotConfigured", "e-belge sağlayıcısı sunucuda yapılandırılmamış.");
