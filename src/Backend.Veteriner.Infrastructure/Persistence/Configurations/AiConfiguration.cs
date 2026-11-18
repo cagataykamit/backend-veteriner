@@ -27,6 +27,8 @@ public sealed class AiUsageRecordConfiguration : IEntityTypeConfiguration<AiUsag
         b.Property(x => x.InputTokens).IsRequired();
         b.Property(x => x.OutputTokens).IsRequired();
         b.Property(x => x.CostUsd).IsRequired().HasPrecision(18, 6);
+        b.Property(x => x.Credits).IsRequired().HasPrecision(18, 2);
+        b.Property(x => x.FundCredits).IsRequired().HasPrecision(18, 2);
         b.Property(x => x.DurationMs).IsRequired();
         b.Property(x => x.Outcome).IsRequired().HasConversion<int>();
         b.Property(x => x.CreatedAtUtc).IsRequired();
@@ -110,8 +112,34 @@ public sealed class ClinicAiSettingsConfiguration : IEntityTypeConfiguration<Cli
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);
         b.Property(x => x.UpdatedByUserId);
+        b.Property(x => x.QuotaWarningMonthStartUtc);
+        b.Property(x => x.QuotaWarningLevel).IsRequired();
 
         b.HasIndex(x => new { x.TenantId, x.ClinicId }).IsUnique();
+
+        b.HasOne<Clinic>().WithMany().HasForeignKey(x => x.ClinicId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+/// <summary>AI fon hareketi (ADR-044 madde 6); bakiye toplamdan hesaplanır.</summary>
+public sealed class AiCreditGrantConfiguration : IEntityTypeConfiguration<AiCreditGrant>
+{
+    public void Configure(EntityTypeBuilder<AiCreditGrant> b)
+    {
+        b.ToTable("AiCreditGrants");
+
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Id).ValueGeneratedNever();
+
+        b.Property(x => x.TenantId).IsRequired();
+        b.Property(x => x.ClinicId).IsRequired();
+        b.Property(x => x.Kind).IsRequired().HasConversion<int>();
+        b.Property(x => x.Credits).IsRequired();
+        b.Property(x => x.Note).HasMaxLength(AiCreditGrant.NoteMaxLength);
+        b.Property(x => x.CreatedByUserId);
+        b.Property(x => x.CreatedAtUtc).IsRequired();
+
+        b.HasIndex(x => new { x.TenantId, x.ClinicId, x.CreatedAtUtc });
 
         b.HasOne<Clinic>().WithMany().HasForeignKey(x => x.ClinicId).OnDelete(DeleteBehavior.Restrict);
     }

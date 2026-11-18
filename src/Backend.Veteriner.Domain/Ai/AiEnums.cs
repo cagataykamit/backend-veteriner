@@ -53,3 +53,10 @@ public enum AiUsageOutcome
     /// <summary>Sağlayıcı hata döndü ya da ulaşılamadı.</summary>
     ProviderError = 5,
 }
+
+/// <summary>Fon hareketinin kaynağı (veritabanında int, mevcut değerler değişmez).</summary>
+public enum AiCreditGrantKind
+{
+    /// <summary>Platform yöneticisinin elle eklediği fon (ücretli satın alma açılana kadar tek yol).</summary>
+    Manual = 1,
+}

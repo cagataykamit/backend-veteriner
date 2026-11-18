@@ -10,9 +10,9 @@ using Microsoft.Extensions.Options;
 namespace Backend.Veteriner.Application.Ai;
 
 /// <summary>
-/// AI sağlayıcı çağrısının tek yeri (<see cref="AiUsageGuard.CheckAsync"/> sonrasında): çağrı, sonucun sınıflanması, kullanım
-/// ve denetim kaydı (AI-008, AI-010), yalnız ölçü içeren günlük ve taslak üreten özelliklerde taslak (AI-009). Taslak ve
-/// kullanım kaydı birlikte kaydedilir; başarısız üretimde taslak oluşmaz ama kullanım kaydı yazılır. İstem ve yanıt metni
+/// AI sağlayıcı çağrısının tek yeri (<see cref="AiUsageGuard.CheckAsync"/> sonrasında): çağrı, sonucun sınıflanması, kredi
+/// harcaması ve kota uyarısı (AI-007, <see cref="AiCreditAccount"/>), kullanım ve denetim kaydı (AI-008, AI-010), yalnız ölçü
+/// içeren günlük ve taslak üreten özelliklerde taslak (AI-009). Taslak, kullanım kaydı ve uyarı birlikte kaydedilir; başarısız üretimde taslak oluşmaz ama kullanım kaydı yazılır. İstem ve yanıt metni
 /// günlüğe ve denetime yazılmaz (ADR-008 madde 10).
 /// </summary>
 public sealed class AiInvoker
@@ -21,6 +21,7 @@ public sealed class AiInvoker
     private readonly IRepository<AiUsageRecord> _usageRecords;
     private readonly IRepository<AiDraft> _drafts;
     private readonly IEnumerable<IAiDraftApplier> _appliers;
+    private readonly AiCreditAccount _credits;
     private readonly AiOptions _options;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<AiInvoker> _logger;
@@ -30,6 +31,7 @@ public sealed class AiInvoker
         IRepository<AiUsageRecord> usageRecords,
         IRepository<AiDraft> drafts,
         IEnumerable<IAiDraftApplier> appliers,
+        AiCreditAccount credits,
         IOptions<AiOptions> options,
         TimeProvider timeProvider,
         ILogger<AiInvoker> logger)
@@ -38,6 +40,7 @@ public sealed class AiInvoker
         _usageRecords = usageRecords;
         _drafts = drafts;
         _appliers = appliers;
+        _credits = credits;
         _options = options.Value;
         _timeProvider = timeProvider;
         _logger = logger;
@@ -112,11 +115,15 @@ public sealed class AiInvoker
         if (draft is not null)
             await _drafts.AddAsync(draft, ct);
 
+        // Gerçek token'dan kredi; başarısız ama token harcayan istek de harcar (maliyet oluştu).
+        var cost = grant.Price.CostOf(generation.InputTokens, generation.OutputTokens);
+        var charge = await _credits.ChargeAsync(
+            invocation.TenantId, invocation.ClinicId, (long)generation.InputTokens + generation.OutputTokens, cost, ct);
+
         var record = AiUsageRecord.Create(
             invocation.TenantId, invocation.ClinicId, invocation.UserId, invocation.Feature, invocation.SubjectId,
             invocation.Sources, draft?.Id, grant.Model, invocation.PromptVersion,
-            generation.InputTokens, generation.OutputTokens,
-            grant.Price.CostOf(generation.InputTokens, generation.OutputTokens),
+            generation.InputTokens, generation.OutputTokens, cost, charge.Credits, charge.FundCredits,
             (int)stopwatch.ElapsedMilliseconds, outcome, _timeProvider.GetUtcNow().UtcDateTime);
         await _usageRecords.AddAsync(record, ct);
         await _usageRecords.SaveChangesAsync(ct);

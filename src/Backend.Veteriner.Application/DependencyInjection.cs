@@ -134,8 +134,10 @@ public static class DependencyInjection
         services.AddScoped<EDocuments.Connections.EDocumentConnectionService>();
         services.AddScoped<RegisterReportRunner>();
 
-        // AI (ADR-008, ADR-044): sınır denetimi ve hasta geçmişi özeti girdisi; sağlayıcı istemcisi Infrastructure'da.
+        // AI (ADR-008, ADR-044): kredi hesabı (AI-007), sınır denetimi ve hasta geçmişi özeti girdisi; sağlayıcı istemcisi Infrastructure'da.
+        services.AddScoped<Ai.AiCreditAccount>();
         services.AddScoped<Ai.AiUsageGuard>();
+        services.AddScoped<Ai.AiAdminClinicReader>();
         services.AddScoped<Ai.PetHistorySummary.PetHistoryAiContextBuilder>();
         // AI çağrısı + kullanım/denetim kaydı (AI-010) ve taslak erişimi (AI-009). Özellik uygulayıcıları (IAiDraftApplier) özellikle birlikte eklenir.
         services.AddScoped<Ai.AiInvoker>();

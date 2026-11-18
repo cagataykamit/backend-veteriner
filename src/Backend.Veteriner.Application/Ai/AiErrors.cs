@@ -18,6 +18,10 @@ public static class AiErrors
     public static readonly Error ClinicNotFound =
         new("Ai.ClinicNotFound", "Klinik bulunamadı.");
 
+    /// <summary>Platform yönetimi klinik araması en az iki karakter ister.</summary>
+    public static readonly Error AdminSearchTooShort =
+        new("Ai.Validation", "Arama en az 2 karakter olmalıdır.");
+
     public static readonly Error RateLimited =
         new("Ai.RateLimited", "Kısa sürede çok fazla AI isteği yapıldı; bir dakika sonra tekrar deneyin.");
 

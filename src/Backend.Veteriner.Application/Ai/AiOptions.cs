@@ -24,10 +24,30 @@ public sealed class AiOptions
     /// <summary>Kullanıcı başına son 60 saniyedeki en çok istek.</summary>
     public int UserRequestsPerMinute { get; init; } = 3;
 
-    /// <summary>Klinik başına aylık en çok token (giriş + çıkış).</summary>
-    public long ClinicMonthlyTokenLimit { get; init; } = 5_000_000;
+    /// <summary>
+    /// Bir kredinin dolar değeri (ADR-044 madde 2 ve 4): standart istek (2.000 giriş + 500 çıkış token) Hızlı AI'da
+    /// $0,00045 = 1 kredi, Üst düzey AI'da 20 kredi. Kredi = tahmini maliyet / bu değer; oran model fiyatından gelir.
+    /// </summary>
+    public decimal CreditValueUsd { get; init; } = 0.00045m;
 
-    /// <summary>Klinik başına aylık en çok tahmini maliyet (USD).</summary>
+    /// <summary>
+    /// Paket hediyesi: klinik başına aylık kredi (ADR-044 madde 5; anahtar paket API kodu). Listede olmayan paket 0 alır.
+    /// Aylık kota devretmez; eklenti satışı açılınca eklentinin kredisi buna eklenir.
+    /// </summary>
+    public Dictionary<string, int> PlanMonthlyCredits { get; init; } = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Basic"] = 0,
+        ["Pro"] = 500,
+        ["Premium"] = 2_000,
+    };
+
+    /// <summary>
+    /// Sigorta: klinik başına aylık en çok token (giriş + çıkış). Kredi kotasından bağımsız üst sınırdır; en büyük paket
+    /// hediyesinin rahatça üstünde olmalıdır.
+    /// </summary>
+    public long ClinicMonthlyTokenLimit { get; init; } = 20_000_000;
+
+    /// <summary>Sigorta: klinik başına aylık en çok tahmini maliyet (USD); kredi kotasından bağımsızdır.</summary>
     public decimal ClinicMonthlyCostLimitUsd { get; init; } = 2m;
 
     /// <summary>Tüm kiracılar toplamı aylık en çok tahmini maliyet (USD); aşılınca AI herkes için durur.</summary>
@@ -51,6 +71,14 @@ public sealed class AiOptions
 
     public AiModelPrice? PriceOf(string model)
         => Prices.TryGetValue(model, out var price) && price.IsValid ? price : null;
+
+    /// <summary>Tahmini maliyetin kredi karşılığı (iki ondalık; istek başına yukarı yuvarlanmaz).</summary>
+    public decimal CreditsOf(decimal costUsd)
+        => CreditValueUsd > 0 && costUsd > 0 ? decimal.Round(costUsd / CreditValueUsd, 2, MidpointRounding.AwayFromZero) : 0m;
+
+    /// <summary>Paketin klinik başına aylık kredi hediyesi; paket yoksa ya da listede değilse 0.</summary>
+    public int MonthlyCreditsFor(string? planApiCode)
+        => planApiCode is not null && PlanMonthlyCredits.TryGetValue(planApiCode, out var credits) ? Math.Max(0, credits) : 0;
 }
 
 public sealed class AiModelPrice

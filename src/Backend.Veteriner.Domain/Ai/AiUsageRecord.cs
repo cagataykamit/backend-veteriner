@@ -6,8 +6,8 @@ namespace Backend.Veteriner.Domain.Ai;
 /// AI sağlayıcısına giden her isteğin kullanım ve denetim kaydı (ADR-044 madde 8, AI-008, AI-010): kim, ne zaman, hangi
 /// özellik, hangi kaynak kayıtlar (yalnız kimlik), model, istem sürümü, gerçek token, tahmini dolar maliyeti, süre ve sonuç.
 /// Klinik içerik (istem, yanıt metni) ve kişi bilgisi <b>tutulmaz</b>. Taslak üreten özelliklerde <see cref="DraftId"/>
-/// taslağa bağlar; taslağa verilen karar <see cref="AiDraft"/>'tadır. Kota ve harcama sınırları bu kayıtların toplamından
-/// hesaplanır. Yalnız eklenir, değişmez.
+/// taslağa bağlar; taslağa verilen karar <see cref="AiDraft"/>'tadır. Kredi kotası, fon bakiyesi ve harcama sınırları bu
+/// kayıtların toplamından hesaplanır. Yalnız eklenir, değişmez.
 /// </summary>
 public sealed class AiUsageRecord : ITenantOwned
 {
@@ -40,6 +40,12 @@ public sealed class AiUsageRecord : ITenantOwned
     /// <summary>Ayardaki model fiyatıyla hesaplanan tahmini maliyet (USD); fatura değildir.</summary>
     public decimal CostUsd { get; private set; }
 
+    /// <summary>Harcanan kredi (ADR-044 madde 2; maliyetin kredi değerine oranı). Başarısız ama token harcayan istek de harcar.</summary>
+    public decimal Credits { get; private set; }
+
+    /// <summary><see cref="Credits"/>'in fondan karşılanan kısmı; kalanı aylık kotadan düşer (ADR-044 madde 6).</summary>
+    public decimal FundCredits { get; private set; }
+
     public int DurationMs { get; private set; }
     public AiUsageOutcome Outcome { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
@@ -61,6 +67,8 @@ public sealed class AiUsageRecord : ITenantOwned
         int inputTokens,
         int outputTokens,
         decimal costUsd,
+        decimal credits,
+        decimal fundCredits,
         int durationMs,
         AiUsageOutcome outcome,
         DateTime utcNow)
@@ -90,6 +98,8 @@ public sealed class AiUsageRecord : ITenantOwned
             InputTokens = Math.Max(0, inputTokens),
             OutputTokens = Math.Max(0, outputTokens),
             CostUsd = Math.Max(0m, costUsd),
+            Credits = Math.Max(0m, credits),
+            FundCredits = Math.Clamp(fundCredits, 0m, Math.Max(0m, credits)),
             DurationMs = Math.Max(0, durationMs),
             Outcome = outcome,
             CreatedAtUtc = utcNow,

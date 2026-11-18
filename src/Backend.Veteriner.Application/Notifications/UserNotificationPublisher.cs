@@ -64,6 +64,9 @@ public interface IUserNotificationPublisher
 
     /// <summary>Ticari e-Fatura alıcı tarafından reddedildi: kliniğe erişen belge kesme izni olanlara.</summary>
     Task EDocumentRejectedByBuyerAsync(Guid tenantId, Guid clinicId, Guid documentId, string? documentNumber, string? reason, CancellationToken ct);
+
+    /// <summary>Kliniğin AI kredisi %80'e ulaştı ya da bitti (ADR-044 madde 7): kliniğe erişen ve klinik ayarını değiştirebilenlere.</summary>
+    Task AiQuotaWarningAsync(Guid tenantId, Guid clinicId, bool exhausted, DateTime resetsAtUtc, CancellationToken ct);
 }
 
 public sealed class UserNotificationPublisher : IUserNotificationPublisher
@@ -75,6 +78,7 @@ public sealed class UserNotificationPublisher : IUserNotificationPublisher
     public const string EDocumentsTarget = "EDocuments";
     public const string EDocumentSettingsTarget = "EDocumentSettings";
     public const string EDocumentTarget = "EDocument";
+    public const string AiUsageTarget = "AiUsage";
 
     private static readonly CultureInfo Turkish = CultureInfo.GetCultureInfo("tr-TR");
 
@@ -310,6 +314,25 @@ public sealed class UserNotificationPublisher : IUserNotificationPublisher
                 EDocumentTarget,
                 documentId,
                 utcNow), ct);
+        }
+    }
+
+    public async Task AiQuotaWarningAsync(Guid tenantId, Guid clinicId, bool exhausted, DateTime resetsAtUtc, CancellationToken ct)
+    {
+        var userIds = await _recipients.ListAsync(tenantId, clinicId, PermissionCatalog.Clinics.Update, TenantWideClaimNames.All, ct);
+        var resetsOn = OperationDayBounds.ToLocal(resetsAtUtc).ToString("d MMMM", Turkish);
+        var (type, title, body) = exhausted
+            ? (UserNotificationType.AiQuotaExhausted,
+                "Yapay zekâ kredisi bitti",
+                $"Yapay zekâ özellikleri kredi {resetsOn} tarihinde yenilenene kadar kullanılamaz. Klinik işleri etkilenmez.")
+            : (UserNotificationType.AiQuotaNearlyUsed,
+                "Yapay zekâ kredisinin %80'i kullanıldı",
+                $"Bu ayın kredisi {resetsOn} tarihinde yenilenir. Kredi bitince yalnız yapay zekâ özellikleri durur.");
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        foreach (var userId in userIds)
+        {
+            await _notifications.AddAsync(UserNotification.Create(
+                tenantId, clinicId, userId, type, title, body, AiUsageTarget, clinicId, utcNow), ct);
         }
     }
 
