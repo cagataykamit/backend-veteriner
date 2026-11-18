@@ -74,6 +74,8 @@ public sealed class AiDraftConfiguration : IEntityTypeConfiguration<AiDraft>
         // Bir kaydın bekleyen taslakları; süre taraması.
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.TargetType, x.TargetId, x.Status });
         b.HasIndex(x => new { x.Status, x.ExpiresAtUtc });
+        // Kayıttaki "AI taslağından" izi (AiProvenanceReader).
+        b.HasIndex(x => new { x.TenantId, x.AppliedRecordId }).HasFilter("[AppliedRecordId] IS NOT NULL");
 
         b.HasOne<Clinic>().WithMany().HasForeignKey(x => x.ClinicId).OnDelete(DeleteBehavior.Restrict);
     }

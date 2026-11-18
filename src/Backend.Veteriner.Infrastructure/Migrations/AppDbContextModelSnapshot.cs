@@ -220,6 +220,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasIndex("Status", "ExpiresAtUtc");
 
+                    b.HasIndex("TenantId", "AppliedRecordId")
+                        .HasFilter("[AppliedRecordId] IS NOT NULL");
+
                     b.HasIndex("TenantId", "ClinicId", "TargetType", "TargetId", "Status");
 
                     b.ToTable("AiDrafts", (string)null);
@@ -5128,6 +5131,52 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("UserNotifications", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.OwnerExplanations.OwnerExplanation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ExaminationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("SourceAiDraftId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("ExaminationId");
+
+                    b.HasIndex("SourceAiDraftId");
+
+                    b.HasIndex("TenantId", "ExaminationId");
+
+                    b.HasIndex("TenantId", "PetId");
+
+                    b.ToTable("OwnerExplanations", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.OwnerPortal.MarketingOptOutLink", b =>
                 {
                     b.Property<Guid>("Id")
@@ -9018,6 +9067,26 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasForeignKey("ImportBatchId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.OwnerExplanations.OwnerExplanation", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.Examinations.Examination", null)
+                        .WithMany()
+                        .HasForeignKey("ExaminationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.Ai.AiDraft", null)
+                        .WithMany()
+                        .HasForeignKey("SourceAiDraftId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.OwnerPortal.MarketingOptOutLink", b =>

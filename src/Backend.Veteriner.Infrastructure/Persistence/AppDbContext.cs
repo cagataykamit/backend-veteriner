@@ -27,6 +27,7 @@ using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Reminders;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.CareInstructions;
+using Backend.Veteriner.Domain.OwnerExplanations;
 using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.Imaging;
@@ -186,6 +187,7 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<HospitalizationWard> HospitalizationWards => Set<HospitalizationWard>();
     public DbSet<HospitalizationRoom> HospitalizationRooms => Set<HospitalizationRoom>();
     public DbSet<CareInstruction> CareInstructions => Set<CareInstruction>();
+    public DbSet<OwnerExplanation> OwnerExplanations => Set<OwnerExplanation>();
     public DbSet<TenantBillingProfile> TenantBillingProfiles => Set<TenantBillingProfile>();
     public DbSet<TenantReminderSettings> TenantReminderSettings => Set<TenantReminderSettings>();
     public DbSet<ReminderDispatchLog> ReminderDispatchLogs => Set<ReminderDispatchLog>();
