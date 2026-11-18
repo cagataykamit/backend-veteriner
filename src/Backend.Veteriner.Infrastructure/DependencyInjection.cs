@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.DataProtection;
 using Backend.Veteriner.Infrastructure.EDocuments.Nilvera;
 using Backend.Veteriner.Infrastructure.EDocuments.Parasut;
 using Backend.Veteriner.Infrastructure.EDocuments;
+using Backend.Veteriner.Infrastructure.Ai;
+using Backend.Veteriner.Infrastructure.Ai.Anthropic;
+using Backend.Veteriner.Application.Ai;
 using Backend.Veteriner.Application.EDocuments.Providers;
 using Backend.Veteriner.Application.EDocuments;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
@@ -432,6 +435,16 @@ public static class DependencyInjection
         services.AddHostedService<EDocumentStatusHostedService>();
         services.AddSingleton<EDocumentAutomationProcessor>();
         services.AddHostedService<EDocumentAutomationHostedService>();
+
+        // ===== AI (ADR-008, ADR-044) =====
+        // Anahtar başlıkta, istem gövdesi klinik veri: varsayılan HttpClient günlükleri kapalı (istemci yalnız durum kodunu yazar).
+        services.Configure<AiOptions>(configuration.GetSection(AiOptions.SectionName));
+        services.Configure<AnthropicOptions>(configuration.GetSection(AnthropicOptions.SectionName));
+        services.AddHttpClient(AnthropicTextGenerator.HttpClientName, (sp, client) =>
+                client.Timeout = TimeSpan.FromSeconds(Math.Clamp(sp.GetRequiredService<IOptions<AnthropicOptions>>().Value.TimeoutSeconds, 10, 300)))
+            .RemoveAllLoggers();
+        services.AddScoped<IAiTextGenerator, AnthropicTextGenerator>();
+        services.AddScoped<IAiUsageReader, AiUsageReader>();
 
         services.Configure<ReminderProcessorOptions>(configuration.GetSection("Reminders:Processor"));
         services.AddScoped<IReminderEmailOutboxEnqueuer, ReminderEmailOutboxEnqueuer>();

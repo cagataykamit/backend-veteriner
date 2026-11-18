@@ -131,6 +131,26 @@ public static class ResultExtensions
             return (StatusCodes.Status502BadGateway, "https://httpstatuses.io/502");
         }
 
+        // AI (AI_HISTORY_SUMMARY_API_CONTRACT.md §5): kliniğe kapalı 403, hız/kota 429, yapılandırma/bütçe/erişim 503,
+        // sağlayıcı reddi veya geçersiz çıktı 502, modelin yanıtlamaması 422. "ai.clinicnotfound" genel 404 dalına düşer.
+        switch (normalized)
+        {
+            case "ai.clinicnotenabled":
+                return (StatusCodes.Status403Forbidden, "https://httpstatuses.io/403");
+            case "ai.ratelimited":
+            case "ai.clinicquotaexceeded":
+                return (StatusCodes.Status429TooManyRequests, "https://httpstatuses.io/429");
+            case "ai.notconfigured":
+            case "ai.systembudgetexhausted":
+            case "ai.providerunavailable":
+                return (StatusCodes.Status503ServiceUnavailable, "https://httpstatuses.io/503");
+            case "ai.providerrejected":
+            case "ai.invalidoutput":
+                return (StatusCodes.Status502BadGateway, "https://httpstatuses.io/502");
+            case "ai.refused":
+                return (StatusCodes.Status422UnprocessableEntity, "https://httpstatuses.io/422");
+        }
+
         // Deneme kaydı ve herkese açık uçların kötüye kullanım önlemleri (TRIAL_SIGNUP_ABUSE_API_CONTRACT.md §5).
         if (normalized is "signupemail.resendtoosoon" or "signupemail.dailylimitreached")
         {

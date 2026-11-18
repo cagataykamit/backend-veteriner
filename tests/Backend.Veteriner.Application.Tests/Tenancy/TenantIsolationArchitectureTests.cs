@@ -47,6 +47,7 @@ public sealed class TenantIsolationArchitectureTests
         ["Backend.Veteriner.Api/Controllers/ClinicSitesAdminController.cs"] = "Adres değiştirme hakkı desteği (platform yöneticisi)",
         ["Backend.Veteriner.Api/Controllers/CustomDevelopmentRequestsAdminController.cs"] = "Özel geliştirme talepleri (platform yöneticisi)",
         ["Backend.Veteriner.Infrastructure/Tenants/TrialActivationMetricsReader.cs"] = "Deneme metrikleri (platform yöneticisi)",
+        ["Backend.Veteriner.Infrastructure/Ai/AiUsageReader.cs"] = "AI sistem harcama sınırı tüm kiracılarda toplanır; klinik dökümü (platform yöneticisi)",
         // Arka plan ve bakım
         ["Backend.Veteriner.Application/Waitlist/WaitlistOfferProcessor.cs"] = "Bekleme listesi işleyicisi: sıradaki kaydı ya da açık teklifi olan kiracıları tarar",
         ["Backend.Veteriner.Infrastructure/Imports/ImportValidationProcessor.cs"] = "Kuyruk taraması",
