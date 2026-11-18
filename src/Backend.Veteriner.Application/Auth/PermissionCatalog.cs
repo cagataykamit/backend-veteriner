@@ -337,6 +337,12 @@ public static class PermissionCatalog
         public const string Manage = "DataExport.Manage";
     }
 
+    /// <summary>AI taslak özellikleri (ADR-008, ADR-044; AI_HISTORY_SUMMARY_API_CONTRACT.md). Kullanım ayrıca kliniğin AI'sinin açık olmasına bağlıdır.</summary>
+    public static class Ai
+    {
+        public const string Use = "Ai.Use";
+    }
+
     public static class Admin
     {
         public const string Diagnostics = "Admin.Diagnostics";
@@ -522,7 +528,9 @@ public static class PermissionCatalog
 
         new(DataExport.Manage, "Kiracının tüm verisini dışa aktarma paketini isteme, durumunu görme ve indirme yetkisi", "DataExport"),
 
-        new(Admin.Diagnostics, "Tanılama ve yönetim kontrollerine erişim yetkisi", "Diagnostics"),
+        new(Ai.Use, "AI taslak özelliklerini (hasta geçmişi özeti) kullanma yetkisi", "Ai"),
+
+        new(Admin.Diagnostics,"Tanılama ve yönetim kontrollerine erişim yetkisi", "Diagnostics"),
 
         new(Test.FeatureRun, "Test amaçlı özellikleri çalıştırma yetkisi", "Test"),
         new(Test.ForbiddenProbe, "Forbidden test endpoint", "Test"),

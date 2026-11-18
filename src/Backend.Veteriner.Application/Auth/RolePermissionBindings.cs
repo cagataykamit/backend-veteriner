@@ -211,6 +211,9 @@ public static class RolePermissionBindings
 
                 // Tüm veri dışa aktarma yalnız kiracı yönetimi (Admin, Owner); veri taşınabilirliği pakete bağlı değildir.
                 PermissionCatalog.DataExport.Manage,
+
+                // AI taslak özellikleri (ADR-008, ADR-044); kullanım ayrıca kliniğin AI'si açıksa mümkündür.
+                PermissionCatalog.Ai.Use,
             ],
 
             // Tenant sahibi: Admin ile aynı operasyonel paket (ürün kararı: Owner ≈ Admin).
@@ -370,6 +373,9 @@ public static class RolePermissionBindings
 
                 // Tüm veri dışa aktarma yalnız kiracı yönetimi (Admin, Owner); veri taşınabilirliği pakete bağlı değildir.
                 PermissionCatalog.DataExport.Manage,
+
+                // AI taslak özellikleri (ADR-008, ADR-044); kullanım ayrıca kliniğin AI'si açıksa mümkündür.
+                PermissionCatalog.Ai.Use,
             ],
 
             // Klinik operasyon paneli: dashboard + çekirdek modüller; klinik profilini
@@ -522,6 +528,9 @@ public static class RolePermissionBindings
 
                 // Online randevu talep kuyruğu (ADR-042 K4).
                 PermissionCatalog.AppointmentRequests.Manage,
+
+                // AI taslak özellikleri (ADR-008, ADR-044); kullanım ayrıca kliniğin AI'si açıksa mümkündür.
+                PermissionCatalog.Ai.Use,
             ],
 
             // Tıbbi operasyon: klinik kayıtlarını (muayene/aşı/tedavi/reçete/lab/yatış) yönetir.
@@ -610,6 +619,9 @@ public static class RolePermissionBindings
                 PermissionCatalog.StockMovements.Read,
 
                 PermissionCatalog.Reminders.Read,
+
+                // AI taslak özellikleri (ADR-008, ADR-044); kullanım ayrıca kliniğin AI'si açıksa mümkündür.
+                PermissionCatalog.Ai.Use,
             ],
 
             // Resepsiyon/operasyon: müşteri/pet, randevu (Complete hariç), ödeme yönetimi.
