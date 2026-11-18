@@ -40,11 +40,15 @@ public sealed record EDocumentDraftGroup(bool IsSelfEmployedReceipt, IReadOnlyLi
 }
 
 /// <param name="TaxpayerType">Yalnız önizlemede <c>null</c> olabilir (mükellef türü seçilmemiş; <see cref="Groups"/> boş).</param>
+/// <param name="TaxpayerIdentityNumber">Kliniğin VKN / TCKN'si (gösterimde maskelenir).</param>
+/// <param name="ClinicSetupIssues">Eksik klinik mükellef ayarları; yalnız önizlemede dolu olabilir (kesme ilk eksikte reddeder).</param>
 public sealed record EDocumentDraftSet(
     Client Client,
     EDocumentBuyer? Buyer,
     IReadOnlyList<string> MissingBuyerFields,
     ClinicTaxpayerType? TaxpayerType,
+    string? TaxpayerIdentityNumber,
+    IReadOnlyList<EDocumentSetupIssueCode> ClinicSetupIssues,
     decimal? WithholdingRate,
     IReadOnlyList<Charge> Charges,
     IReadOnlyList<EDocumentDraftGroup> Groups,
@@ -89,11 +93,12 @@ public sealed class EDocumentDraftBuilder
         if (sources != 1)
             return Fail("EDocuments.Validation", "Kaynak olarak ücretler, satış veya ziyaretten tam olarak biri verilmelidir.");
 
-        // Belge türü mükellef türünden çıkar; seçilmemişse kesilmez (önizleme bunu hazırlık listesinde gösterir).
+        // Eksik mükellef ayarıyla kesilmez; önizleme eksikleri hazırlık listesinde gösterir.
         var settings = await _taxpayerSettings.FirstOrDefaultAsync(new ClinicTaxpayerSettingsByClinicSpec(tenantId, clinicId), ct);
         var taxpayerType = settings?.TaxpayerType;
-        if (taxpayerType is null && mode == EDocumentDraftMode.Issue)
-            return Result<EDocumentDraftSet>.Failure(TaxpayerTypeMissing());
+        var clinicIssues = ClinicSetupIssues(settings);
+        if (clinicIssues.Count > 0 && mode == EDocumentDraftMode.Issue)
+            return Result<EDocumentDraftSet>.Failure(ClinicSetupError(clinicIssues[0]));
 
         var chargesResult = await LoadChargesAsync(tenantId, clinicId, selection, track: mode == EDocumentDraftMode.Issue, ct);
         if (!chargesResult.IsSuccess)
@@ -137,6 +142,8 @@ public sealed class EDocumentDraftBuilder
             buyer,
             missing,
             taxpayerType,
+            settings?.TaxIdentityNumber,
+            clinicIssues,
             settings?.WithholdingRate,
             included,
             groups,
@@ -177,10 +184,29 @@ public sealed class EDocumentDraftBuilder
         return individual.IsSuccess ? (individual.Value, []) : (null, [MissingFullNameField]);
     }
 
-    public static Error TaxpayerTypeMissing()
-        => new(
-            "EDocuments.TaxpayerTypeMissing",
-            "Klinik mükellef türü seçilmemiş; Ayarlar › Klinikler sayfasında kliniğin Mükellef bilgileri kartını doldurun.");
+    /// <summary>
+    /// Kesme için klinik mükellef ayarı kuralı (tek yer): belge türü mükellef türünden çıkar; belgeyi düzenleyenin vergi kimliği
+    /// zorunludur (10 hane VKN veya 11 hane TCKN, <see cref="TurkishTaxIdentity.IsValidTaxpayerIdentity"/>). Entegratör hesabındaki
+    /// numarayla eşleştirme yapılmaz.
+    /// </summary>
+    public static IReadOnlyList<EDocumentSetupIssueCode> ClinicSetupIssues(ClinicTaxpayerSettings? settings)
+    {
+        var issues = new List<EDocumentSetupIssueCode>();
+        if (settings?.TaxpayerType is null)
+            issues.Add(EDocumentSetupIssueCode.TaxpayerTypeMissing);
+        if (!TurkishTaxIdentity.IsValidTaxpayerIdentity(settings?.TaxIdentityNumber))
+            issues.Add(EDocumentSetupIssueCode.TaxpayerIdentityMissing);
+        return issues;
+    }
+
+    public static Error ClinicSetupError(EDocumentSetupIssueCode issue)
+        => issue == EDocumentSetupIssueCode.TaxpayerIdentityMissing
+            ? new(
+                "EDocuments.TaxpayerIdentityMissing",
+                "Kliniğin VKN / TCKN numarası girilmemiş; Ayarlar › Klinikler sayfasında kliniğin Mükellef bilgileri kartını doldurun.")
+            : new(
+                "EDocuments.TaxpayerTypeMissing",
+                "Klinik mükellef türü seçilmemiş; Ayarlar › Klinikler sayfasında kliniğin Mükellef bilgileri kartını doldurun.");
 
     /// <summary>Eksik alıcı alanının kullanıcı metni (kesme hatası ve belgesiz ücret nedeni aynı metni kullanır).</summary>
     public static string MissingBuyerMessage(IReadOnlyList<string> missing)

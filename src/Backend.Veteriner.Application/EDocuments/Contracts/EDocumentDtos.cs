@@ -118,6 +118,7 @@ public sealed record EDocumentSkippedChargeDto(
     [property: JsonConverter(typeof(JsonStringEnumConverter))] EDocumentSkipReason Reason);
 
 /// <param name="TaxpayerType">Klinik mükellef türü (hazırlık listesinde tamam olanın değeri); seçilmemişse <c>null</c>.</param>
+/// <param name="TaxpayerIdentityMasked">Kliniğin VKN / TCKN'si maskeli (hazırlık listesinde tamam olanın değeri); yoksa <c>null</c>.</param>
 /// <param name="ClinicSetupIssues">Belge kesmeden önce klinikte tamamlanması gereken ayarlar; boş değilse kesme reddedilir.</param>
 public sealed record EDocumentPreviewDto(
     Guid ClientId,
@@ -128,6 +129,7 @@ public sealed record EDocumentPreviewDto(
     IReadOnlyList<EDocumentPreviewGroupDto> Groups,
     IReadOnlyList<EDocumentSkippedChargeDto> Skipped,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] ClinicTaxpayerType? TaxpayerType,
+    string? TaxpayerIdentityMasked,
     IReadOnlyList<EDocumentSetupIssueDto> ClinicSetupIssues);
 
 /// <param name="FailedDocumentId">Ücret kesilemeyen bir belgeye bağlıysa o belge (yeniden dene / vazgeç).</param>

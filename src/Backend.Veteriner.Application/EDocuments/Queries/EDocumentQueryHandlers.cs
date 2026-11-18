@@ -247,6 +247,7 @@ public sealed class PreviewEDocumentQueryHandler : IRequestHandler<PreviewEDocum
             groups,
             draft.Skipped.Select(s => new EDocumentSkippedChargeDto(s.ChargeId, s.Reason)).ToList(),
             draft.TaxpayerType,
+            TurkishTaxIdentity.Mask(draft.TaxpayerIdentityNumber),
             EDocumentClinicSetup.Issues(draft, opened).Select(code => new EDocumentSetupIssueDto(code)).ToList()));
     }
 }
