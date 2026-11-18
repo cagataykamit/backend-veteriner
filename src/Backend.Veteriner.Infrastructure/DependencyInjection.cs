@@ -445,6 +445,8 @@ public static class DependencyInjection
             .RemoveAllLoggers();
         services.AddScoped<IAiTextGenerator, AnthropicTextGenerator>();
         services.AddScoped<IAiUsageReader, AiUsageReader>();
+        services.Configure<AiDraftExpiryOptions>(configuration.GetSection(AiDraftExpiryOptions.SectionName));
+        services.AddHostedService<AiDraftExpiryHostedService>();
 
         services.Configure<ReminderProcessorOptions>(configuration.GetSection("Reminders:Processor"));
         services.AddScoped<IReminderEmailOutboxEnqueuer, ReminderEmailOutboxEnqueuer>();

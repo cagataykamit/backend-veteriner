@@ -1,17 +1,16 @@
-using System.Diagnostics;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Ai;
 using Backend.Veteriner.Domain.Shared;
 using FluentValidation;
 using Mediator;
-using Microsoft.Extensions.Logging;
 
 namespace Backend.Veteriner.Application.Ai.PetHistorySummary;
 
 /// <summary>
-/// AI hasta geçmişi özeti taslağı (AI-002; docs/AI_HISTORY_SUMMARY_API_CONTRACT.md §2). Hiçbir klinik kayıt yazmaz; yalnız
-/// kullanım kaydı yazar. Aktif klinik bağlamı gerekir (kullanım ve sınır kliniğe yazılır); kayıtlar o klinikle sınırlıdır.
+/// AI hasta geçmişi özeti taslağı (AI-002; docs/AI_HISTORY_SUMMARY_API_CONTRACT.md §2). Hiçbir klinik kayıt yazmaz ve taslak
+/// kaydı oluşturmaz; yalnız kullanım/denetim kaydı yazar. Aktif klinik bağlamı gerekir (kullanım ve sınır kliniğe yazılır);
+/// kayıtlar o klinikle sınırlıdır.
 /// </summary>
 public sealed record GeneratePetHistorySummaryCommand(Guid PetId)
     : IRequest<Result<PetHistoryAiSummaryDto>>, IAuditableRequest
@@ -34,10 +33,8 @@ public sealed class GeneratePetHistorySummaryCommandHandler
     private readonly IClinicReadScopeResolver _scopeResolver;
     private readonly AiUsageGuard _guard;
     private readonly PetHistoryAiContextBuilder _contextBuilder;
-    private readonly IAiTextGenerator _generator;
-    private readonly IRepository<AiUsageRecord> _usageRecords;
+    private readonly AiInvoker _invoker;
     private readonly TimeProvider _timeProvider;
-    private readonly ILogger<GeneratePetHistorySummaryCommandHandler> _logger;
 
     public GeneratePetHistorySummaryCommandHandler(
         ITenantContext tenantContext,
@@ -46,10 +43,8 @@ public sealed class GeneratePetHistorySummaryCommandHandler
         IClinicReadScopeResolver scopeResolver,
         AiUsageGuard guard,
         PetHistoryAiContextBuilder contextBuilder,
-        IAiTextGenerator generator,
-        IRepository<AiUsageRecord> usageRecords,
-        TimeProvider timeProvider,
-        ILogger<GeneratePetHistorySummaryCommandHandler> logger)
+        AiInvoker invoker,
+        TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -57,10 +52,8 @@ public sealed class GeneratePetHistorySummaryCommandHandler
         _scopeResolver = scopeResolver;
         _guard = guard;
         _contextBuilder = contextBuilder;
-        _generator = generator;
-        _usageRecords = usageRecords;
+        _invoker = invoker;
         _timeProvider = timeProvider;
-        _logger = logger;
     }
 
     public async ValueTask<Result<PetHistoryAiSummaryDto>> Handle(GeneratePetHistorySummaryCommand request, CancellationToken ct)
@@ -91,52 +84,27 @@ public sealed class GeneratePetHistorySummaryCommandHandler
                 request.PetId, PetHistoryAiSummaryStatus.NoRecords, true, utcNow, null, context.Coverage, [], 0));
         }
 
-        var stopwatch = Stopwatch.StartNew();
-        var generation = await _generator.GenerateJsonAsync(
-            new AiGenerationRequest(
-                grant.Value.Model,
+        var parsed = await _invoker.InvokeAsync(
+            new AiInvocation(
+                tenantId,
+                clinicId,
+                userId,
+                AiFeature.PetHistorySummary,
+                request.PetId,
+                context.Sources.Values.Select(s => new AiSourceRef(s.Type, s.Id)).ToList(),
+                grant.Value,
+                PetHistoryAiPrompt.Version,
                 PetHistoryAiPrompt.System,
                 context.UserContent,
-                PetHistoryAiPrompt.Schema(),
-                grant.Value.MaxOutputTokens),
+                PetHistoryAiPrompt.Schema()),
+            text => PetHistoryAiOutputParser.Parse(text, context.Sources),
             ct);
-        stopwatch.Stop();
+        if (!parsed.IsSuccess)
+            return Fail(parsed.Error);
 
-        var parsed = generation.Status == AiGenerationStatus.Completed
-            ? PetHistoryAiOutputParser.Parse(generation.Text, context.Sources)
-            : null;
-        var outcome = generation.Status switch
-        {
-            AiGenerationStatus.Completed => parsed is null ? AiUsageOutcome.InvalidOutput : AiUsageOutcome.Succeeded,
-            AiGenerationStatus.Truncated => AiUsageOutcome.Truncated,
-            AiGenerationStatus.Refused => AiUsageOutcome.Refused,
-            _ => AiUsageOutcome.ProviderError,
-        };
-
-        var record = AiUsageRecord.Create(
-            tenantId, clinicId, userId, AiFeature.PetHistorySummary, request.PetId, grant.Value.Model,
-            generation.InputTokens, generation.OutputTokens,
-            grant.Value.Price.CostOf(generation.InputTokens, generation.OutputTokens),
-            (int)stopwatch.ElapsedMilliseconds, outcome, _timeProvider.GetUtcNow().UtcDateTime);
-        await _usageRecords.AddAsync(record, ct);
-        await _usageRecords.SaveChangesAsync(ct);
-
-        // Yalnız ölçü günlüğe yazılır; istem ve yanıt metni klinik veridir (ADR-008 madde 10).
-        _logger.LogInformation(
-            "AI {Feature} {Outcome}: model={Model} input={InputTokens} output={OutputTokens} durationMs={DurationMs}",
-            record.Feature, record.Outcome, record.Model, record.InputTokens, record.OutputTokens, record.DurationMs);
-
-        return outcome switch
-        {
-            AiUsageOutcome.Succeeded => Result<PetHistoryAiSummaryDto>.Success(new PetHistoryAiSummaryDto(
-                request.PetId, PetHistoryAiSummaryStatus.Generated, true, utcNow, grant.Value.Model,
-                context.Coverage, parsed!.Sections, parsed.DroppedItemCount)),
-            AiUsageOutcome.Refused => Fail(AiErrors.Refused),
-            AiUsageOutcome.ProviderError => Fail(generation.FailureKind == AiFailureKind.Rejected
-                ? AiErrors.ProviderRejected
-                : AiErrors.ProviderUnavailable),
-            _ => Fail(AiErrors.InvalidOutput),
-        };
+        return Result<PetHistoryAiSummaryDto>.Success(new PetHistoryAiSummaryDto(
+            request.PetId, PetHistoryAiSummaryStatus.Generated, true, utcNow, grant.Value.Model,
+            context.Coverage, parsed.Value!.Sections, parsed.Value.DroppedItemCount));
     }
 
     private static Result<PetHistoryAiSummaryDto> Fail(Error error) => Result<PetHistoryAiSummaryDto>.Failure(error);

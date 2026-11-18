@@ -110,6 +110,11 @@ public sealed class AiHistorySummaryIntegrationTests : IClassFixture<CustomWebAp
         record.Outcome.Should().Be(AiUsageOutcome.Succeeded);
         record.Feature.Should().Be(AiFeature.PetHistorySummary);
         record.SubjectId.Should().Be(ctx.PetId);
+        record.PromptVersion.Should().Be("pet-history-summary/1");
+        record.DraftId.Should().BeNull("geçmiş özeti taslak kaydı oluşturmaz");
+        record.SourceRefs.Should().Contain(new AiSourceRef("Examination", examId))
+            .And.Contain(new AiSourceRef("Treatment", treatmentId))
+            .And.Contain(new AiSourceRef("Pet", ctx.PetId));
         (record.InputTokens, record.OutputTokens).Should().Be((1_200, 300));
         record.CostUsd.Should().Be(0.00027m);
     }
@@ -375,7 +380,7 @@ public sealed class AiHistorySummaryIntegrationTests : IClassFixture<CustomWebAp
         public Task<Guid> AddUsageAsync(decimal costUsd)
         {
             var record = AiUsageRecord.Create(
-                TenantId, ClinicId, Guid.NewGuid(), AiFeature.PetHistorySummary, PetId, "claude-haiku-5-5",
+                TenantId, ClinicId, Guid.NewGuid(), AiFeature.PetHistorySummary, PetId, null, null, "claude-haiku-5-5", "test/1",
                 1_000, 100, costUsd, 500, AiUsageOutcome.Succeeded, DateTime.UtcNow);
             return SaveAsync(record, record.Id);
         }

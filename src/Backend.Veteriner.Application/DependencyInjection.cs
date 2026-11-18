@@ -137,6 +137,8 @@ public static class DependencyInjection
         // AI (ADR-008, ADR-044): sınır denetimi ve hasta geçmişi özeti girdisi; sağlayıcı istemcisi Infrastructure'da.
         services.AddScoped<Ai.AiUsageGuard>();
         services.AddScoped<Ai.PetHistorySummary.PetHistoryAiContextBuilder>();
+        // AI çağrısı + kullanım/denetim kaydı (AI-010). Özellik uygulayıcıları (IAiDraftApplier) özellikle birlikte eklenir.
+        services.AddScoped<Ai.AiInvoker>();
 
         // Hasta sahibi portalı (ADR-031): sahiplik kontrolü, davet çözümü, oturum ve kod.
         services.AddScoped<OwnerPortalAccess>();

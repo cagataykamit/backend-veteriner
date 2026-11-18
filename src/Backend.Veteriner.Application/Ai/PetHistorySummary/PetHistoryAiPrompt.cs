@@ -20,6 +20,9 @@ public enum PetHistoryAiSectionKind
 /// </summary>
 public static class PetHistoryAiPrompt
 {
+    /// <summary>İstem ve şema sürümü (denetim kaydında; AI-010). <see cref="System"/> ya da <see cref="Schema"/> değişince artırılır.</summary>
+    public const string Version = "pet-history-summary/1";
+
     public const int MaxItemsPerSection = 8;
     public const int MaxItemTextLength = 400;
 

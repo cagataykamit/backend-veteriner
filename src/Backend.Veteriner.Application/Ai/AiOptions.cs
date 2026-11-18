@@ -33,6 +33,14 @@ public sealed class AiOptions
     /// <summary>Tüm kiracılar toplamı aylık en çok tahmini maliyet (USD); aşılınca AI herkes için durur.</summary>
     public decimal SystemMonthlyCostLimitUsd { get; init; } = 10m;
 
+    /// <summary>
+    /// AI taslağının karar beklediği en uzun süre (gün; AI-009). Süre dolunca taslak "süresi doldu" olur ve klinik içeriği
+    /// silinir; karar alanları denetim için kalır.
+    /// </summary>
+    public int DraftLifetimeDays { get; init; } = 30;
+
+    public TimeSpan DraftLifetime => TimeSpan.FromDays(Math.Clamp(DraftLifetimeDays, 1, 365));
+
     /// <summary>Model → 1 milyon token fiyatı (USD). Fiyatı olmayan modelle istek yapılmaz (maliyet sınırı hesaplanamaz).</summary>
     public Dictionary<string, AiModelPrice> Prices { get; init; } = new(StringComparer.OrdinalIgnoreCase)
     {

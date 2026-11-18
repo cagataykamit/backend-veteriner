@@ -173,6 +173,7 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<ClinicEDocumentSettings> ClinicEDocumentSettings => Set<ClinicEDocumentSettings>();
     public DbSet<AiUsageRecord> AiUsageRecords => Set<AiUsageRecord>();
     public DbSet<ClinicAiSettings> ClinicAiSettings => Set<ClinicAiSettings>();
+    public DbSet<AiDraft> AiDrafts => Set<AiDraft>();
     public DbSet<SaleLine> SaleLines => Set<SaleLine>();
     public DbSet<Treatment> Treatments => Set<Treatment>();
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
