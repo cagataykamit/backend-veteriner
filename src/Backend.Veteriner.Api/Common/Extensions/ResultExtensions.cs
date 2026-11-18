@@ -149,6 +149,14 @@ public static class ResultExtensions
                 return (StatusCodes.Status502BadGateway, "https://httpstatuses.io/502");
             case "ai.refused":
                 return (StatusCodes.Status422UnprocessableEntity, "https://httpstatuses.io/422");
+            // AI taslağı (AI_DRAFTS_API_CONTRACT.md §5): karar verilmiş 409, süresi dolmuş 410, uygulayıcısız özellik 422.
+            // "aidrafts.notfound" 404, "aidrafts.forbidden" 403, "aidrafts.validation" 400 genel dallara düşer.
+            case "aidrafts.notpending":
+                return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+            case "aidrafts.expired":
+                return (StatusCodes.Status410Gone, "https://httpstatuses.io/410");
+            case "aidrafts.featurenotsupported":
+                return (StatusCodes.Status422UnprocessableEntity, "https://httpstatuses.io/422");
         }
 
         // Deneme kaydı ve herkese açık uçların kötüye kullanım önlemleri (TRIAL_SIGNUP_ABUSE_API_CONTRACT.md §5).

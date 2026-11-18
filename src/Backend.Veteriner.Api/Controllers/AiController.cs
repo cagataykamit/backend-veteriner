@@ -1,6 +1,8 @@
+using System.Text.Json.Nodes;
 using Asp.Versioning;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Ai;
+using Backend.Veteriner.Application.Ai.Drafts;
 using Backend.Veteriner.Application.Ai.PetHistorySummary;
 using Backend.Veteriner.Application.Auth;
 using Mediator;
@@ -47,4 +49,57 @@ public sealed class AiController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> GeneratePetHistorySummary([FromRoute] Guid id, CancellationToken ct)
         => (await _mediator.Send(new GeneratePetHistorySummaryCommand(id), ct)).ToActionResult(this);
+
+    /// <summary>
+    /// AI taslağı (AI-009): içerik yalnız karar bekleyen taslakta gelir. Aktif klinik taslağın kliniği olmalı; özelliğin izni
+    /// (ör. muayene notu için <c>Examinations.Update</c>) gerekir. Sözleşme: docs/AI_DRAFTS_API_CONTRACT.md.
+    /// </summary>
+    [HttpGet("ai/drafts/{id:guid}")]
+    [ProducesResponseType(typeof(AiDraftDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetDraft([FromRoute] Guid id, CancellationToken ct)
+        => (await _mediator.Send(new GetAiDraftQuery(id), ct)).ToActionResult(this);
+
+    /// <summary>Bir kaydın karar bekleyen AI taslakları (yeniden eskiye, en çok 20); yalnız kullanıcının izinli olduğu özellikler.</summary>
+    [HttpGet("ai/drafts")]
+    [ProducesResponseType(typeof(IReadOnlyList<AiDraftDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ListPendingDrafts([FromQuery] string targetType, [FromQuery] Guid targetId, CancellationToken ct)
+        => (await _mediator.Send(new ListPendingAiDraftsQuery(targetType, targetId), ct)).ToActionResult(this);
+
+    /// <summary>
+    /// Taslağı kabul eder; <c>editedContent</c> verilirse düzenlenmiş hali yazılır. İçerik özelliğin mevcut komutlarıyla hedef
+    /// kayda tek transaction'da yazılır; başarısızsa hiçbir şey yazılmaz ve taslak bekler.
+    /// </summary>
+    [HttpPost("ai/drafts/{id:guid}/accept")]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(AiDraftDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status410Gone)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> AcceptDraft([FromRoute] Guid id, [FromBody] AiDraftAcceptBody? body, CancellationToken ct)
+        => (await _mediator.Send(new AcceptAiDraftCommand(id, body?.EditedContent), ct)).ToActionResult(this);
+
+    /// <summary>Taslağı atar; hiçbir kayda yazılmaz.</summary>
+    [HttpPost("ai/drafts/{id:guid}/discard")]
+    [ProducesResponseType(typeof(AiDraftDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status410Gone)]
+    public async Task<IActionResult> DiscardDraft([FromRoute] Guid id, CancellationToken ct)
+        => (await _mediator.Send(new DiscardAiDraftCommand(id), ct)).ToActionResult(this);
+}
+
+public sealed class AiDraftAcceptBody
+{
+    /// <summary>Kullanıcının düzenlediği içerik (taslakla aynı şemada); <c>null</c> ise üretilen içerik olduğu gibi kabul edilir.</summary>
+    public JsonObject? EditedContent { get; init; }
 }
