@@ -72,7 +72,7 @@ ikisi de yoksa 400 `Vaccinations.ClinicScopeRequired`; bağlamla çelişirse 400
 ```json
 [ { "vaccinationId": "…", "kind": "NextDue", "state": "DueToday", "date": "2026-11-16", "atUtc": "2026-11-16T09:00:00Z",
     "clinicId": "…", "petId": "…", "petName": "Pamuk", "clientId": "…", "clientName": "Ayşe Yılmaz",
-    "vaccineDefinitionId": "…", "vaccineName": "Karma", "notes": null } ]
+    "vaccineDefinitionId": "…", "vaccineName": "Karma", "notes": null, "timeSpecified": true } ]
 ```
 
 | Alan | Anlam |
@@ -80,7 +80,7 @@ ikisi de yoksa 400 `Vaccinations.ClinicScopeRequired`; bağlamla çelişirse 400
 | `kind` | `Planned`: planlı aşı kaydı (`Scheduled`, tarih `dueAtUtc`). `NextDue`: uygulanmış aşının sonraki uygulama tarihi (`Applied` + `dueAtUtc`; E-vet aktarmasının "sonraki aşı tarihi" buradan görünür). `Applied`: o gün uygulanan aşı (tarih `appliedAtUtc`). |
 | `state` | Ortak takvim durumu (§6): `Completed` (uygulandı, yeşil), `DueToday` (sarı), `Upcoming` (gelecek, siyah), `Overdue` (kırmızı). Gün sınırı ve gecikme tanımı `VaccinationDueRule` (ADR-028, İstanbul günü): bugünün başından önceki vade gecikmiş, bugün içindeki vade saati geçse de "bugün". Kural `CalendarItemStateRule`. |
 | `date` | Satırın göründüğü İstanbul günü. |
-| `atUtc` | Vade ya da uygulama anı. Vadeli satırda saat anlamlı değildir; istemci satırı günün üst şeridinde (tüm gün) gösterir. |
+| `atUtc` | Vade ya da uygulama anı. Saat yalnız `timeSpecified: true` ise gerçektir (§8.2); değilse istemci satırı "Saatsiz" grubunda gösterir. |
 
 Satır anahtarı `vaccinationId` + `kind`: aynı kayıt aralıkta hem uygulandığı gün hem sonraki tarihi için iki satır verebilir.
 Sıralama `atUtc`, hayvan adı, aşı adı.
@@ -97,7 +97,7 @@ Kurallar (tek yer `VaccinationCalendarRules`):
 - **Vefat:** bakım dışı hayvanın (`Pet.ReceivesCare` değil) `Planned`/`NextDue` satırı çıkmaz; `Applied` geçmişi görünür.
 - **Randevu değildir:** saat dilimini doldurmaz, çakışma (`ClinicOverlapBlocks`) ve "Boş saat bul" (`AppointmentAvailabilityCalculator`)
   hesabına girmez, randevu hatırlatması üretmez. Aşı hatırlatması değişmedi (`ReminderProcessorService`).
-- **Hekim:** aşı kaydında hekim tutulmaz; hekim sütunlu görünümde satır günün üst şeridindedir.
+- **Hekim:** aşı kaydında hekim tutulmaz; hekim sütunlu görünümde satır ayrı "Aşılar" sütunundadır (§8).
 
 Panelde tıklama: `Planned` → aşı düzenleme (uygulandı yap); `NextDue` → yeni aşı (hasta ve aşı dolu); `Applied` → aşı ayrıntısı;
 her vadeli satırda "Randevu ver" → yeni randevu (`?petId&clientId&date&type=Vaccination&notes=`).
@@ -176,3 +176,72 @@ Yanıt (yalnız kaydı olan günler, tarih sırasıyla):
 - Kural tek yerde kalsın diye özet işleyicisi aynı takvim sorgusunu gönderir (doğrulama, kapsam, filtre, karşılanmış sonraki tarih,
   vefat kuralı orada) ve gün + durum bazında sayar (`CalendarDaySummary`). Hata kodları `calendar` ile aynı.
 - Testler: Application `CalendarSummaryTests`; entegrasyon `AppointmentCalendarFilterEndpointTests` (özet ve filtre).
+
+## 8) Takvim yeniden tasarımı: aşı saati, randevu durumu, günlük kapasite (2026-11-18)
+
+Kaynak: kullanıcı seçimi 2026-11-18 (ürün deposu `ux/takvim-yeniden-tasarim.md`): gün görünümünde hekim sütunlarının yanında saatli
+"Aşılar" sütunu, hafta görünümünde gün sütunlarında kartlar, ay görünümünde doluluk haritası. Eklemeli; eski istemci etkilenmez.
+**Migration var** (`AddVaccinationDueTimeSpecified`); yeni izin yok.
+
+### 8.1 Aşı vadesinin saati (`Vaccination.DueTimeSpecified`)
+
+- `Vaccination`'a `DueTimeSpecified` (bool, varsayılan `false`) eklendi. `true`: `DueAtUtc`'nin saati gerçektir (takvimde saatiyle
+  durur). `false`: yalnız gün bilinir (saat gösterilmez, "Saatsiz" grubu). Mevcut kayıtlar `false` kalır. Vadesiz kayıtta her zaman
+  `false`.
+- **İçe aktarma:** `SonrakiAsiTarihi` saat eki taşırsa (`yyyy-aa-gg SS:dd`, `gg.aa.yyyy SS:dd`; bölüm 4.4 biçimleri) saat korunur ve
+  bayrak `true` olur; saat eki yoksa vade bugünkü gibi günün 12:00'si (İstanbul) ve bayrak `false`. E-vet dönüştürücüsü "Yapılacak"
+  aşı görevinin başlangıç saatini artık `SonrakiAsiTarihi`'ne yazar (önce yalnız gün yazılıyordu). E-vet görev saati gerçek saat sayılır
+  (kullanıcı kararı 2026-11-18; "00:00 ise saatsiz" kuralı kırılgan olduğu için elendi).
+- **Panel:** aşı oluşturma bayrağı `false` yazar. Düzenlemede vade değişmezse bayrak korunur, vade değişirse `false` olur (kural tek
+  yer `Vaccination.UpdateDetails`). Panel formunda "saat gerçek" seçimi ilk sürümde yok.
+- Vade, gecikme, hatırlatma, çakışma ve boş saat kuralları değişmedi: hepsi gün bazlıdır (ADR-028). Saat yalnız sıralama ve gösterim
+  içindir.
+- Yayındaki eski aktarmalarda saat yoktur; saat ancak yeniden aktarma ya da güncelleme aktarmasıyla gelir (canlı veriye dokunduğu için
+  ayrı onay).
+
+### 8.2 `GET /api/v1/vaccinations/calendar` yanıtına `timeSpecified`
+
+| Alan | Tip | Anlam |
+|---|---|---|
+| `timeSpecified` | `bool` | `atUtc` saati gerçek mi. `Planned` ve `NextDue` satırında kaydın `DueTimeSpecified` değeri; `Applied` satırında her zaman `false` (uygulanan aşılar takvimde tek satıra toplanır, saati gösterilmez). |
+
+`false` olan vadeli satırı istemci gün ızgarasında "Saatsiz" başlığında gösterir; `true` olan satır "Aşılar" sütununda saatiyle durur.
+Aşı yine randevu değildir: saat dilimini doldurmaz (§5.2).
+
+### 8.3 `GET /api/v1/appointments/calendar` yanıtına `state`
+
+| Alan | Tip | Anlam |
+|---|---|---|
+| `state` | `CalendarItemState?` (sayı: 0 `DueToday`, 1 `Upcoming`, 2 `Overdue`, 3 `Completed`) | §6.1 durumu; iptal ve gelmedi randevuda `null`. Kural `CalendarItemStateRule.ForAppointment` (filtre ve özetle aynı yer). |
+
+Komut veritabanı ve okuma modeli yolları aynı değeri verir.
+
+### 8.4 `GET /api/v1/appointments/calendar/capacity` (`Appointments.Read`)
+
+Ay görünümünde doluluk rengi için günlük kapasite: o günün çalışma saatlerine kaç randevu sığar.
+
+| Parametre | Anlam |
+|---|---|
+| `dateFromUtc`, `dateToUtc` | Zorunlu, `[from, to)`, en çok 45 gün (`calendar` ile aynı). |
+| `clinicId` | Yoksa aktif klinik; hatalar `calendar` ile aynı (`Appointments.ClinicScopeRequired`, `Appointments.ClinicContextMismatch`, `Clinics.AccessDenied`). |
+| `veterinarianUserId` | Verilirse tek hekimin kapasitesi (takvim hekim filtresiyle aynı görünüm). |
+
+Yanıt (aralıktaki her İstanbul günü, tarih sırasıyla; kapalı gün `0`):
+
+```json
+[ { "date": "2026-11-16", "capacity": 32 } ]
+```
+
+- Hesap `AppointmentAvailabilityCalculator.DailyCapacity` (müsaitlik hesabıyla aynı adım ve mola kuralı): o günün çalışma saatleri
+  (mola hariç) içinde kliniğin varsayılan randevu süresiyle (`appointment-settings.defaultAppointmentDurationMinutes`) slot aralığına
+  hizalı kaç başlangıç varsa × kaynak sayısı. Kaynak: klinikteki hekim sayısı; hekim yoksa ya da `veterinarianUserId` verildiyse 1.
+- Doluluk = o günün randevu sayısı (§7 özet `total`) / `capacity`; istemci hesaplar. Kapasite `0` ise gün kapalıdır.
+- Hekim bazında çalışma saati ve tarihe özel kapalı gün modeli yok (§4); kapasite haftanın gününe göre aynıdır.
+
+### 8.5 Testler
+
+- Domain: `VaccinationDueTimeTests` (oluşturma, içe aktarma, düzenlemede koruma ve sıfırlama).
+- Application: `AppointmentAvailabilityCalculatorTests` (günlük kapasite: kapalı gün, mola, hekim sayısı), `GetAppointmentsCalendarQueryHandlerTests`
+  (`state`), `GetVaccinationsCalendarQueryHandlerTests` (`timeSpecified`), `ImportValueParsersTests` (saat eki), E-vet dönüştürücü
+  testleri (sonraki aşı tarihinde saat), içe aktarma doğrulama testleri (saatli vade).
+- Entegrasyon: `AppointmentCalendarFilterEndpointTests` (kapasite ucu).
