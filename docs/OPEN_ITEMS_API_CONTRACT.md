@@ -2,7 +2,7 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak: vetinity-product `ux/HEDEF-IS-AKISLARI-2026-10.md` (dilim D2, bölüm 1.1, 1.4, 1.12), `ux/ARAYUZ-IS-AKISI-DENETIMI-2026-10.md` (B-02, B-15), ADR-017 K6 ve "Rakip iş akışı çalışması sonrası ayarlar". Ücret, tahsis, lab ve geliş sözleşmeleri: `CHARGES_API_CONTRACT.md`, `PAYMENT_ALLOCATION_API_CONTRACT.md`, `LAB_RESULT_STATUS_API_CONTRACT.md`, `VISITS_API_CONTRACT.md`.
 
-> **Durum:** Sözleşme. **Yeni uç, tablo, migration, izin yoktur.** Göstergeler mevcut `Visit`, `Charge` (tahsis sayaçları dahil), `Examination`, `Treatment`, `Administration`, `Vaccination`, `Hospitalization`, `LabResult` verisinden **hesaplanır**; hiçbiri saklanmaz. Yüzey: `GET /api/v1/visits/today` yanıtına eklenen alanlar (madde 3, 4) ve gün sonu raporunun (D6) aynı kuralı kullanması için tek hesap yeri (madde 6).
+> **Durum:** Sözleşme. **Tablo, migration, izin yoktur.** Tek salt okunur uç: açık iş listesi (madde 10, 2026-11-18). Göstergeler mevcut `Visit`, `Charge` (tahsis sayaçları dahil), `Examination`, `Treatment`, `Administration`, `Vaccination`, `Hospitalization`, `LabResult` verisinden **hesaplanır**; hiçbiri saklanmaz. Yüzey: `GET /api/v1/visits/today` yanıtına eklenen alanlar (madde 3, 4) ve gün sonu raporunun (D6) aynı kuralı kullanması için tek hesap yeri (madde 6).
 
 ---
 
@@ -78,6 +78,8 @@ Kural tek bileşendedir: `IVisitOpenItemsReader` (Application, `Visits/ReadModel
 
 - `GetForVisitsAsync(scope, visitIds)`: ziyaret başına satır alanları (madde 3) ve ücret tutarları.
 - `GetSummaryAsync(request)`: özet sayılar (madde 4). Gün sonu raporu (D6) aynı arayüzü, kendi pencere parametreleriyle çağırır; ayrı bir "ücretsiz ziyaret" kuralı yazılmaz.
+- `ListVisitsAsync(request, kind, maxItems)`: özetteki ziyaret sayısının arkasındaki ziyaretler (madde 10). "Ücret yok" ve "tamamlanmamış geliş" süzgeçleri okuyucuda birer özel sorgu parçasıdır (`UnchargedVisits`, `IncompleteVisits`); hem sayım hem liste bu parçadan beslenir.
+- `OpenItemsSummaryRequest.ForToday(scope, nowUtc)`: Bugün pencereleri tek yerde; Bugün özeti ve açık iş listesi aynı pencereyi buradan alır.
 - `OpenItemsScope.For(tenantId, clinicId, permissions)`: kullanıcının görebildiği türleri tek yerde çıkarır.
 
 ## 7) Frontend için değişenler
@@ -88,7 +90,7 @@ Kural tek bileşendedir: `IVisitOpenItemsReader` (Application, `Visits/ReadModel
 4. `chargedAmount`, `allocatedAmount`, `outstandingAmount` artık muayene bağlı ücretleri de içerir; sayılar önceki sürüme göre **artabilir** (hata düzeltmesi).
 5. `paymentIndicator` olduğu gibi kalır; "ödendi" anlamı taşımaz.
 6. Bu sürüm ücret **kalemi** göstermez; "n işlem" yalnız sayıdır. Kalem düzeyi ve "Ücretlendir" paneli D4'tür.
-7. Özet sayılarının açacağı klinik geneli liste (önceki günler dahil) için ayrı uç yoktur; D2 yalnız sayı ve satır göstergeleri verir. Ayrı liste ucu ürün kararı/ayrı iş olarak bırakıldı.
+7. ~~Özet sayılarının açacağı klinik geneli liste için ayrı uç yoktur.~~ 2026-11-18: "Ücret yok" ve "Önceki günden açık geliş" sayıları için liste ucu eklendi (madde 10). Lab, ödeme bekliyor ve HBS sayıları mevcut liste sayfalarına gider.
 
 ## 8) Kararlar (rakip pratiği varsayılan)
 
@@ -96,6 +98,7 @@ Kural tek bileşendedir: `IVisitOpenItemsReader` (Application, `Visits/ReadModel
 - **K-D2-2:** "Ücret yok" ziyaret düzeyindedir (kalem yok), tek ücret kaydı yeterlidir. Pilot-öncesi küçük sürüm kararı (HEDEF §1.4).
 - **K-D2-3:** Tamamlanmamış geliş = önceki günden açık kalan. Aynı gün açık olan zaten Bugün kuyruğundadır.
 - **K-D2-4:** Özet klinik geneli, hekim/tarih süzgecinden bağımsızdır; ücretsiz ziyaret sayımı 30 gün pencerelidir.
+- **K-D2-6 (2026-11-18):** Bugün şeridindeki her açık iş sayısı bir yere götürür. Liste sayfası olmayan iki sayı (ücret yok, önceki günden açık geliş) için ayrı sayfa değil, çipten açılan küçük liste (madde 10); en eski önce, en çok 200 satır. Rakip pratiği: açık kabul/ücretsiz işlem listesi günlük ekrandan açılır ve satırdan işe gidilir.
 - **K-D2-5:** Borçlu çıkan yalnız Visit'e bağlı ücretlerden hesaplanır; ziyaretsiz müşteri borcu için mevcut `clientOutstandingAmount`, bakiye ve borç raporu (`OUTSTANDING_BALANCE_REPORT_API_CONTRACT.md`) geçerlidir.
 
 ## 9) Bilinen eksikler
@@ -104,3 +107,37 @@ Kural tek bileşendedir: `IVisitOpenItemsReader` (Application, `Visits/ReadModel
 - Muayenesiz ve ziyaretsiz kaydedilmiş işlemler (ör. `examinationId` boş tedavi) ziyarete bağlanamaz, göstergeye girmez.
 - Ücretsiz sayma (gerekçeli) kavramı yok; bilerek ücretsiz bırakılan ziyaret "ücret yok" görünür (D4'te kapanır).
 - Gerçek veri hacmiyle sorgu ölçümü yapılmadı.
+
+## 10) Açık iş listesi (2026-11-18)
+
+`GET /api/v1/visits/open-items/{kind}?clinicId=` — `kind`: `uncharged` | `incomplete` (büyük/küçük harf duyarsız). Salt okunur; Bugün şeridindeki "Ücret yok: N ziyaret" ve "Önceki günden açık geliş: N" çiplerinin açtığı listedir.
+
+- **Kural ve pencere özetle aynıdır:** `uncharged` = madde 1 "ücret yok" + madde 4 penceresi (son 30 İstanbul günü), `incomplete` = madde 1 "tamamlanmamış geliş". Sayım ve liste okuyucudaki aynı sorgu parçasından gelir; pencere `OpenItemsSummaryRequest.ForToday` ile kurulur (madde 6). Bu yüzden `totalCount` aynı anda alınan özetteki sayıya eşittir.
+- **Kapsam ve yetki Bugün ile aynıdır:** `Visits.Read` politikası; klinik `clinicId` veya klinik bağlamından, Bugün'ün klinik kapsamı çözümüyle (`Visits.ClinicContextMismatch`, `Visits.ClinicScopeRequired`, `Clinics.AccessDenied`). Hekim ve tarih süzgeci yoktur (özet gibi klinik geneli). İşlem türü görünürlüğü madde 4'teki izin süzmesiyle aynıdır.
+- `uncharged` için `Charges.Read` gerekir (özette alan `null` döner); yoksa **403** `Visits.OpenItemsForbidden`. `incomplete` ek izin istemez.
+- Geçersiz `kind` → 400.
+
+Yanıt `OpenItemVisitsDto`:
+
+| Alan | Tip | Not |
+|---|---|---|
+| `kind` | `Uncharged` \| `Incomplete` | İstenen tür |
+| `totalCount` | int | Özetteki sayı (kesilmemiş) |
+| `items` | dizi | Geliş zamanı artan (en eski önce), en çok **200** satır |
+
+Satır (`OpenItemVisitDto`):
+
+| Alan | Tip | Not |
+|---|---|---|
+| `visitId` | guid | Ziyaret |
+| `arrivedAtUtc` | datetime | Geliş zamanı |
+| `careStatus` | `Waiting` \| `InProgress` \| `Completed` | `incomplete` listesinde hiçbir zaman `Completed` değildir |
+| `petId`, `petName`, `speciesName` | | Hasta (`speciesName` null olabilir) |
+| `clientId`, `clientName` | | Müşteri |
+| `responsibleVeterinarianUserId`, `responsibleVeterinarianName` | guid?, string? | Sorumlu hekim; atanmamışsa null |
+| `latestExaminationId` | guid? | Ziyaretin en son muayenesi (`examinedAtUtc` azalan); yoksa null. Ücret bu muayeneye bağlanırsa ziyaret "ücret yok"tan çıkar (madde 1 ziyaret bağı) |
+| `chargeableWorkCount` | int? | Yalnız `uncharged`: ziyaretteki görünür ücretlendirilebilir işlem sayısı (madde 2, madde 3 ile aynı hesap); `incomplete` için null |
+
+Performans: sayım bir `COUNT`, satırlar tek sorgu (hasta, müşteri birleşimi ve en son muayene alt sorgusu); hekim adları tek toplu okuma; `uncharged` işlem sayıları `GetForVisitsAsync` ile sabit sayıda sorgu. Yeni indeks yoktur.
+
+Frontend (karar, rakip pratiği varsayılan — K-D2-6): çip tıklanınca küçük bir panel bu ucu çağırır. `uncharged` satırı ücret eklemeye gider (`/panel/charges/new?clientId&petId&visitId&examinationId`; ücret en son muayeneye bağlanır, böylece önceki günün ziyareti de "ücret yok"tan çıkar). `incomplete` satırı gelişi kapatır: `InProgress` → mevcut `POST /visits/{id}/complete`; `Waiting` (hiç başlamamış) → mevcut geliş düzeltmesi (`POST /visits/{id}/corrections`: "Tamamlandı" ya da "Yanlış geliş", gerekçeli). Yeni yazma ucu yoktur.

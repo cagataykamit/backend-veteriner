@@ -247,6 +247,74 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
             .Should().Be(((VisitChargeIndicator?)null, (int?)null, (int?)null));
     }
 
+    [Fact]
+    public async Task Open_Item_Lists_Should_Return_The_Visits_Behind_Summary_Counts()
+    {
+        var ctx = await SeedAsync();
+
+        // Ücret yok: bugün gelen, muayeneli ve ücretsiz.
+        var unchargedVisit = await ctx.CreateVisitAsync();
+        var examinationId = await ctx.CreateExaminationAsync(unchargedVisit);
+        await ctx.SeedTreatmentAsync(examinationId);
+
+        // Ücret yok + önceki günden açık: 3 gün önce gelmiş, işlemli, ücretsiz, tamamlanmamış.
+        var carriedPet = await ctx.SeedPetAsync();
+        var carriedVisit = await ctx.SeedVisitAsync(carriedPet, DateTime.UtcNow.AddDays(-3), VisitCareStatus.InProgress);
+        await ctx.SeedExaminationRowAsync(carriedVisit, carriedPet);
+
+        // Sayılmayanlar: ücretli ziyaret, pencere dışı ücretsiz ziyaret, başka klinik, yanlış geliş.
+        var chargedPet = await ctx.SeedPetAsync();
+        var chargedVisit = await ctx.CreateVisitAsync(chargedPet);
+        await ctx.CreateExaminationAsync(chargedVisit);
+        await ctx.SeedChargeAsync(chargedVisit, null, 100m, chargedPet);
+        var oldPet = await ctx.SeedPetAsync();
+        var oldVisit = await ctx.SeedVisitAsync(oldPet, DateTime.UtcNow.AddDays(-40), VisitCareStatus.Completed);
+        await ctx.SeedExaminationRowAsync(oldVisit, oldPet);
+        var otherClinic = await ctx.SeedOtherClinicAsync();
+        var otherPet = await ctx.SeedPetAsync();
+        var otherVisit = await ctx.SeedVisitAsync(otherPet, DateTime.UtcNow.AddDays(-2), VisitCareStatus.Waiting, otherClinic);
+        await ctx.SeedExaminationRowAsync(otherVisit, otherPet, otherClinic);
+        var voidedPet = await ctx.SeedPetAsync();
+        await ctx.SeedVisitAsync(voidedPet, DateTime.UtcNow.AddDays(-2), VisitCareStatus.Waiting, voided: true);
+
+        var summary = (await ctx.GetTodayAsync()).OpenItems!;
+        var uncharged = await ctx.GetOpenItemVisitsAsync("uncharged");
+        var incomplete = await ctx.GetOpenItemVisitsAsync("incomplete");
+
+        uncharged.Kind.Should().Be(OpenItemVisitKind.Uncharged);
+        uncharged.TotalCount.Should().Be(summary.UnchargedVisitCount).And.Be(2);
+        uncharged.Items.Select(i => i.VisitId).Should().Equal(carriedVisit, unchargedVisit); // geliş artan
+        var row = uncharged.Items.Single(i => i.VisitId == unchargedVisit);
+        row.LatestExaminationId.Should().Be(examinationId);
+        row.ChargeableWorkCount.Should().Be(2, "muayene + tedavi");
+        row.PetId.Should().Be(ctx.PetId);
+        row.PetName.Should().StartWith("OPet-");
+        row.ClientName.Should().StartWith("OClient-");
+        row.CareStatus.Should().Be(VisitCareStatus.InProgress, "muayene açılınca geliş başlar");
+
+        incomplete.Kind.Should().Be(OpenItemVisitKind.Incomplete);
+        incomplete.TotalCount.Should().Be(summary.IncompleteVisitCount).And.Be(1);
+        var open = incomplete.Items.Single();
+        open.VisitId.Should().Be(carriedVisit);
+        open.CareStatus.Should().Be(VisitCareStatus.InProgress);
+        open.LatestExaminationId.Should().NotBeNull();
+        open.ChargeableWorkCount.Should().BeNull("işlem sayısı yalnız ücret yok listesinde");
+    }
+
+    [Fact]
+    public async Task Uncharged_List_Should_Require_Charges_Read_But_Incomplete_List_Should_Not()
+    {
+        var ctx = await SeedAsync();
+        var carriedPet = await ctx.SeedPetAsync();
+        await ctx.SeedVisitAsync(carriedPet, DateTime.UtcNow.AddDays(-2), VisitCareStatus.Waiting);
+
+        var noCharges = ctx.WithPermissions([.. AllPermissions.Where(p => p != PermissionCatalog.Charges.Read)]);
+
+        (await noCharges.GetOpenItemVisitsResponseAsync("uncharged")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await noCharges.GetOpenItemVisitsAsync("incomplete")).TotalCount.Should().Be(1);
+        (await ctx.GetOpenItemVisitsResponseAsync("unknown")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     // ---- Kurulum ----
 
     private async Task<TestContext> SeedAsync()
@@ -331,6 +399,16 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
             var response = await _http.GetAsync(url);
             response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
             return (await response.Content.ReadFromJsonAsync<TodayDto>())!;
+        }
+
+        public Task<HttpResponseMessage> GetOpenItemVisitsResponseAsync(string kind)
+            => _http.GetAsync($"/api/v1/visits/open-items/{kind}?clinicId={ClinicId}");
+
+        public async Task<OpenItemVisitsDto> GetOpenItemVisitsAsync(string kind)
+        {
+            var response = await GetOpenItemVisitsResponseAsync(kind);
+            response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+            return (await response.Content.ReadFromJsonAsync<OpenItemVisitsDto>())!;
         }
 
         public async Task<Guid> CreateVisitAsync(Guid? petId = null)

@@ -118,7 +118,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
 
         var openItems = request.Voided
             ? null
-            : await _openItems.GetSummaryAsync(BuildOpenItemsRequest(openScope, nowUtc, todayLocal), ct);
+            : await _openItems.GetSummaryAsync(OpenItemsSummaryRequest.ForToday(openScope, nowUtc), ct);
 
         return Result<TodayDto>.Success(new TodayDto(
             date,
@@ -128,18 +128,6 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
             data.ActiveHospitalizations,
             openItems));
     }
-
-    /// <summary>
-    /// Açık iş özeti isteği: ücretsiz ziyaret ve "HBS'e girilmedi" penceresi son 30 İstanbul günü, tamamlanmamış geliş = bugünden önceki açık geliş.
-    /// </summary>
-    private static OpenItemsSummaryRequest BuildOpenItemsRequest(OpenItemsScope scope, DateTime nowUtc, DateOnly todayLocal)
-        => new(
-            scope,
-            OperationDayBounds.ForLocalDate(todayLocal.AddDays(-OpenItemsDefaults.UnchargedLookbackDays)).DayStartUtc,
-            nowUtc,
-            OperationDayBounds.ForLocalDate(todayLocal).DayStartUtc,
-            OperationDayBounds.ForLocalDate(todayLocal.AddDays(-OpenItemsDefaults.HbsLookbackDays)).DayStartUtc,
-            nowUtc);
 
     /// <summary>
     /// Ücret tutarlarını ve açık iş alanlarını ekler: ziyaret bazında (hesap kuralı <see cref="IVisitOpenItemsReader"/>'da),
