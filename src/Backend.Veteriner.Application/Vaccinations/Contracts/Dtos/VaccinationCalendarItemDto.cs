@@ -9,7 +9,8 @@ namespace Backend.Veteriner.Application.Vaccinations.Contracts.Dtos;
 /// (<c>Applied</c>) ve sonraki uygulama tarihi (<c>NextDue</c>); satır anahtarı <c>vaccinationId</c> + <c>kind</c>.
 /// </summary>
 /// <param name="Date">Satırın göründüğü İstanbul günü.</param>
-/// <param name="AtUtc">Vade (<c>DueAtUtc</c>) ya da uygulama anı (<c>AppliedAtUtc</c>). Vadeli satırda saat anlamlı değildir (gün içi).</param>
+/// <param name="AtUtc">Vade (<c>DueAtUtc</c>) ya da uygulama anı (<c>AppliedAtUtc</c>); saati yalnız <paramref name="TimeSpecified"/> ise gerçektir.</param>
+/// <param name="TimeSpecified">Saat gerçek mi (§8.2): vadeli satırda kaydın <c>DueTimeSpecified</c> değeri, uygulanan satırda false.</param>
 public sealed record VaccinationCalendarItemDto(
     Guid VaccinationId,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] VaccinationCalendarKind Kind,
@@ -23,4 +24,5 @@ public sealed record VaccinationCalendarItemDto(
     string ClientName,
     Guid? VaccineDefinitionId,
     string VaccineName,
-    string? Notes);
+    string? Notes,
+    bool TimeSpecified = false);

@@ -151,7 +151,8 @@ public sealed class GetVaccinationsCalendarQueryHandler
                     clientNameById.GetValueOrDefault(clientId, string.Empty),
                     e.Row.VaccineDefinitionId,
                     e.Row.VaccineName,
-                    e.Row.Notes);
+                    e.Row.Notes,
+                    VaccinationCalendarRules.TimeSpecified(e.Kind, e.Row.DueTimeSpecified));
             })
             .OrderBy(i => i.AtUtc)
             .ThenBy(i => i.PetName, TurkishIgnoreCase)

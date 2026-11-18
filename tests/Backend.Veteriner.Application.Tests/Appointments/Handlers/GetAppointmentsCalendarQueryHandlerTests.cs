@@ -197,6 +197,9 @@ public sealed class GetAppointmentsCalendarQueryHandlerTests
         result.Value[0].VeterinarianName.Should().Be("Dr. Ayşe");
         result.Value[1].VeterinarianUserId.Should().BeNull();
         result.Value[1].VeterinarianName.Should().BeNull();
+        result.Value[0].State.Should().Be(CalendarItemStateRule.ForAppointment(AppointmentStatus.Scheduled, rows[0].ScheduledAtUtc, DateTime.UtcNow), "kural tek yer");
+        result.Value[0].State.Should().NotBeNull();
+        result.Value[1].State.Should().BeNull("iptal randevunun durumu yok");
     }
 
     [Fact]
@@ -250,6 +253,7 @@ public sealed class GetAppointmentsCalendarQueryHandlerTests
             CancellationToken.None);
 
         result.Value!.Select(i => i.Id).Should().Equal(unassigned);
+        result.Value!.Single().State.Should().NotBeNull("okuma modeli yolu da durumu verir");
     }
 
     [Fact]
