@@ -1,3 +1,6 @@
+using System.Text.Json.Serialization;
+using Backend.Veteriner.Domain.Visits;
+
 namespace Backend.Veteriner.Application.Visits.Contracts.Dtos;
 
 /// <summary>
@@ -23,6 +26,36 @@ public sealed record OpenItemsSummaryDto(
     int IncompleteVisitCount,
     int? HbsNotEnteredPrescriptionCount = null,
     int? HbsNotEnteredVaccinationCount = null);
+
+/// <summary>Listesi açılabilen özet sayısı: <c>Uncharged</c> = <see cref="OpenItemsSummaryDto.UnchargedVisitCount"/>, <c>Incomplete</c> = <see cref="OpenItemsSummaryDto.IncompleteVisitCount"/>.</summary>
+public enum OpenItemVisitKind
+{
+    Uncharged = 0,
+    Incomplete = 1
+}
+
+/// <summary>Açık iş listesinde bir ziyaret; satırdan ücret eklemeye veya gelişi kapatmaya gidilir.</summary>
+/// <param name="LatestExaminationId">Ziyaretin en son muayenesi; yoksa null.</param>
+/// <param name="ChargeableWorkCount">Yalnız <c>Uncharged</c> listesinde: ziyaretteki ücretlendirilebilir işlem sayısı (görünür türler).</param>
+public sealed record OpenItemVisitDto(
+    Guid VisitId,
+    DateTime ArrivedAtUtc,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] VisitCareStatus CareStatus,
+    Guid PetId,
+    string PetName,
+    string? SpeciesName,
+    Guid ClientId,
+    string ClientName,
+    Guid? ResponsibleVeterinarianUserId,
+    string? ResponsibleVeterinarianName,
+    Guid? LatestExaminationId,
+    int? ChargeableWorkCount);
+
+/// <param name="TotalCount">Özetteki sayıyla aynı; <paramref name="Items"/> en çok <c>MaxItems</c> satırdır.</param>
+public sealed record OpenItemVisitsDto(
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] OpenItemVisitKind Kind,
+    int TotalCount,
+    IReadOnlyList<OpenItemVisitDto> Items);
 
 public static class OpenItemsDefaults
 {

@@ -79,14 +79,7 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
 
         if (scope.Sees(OpenItemSources.Charges))
         {
-            var work = WorkVisitIds(scope);
-            var charged = ChargeFacts(scope).Select(c => c.VisitId);
-            uncharged = await OpenVisits(scope)
-                .Where(v => v.ArrivedAtUtc >= request.UnchargedFromUtc
-                            && v.ArrivedAtUtc < request.UnchargedToUtc
-                            && work.Contains(v.Id)
-                            && !charged.Contains(v.Id))
-                .CountAsync(ct);
+            uncharged = await UnchargedVisits(request).CountAsync(ct);
 
             // Borçlu çıkan: tamamlanmış ziyaretin açık tutarı > 0. Yalnız açık ücretler (AllocatedAmount < Amount) toplanır:
             // tahsisi tamamlanmış ücret toplama 0 katar (CK_Charges_AllocatedAmount_Range), bu yüzden sonuç aynıdır ama
@@ -112,8 +105,7 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
                                  && l.Status == LabResultStatus.Requested, ct);
         }
 
-        var incomplete = await OpenVisits(scope)
-            .CountAsync(v => v.CareStatus != VisitCareStatus.Completed && v.ArrivedAtUtc < request.IncompleteBeforeUtc, ct);
+        var incomplete = await IncompleteVisits(request).CountAsync(ct);
 
         // HBS'e girilmedi (ADR-036 Dilim 2): takip kapsamı HbsTracking'den; yalnız pencere verilmişse (Bugün).
         int? hbsPrescriptions = null;
@@ -141,6 +133,70 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
 
         return new OpenItemsSummaryDto(uncharged, outstandingVisits, outstandingAmount, awaitingLabs, incomplete, hbsPrescriptions, hbsVaccinations);
     }
+
+    public async Task<OpenItemVisitsReadResult> ListVisitsAsync(
+        OpenItemsSummaryRequest request, OpenItemVisitKind kind, int maxItems, CancellationToken ct = default)
+    {
+        var visits = kind switch
+        {
+            OpenItemVisitKind.Uncharged => UnchargedVisits(request),
+            OpenItemVisitKind.Incomplete => IncompleteVisits(request),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
+        };
+
+        var total = await visits.CountAsync(ct);
+        if (total == 0)
+            return new OpenItemVisitsReadResult(0, []);
+
+        var examinations = _db.Examinations.AsNoTracking()
+            .Where(e => e.TenantId == request.Scope.TenantId && e.ClinicId == request.Scope.ClinicId);
+        var rows = await (
+                from v in visits
+                join p in _db.Pets.AsNoTracking() on v.PetId equals p.Id
+                join c in _db.Clients.AsNoTracking() on p.ClientId equals c.Id
+                orderby v.ArrivedAtUtc, v.Id
+                select new OpenItemVisitRow(
+                    v.Id,
+                    v.ArrivedAtUtc,
+                    v.CareStatus,
+                    p.Id,
+                    p.Name,
+                    p.Species != null ? p.Species!.Name : null,
+                    c.Id,
+                    c.FullName,
+                    v.ResponsibleVeterinarianUserId,
+                    examinations
+                        .Where(e => e.VisitId == v.Id)
+                        .OrderByDescending(e => e.ExaminedAtUtc)
+                        .ThenByDescending(e => e.Id)
+                        .Select(e => (Guid?)e.Id)
+                        .FirstOrDefault()))
+            .Take(maxItems)
+            .ToListAsync(ct);
+
+        return new OpenItemVisitsReadResult(total, rows);
+    }
+
+    /// <summary>
+    /// "Ücret yok" ziyaretleri (madde 1): pencere içinde gelmiş, görünür ücretlendirilebilir işlemi olan, ziyarete bağlı hiç ücreti olmayan.
+    /// Özet sayısı ve liste bu tek parçadan beslenir.
+    /// </summary>
+    private IQueryable<Visit> UnchargedVisits(OpenItemsSummaryRequest request)
+    {
+        var scope = request.Scope;
+        var work = WorkVisitIds(scope);
+        var charged = ChargeFacts(scope).Select(c => c.VisitId);
+        return OpenVisits(scope)
+            .Where(v => v.ArrivedAtUtc >= request.UnchargedFromUtc
+                        && v.ArrivedAtUtc < request.UnchargedToUtc
+                        && work.Contains(v.Id)
+                        && !charged.Contains(v.Id));
+    }
+
+    /// <summary>Tamamlanmamış geliş (madde 1): <c>IncompleteBeforeUtc</c>'den önce gelip tamamlanmamış, yanlış işaretsiz ziyaretler.</summary>
+    private IQueryable<Visit> IncompleteVisits(OpenItemsSummaryRequest request)
+        => OpenVisits(request.Scope)
+            .Where(v => v.CareStatus != VisitCareStatus.Completed && v.ArrivedAtUtc < request.IncompleteBeforeUtc);
 
     /// <summary>Ücret varsa açık tutara, yoksa işlemin varlığına göre ziyaret ücret durumu (tek yer).</summary>
     private static VisitChargeIndicator Classify(bool hasCharge, decimal charged, decimal allocated, int workCount)

@@ -1,6 +1,8 @@
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
+using Backend.Veteriner.Domain.Visits;
 
 namespace Backend.Veteriner.Application.Visits.ReadModels;
 
@@ -67,7 +69,41 @@ public sealed record OpenItemsSummaryRequest(
     DateTime UnchargedToUtc,
     DateTime IncompleteBeforeUtc,
     DateTime? HbsFromUtc = null,
-    DateTime? HbsToUtc = null);
+    DateTime? HbsToUtc = null)
+{
+    /// <summary>
+    /// Bugün pencereleri (tek yer): ücretsiz ziyaret ve "HBS'e girilmedi" son 30 İstanbul günü, tamamlanmamış geliş = bugünden önceki açık geliş.
+    /// Bugün özeti ve açık iş listesi aynı pencereyi buradan alır; sayı ile liste hep tutar.
+    /// </summary>
+    public static OpenItemsSummaryRequest ForToday(OpenItemsScope scope, DateTime nowUtc)
+    {
+        var todayLocal = OperationDayBounds.ToLocalDate(nowUtc);
+        return new OpenItemsSummaryRequest(
+            scope,
+            OperationDayBounds.ForLocalDate(todayLocal.AddDays(-OpenItemsDefaults.UnchargedLookbackDays)).DayStartUtc,
+            nowUtc,
+            OperationDayBounds.ForLocalDate(todayLocal).DayStartUtc,
+            OperationDayBounds.ForLocalDate(todayLocal.AddDays(-OpenItemsDefaults.HbsLookbackDays)).DayStartUtc,
+            nowUtc);
+    }
+}
+
+/// <summary>Açık iş listesindeki ziyaret satırı (ham; hekim adı ve işlem sayısı işleyicide eklenir).</summary>
+/// <param name="LatestExaminationId">Ziyaretin en son muayenesi (yoksa null); ücret bu muayeneye bağlanabilir.</param>
+public sealed record OpenItemVisitRow(
+    Guid VisitId,
+    DateTime ArrivedAtUtc,
+    VisitCareStatus CareStatus,
+    Guid PetId,
+    string PetName,
+    string? SpeciesName,
+    Guid ClientId,
+    string ClientName,
+    Guid? ResponsibleVeterinarianUserId,
+    Guid? LatestExaminationId);
+
+/// <param name="TotalCount">Özetteki sayıyla aynı kural ve pencere; <paramref name="Rows"/> sınırla kesilmiş olabilir.</param>
+public sealed record OpenItemVisitsReadResult(int TotalCount, IReadOnlyList<OpenItemVisitRow> Rows);
 
 /// <summary>
 /// Açık iş göstergelerinin (ücret yok, ödeme bekliyor, lab bekliyor, tamamlanmamış geliş) tek hesap yeri.
@@ -80,4 +116,11 @@ public interface IVisitOpenItemsReader
         OpenItemsScope scope, IReadOnlyCollection<Guid> visitIds, CancellationToken ct = default);
 
     Task<OpenItemsSummaryDto> GetSummaryAsync(OpenItemsSummaryRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Özetteki ziyaret sayılarının (<see cref="OpenItemVisitKind"/>) arkasındaki ziyaretler: özetle aynı sorgu parçası ve pencere,
+    /// geliş zamanı artan (en eski önce), en çok <paramref name="maxItems"/> satır. Ücret yok için <c>Charges</c> görünürlüğü çağıranda denetlenir.
+    /// </summary>
+    Task<OpenItemVisitsReadResult> ListVisitsAsync(
+        OpenItemsSummaryRequest request, OpenItemVisitKind kind, int maxItems, CancellationToken ct = default);
 }

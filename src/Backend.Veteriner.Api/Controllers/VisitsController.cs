@@ -11,6 +11,7 @@ using Backend.Veteriner.Application.Visits.Commands.SetUrgency;
 using Backend.Veteriner.Application.Visits.Commands.Transition;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.Queries.GetById;
+using Backend.Veteriner.Application.Visits.Queries.GetOpenItemVisits;
 using Backend.Veteriner.Application.Visits.Queries.GetToday;
 using Backend.Veteriner.Domain.Visits;
 using Mediator;
@@ -206,6 +207,24 @@ public sealed class VisitsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetVisitsTodayQuery(clinicId, localDate, voided, responsibleVeterinarianUserId), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Bugün "Açık işler" özetindeki ziyaret sayısının arkasındaki ziyaretler: <c>Uncharged</c> (ücret yok, <c>Charges.Read</c> gerekir) veya
+    /// <c>Incomplete</c> (önceki günden açık geliş). Özetle aynı kural, pencere ve klinik kapsamı; <c>totalCount</c> özetteki sayıdır.
+    /// </summary>
+    [HttpGet("open-items/{kind}")]
+    [Authorize(Policy = PermissionCatalog.Visits.Read)]
+    [ProducesResponseType(typeof(OpenItemVisitsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetOpenItemVisits(OpenItemVisitKind kind, [FromQuery] Guid? clinicId, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetOpenItemVisitsQuery(clinicId, kind), ct);
         return result.ToActionResult(this);
     }
 
