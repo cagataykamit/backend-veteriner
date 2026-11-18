@@ -290,7 +290,7 @@ public sealed class PetHistoryAiContextBuilder
             ["records"] = new JsonArray(entries.Select(e => (JsonNode)e.Render()).ToArray()),
         }.ToJsonString(JsonOptions);
 
-    private static string? Age(DateOnly? birthDate, DateOnly asOf)
+    internal static string? Age(DateOnly? birthDate, DateOnly asOf)
     {
         if (birthDate is not { } birth || birth > asOf)
             return null;
@@ -299,7 +299,7 @@ public sealed class PetHistoryAiContextBuilder
         return months >= 12 ? $"{months / 12} yıl {months % 12} ay" : $"{months} ay";
     }
 
-    private static string? Date(DateTime? utc)
+    internal static string? Date(DateTime? utc)
         => utc is { } value ? OperationDayBounds.ToLocalDate(value).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null;
 
     private static string? Clip(string? text)
@@ -312,7 +312,7 @@ public sealed class PetHistoryAiContextBuilder
     }
 
     /// <summary>Boş alanlar gönderilmez (token tasarrufu).</summary>
-    private static JsonObject Compact(JsonObject obj)
+    internal static JsonObject Compact(JsonObject obj)
     {
         foreach (var key in obj.Where(p => p.Value is null).Select(p => p.Key).ToList())
             obj.Remove(key);

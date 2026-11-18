@@ -37,3 +37,16 @@ public sealed class DueAiDraftsSpec : Specification<AiDraft>
             .Take(take);
 }
 
+
+/// <summary>Kayıtlara yazılmış (kabul edilmiş) taslaklar: "AI taslağından" izi (AI-010), eskiden yeniye.</summary>
+public sealed class AcceptedAiDraftsForRecordsSpec : Specification<AiDraft>
+{
+    public AcceptedAiDraftsForRecordsSpec(Guid tenantId, IReadOnlyCollection<Guid> recordIds)
+        => Query
+            .Where(d => d.TenantId == tenantId
+                        && d.AppliedRecordId != null
+                        && recordIds.Contains(d.AppliedRecordId.Value)
+                        && (d.Status == AiDraftStatus.Accepted || d.Status == AiDraftStatus.AcceptedWithEdits))
+            .OrderBy(d => d.DecidedAtUtc)
+            .AsNoTracking();
+}

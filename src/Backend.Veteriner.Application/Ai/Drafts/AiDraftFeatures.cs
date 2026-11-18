@@ -273,8 +273,8 @@ public sealed class AcceptAiDraftCommandHandler : IRequestHandler<AcceptAiDraftC
         if (original is null)
             return Fail(AiErrors.InvalidDraftContent("Taslak içeriği okunamadı."));
 
-        var wasEdited = request.EditedContent is not null && !JsonNode.DeepEquals(request.EditedContent, original);
-        var content = wasEdited ? request.EditedContent! : original;
+        var wasEdited = request.EditedContent is not null && applier.IsEdited(original, request.EditedContent);
+        var content = request.EditedContent ?? original;
 
         var applied = await applier.ApplyAsync(
             new AiDraftApplication(draft.Id, caller.TenantId, caller.ClinicId, draft.TargetType, draft.TargetId, content, wasEdited),

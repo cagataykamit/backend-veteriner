@@ -30,6 +30,12 @@ public interface IAiDraftApplier
     /// </summary>
     /// <returns>Yazılan/oluşan kaydın kimliği (taslakta <see cref="AiDraft.AppliedRecordId"/> olarak saklanır).</returns>
     Task<Result<Guid?>> ApplyAsync(AiDraftApplication application, CancellationToken ct);
+
+    /// <summary>
+    /// Kabul edilen içerik üretilenden farklı mı (<c>AcceptedWithEdits</c>). Varsayılan: JSON derin karşılaştırma. İçerikte
+    /// metin dışı kabul seçenekleri taşıyan özellik (ör. muayene notunda "yerine yaz") yalnız metni karşılaştırır.
+    /// </summary>
+    bool IsEdited(JsonObject generated, JsonObject accepted) => !JsonNode.DeepEquals(generated, accepted);
 }
 
 /// <param name="DraftId">Hedef kayda "AI taslağından" izi olarak yazılabilir.</param>
