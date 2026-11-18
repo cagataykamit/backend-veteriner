@@ -74,7 +74,7 @@ public sealed class IssueEDocumentCommandHandler : IRequestHandler<IssueEDocumen
         if (!trialBlock.IsSuccess)
             return Result<EDocumentDto>.Failure(trialBlock.Error);
 
-        var draftResult = await _drafts.BuildAsync(caller.TenantId, caller.ClinicId, selection, trackCharges: true, ct);
+        var draftResult = await _drafts.BuildAsync(caller.TenantId, caller.ClinicId, selection, EDocumentDraftMode.Issue, ct);
         if (!draftResult.IsSuccess)
             return Result<EDocumentDto>.Failure(draftResult.Error);
         var draft = draftResult.Value!;

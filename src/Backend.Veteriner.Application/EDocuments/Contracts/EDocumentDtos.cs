@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Backend.Veteriner.Domain.Charges;
+using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.EDocuments;
 using Backend.Veteriner.Domain.Shared;
 
@@ -109,10 +110,16 @@ public sealed record EDocumentPreviewGroupDto(
     decimal TotalAmount,
     int LineCount);
 
+public sealed record EDocumentSetupIssueDto(
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] EDocumentSetupIssueCode Code);
+
 public sealed record EDocumentSkippedChargeDto(
     Guid ChargeId,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] EDocumentSkipReason Reason);
 
+/// <param name="TaxpayerType">Klinik mükellef türü (hazırlık listesinde tamam olanın değeri); seçilmemişse <c>null</c>.</param>
+/// <param name="TaxpayerIdentityMasked">Kliniğin VKN / TCKN'si maskeli (hazırlık listesinde tamam olanın değeri); yoksa <c>null</c>.</param>
+/// <param name="ClinicSetupIssues">Belge kesmeden önce klinikte tamamlanması gereken ayarlar; boş değilse kesme reddedilir.</param>
 public sealed record EDocumentPreviewDto(
     Guid ClientId,
     string ClientName,
@@ -120,7 +127,10 @@ public sealed record EDocumentPreviewDto(
     IReadOnlyList<string> MissingBuyerFields,
     EDocumentPreviewConnectionDto Connection,
     IReadOnlyList<EDocumentPreviewGroupDto> Groups,
-    IReadOnlyList<EDocumentSkippedChargeDto> Skipped);
+    IReadOnlyList<EDocumentSkippedChargeDto> Skipped,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] ClinicTaxpayerType? TaxpayerType,
+    string? TaxpayerIdentityMasked,
+    IReadOnlyList<EDocumentSetupIssueDto> ClinicSetupIssues);
 
 /// <param name="FailedDocumentId">Ücret kesilemeyen bir belgeye bağlıysa o belge (yeniden dene / vazgeç).</param>
 /// <param name="Reason">Belgenin neden kesilmediği / kesilemeyeceği (kullanıcı metni); hazırsa <c>null</c>.</param>

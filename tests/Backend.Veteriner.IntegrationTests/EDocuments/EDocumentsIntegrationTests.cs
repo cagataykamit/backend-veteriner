@@ -270,6 +270,52 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
     }
 
     [Fact]
+    public async Task Preview_Should_List_Every_Missing_Clinic_Setting_While_Issue_Rejects_At_The_First()
+    {
+        var ctx = await SeedAsync();
+        var clientId = await ctx.CreateClientAsync(null);
+        var charge = await ctx.ChargeAsync(clientId, 100m, "Service");
+        var source = new { clinicId = ctx.ClinicId, chargeIds = new[] { charge } };
+
+        var ready = await ctx.PostAsync("/api/v1/e-documents/preview", source);
+        ready.GetProperty("clinicSetupIssues").GetArrayLength().Should().Be(0);
+        ready.GetProperty("taxpayerType").GetString().Should().Be("Both");
+        ready.GetProperty("taxpayerIdentityMasked").GetString().Should().Be("100******46");
+
+        await ClearClinicTaxIdentityAsync(ctx.ClinicId);
+        var noIdentity = await ctx.PostAsync("/api/v1/e-documents/preview", source);
+        SetupIssueCodes(noIdentity).Should().Equal("TaxpayerIdentityMissing");
+        noIdentity.GetProperty("taxpayerIdentityMasked").ValueKind.Should().Be(JsonValueKind.Null);
+        noIdentity.GetProperty("groups").GetArrayLength().Should().Be(1);
+
+        var issueWithoutIdentity = await ctx.Http.PostAsJsonAsync("/api/v1/e-documents", new { requestId = Guid.NewGuid(), clinicId = ctx.ClinicId, chargeIds = new[] { charge } });
+        issueWithoutIdentity.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(issueWithoutIdentity)).Should().Be("EDocuments.TaxpayerIdentityMissing");
+
+        await RemoveTaxpayerSettingsAsync(ctx.ClinicId);
+        var noTaxpayer = await ctx.PostAsync("/api/v1/e-documents/preview", source);
+        SetupIssueCodes(noTaxpayer).Should().Equal("TaxpayerTypeMissing", "TaxpayerIdentityMissing");
+        noTaxpayer.GetProperty("taxpayerType").ValueKind.Should().Be(JsonValueKind.Null);
+        noTaxpayer.GetProperty("groups").GetArrayLength().Should().Be(0);
+        noTaxpayer.GetProperty("connection").GetProperty("status").GetString().Should().Be("Connected");
+
+        var issue = await ctx.Http.PostAsJsonAsync("/api/v1/e-documents", new { requestId = Guid.NewGuid(), clinicId = ctx.ClinicId, chargeIds = new[] { charge } });
+        issue.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(issue)).Should().Be("EDocuments.TaxpayerTypeMissing");
+
+        (await ctx.Http.DeleteAsync($"/api/v1/clinics/{ctx.ClinicId}/e-document-connection")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var nothingReady = await ctx.PostAsync("/api/v1/e-documents/preview", source);
+        SetupIssueCodes(nothingReady).Should().Equal("TaxpayerTypeMissing", "TaxpayerIdentityMissing", "NotConnected");
+        nothingReady.GetProperty("connection").GetProperty("status").GetString().Should().Be("NotConnected");
+
+        var issueWithoutConnection = await ctx.Http.PostAsJsonAsync("/api/v1/e-documents", new { requestId = Guid.NewGuid(), clinicId = ctx.ClinicId, chargeIds = new[] { charge } });
+        (await IntegrationTestProblemDetails.ReadCodeAsync(issueWithoutConnection)).Should().Be("EDocuments.NotConnected");
+    }
+
+    private static List<string?> SetupIssueCodes(JsonElement preview)
+        => preview.GetProperty("clinicSetupIssues").EnumerateArray().Select(i => i.GetProperty("code").GetString()).ToList();
+
+    [Fact]
     public async Task Payment_Should_Issue_Only_Fully_Paid_Charges_Once_And_Settings_Should_Report_Document_Kinds()
     {
         var ctx = await SeedAsync();
@@ -517,6 +563,20 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
         await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE Clients SET FullName = {name} WHERE Id = {clientId}");
     }
 
+    private async Task ClearClinicTaxIdentityAsync(Guid clinicId)
+    {
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE ClinicTaxpayerSettings SET TaxIdentityNumber = NULL WHERE ClinicId = {clinicId}");
+    }
+
+    private async Task RemoveTaxpayerSettingsAsync(Guid clinicId)
+    {
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await db.ClinicTaxpayerSettings.IgnoreQueryFilters().Where(s => s.ClinicId == clinicId).ExecuteDeleteAsync();
+    }
+
     private async Task<TestContext> SeedAsync()
     {
         var hasher = _factory.Services.GetRequiredService<IPasswordHasher>();
@@ -544,7 +604,7 @@ public sealed class EDocumentsIntegrationTests : IClassFixture<CustomWebApplicat
             db.UserClinics.Add(new UserClinic(user.Id, clinic.Id, DateTime.UtcNow));
 
             db.ClinicTaxpayerSettings.Add(ClinicTaxpayerSettings.Create(
-                tenant.Id, clinic.Id, ClinicTaxpayerType.Both, null, null, "Edoc Klinik", null, null, null, 20m, 20m, user.Id, DateTime.UtcNow).Value!);
+                tenant.Id, clinic.Id, ClinicTaxpayerType.Both, Tckn, null, "Edoc Klinik", null, null, null, 20m, 20m, user.Id, DateTime.UtcNow).Value!);
             var connection = EDocumentConnection.Create(tenant.Id, clinic.Id, FakeProvider.Code, EDocumentEnvironment.Test, DateTime.UtcNow);
             connection.Authorize(
                 FakeProvider.Code, EDocumentEnvironment.Test,

@@ -42,7 +42,7 @@ public sealed class EDocumentBatchIssuer
         if (chargeIds.Count == 0)
             return EDocumentBatchOutcome.Empty;
 
-        var draftResult = await _drafts.BuildAsync(tenantId, clinicId, new EDocumentSelection(chargeIds, null, null), trackCharges: true, ct);
+        var draftResult = await _drafts.BuildAsync(tenantId, clinicId, new EDocumentSelection(chargeIds, null, null), EDocumentDraftMode.Issue, ct);
         if (!draftResult.IsSuccess)
             return new EDocumentBatchOutcome([], chargeIds.Select(id => new EDocumentBatchSkip(id, draftResult.Error.Code, draftResult.Error.Message)).ToList());
 
