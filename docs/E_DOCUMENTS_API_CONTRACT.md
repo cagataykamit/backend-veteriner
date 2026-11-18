@@ -25,7 +25,7 @@ Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-036 (vetinity-product, ka
 | `SelfEmployed` (serbest meslek) | e-SMM | e-SMM |
 | `Company` (şirket) | fatura | fatura |
 | `Both` (karma) | e-SMM | fatura |
-| null | — `EDocuments.TaxpayerTypeMissing` (400) | |
+| null | — kesme `EDocuments.TaxpayerTypeMissing` (400); önizleme reddetmez, `clinicSetupIssues` listeler (§4.1) | |
 
 "Fatura" = alıcı e-Fatura mükellefiyse **e-Fatura**, değilse **e-Arşiv**. Mükellef sorgusu yalnız kurumsal alıcıda (`Client.personType = Corporate` ve `taxNumber` dolu) sağlayıcıdan yapılır; bireysel/bilinmeyen alıcı e-Arşiv'dir. Satış (`Sale`) satırları her zaman ürün satırıdır (satışın ücreti hangi satır türüyle yazılmış olursa olsun).
 
@@ -193,11 +193,15 @@ Yanıt:
     { "documentType": "ESmm", "chargeIds": ["…"], "totalAmount": 1500.00, "lineCount": 2 },
     { "documentType": "EArchive", "chargeIds": ["…"], "totalAmount": 300.00, "lineCount": 1 }
   ],
-  "skipped": [ { "chargeId": "…", "reason": "AlreadyDocumented" } ]
+  "skipped": [ { "chargeId": "…", "reason": "AlreadyDocumented" } ],
+  "taxpayerType": "Both",
+  "clinicSetupIssues": []
 }
 ```
 
 - `skipped.reason`: `AlreadyDocumented` | `Voided`. Hepsi atlanırsa `groups` boş.
+- `clinicSetupIssues`: belge kesmeden önce klinikte tamamlanması gereken ayarlar, gösterim sırasıyla: `{ "code": "TaxpayerTypeMissing" }` (klinik mükellef türü seçilmemiş) ve `{ "code": "NotConnected" }` (entegratör bağlı değil veya yeniden yetki gerekiyor; ayrıntı `connection.status`). Önizleme eksik klinik ayarında **reddetmez**; liste boş değilse kesme reddedilir (§4.2, ilk eksiğin kodu). Kurallar tek yerde: mükellef türü `EDocumentDraftBuilder`, bağlantı `EDocumentProviderGateway.Open`; önizleme yalnız toplar (`EDocumentClinicSetup`). VKN / TCKN kesme koşulu değildir (entegratör hesabında vergi no var).
+- `taxpayerType`: klinik mükellef türü (`SelfEmployed` | `Company` | `Both`), seçilmemişse `null`. `null` iken belge türü hesaplanamaz, `groups` boş döner (alıcı ve `skipped` yine dolu).
 - e-Fatura mükellef sorgusu önizlemede de yapılır (bağlantı varsa); bağlantı yoksa kurumsal alıcının fatura grubu `EArchive` görünür ve `connection.status` `NotConnected` olur.
 - Tüm ücretler aynı müşteriye ve aynı kliniğe ait olmalı (`EDocuments.MixedClients`, 400).
 
@@ -209,7 +213,7 @@ Yanıt:
 
 - `requestId` zorunlu; aynı kiracıda aynı `requestId` ilk belgeyi döndürür (200, yeniden gönderim yapmaz). Farklı içerikle aynı `requestId` → `EDocuments.RequestIdConflict` (409).
 - Seçim tek gruba düşmeli (§1.1). Ücret başka geçerli belgeye bağlıysa `EDocuments.ChargeAlreadyDocumented` (409); iptal edilmiş ücret `EDocuments.ChargeVoided` (409); eski programdan devreden bakiye ücreti (`isImported`, ADR-048 T3) `EDocuments.ImportedCharge` (409). Eşzamanlı iki istek aynı ücreti alamaz (ücret eşzamanlılık belirteci; kaybeden `EDocuments.ConcurrencyConflict`, 409).
-- Bağlantı yoksa / yeniden yetki gerekiyorsa `EDocuments.NotConnected` (409).
+- Bağlantı yoksa / yeniden yetki gerekiyorsa `EDocuments.NotConnected` (409); bağlantı varken mükellef türü seçilmemişse `EDocuments.TaxpayerTypeMissing` (400). Önizlemenin `clinicSetupIssues` listesiyle aynı denetimler (§4.1).
 - `note` (≤ 500) belgeye not olarak gider.
 - Akış: belge kaydı (kimliği ve sağlayıcıya giden dış referans UUID'si bizde üretilir) **gönderimden önce** yazılır → sağlayıcıya gönderilir → yanıt `EDocumentDto`. e-SMM genelde hemen `Issued`; e-Arşiv / e-Fatura `Sending` döner, arka plan işi sonucu alır. Kalıcı hata `Failed` + `lastError`.
 - Yanıt 200 `EDocumentDto` (§4.4). Denetim: `EDocument.Issue`.
