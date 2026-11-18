@@ -134,6 +134,24 @@ public sealed class GetVaccinationsCalendarQueryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_Report_TimeSpecified_Only_For_Due_Rows_With_Real_Time()
+    {
+        var timedDue = NowUtc.AddHours(2);
+        Rows(
+            Row(VaccinationStatus.Scheduled, null, NowUtc.AddHours(1), "Kuduz"),
+            Row(VaccinationStatus.Applied, NowUtc.AddYears(-1), timedDue, "Karma") with { DueTimeSpecified = true },
+            Row(VaccinationStatus.Applied, NowUtc.AddHours(-1), NowUtc.AddMonths(1), "İç parazit") with { DueTimeSpecified = true });
+
+        var result = await CreateHandler().Handle(new GetVaccinationsCalendarQuery(FromUtc, ToUtc), CancellationToken.None);
+
+        result.Value!.Select(i => (i.Kind, i.VaccineName, i.TimeSpecified)).Should().Equal(
+            (VaccinationCalendarKind.Applied, "İç parazit", false),
+            (VaccinationCalendarKind.Planned, "Kuduz", false),
+            (VaccinationCalendarKind.NextDue, "Karma", true));
+        result.Value!.Single(i => i.TimeSpecified).AtUtc.Should().Be(timedDue);
+    }
+
+    [Fact]
     public async Task Handle_Should_Mark_Past_Due_In_Window_As_Overdue()
     {
         var lastWeekFrom = FromUtc.AddDays(-7);

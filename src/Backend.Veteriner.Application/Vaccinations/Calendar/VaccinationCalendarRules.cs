@@ -28,6 +28,13 @@ public static class VaccinationCalendarRules
     public static CalendarItemState State(VaccinationCalendarKind kind, DateTime atUtc, DateTime utcNow)
         => kind == VaccinationCalendarKind.Applied ? CalendarItemState.Completed : CalendarItemStateRule.ForDue(atUtc, utcNow);
 
+    /// <summary>
+    /// Satırın saati gerçek mi (§8.2): vadeli satırda kaydın <c>DueTimeSpecified</c> değeri; uygulanan aşılar takvimde tek satıra
+    /// toplanır, saati gösterilmez.
+    /// </summary>
+    public static bool TimeSpecified(VaccinationCalendarKind kind, bool dueTimeSpecified)
+        => kind != VaccinationCalendarKind.Applied && dueTimeSpecified;
+
     /// <summary>Kaydın takvimde göründüğü İstanbul günü.</summary>
     public static DateOnly LocalDate(DateTime utc) => OperationDayBounds.ToLocalDate(utc);
 

@@ -8,7 +8,8 @@ namespace Backend.Veteriner.Application.Vaccinations.Commands.Import;
 /// Yalnız içe aktarma uygulama işinden çağrılır (HTTP ucu yoktur); klinik yazma erişimi ve izinler commit isteğinde
 /// denetlenmiştir. Günlük girişteki 7 günlük geçmiş penceresi uygulanmaz; ürün/stok/uygulama kaydı oluşmaz.
 /// Transaction sınırı çağıran sahip birimidir. <see cref="SpeciesUnverified"/>: hastanın türü eski programda belirtilmemiş ("Diğer";
-/// karar doğrulamada, <c>Imports.VaccineSpeciesUnverified</c>), aşı-tür uyumu denetlenmez.
+/// karar doğrulamada, <c>Imports.VaccineSpeciesUnverified</c>), aşı-tür uyumu denetlenmez. <see cref="DueTimeSpecified"/>: sonraki aşı tarihinin saati
+/// kaynakta yazılıydı (takvimde saatiyle durur).
 /// </summary>
 public sealed record CreateImportedVaccinationCommand(
     Guid ImportBatchId,
@@ -18,5 +19,6 @@ public sealed record CreateImportedVaccinationCommand(
     DateTime AppliedAtUtc,
     DateTime? DueAtUtc,
     string? Notes,
-    bool SpeciesUnverified = false)
+    bool SpeciesUnverified = false,
+    bool DueTimeSpecified = false)
     : IRequest<Result<Guid>>;

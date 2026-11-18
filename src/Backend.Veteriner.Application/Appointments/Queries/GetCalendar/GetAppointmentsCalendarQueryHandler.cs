@@ -7,6 +7,7 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Options;
+using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
@@ -124,9 +125,9 @@ public sealed class GetAppointmentsCalendarQueryHandler
                 ct);
 
             var detailed = await WithDetailsFromCommandDbAsync(tenantId, items, ct);
-            return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Success(filter.IsEmpty
+            return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Success(WithState(filter.IsEmpty
                 ? detailed
-                : detailed.Where(i => filter.Matches(i.VeterinarianUserId, i.AppointmentType, i.Status, i.ScheduledAtUtc, utcNow)).ToList());
+                : detailed.Where(i => filter.Matches(i.VeterinarianUserId, i.AppointmentType, i.Status, i.ScheduledAtUtc, utcNow)).ToList(), utcNow));
         }
 
         return await HandleFromCommandDbAsync(
@@ -200,7 +201,7 @@ public sealed class GetAppointmentsCalendarQueryHandler
                 Notes: r.Notes);
         }).ToList();
 
-        return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Success(await WithNamesAsync(tenantId, items, ct));
+        return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Success(WithState(await WithNamesAsync(tenantId, items, ct), utcNow));
     }
 
     /// <summary>
@@ -251,6 +252,10 @@ public sealed class GetAppointmentsCalendarQueryHandler
             })
             .ToList();
     }
+
+    /// <summary>Takvim durumu (§8.3); kural tek yer <see cref="CalendarItemStateRule.ForAppointment"/> (filtre ve özetle aynı).</summary>
+    private static IReadOnlyList<AppointmentCalendarItemDto> WithState(IReadOnlyList<AppointmentCalendarItemDto> items, DateTime utcNow)
+        => items.Select(i => i with { State = CalendarItemStateRule.ForAppointment(i.Status, i.ScheduledAtUtc, utcNow) }).ToList();
 
     private static DateTime NormalizeToUtc(DateTime value)
     {

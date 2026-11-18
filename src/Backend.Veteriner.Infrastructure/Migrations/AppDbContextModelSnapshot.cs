@@ -7514,6 +7514,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<DateTime?>("DueAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("DueTimeSpecified")
+                        .HasColumnType("bit");
+
                     b.Property<Guid?>("ExaminationId")
                         .HasColumnType("uniqueidentifier");
 

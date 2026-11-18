@@ -29,6 +29,8 @@ public sealed class VaccinationConfiguration : IEntityTypeConfiguration<Vaccinat
         b.Property(x => x.VaccineDefinitionId);
         b.Property(x => x.AppliedAtUtc);
         b.Property(x => x.DueAtUtc);
+        // Takvim yeniden tasarımı (2026-11-18): mevcut kayıtlar saatsiz (false) başlar.
+        b.Property(x => x.DueTimeSpecified).IsRequired();
         b.Property(x => x.Status).IsRequired();
         b.Property(x => x.Notes).HasMaxLength(4000);
         b.Property(x => x.Route).HasConversion<int?>();

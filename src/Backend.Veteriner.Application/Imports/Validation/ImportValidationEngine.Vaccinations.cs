@@ -167,9 +167,13 @@ public sealed partial class ImportValidationEngine
         var (dueAt, _) = ReadDate(reader, "SonrakiAsiTarihi", issues);
         DateTime? appliedAtUtc = appliedAt is { } a ? OperationDayBounds.NoonUtcForLocalDate(a) : null;
         DateTime? dueAtUtc = null;
+        var dueTime = ImportValueParsers.TimeOfDayIn(rawDue);
         if (dueAt is { } due)
         {
-            dueAtUtc = OperationDayBounds.NoonUtcForLocalDate(due);
+            // Saat eki varsa saat korunur (takvimde saatiyle durur); yoksa günün 12:00'si.
+            dueAtUtc = dueTime is { } time
+                ? OperationDayBounds.FromLocal(due.ToDateTime(time))
+                : OperationDayBounds.NoonUtcForLocalDate(due);
             if (due > _today.AddYears(VaccinationDueAtWindow.MaxFutureYears))
             {
                 issues.Add(ImportRules.DueTooFarInFuture.At("SonrakiAsiTarihi", value: rawDue));
@@ -204,7 +208,8 @@ public sealed partial class ImportValidationEngine
             appliedAtUtc,
             dueAtUtc,
             notes,
-            speciesUnverified);
+            speciesUnverified,
+            DueTimeSpecified: dueAtUtc is not null && dueTime is not null);
 
         if (HasError(issues))
             return Finish(ImportTable.Vaccinations, reader.RowNumber, issues, normalized);

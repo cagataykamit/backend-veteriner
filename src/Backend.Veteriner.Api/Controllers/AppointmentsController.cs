@@ -201,6 +201,29 @@ public sealed class AppointmentsController : ControllerBase
         return result.ToActionResult(this);
     }
 
+    /// <summary>
+    /// Takvim ay görünümü doluluğu: aralıktaki her gün için kaç randevu sığar (APPOINTMENT_CALENDAR_API_CONTRACT.md §8.4). Kapalı gün 0;
+    /// <c>veterinarianUserId</c> verilirse tek hekimin kapasitesi.
+    /// </summary>
+    [HttpGet("calendar/capacity")]
+    [Authorize(Policy = PermissionCatalog.Appointments.Read)]
+    [ProducesResponseType(typeof(IReadOnlyList<CalendarDayCapacityDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetCalendarCapacity(
+        [FromQuery] DateTime? dateFromUtc,
+        [FromQuery] DateTime? dateToUtc,
+        [FromQuery] Guid? clinicId = null,
+        [FromQuery] Guid? veterinarianUserId = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(
+            new GetAppointmentsCalendarCapacityQuery(dateFromUtc, dateToUtc, clinicId, veterinarianUserId), ct);
+        return result.ToActionResult(this);
+    }
+
     /// <summary>Planlı randevuyu iptal eder; yanıt "Geri al" süresini taşır (APPOINTMENT_CANCEL_UNDO_API_CONTRACT.md).</summary>
     [HttpPost("{id:guid}/cancel")]
     [Authorize(Policy = PermissionCatalog.Appointments.Cancel)]

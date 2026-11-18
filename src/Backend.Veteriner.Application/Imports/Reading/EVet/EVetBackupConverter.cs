@@ -786,7 +786,8 @@ internal static class EVetBackupConverter
                 petName,
                 Vaccine,
                 Start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                DueAt?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                // Görev saati gerçek saat sayılır (takvimde saatiyle durur; APPOINTMENT_CALENDAR_API_CONTRACT.md §8.1).
+                DueAt?.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
                 Report?.Serial,
                 sheet[row, "Veteriner"],
                 EVetCells.Join(

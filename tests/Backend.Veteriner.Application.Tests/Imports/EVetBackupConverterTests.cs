@@ -774,7 +774,7 @@ public sealed class EVetBackupConverterTests
         var karma = vaccinations.Single(v => v["AsiAdi"] == "KEDİ KARMA 1");
         karma["HayvanNo"].Should().Be("205");
         karma["UygulamaTarihi"].Should().Be("2025-10-01");
-        karma["SonrakiAsiTarihi"].Should().Be("2025-10-22", "aynı serinin (karma) yapılacak görevi");
+        karma["SonrakiAsiTarihi"].Should().Be("2025-10-22 10:00", "aynı serinin (karma) yapılacak görevi, saatiyle");
         karma["Uygulayan"].Should().Be("Dr. A");
         vaccinations.Single(v => v["AsiAdi"] == "İÇ+DIŞ PARAZİT")["SonrakiAsiTarihi"].Should().BeNull();
     }
@@ -926,6 +926,8 @@ public sealed class EVetBackupConverterTests
         var karmaRow = (ImportNormalizedVaccination)Row(ImportTable.Vaccinations, 2).Normalized;
         (karmaRow.VaccineDefinitionId, karmaRow.DueAt, karmaRow.Notes).Should().Be(
             (karma, new DateOnly(2025, 10, 22), "Seri: SER-1; Uygulayan: Dr. A; Ürün: Felocell Cvr (Kedi Karma); SKT: 31.12.2026; İlk doz"));
+        (karmaRow.DueTimeSpecified, karmaRow.DueAtUtc).Should().Be(
+            (true, new DateTime(2025, 10, 22, 7, 0, 0, DateTimeKind.Utc)), "E-vet görev saati gerçek saattir (10:00 İstanbul)");
 
         Row(ImportTable.ClinicalRecords, 3).Issues.Should().Contain(i => i.Code == ImportRules.PetNotFound.Code, "belirsiz eşleşme hatadır");
         Row(ImportTable.ClinicalRecords, 4).Status.Should().NotBe(ImportRowValidationStatus.Error, "yalnız kilo taşıyan kayıt boş değildir");

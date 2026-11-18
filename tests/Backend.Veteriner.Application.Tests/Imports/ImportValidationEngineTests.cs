@@ -929,8 +929,20 @@ public sealed class ImportValidationEngineTests
         n.AppliedAt.Should().Be(new DateOnly(2024, 4, 10));
         n.AppliedAtUtc.Should().Be(new DateTime(2024, 4, 10, 9, 0, 0, DateTimeKind.Utc), "İstanbul 12:00 = 09:00 UTC");
         n.DueAtUtc.Should().Be(new DateTime(2025, 4, 10, 9, 0, 0, DateTimeKind.Utc));
+        n.DueTimeSpecified.Should().BeFalse("saat eki yok: yalnız gün bilinir");
         n.Notes.Should().Be("Seri: L-5; Uygulayan: Dr. Örnek; Doz 1");
         n.PetKey.Should().Be("file:2");
+    }
+
+    [Fact]
+    public void Vaccination_Due_With_Time_Suffix_Should_Keep_Time_And_Mark_It_Specified()
+    {
+        var output = WithPet(Vaccination(petNo: "H-1", due: "2025-04-10 00:14"));
+
+        var n = (ImportNormalizedVaccination)Single(output, ImportTable.Vaccinations).Normalized;
+        n.DueAt.Should().Be(new DateOnly(2025, 4, 10));
+        n.DueAtUtc.Should().Be(new DateTime(2025, 4, 9, 21, 14, 0, DateTimeKind.Utc), "İstanbul 00:14 = önceki gün 21:14 UTC");
+        n.DueTimeSpecified.Should().BeTrue();
     }
 
     [Fact]

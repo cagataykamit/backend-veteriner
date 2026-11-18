@@ -66,6 +66,33 @@ public sealed class AppointmentCalendarFilterEndpointTests : IClassFixture<Custo
     }
 
     [Fact]
+    public async Task Calendar_Returns_State_And_Capacity_Lists_Every_Day()
+    {
+        var ctx = await SeedAsync();
+        var http = Client(ctx.Token);
+
+        var items = (await http.GetFromJsonAsync<JsonElement>($"/api/v1/appointments/calendar?{ctx.Window}")).EnumerateArray()
+            .ToDictionary(e => e.GetProperty("id").GetGuid(), e => e.GetProperty("state"));
+        items[ctx.VetVaccinationTomorrow].GetString().Should().Be("Upcoming");
+        items[ctx.VetCheckupCompleted].GetString().Should().Be("Completed");
+        items[ctx.UnassignedCancelled].ValueKind.Should().Be(JsonValueKind.Null, "iptal randevunun durumu yok");
+
+        var response = await http.GetAsync($"/api/v1/appointments/calendar/capacity?{ctx.Window}");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var days = (await response.Content.ReadFromJsonAsync<JsonElement>()).EnumerateArray()
+            .Select(e => (Date: DateOnly.Parse(e.GetProperty("date").GetString()!), Capacity: e.GetProperty("capacity").GetInt32()))
+            .ToList();
+
+        days.Should().HaveCount(7, "aralıktaki her gün, kayıt olmasa da");
+        days.Zip(days.Skip(1)).Should().OnlyContain(p => p.Second.Date == p.First.Date.AddDays(1));
+        days.Where(d => d.Date.DayOfWeek == DayOfWeek.Sunday).Should().ContainSingle().Which.Capacity.Should().Be(0, "varsayılan haftada pazar kapalı");
+        days.Where(d => d.Date.DayOfWeek == DayOfWeek.Monday).Single().Capacity.Should().BePositive();
+
+        (await http.GetAsync($"/api/v1/appointments/calendar/capacity?clinicId={Guid.NewGuid():D}")).StatusCode
+            .Should().Be(HttpStatusCode.BadRequest, "tarih aralığı zorunlu");
+    }
+
+    [Fact]
     public async Task Calendar_Rejects_Veterinarian_And_WithoutVeterinarian_Together()
     {
         var ctx = await SeedAsync();

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Domain.Appointments;
 
 namespace Backend.Veteriner.Application.Appointments.Contracts.Dtos;
@@ -7,6 +9,7 @@ namespace Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 /// <param name="ReasonId">Randevu nedeni; nedensiz randevuda boş.</param>
 /// <param name="ReasonName">Nedenin adı (takvim ayrıntı balonu); bulunamazsa boş.</param>
 /// <param name="Notes">Randevu notu (takvim ayrıntı balonu).</param>
+/// <param name="State">Takvim durumu (§6.1, §8.3; <see cref="CalendarItemStateRule.ForAppointment"/>); iptal ve gelmedi randevuda boş.</param>
 public sealed record AppointmentCalendarItemDto(
     Guid Id,
     Guid ClinicId,
@@ -23,4 +26,5 @@ public sealed record AppointmentCalendarItemDto(
     string? VeterinarianName = null,
     Guid? ReasonId = null,
     string? ReasonName = null,
-    string? Notes = null);
+    string? Notes = null,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] CalendarItemState? State = null);

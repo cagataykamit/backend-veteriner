@@ -14,7 +14,8 @@ public sealed record VaccinationCalendarRow(
     VaccinationStatus Status,
     DateTime? AppliedAtUtc,
     DateTime? DueAtUtc,
-    string? Notes);
+    string? Notes,
+    bool DueTimeSpecified = false);
 
 /// <summary>
 /// Klinikte <c>[from, to)</c> aralığına düşen aşı kayıtları: vadesi aralıkta olan planlı ya da uygulanmış (sonraki tarih) kayıt ve
@@ -40,7 +41,8 @@ public sealed class VaccinationsCalendarSpec : Specification<Vaccination, Vaccin
             v.Status,
             v.AppliedAtUtc,
             v.DueAtUtc,
-            v.Notes));
+            v.Notes,
+            v.DueTimeSpecified));
     }
 }
 

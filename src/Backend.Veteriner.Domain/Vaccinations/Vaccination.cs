@@ -24,6 +24,13 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned, IC
 
     public DateTime? AppliedAtUtc { get; private set; }
     public DateTime? DueAtUtc { get; private set; }
+
+    /// <summary>
+    /// <see cref="DueAtUtc"/>'nin saati gerçek mi (takvimde saatiyle durur); değilse yalnız gün bilinir. Vadesiz kayıtta her zaman false.
+    /// Vade ve gecikme kuralı gün bazlıdır (ADR-028); saat yalnız sıralama ve gösterim içindir.
+    /// </summary>
+    public bool DueTimeSpecified { get; private set; }
+
     public VaccinationStatus Status { get; private set; }
     public string? Notes { get; private set; }
 
@@ -128,7 +135,8 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned, IC
         DateTime? dueAtUtc,
         string? notes,
         Guid importBatchId,
-        DateTime utcNow)
+        DateTime utcNow,
+        bool dueTimeSpecified = false)
     {
         if (importBatchId == Guid.Empty)
             throw new ArgumentException("ImportBatchId geçersiz.", nameof(importBatchId));
@@ -138,6 +146,7 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned, IC
             VaccinationStatus.Applied, appliedAtUtc, dueAtUtc, notes, utcNow)
         {
             ImportBatchId = importBatchId,
+            DueTimeSpecified = dueAtUtc.HasValue && dueTimeSpecified,
         };
     }
 
@@ -170,6 +179,8 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned, IC
         if (!subject.IsSuccess)
             return subject;
 
+        var newDueAtUtc = dueAtUtc.HasValue ? NormalizeUtc(dueAtUtc.Value) : (DateTime?)null;
+
         PetId = petId;
         ClinicId = clinicId;
         ExaminationId = examinationId;
@@ -177,7 +188,9 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned, IC
         VaccineName = vaccineNameSnapshot.Trim();
         Status = status;
         AppliedAtUtc = appliedAtUtc.HasValue ? NormalizeUtc(appliedAtUtc.Value) : null;
-        DueAtUtc = dueAtUtc.HasValue ? NormalizeUtc(dueAtUtc.Value) : null;
+        // Vade değişmezse saatin gerçekliği korunur; değişen vade panelden gelir ve saati gerçek sayılmaz.
+        DueTimeSpecified = DueTimeSpecified && newDueAtUtc is not null && newDueAtUtc == DueAtUtc;
+        DueAtUtc = newDueAtUtc;
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
         UpdatedAtUtc = utcNow;
         return Result.Success();
