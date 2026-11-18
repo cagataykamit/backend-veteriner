@@ -152,7 +152,7 @@ Değerler tek yerde: `appsettings` `Ai` bölümü.
 | `Ai:Anthropic:TimeoutSeconds` | 60 | |
 
 - Sınırlar istek **öncesi** denetlenir; aynı anda giden istekler sınırı en çok o isteklerin maliyeti kadar aşabilir (istek başı üst sınır ≈ $0,0022 Haiku'da).
-- **Kullanım kaydı** (`AiUsageRecords`): her sağlayıcı çağrısında (başarısız dahil) klinik, kullanıcı, özellik (`PetHistorySummary`), konu (`SubjectId` = hayvan), model, gerçek giriş/çıkış token (sağlayıcının `usage` alanı; önbellek dahil), tahmini $ maliyet, süre (ms), sonuç (`Succeeded`, `InvalidOutput`, `Truncated`, `Refused`, `ProviderError`). İstem ve yanıt metni **tutulmaz**; normal günlüğe yalnız özellik, sonuç, model, token ve süre yazılır. HTTP istemcisinin varsayılan günlükleri kapalıdır.
+- **Kullanım kaydı** (`AiUsageRecords`): her sağlayıcı çağrısında (başarısız dahil) klinik, kullanıcı, özellik (`PetHistorySummary`), konu (`SubjectId` = hayvan), model, gerçek giriş/çıkış token (sağlayıcının `usage` alanı; önbellek dahil), tahmini $ maliyet, süre (ms), sonuç (`Succeeded`, `InvalidOutput`, `Truncated`, `Refused`, `ProviderError`). AI-010 ile ayrıca modele gönderilen kaynak kayıtlar (`SourceRefsJson`, yalnız `{type,id}`), istem sürümü (`PromptVersion`, özet için `pet-history-summary/1`) ve taslak üreten özelliklerde `DraftId` tutulur (`AI_DRAFTS_API_CONTRACT.md` §6). İstem ve yanıt metni **tutulmaz**; normal günlüğe yalnız özellik, sonuç, model, istem sürümü, token ve süre yazılır. HTTP istemcisinin varsayılan günlükleri kapalıdır. Hata mesajları `Ai.InvalidOutput` / `Ai.Refused` genelleştirildi ("sonuç"); kodlar aynı.
 - Model çağrılmayan istekler (kayıt yok, engel) kullanım kaydı yazmaz ve sınıra sayılmaz.
 
 ## 5) Hata kodları
