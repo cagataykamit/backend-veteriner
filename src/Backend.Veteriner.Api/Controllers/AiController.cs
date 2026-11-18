@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using Asp.Versioning;
 using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Ai;
+using Backend.Veteriner.Application.Ai.ClinicalDrafts;
 using Backend.Veteriner.Application.Ai.Drafts;
 using Backend.Veteriner.Application.Ai.PetHistorySummary;
 using Backend.Veteriner.Application.Auth;
@@ -49,6 +50,84 @@ public sealed class AiController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> GeneratePetHistorySummary([FromRoute] Guid id, CancellationToken ct)
         => (await _mediator.Send(new GeneratePetHistorySummaryCommand(id), ct)).ToActionResult(this);
+
+    /// <summary>
+    /// Muayene notu taslağı (AI-001): hekimin serbest notunu muayene alanlarına ayırır. Muayeneye yazmaz; kabul
+    /// <c>ai/drafts/{id}/accept</c> ile. Serbest not saklanmaz. Kesinleşmiş muayenede 409. Sözleşme: docs/AI_DRAFTS_API_CONTRACT.md §7.1.
+    /// </summary>
+    [HttpPost("examinations/{id:guid}/ai/note-draft")]
+    [Authorize(Policy = PermissionCatalog.Examinations.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(AiDraftDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status502BadGateway)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> GenerateExamNoteDraft([FromRoute] Guid id, [FromBody] AiNoteDraftBody body, CancellationToken ct)
+        => (await _mediator.Send(new GenerateExamNoteDraftCommand(id, body.Text ?? string.Empty), ct)).ToActionResult(this);
+
+    /// <summary>
+    /// Hasta sahibine sade açıklama taslağı (AI-003): muayene kaydından (ve bağlı reçete/tedaviden). Kabulde muayeneye bağlı ayrı
+    /// açıklama kaydı oluşur. Sözleşme: docs/AI_DRAFTS_API_CONTRACT.md §7.2.
+    /// </summary>
+    [HttpPost("examinations/{id:guid}/ai/owner-explanation-draft")]
+    [Authorize(Policy = PermissionCatalog.Examinations.Read)]
+    [Authorize(Policy = PermissionCatalog.Examinations.Update)]
+    [ProducesResponseType(typeof(AiDraftDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status502BadGateway)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> GenerateOwnerExplanationDraft([FromRoute] Guid id, [FromBody] AiNoteDraftBody? body, CancellationToken ct)
+        => (await _mediator.Send(new GenerateOwnerExplanationDraftCommand(id, body?.Text), ct)).ToActionResult(this);
+
+    /// <summary>
+    /// Taburcu / evde bakım talimatı taslağı (AI-004), muayeneden. Kabulde muayeneye bağlı bakım talimatı oluşur.
+    /// Sözleşme: docs/AI_DRAFTS_API_CONTRACT.md §7.3.
+    /// </summary>
+    [HttpPost("examinations/{id:guid}/ai/care-instruction-draft")]
+    [Authorize(Policy = PermissionCatalog.Examinations.Read)]
+    [Authorize(Policy = PermissionCatalog.CareInstructions.Create)]
+    [ProducesResponseType(typeof(AiDraftDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status502BadGateway)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> GenerateExaminationCareInstructionDraft(
+        [FromRoute] Guid id, [FromBody] AiNoteDraftBody? body, CancellationToken ct)
+        => (await _mediator.Send(
+            new GenerateDischargeInstructionsDraftCommand(DischargeDraftSource.Examination, id, body?.Text), ct)).ToActionResult(this);
+
+    /// <summary>
+    /// Taburcu / evde bakım talimatı taslağı (AI-004), yatıştan (ve yatışın muayenesinden). Kabulde yatışa bağlı bakım talimatı
+    /// oluşur. İptal edilmiş yatışta 409. Sözleşme: docs/AI_DRAFTS_API_CONTRACT.md §7.3.
+    /// </summary>
+    [HttpPost("hospitalizations/{id:guid}/ai/care-instruction-draft")]
+    [Authorize(Policy = PermissionCatalog.Hospitalizations.Read)]
+    [Authorize(Policy = PermissionCatalog.CareInstructions.Create)]
+    [ProducesResponseType(typeof(AiDraftDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status502BadGateway)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> GenerateHospitalizationCareInstructionDraft(
+        [FromRoute] Guid id, [FromBody] AiNoteDraftBody? body, CancellationToken ct)
+        => (await _mediator.Send(
+            new GenerateDischargeInstructionsDraftCommand(DischargeDraftSource.Hospitalization, id, body?.Text), ct)).ToActionResult(this);
 
     /// <summary>
     /// AI taslağı (AI-009): içerik yalnız karar bekleyen taslakta gelir. Aktif klinik taslağın kliniği olmalı; özelliğin izni
@@ -102,4 +181,13 @@ public sealed class AiDraftAcceptBody
 {
     /// <summary>Kullanıcının düzenlediği içerik (taslakla aynı şemada); <c>null</c> ise üretilen içerik olduğu gibi kabul edilir.</summary>
     public JsonObject? EditedContent { get; init; }
+}
+
+public sealed class AiNoteDraftBody
+{
+    /// <summary>
+    /// Kullanıcının yazdığı serbest not: AI-001'de bölünecek muayene notu (zorunlu, en çok 8000 karakter); AI-003/004'te hekimin
+    /// vurgulanmasını istediği noktalar (isteğe bağlı, en çok 2000 karakter). Saklanmaz.
+    /// </summary>
+    public string? Text { get; init; }
 }

@@ -1,7 +1,9 @@
 using Ardalis.Specification;
+using Backend.Veteriner.Application.Ai.Drafts;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Queries.GetById;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -24,6 +26,7 @@ public sealed class GetExaminationByIdQueryHandlerTests
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
     private readonly Mock<IClinicVeterinarianReader> _userNames = new();
+    private readonly Mock<IAiProvenanceReader> _aiProvenance = AiProvenanceReaderMock.Empty();
 
     private readonly Guid _userId = Guid.NewGuid();
 
@@ -45,7 +48,8 @@ public sealed class GetExaminationByIdQueryHandlerTests
             _examinations.Object,
             _pets.Object,
             _clients.Object,
-            _userNames.Object);
+            _userNames.Object,
+            _aiProvenance.Object);
 
     private void SetupTenant(Guid tenantId) => _tenantContext.SetupGet(x => x.TenantId).Returns(tenantId);
 

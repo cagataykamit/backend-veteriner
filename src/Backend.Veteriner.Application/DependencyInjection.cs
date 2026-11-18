@@ -140,6 +140,13 @@ public static class DependencyInjection
         // AI çağrısı + kullanım/denetim kaydı (AI-010) ve taslak erişimi (AI-009). Özellik uygulayıcıları (IAiDraftApplier) özellikle birlikte eklenir.
         services.AddScoped<Ai.AiInvoker>();
         services.AddScoped<Ai.Drafts.AiDraftAccess>();
+        services.AddScoped<Ai.Drafts.AiDraftGenerator>();
+        services.AddScoped<Ai.Drafts.IAiProvenanceReader, Ai.Drafts.AiProvenanceReader>();
+        // Taslak üreten klinik özellikler (AI-001/003/004): ortak girdi ve özellik başına uygulayıcı.
+        services.AddScoped<Ai.ClinicalDrafts.ClinicalAiContextBuilder>();
+        services.AddScoped<Ai.Drafts.IAiDraftApplier, Ai.ClinicalDrafts.ExamNoteDraftApplier>();
+        services.AddScoped<Ai.Drafts.IAiDraftApplier, Ai.ClinicalDrafts.OwnerExplanationDraftApplier>();
+        services.AddScoped<Ai.Drafts.IAiDraftApplier, Ai.ClinicalDrafts.DischargeInstructionsDraftApplier>();
 
         // Hasta sahibi portalı (ADR-031): sahiplik kontrolü, davet çözümü, oturum ve kod.
         services.AddScoped<OwnerPortalAccess>();

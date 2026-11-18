@@ -352,7 +352,7 @@ public sealed class CareInstructionHandlersTests
             .ReturnsAsync(c);
         var denied = ClinicReadScopeResolverMock.ForClinicAdmin([Guid.NewGuid()]);
         var handler = new GetCareInstructionByIdQueryHandler(
-            _tenantContext.Object, new Mock<IClinicContext>().Object, denied.Object, _read.Object);
+            _tenantContext.Object, new Mock<IClinicContext>().Object, denied.Object, _read.Object, AiProvenanceReaderMock.Empty().Object);
 
         var result = await handler.Handle(new GetCareInstructionByIdQuery(c.Id), CancellationToken.None);
 
@@ -368,7 +368,7 @@ public sealed class CareInstructionHandlersTests
         _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<CareInstructionByIdSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(c);
         var handler = new GetCareInstructionByIdQueryHandler(
-            _tenantContext.Object, _clinicContext.Object, _scopeResolver.Object, _read.Object);
+            _tenantContext.Object, _clinicContext.Object, _scopeResolver.Object, _read.Object, AiProvenanceReaderMock.Empty().Object);
 
         var result = await handler.Handle(new GetCareInstructionByIdQuery(c.Id), CancellationToken.None);
 
