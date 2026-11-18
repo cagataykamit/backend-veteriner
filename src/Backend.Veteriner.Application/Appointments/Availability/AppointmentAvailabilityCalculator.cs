@@ -38,30 +38,14 @@ public static class AppointmentAvailabilityCalculator
 
     public static IReadOnlyList<AvailabilityDay> Compute(AvailabilityInput input)
     {
-        var interval = Math.Max(1, input.SlotIntervalMinutes);
-        var step = (int)Math.Ceiling(input.DurationMinutes / (double)interval) * interval;
         var days = new List<AvailabilityDay>();
 
         for (var offset = 0; offset < Math.Clamp(input.Days, 1, MaxDays); offset++)
         {
             var date = input.FromLocalDate.AddDays(offset);
-            var row = input.WeekHours.FirstOrDefault(x => x.DayOfWeek == date.DayOfWeek);
-            if (row is not { IsClosed: false, OpensAt: { } opensAt, ClosesAt: { } closesAt })
-            {
-                days.Add(new AvailabilityDay(date, []));
-                continue;
-            }
-
             var slots = new List<AvailableSlot>();
-            var startMinute = (int)Math.Ceiling(opensAt.ToTimeSpan().TotalMinutes / interval) * interval;
-            var closeMinute = (int)closesAt.ToTimeSpan().TotalMinutes;
-            for (var minute = startMinute; minute + input.DurationMinutes <= closeMinute; minute += step)
+            foreach (var localStart in SlotStarts(DayHours(input.WeekHours, date), input.DurationMinutes, input.SlotIntervalMinutes))
             {
-                var localStart = TimeOnly.FromTimeSpan(TimeSpan.FromMinutes(minute));
-                var localEnd = localStart.AddMinutes(input.DurationMinutes);
-                if (row.BreakStartsAt is { } bs && row.BreakEndsAt is { } be && localStart < be && bs < localEnd)
-                    continue;
-
                 var startUtc = OperationDayBounds.FromLocal(date.ToDateTime(localStart));
                 if (startUtc < input.EarliestUtc || startUtc > input.LatestUtc)
                     continue;
@@ -75,6 +59,42 @@ public static class AppointmentAvailabilityCalculator
         }
 
         return days;
+    }
+
+    /// <summary>
+    /// Günlük kapasite (takvim ay görünümü doluluğu; APPOINTMENT_CALENDAR_API_CONTRACT.md §8.4): boş bir günde çalışma saatlerine (mola
+    /// hariç) müsaitlikle aynı adımla kaç randevu başlangıcı sığar × kaynak (hekim) sayısı. Kapalı gün 0.
+    /// </summary>
+    public static int DailyCapacity(
+        IReadOnlyList<ClinicWorkingHourDto> weekHours,
+        DateOnly date,
+        int durationMinutes,
+        int slotIntervalMinutes,
+        int resourceCount)
+        => SlotStarts(DayHours(weekHours, date), durationMinutes, slotIntervalMinutes).Count() * Math.Max(1, resourceCount);
+
+    private static ClinicWorkingHourDto? DayHours(IReadOnlyList<ClinicWorkingHourDto> weekHours, DateOnly date)
+        => weekHours.FirstOrDefault(x => x.DayOfWeek == date.DayOfWeek);
+
+    /// <summary>Günün yerel başlangıç saatleri: açılıştan slot aralığına hizalı, adım süre (aralığın katı), molayla çakışan atlanır.</summary>
+    private static IEnumerable<TimeOnly> SlotStarts(ClinicWorkingHourDto? row, int durationMinutes, int slotIntervalMinutes)
+    {
+        if (row is not { IsClosed: false, OpensAt: { } opensAt, ClosesAt: { } closesAt })
+            yield break;
+
+        var interval = Math.Max(1, slotIntervalMinutes);
+        var step = Math.Max(interval, (int)Math.Ceiling(durationMinutes / (double)interval) * interval);
+        var startMinute = (int)Math.Ceiling(opensAt.ToTimeSpan().TotalMinutes / interval) * interval;
+        var closeMinute = (int)closesAt.ToTimeSpan().TotalMinutes;
+        for (var minute = startMinute; minute + durationMinutes <= closeMinute; minute += step)
+        {
+            var localStart = TimeOnly.FromTimeSpan(TimeSpan.FromMinutes(minute));
+            var localEnd = localStart.AddMinutes(durationMinutes);
+            if (row.BreakStartsAt is { } bs && row.BreakEndsAt is { } be && localStart < be && bs < localEnd)
+                continue;
+
+            yield return localStart;
+        }
     }
 
     /// <summary>

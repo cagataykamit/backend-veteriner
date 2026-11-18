@@ -122,4 +122,29 @@ public sealed class AppointmentAvailabilityCalculatorTests
         slots.First().StartUtc.Should().Be(Local(Monday, 12));
         slots.Last().StartUtc.Should().Be(Local(Monday.AddDays(1), 10));
     }
+
+    [Fact]
+    public void DailyCapacity_Should_Match_Empty_Day_Slots_Times_Resources()
+    {
+        var week = ClinicWorkingHoursDefaults.BuildWeek();
+        var emptyDaySlots = Slots(Input(vets: [VetA], allowOverlap: false)).Count;
+
+        AppointmentAvailabilityCalculator.DailyCapacity(week, Monday, 30, 15, resourceCount: 1).Should().Be(emptyDaySlots);
+        AppointmentAvailabilityCalculator.DailyCapacity(week, Monday, 30, 15, resourceCount: 3).Should().Be(emptyDaySlots * 3);
+        AppointmentAvailabilityCalculator.DailyCapacity(week, Monday, 30, 15, resourceCount: 0).Should().Be(emptyDaySlots, "hekimsiz klinik tek kaynaktır");
+    }
+
+    [Fact]
+    public void DailyCapacity_Should_Be_Zero_On_Closed_Day_And_Skip_Break()
+    {
+        AppointmentAvailabilityCalculator.DailyCapacity(ClinicWorkingHoursDefaults.BuildWeek(), new DateOnly(2026, 11, 1), 30, 15, 2)
+            .Should().Be(0, "pazar kapalı");
+
+        var week = new List<ClinicWorkingHourDto>
+        {
+            new(DayOfWeek.Monday, false, new TimeOnly(9, 0), new TimeOnly(13, 0), new TimeOnly(11, 0), new TimeOnly(12, 0)),
+        };
+        AppointmentAvailabilityCalculator.DailyCapacity(week, Monday, 30, 15, 1).Should().Be(6, "09:00–11:00 ve 12:00–13:00");
+        AppointmentAvailabilityCalculator.DailyCapacity(week, Monday, 45, 15, 1).Should().Be(3, "09:00, 09:45; 10:30 molaya taşar; 12:00");
+    }
 }
