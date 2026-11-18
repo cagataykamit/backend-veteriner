@@ -196,7 +196,8 @@ Kaynak: kullanıcı seçimi 2026-11-18 (ürün deposu `ux/takvim-yeniden-tasarim
   yer `Vaccination.UpdateDetails`). Panel formunda "saat gerçek" seçimi ilk sürümde yok.
 - Vade, gecikme, hatırlatma, çakışma ve boş saat kuralları değişmedi: hepsi gün bazlıdır (ADR-028). Saat yalnız sıralama ve gösterim
   içindir.
-- Yayındaki eski aktarmalarda saat yoktur; saat ancak yeniden aktarma ya da güncelleme aktarmasıyla gelir (canlı veriye dokunduğu için
+- Yayındaki eski aktarmalarda saat yoktur. Güncelleme aktarması (ADR-051) mevcut aşıyı mükerrer sayıp atladığı için saati getirmez;
+  saat ancak aktarmanın geri alınıp yeniden yapılmasıyla ya da ayrı bir düzeltme işiyle gelir (canlı veriye dokunduğu için
   ayrı onay).
 
 ### 8.2 `GET /api/v1/vaccinations/calendar` yanıtına `timeSpecified`
@@ -212,7 +213,7 @@ Aşı yine randevu değildir: saat dilimini doldurmaz (§5.2).
 
 | Alan | Tip | Anlam |
 |---|---|---|
-| `state` | `CalendarItemState?` (sayı: 0 `DueToday`, 1 `Upcoming`, 2 `Overdue`, 3 `Completed`) | §6.1 durumu; iptal ve gelmedi randevuda `null`. Kural `CalendarItemStateRule.ForAppointment` (filtre ve özetle aynı yer). |
+| `state` | `string?` (`DueToday`, `Upcoming`, `Overdue`, `Completed`; aşı takvimiyle aynı yazım) | §6.1 durumu; iptal ve gelmedi randevuda `null`. Kural `CalendarItemStateRule.ForAppointment` (filtre ve özetle aynı yer). |
 
 Komut veritabanı ve okuma modeli yolları aynı değeri verir.
 
