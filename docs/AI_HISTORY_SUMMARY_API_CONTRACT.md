@@ -2,7 +2,7 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-008-embedded-ai-assistant.md` (AI yalnız taslak üretir, anahtar yalnız backend'de, AI durursa klinik akış sürer), `decisions/ADR-044-ai-eklentisi-kredi-ve-fon.md` (madde 3 model, madde 7 kota bitince yalnız AI durur, madde 8 maliyet sınırları ve gerçek token/maliyet kaydı), `decisions/ADR-006-patient-timeline.md` (kaynaklar ve kayda bağlantı), backlog `AI-002`, `AI-007`, `AI-008`, `TIER-014`. İlgili: `PET_TIMELINE_API_CONTRACT.md` (tür adları, tür bazlı izin, klinik kapsamı). Hata zarfı standart `ProblemDetails` + `extensions.code`.
 
-> **Durum:** Uygulandı (kod + test), dal `feature/ai-gecmis-ozeti`. **Migration var** (`AddAiUsage`: `AiUsageRecords`, `ClinicAiSettings`; mevcut tablolara dokunmaz). **Yeni izin:** `Ai.Use` (seed gerekir). Claude API hesabı henüz açılmadı: anahtar yokken özellik **kapalıdır** ve hata fırlatmaz; anahtar backend ayarına konunca açılır. Kredi satışı/ödeme (ADR-044 tarifesi) bu işin dışındadır.
+> **Durum:** Uygulandı (kod + test), dal `feature/ai-gecmis-ozeti`. **Migration var** (`AddAiUsage`: `AiUsageRecords`, `ClinicAiSettings`; mevcut tablolara dokunmaz). **Yeni izin:** `Ai.Use` (seed gerekir). Claude API hesabı henüz açılmadı: anahtar yokken özellik **kapalıdır** ve hata fırlatmaz; anahtar backend ayarına konunca açılır. Kredi satışı/ödeme (ADR-044 tarifesi) bu işin dışındadır. **4. dalga (`feature/ai-kota`):** kredi kotası, fon ve uyarılar (AI-007, §4a), platform yönetimi klinik listesi / fon / aylık kırılımlar (AI-008, §3); migration `AddAiCredits`.
 
 ---
 
@@ -29,12 +29,18 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-008-em
   "unavailableCode": null,
   "isConfigured": true,
   "isClinicEnabled": true,
-  "clinicMonthUsedPercent": 12
+  "clinicMonthUsedPercent": 12,
+  "monthlyCredits": 2000,
+  "creditsUsedThisMonth": 240.5,
+  "creditsRemaining": 1759.5,
+  "fundCredits": 0,
+  "quotaResetsAtUtc": "2026-11-30T21:00:00Z"
 }
 ```
 
 - `unavailableCode`: kullanılamıyorsa ilk engelin kodu (`Ai.NotConfigured` → `Ai.ClinicNotEnabled` → `Ai.ClinicQuotaExceeded` → `Ai.SystemBudgetExhausted`; aktif klinik yoksa `Clinics.ClinicSelectionRequired`).
-- `clinicMonthUsedPercent` (0–100): kliniğin bu ayki (İstanbul takvim ayı) kullanımının sınıra oranı; token ve maliyet oranından büyüğü. ADR-044 madde 7'deki %80 uyarısı için.
+- `clinicMonthUsedPercent` (0–100): kliniğin bu ayki (İstanbul takvim ayı) kullanım oranı = harcanan / (harcanan + kalan kredi); token/maliyet sigortası daha yüksekse o. Kredi ya da sigorta bitince 100, öncesinde en çok 99. ADR-044 madde 7'deki %80 uyarısı için (§4a).
+- Kredi alanları (AI-007, §4a): `monthlyCredits` bu ayın kotası (paket hediyesi), `creditsUsedThisMonth` bu ay harcanan (kota + fon), `creditsRemaining` kalan aylık kota + fon bakiyesi, `fundCredits` fon bakiyesi (devreder), `quotaResetsAtUtc` kotanın yenileneceği an (sonraki İstanbul ayının 1'i 00:00). İki ondalıklı; arayüz tam sayıya aşağı yuvarlar. Aktif klinik yoksa hepsi `null`. Dolar yok.
 
 ## 2) `POST /api/v1/pets/{id}/ai/history-summary`
 
@@ -99,40 +105,68 @@ Model talimatı: yalnız verilen kayıtlar; tanı koymaz, tedavi/ilaç/doz öner
 
 ## 3) Platform yönetimi — `api/v1/admin/ai`
 
-Yalnız platform yöneticisi (`platform_admin` claim'i); klinik rolleri 403. Kiracılar arası.
+Yalnız platform yöneticisi (`platform_admin` claim'i); klinik rolleri 403. Kiracılar arası. Hiçbir yanıtta klinik metin (istem, yanıt, hasta bilgisi) yoktur; yalnız klinik/kiracı adı, sayılar, model ve özellik.
+
+### Klinik satırı (`AiAdminClinicDto`)
+
+```json
+{
+  "tenantId": "…", "tenantName": "Pati Klinikleri", "clinicId": "…", "clinicName": "Merkez", "isClinicActive": true,
+  "planCode": "Premium", "isEnabled": true, "updatedAtUtc": "…",
+  "monthlyCredits": 2000, "creditsUsedThisMonth": 240.5, "creditsRemaining": 2009.5, "fundCredits": 250,
+  "usedPercent": 10, "quotaResetsAtUtc": "2026-11-30T21:00:00Z"
+}
+```
+
+`planCode` abonelik yoksa `null` (kota 0). `usedPercent` kliniğin gördüğü oranla aynıdır (§1).
+
+### `GET /api/v1/admin/ai/clinics?search=`
+
+- `search` yok: AI ayarı olan (bir kez açılmış ya da kapatılmış) klinikler; açıklar önce, sonra ada göre.
+- `search` (en az 2 karakter, yoksa `400 Ai.Validation`): klinik ya da kiracı adına uyan en çok 50 klinik (açılacak kliniği bulmak için).
 
 ### `PUT /api/v1/admin/ai/clinics/{clinicId}`
 
-Gövde `{ "isEnabled": true }`. Kayıt yoksa oluşturur. Denetim kaydı `Ai.ClinicSettings.Update`.
+Gövde `{ "isEnabled": true }`. Kayıt yoksa oluşturur. Denetim kaydı `Ai.ClinicSettings.Update`. Yanıt klinik satırı. Klinik yoksa `404 Ai.ClinicNotFound`.
 
-```json
-{ "tenantId": "…", "clinicId": "…", "clinicName": "…", "isEnabled": true, "updatedAtUtc": "…" }
-```
+### `POST /api/v1/admin/ai/clinics/{clinicId}/fund-grants` — fon ekleme (AI-007)
 
-Klinik yoksa `404 Ai.ClinicNotFound`.
+Gövde `{ "credits": 250, "note": "Pilot telafisi" }`: `credits` 1–100.000 tam sayı, `note` en çok 200 karakter (isteğe bağlı). Ücretli satın alma açılana kadar fonun tek yolu budur. Fon aylık kotadan sonra harcanır ve devreder; geri alınmaz (yanlış eklemede destek kaydıyla düzeltilir). Denetim kaydı `Ai.Fund.Grant`. Yanıt güncel klinik satırı. Hatalar: `400 Validation.FluentValidation`, `404 Ai.ClinicNotFound`.
 
-### `GET /api/v1/admin/ai/usage`
+### `GET /api/v1/admin/ai/clinics/{clinicId}/fund-grants`
 
-Bu ayın (İstanbul takvim ayı) kullanımı; maliyet **tahminidir** (ayardaki fiyatla), fatura değildir.
+Fon hareketleri, yeniden eskiye, en çok 100: `[{ "id", "kind": "Manual", "credits", "note", "createdByUserId", "createdAtUtc" }]`.
+
+### `GET /api/v1/admin/ai/usage?month=yyyy-MM` — maliyet takibi (AI-008)
+
+İstanbul takvim ayının kullanımı (`month` yoksa bu ay; biçim bozuksa `400`). Maliyet **tahminidir** (ayardaki fiyatla), fatura değildir.
 
 ```json
 {
   "isConfigured": true,
   "model": "claude-haiku-5-5",
+  "month": "2026-11",
+  "isCurrentMonth": true,
   "monthStartUtc": "2026-10-31T21:00:00Z",
   "monthEndUtc": "2026-11-30T21:00:00Z",
-  "system": { "requests": 120, "tokens": 310000, "costUsd": 0.041 },
+  "system": { "requests": 120, "failedRequests": 2, "inputTokens": 280000, "outputTokens": 30000, "tokens": 310000,
+              "credits": 91.2, "fundCredits": 0, "costUsd": 0.041 },
+  "budget": { "limitUsd": 10, "spentUsd": 0.041, "remainingUsd": 9.959, "usedPercent": 0 },
   "limits": {
     "maxInputTokens": 12000, "maxOutputTokens": 2000, "userRequestsPerMinute": 3,
-    "clinicMonthlyTokenLimit": 5000000, "clinicMonthlyCostLimitUsd": 2, "systemMonthlyCostLimitUsd": 10
+    "clinicMonthlyTokenLimit": 20000000, "clinicMonthlyCostLimitUsd": 2, "systemMonthlyCostLimitUsd": 10,
+    "creditValueUsd": 0.00045, "planMonthlyCredits": { "Basic": 0, "Pro": 500, "Premium": 2000 }
   },
-  "clinics": [
-    { "tenantId": "…", "clinicId": "…", "clinicName": "…", "isEnabled": true, "requests": 80, "tokens": 200000, "costUsd": 0.027 }
-  ]
+  "clinics": [ { "tenantId": "…", "tenantName": "…", "clinicId": "…", "clinicName": "…", "isEnabled": true, "usage": { /* system ile aynı alanlar */ } } ],
+  "features": [ { "feature": "PetHistorySummary", "usage": { … } } ],
+  "models": [ { "model": "claude-haiku-5-5", "usage": { … } } ]
 }
 ```
 
-`clinics`: bu ay kullanan klinikler (maliyete göre azalan) + AI'si açık olup henüz kullanmayanlar (sıfırlarla).
+- `usage` / `system` alanları: istek sayısı, başarısız istek (`Outcome != Succeeded`), gerçek giriş/çıkış token, harcanan kredi, fondan karşılanan kredi, tahmini $.
+- `budget`: sistem aylık sınırına uzaklık (`Ai:SystemMonthlyCostLimitUsd`).
+- `clinics`, `features`, `models` maliyete göre azalan. Bu ay için AI'si açık olup henüz kullanmayan klinikler de sıfırlarla gelir; geçmiş aylarda yalnız kullananlar.
+- `feature` değerleri: `PetHistorySummary`, `ExamNoteStructure`, `OwnerExplanation`, `DischargeInstructions`.
 
 ## 4) Sınırlar ve kullanım kaydı (ADR-044 madde 8)
 
@@ -145,8 +179,10 @@ Değerler tek yerde: `appsettings` `Ai` bölümü.
 | `Ai:MaxInputTokens` | 12.000 | Tahmini girdi (karakter/3); aşan geçmişte en eski kayıtlar çıkar. |
 | `Ai:MaxOutputTokens` | 2.000 | Sağlayıcıya `max_tokens` (düşünme dahil). |
 | `Ai:UserRequestsPerMinute` | 3 | Kullanıcının son 60 sn'deki sağlayıcı çağrısı sayısı. |
-| `Ai:ClinicMonthlyTokenLimit` | 5.000.000 | Klinik, İstanbul takvim ayı, giriş+çıkış. |
-| `Ai:ClinicMonthlyCostLimitUsd` | 2 | Klinik, ay, tahmini $. |
+| `Ai:CreditValueUsd` | 0,00045 | Bir kredinin $ değeri (§4a). |
+| `Ai:PlanMonthlyCredits` | Basic 0, Pro 500, Premium 2.000 | Paket hediyesi, klinik başına aylık (§4a). |
+| `Ai:ClinicMonthlyTokenLimit` | 20.000.000 | **Sigorta.** Klinik, İstanbul takvim ayı, giriş+çıkış. Kredi kotasının üstünde kalmalı (2.000 kredi Haiku'da girdi ağırlığına göre ~5–8M token). |
+| `Ai:ClinicMonthlyCostLimitUsd` | 2 | **Sigorta.** Klinik, ay, tahmini $ (2.000 kredi ≈ $0,90). Büyük fon eklenen klinikte artırılmalı. |
 | `Ai:SystemMonthlyCostLimitUsd` | 10 | Tüm kiracılar, ay; aşılınca AI herkes için durur. |
 | `Ai:Anthropic:Effort` | `low` | `output_config.effort`; özet için yeterli varsayıldı, **ölçülmedi**. |
 | `Ai:Anthropic:TimeoutSeconds` | 60 | |
@@ -154,6 +190,17 @@ Değerler tek yerde: `appsettings` `Ai` bölümü.
 - Sınırlar istek **öncesi** denetlenir; aynı anda giden istekler sınırı en çok o isteklerin maliyeti kadar aşabilir (istek başı üst sınır ≈ $0,0022 Haiku'da).
 - **Kullanım kaydı** (`AiUsageRecords`): her sağlayıcı çağrısında (başarısız dahil) klinik, kullanıcı, özellik (`PetHistorySummary`), konu (`SubjectId` = hayvan), model, gerçek giriş/çıkış token (sağlayıcının `usage` alanı; önbellek dahil), tahmini $ maliyet, süre (ms), sonuç (`Succeeded`, `InvalidOutput`, `Truncated`, `Refused`, `ProviderError`). AI-010 ile ayrıca modele gönderilen kaynak kayıtlar (`SourceRefsJson`, yalnız `{type,id}`), istem sürümü (`PromptVersion`, özet için `pet-history-summary/1`) ve taslak üreten özelliklerde `DraftId` tutulur (`AI_DRAFTS_API_CONTRACT.md` §6). İstem ve yanıt metni **tutulmaz**; normal günlüğe yalnız özellik, sonuç, model, istem sürümü, token ve süre yazılır. HTTP istemcisinin varsayılan günlükleri kapalıdır. Hata mesajları `Ai.InvalidOutput` / `Ai.Refused` genelleştirildi ("sonuç"); kodlar aynı.
 - Model çağrılmayan istekler (kayıt yok, engel) kullanım kaydı yazmaz ve sınıra sayılmaz.
+
+## 4a) Kredi kotası ve fon (AI-007, ADR-044 madde 2, 5–7)
+
+Kuralın tek yeri `AiClinicQuota` (Application); hesap `AiCreditAccount`.
+
+- **Kredi:** her sağlayıcı çağrısının gerçek token'ından tahmini maliyet → `kredi = maliyet / Ai:CreditValueUsd`, iki ondalık, istek başına yukarı yuvarlanmaz. Standart istek (2.000 giriş + 500 çıkış) Haiku'da 1, Sonnet'te 20 kredi. Başarısız ama token harcayan çağrı da harcar (`AiUsageRecords.Credits`).
+- **Kota:** klinik başına aylık, paket hediyesi (`Ai:PlanMonthlyCredits`, kiracının paketinden; abonelik yoksa 0). Eklenti satışı açılınca eklentinin kredisi buraya eklenecek. İstanbul takvim ayı; devretmez.
+- **Fon:** `AiCreditGrants` (yalnız eklenir; şimdilik yalnız platform yöneticisi elle, §3). Bakiye = eklenen − harcanan (tüm zamanlar); devreder. Değişen sayaç tutulmaz (eşzamanlı isteklerde kayıp yazma olmaz).
+- **Harcama sırası:** önce kalan aylık kota, artanı fon (`AiUsageRecords.FundCredits`). İstek öncesi onaylandığı için son istek kalanı aşabilir; aşan kısım fondan düşer ve fon eksiye inebilir (sonraki fon eklemesi önce bunu kapatır).
+- **Durma:** kalan kredi (kota + fon) 0 ya da token/$ sigortası dolduysa `429 Ai.ClinicQuotaExceeded`; yalnız AI durur.
+- **Uyarı:** isteğin harcamasından sonra oran %80'e ulaştıysa `AiQuotaNearlyUsed`, kredi bittiyse `AiQuotaExhausted` kullanıcı bildirimi (tür 12 / 13; `targetType: "AiUsage"`, `targetId` = klinik). Alıcılar: kliniğe erişen ve `Clinics.Update` izni olanlar (klinik yöneticisi; e-belge durdurma uyarısıyla aynı). Her eşik ayda bir kez (`ClinicAiSettings.QuotaWarningMonthStartUtc/Level`); %80 atlanıp doğrudan bitilirse yalnız bitiş uyarısı gider. Fon eklenip oran düşse de aynı ay yeniden %80 uyarısı gitmez.
 
 ## 5) Hata kodları
 
