@@ -197,6 +197,16 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
                 "Sorumlu hekim bu kliniğe atanmış aktif bir hekim (Veteriner) olmalıdır.");
         }
 
+        // Hekim seçilmediyse randevunun hekimi geçer (hâlâ klinikte aktif hekimse): sekreter "Geldi" deyince hasta hekimin
+        // "Benim hastalarım" listesine düşer (2026-11-19).
+        var responsibleVeterinarianUserId = request.ResponsibleVeterinarianUserId;
+        if (responsibleVeterinarianUserId is null
+            && appointment?.VeterinarianUserId is { } appointmentVetId
+            && await _veterinarians.IsClinicVeterinarianAsync(appointmentVetId, tenantId, clinicId, ct))
+        {
+            responsibleVeterinarianUserId = appointmentVetId;
+        }
+
         var preparation = Visit.ValidatePreparation(request.ArrivalReason, request.PreparedExaminationTemplateId);
         if (!preparation.IsSuccess)
             return Result<VisitCreateResultDto>.Failure(preparation.Error);
@@ -214,7 +224,7 @@ public sealed class CreateVisitCommandHandler : IRequestHandler<CreateVisitComma
             clinicId,
             petId,
             appointment?.Id,
-            request.ResponsibleVeterinarianUserId,
+            responsibleVeterinarianUserId,
             userId,
             _timeProvider.GetUtcNow().UtcDateTime,
             request.IsUrgent,

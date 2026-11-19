@@ -753,10 +753,36 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
 
         var filtered = await ctx.GetTodayAsync(responsibleVeterinarianUserId: vet.UserId);
 
+        // Hekimsiz planlı randevu (pets[3]) hekimin listesine girmez.
         filtered.Items.Select(i => i.VisitId).Should().BeEquivalentTo(new Guid?[] { mine, carriedOver });
         filtered.Items.Should().OnlyContain(i => i.ResponsibleVeterinarianUserId == vet.UserId);
         filtered.Items.Single(i => i.VisitId == mine).ResponsibleVeterinarianName.Should().Be("Dr. Ali Veli");
         filtered.ActiveHospitalizations.Should().HaveCount(1, "yatış listesi klinik düzeyindedir");
+    }
+
+    [Fact]
+    public async Task Appointment_Veterinarian_Should_Show_On_Planned_Row_And_Pass_To_Visit_When_None_Chosen()
+    {
+        var ctx = await SeedAsync();
+        var vet = await ctx.SeedClinicUserAsync("Veteriner", "Dr. Ali Veli");
+        var otherVet = await ctx.SeedClinicUserAsync("Veteriner", "Dr. Diger");
+        var mineAppt = await ctx.SeedAppointmentAsync(TimeSpan.FromMinutes(30), await ctx.SeedPetAsync(), vet.UserId);
+        await ctx.SeedAppointmentAsync(TimeSpan.FromMinutes(45), await ctx.SeedPetAsync(), otherVet.UserId);
+
+        // Planlı satırda randevunun hekimi; "Benim hastalarım" hekimin planlı randevularını da getirir.
+        var mine = await ctx.GetTodayAsync(responsibleVeterinarianUserId: vet.UserId);
+        var planned = mine.Items.Should().ContainSingle().Which;
+        planned.AppointmentId.Should().Be(mineAppt);
+        planned.ResponsibleVeterinarianName.Should().Be("Dr. Ali Veli");
+
+        // Hekim seçmeden "Geldi": randevunun hekimi gelişe geçer.
+        var visit = (await ctx.PostVisitAsync(new { appointmentId = mineAppt })).Result!.Visit;
+        visit.ResponsibleVeterinarianUserId.Should().Be(vet.UserId);
+
+        // Seçilen hekim randevununkini ezer.
+        var otherAppt = await ctx.SeedAppointmentAsync(TimeSpan.FromMinutes(60), await ctx.SeedPetAsync(), vet.UserId);
+        var chosen = (await ctx.PostVisitAsync(new { appointmentId = otherAppt, responsibleVeterinarianUserId = otherVet.UserId })).Result!.Visit;
+        chosen.ResponsibleVeterinarianUserId.Should().Be(otherVet.UserId);
     }
 
     [Fact]
@@ -1400,13 +1426,13 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
             return pet.Id;
         }
 
-        public async Task<Guid> SeedAppointmentAsync(TimeSpan fromNow, Guid? petId = null)
+        public async Task<Guid> SeedAppointmentAsync(TimeSpan fromNow, Guid? petId = null, Guid? veterinarianUserId = null)
         {
             await using var scope = _services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var appointment = new Appointment(
                 TenantId, ClinicId, petId ?? PetId, TodaySlot.FromNow(fromNow), 30,
-                AppointmentType.Consultation, AppointmentStatus.Scheduled);
+                AppointmentType.Consultation, AppointmentStatus.Scheduled, veterinarianUserId: veterinarianUserId);
             db.Appointments.Add(appointment);
             await db.SaveChangesAsync();
             return appointment.Id;

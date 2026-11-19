@@ -27,8 +27,9 @@ public sealed class VisitTodayReader : IVisitTodayReader
     public async Task<VisitTodayReadResult> GetAsync(VisitTodayReadRequest request, CancellationToken ct = default)
     {
         var visitRows = await ReadVisitRowsAsync(request, ct);
-        // Randevu hekim alanı taşımaz: voided veya hekim süzgecinde planlı satır yoktur.
-        var plannedRows = request.OnlyVoided || request.ResponsibleVeterinarianUserId.HasValue
+        // Yanlış işaretlenenler görünümünde planlı satır yoktur. Hekim filtresinde yalnız o hekimin randevuları gelir (randevunun
+        // hekimi satırda sorumlu hekim olarak görünür; 2026-11-19).
+        var plannedRows = request.OnlyVoided
             ? new List<Row>()
             : await ReadPlannedRowsAsync(request, ct);
 
@@ -116,13 +117,17 @@ public sealed class VisitTodayReader : IVisitTodayReader
         var start = request.DayStartUtc;
         var end = request.DayEndUtc;
 
-        // Visit'i olmayan, iptal edilmemiş randevular (muayeneyle Completed olmuş ama Visit'siz olanlar dahil).
+        var responsibleId = request.ResponsibleVeterinarianUserId;
+
+        // Visit'i olmayan, iptal edilmemiş randevular (muayeneyle Completed olmuş ama Visit'siz olanlar dahil). Hekim filtresi
+        // randevunun hekimine uygulanır.
         var appointments = _db.Appointments.AsNoTracking()
             .Where(a => a.TenantId == request.TenantId
                         && a.ClinicId == request.ClinicId
                         && a.ScheduledAtUtc >= start
                         && a.ScheduledAtUtc < end
                         && a.Status != AppointmentStatus.Cancelled
+                        && (responsibleId == null || a.VeterinarianUserId == responsibleId)
                         && !_db.Visits.Any(v => v.AppointmentId == a.Id && v.VoidedAtUtc == null));
 
         return await (
@@ -143,7 +148,7 @@ public sealed class VisitTodayReader : IVisitTodayReader
                     null,
                     null,
                     a.Status,
-                    null,
+                    a.VeterinarianUserId,
                     false,
                     false,
                     null,

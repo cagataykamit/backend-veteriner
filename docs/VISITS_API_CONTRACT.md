@@ -22,7 +22,7 @@ Backend tek doğruluk kaynağıdır. Kaynak karar: ADR-009 (vetinity-product), b
 | `clinicId` | guid | |
 | `petId` | guid | |
 | `appointmentId` | guid? | Randevusuz geliş: `null` |
-| `responsibleVeterinarianUserId` | guid? | Opsiyonel; verilirse o kliniğin aktif hekimi olmalı (madde 3.1) |
+| `responsibleVeterinarianUserId` | guid? | Opsiyonel; verilirse o kliniğin aktif hekimi olmalı (madde 3.1). Verilmezse ve randevunun hekimi klinikte aktif hekimse randevunun hekimi yazılır (2026-11-19) |
 | `responsibleVeterinarianName` | string? | Hekimin görünen adı; hekim yoksa `null` |
 | `arrivedAtUtc` | datetime (UTC, `Z`) | Sunucu saatiyle atanır; istemci göndermez |
 | `careStatus` | `Waiting` \| `InProgress` \| `Completed` | |
@@ -282,7 +282,7 @@ Randevulu Visit **tek satırdır** (randevu ayrıca satır üretmez). Satır kay
 | `arrivedAtUtc` | datetime? | Visit varsa |
 | `careStatus` | enum? | Visit varsa; planlı satırda `null` |
 | `appointmentStatus` | `Scheduled` \| `Completed` \| `Cancelled` \| `NoShow`? | Randevu varsa; `NoShow` (gelmedi) satırı Visit'siz planlı satırdır ve sırada en sonda ("Gelmedi" grubu) yer alır |
-| `responsibleVeterinarianUserId`, `responsibleVeterinarianName` | guid?, string? | Visit varsa, opsiyonel (madde 3.1) |
+| `responsibleVeterinarianUserId`, `responsibleVeterinarianName` | guid?, string? | Visit varsa gelişin sorumlu hekimi; planlı (Visit'siz) satırda randevunun hekimi (2026-11-19). Opsiyonel (madde 3.1) |
 | `isCarriedOver` | bool | |
 | `paymentIndicator` | `NoPaymentRecorded` \| `PaymentRecorded` | Aşağıya bakın |
 | `hasActiveHospitalization` | bool | Hayvanın açık yatışı var mı |
@@ -318,7 +318,7 @@ Resepsiyonun yanlış işaretlediği kaydı bulup `POST /visits/{id}/restore` il
 Hekimin yalnızca kendine atanmış satırları görmesi için sorumlu hekim filtresi. Varsayılanı ("hekim rolünde varsayılan Benim hastalarım, tümünü göster seçeneği") istemci yönetir: filtreyi yollamak "benim hastalarım", yollamamak "tümü"dür. Sunucu rol çıkarımı yapmaz.
 
 - **Doğrulama (mevcut hekim kuralıyla aynı, tek yerde):** `userId`, aktif klinikte (`clinicId`) hekim olmalıdır: kiracıda o kliniğe atanmış aktif ve `Veteriner` operasyon claim'li kullanıcı (madde 3.1, `IClinicVeterinarianReader`). Değilse (rol yok, başka klinik, bilinmeyen kimlik, `Guid.Empty`) → `400 Visits.Validation`; boş liste dönmez, çünkü yanlış kimlik sessizce "kimsenin hastası yok" göstermemeli.
-- **Kapsam:** Yalnızca `responsibleVeterinarianUserId` eşleşen Visit satırları (bugünün geliş kayıtları ve devralınanlar). Planlı (Visit'siz) randevu satırları dışlanır: randevu hekim alanı taşımaz (madde 3.1), dolayısıyla hekime atanmış sayılamaz. Sorumlu hekimi boş Visit'ler de dışlanır.
+- **Kapsam:** `responsibleVeterinarianUserId` eşleşen Visit satırları (bugünün geliş kayıtları ve devralınanlar) ve **randevusunun hekimi bu kullanıcı olan planlı (Visit'siz) randevular** (2026-11-19; önceden planlı satırlar dışlanıyordu). Hekimi boş Visit'ler ve hekimsiz randevular dışlanır.
 - `activeHospitalizations` filtreden **etkilenmez** (klinik düzeyinde aktif yatış listesidir; yatış kaydı sorumlu hekim taşımaz).
 - `voided=true` ile birlikte kullanılabilir (yanlış işaretlenenler de aynı hekime göre süzülür). Diğer sıra/sınır kuralları aynen geçerlidir.
 - Yetki: `Visits.Read`; klinik/kiracı kuralları normal Bugün ile aynıdır. Hekim listesi için mevcut `GET /clinics/{clinicId}/veterinarians` kullanılır.
