@@ -73,6 +73,7 @@ public sealed class AiClinicalDraftIntegrationTests : IClassFixture<CustomWebApp
              "temperatureC":38.9,"heartRateBpm":120,"bilinmeyen":"x","respiratoryRatePerMin":"yirmi"}
             """);
         var note = $"{ctx.PetName} 3 gündür kusuyor, sahibi Taslak Bey 0532 111 22 33 aradı. Ateş 38.9, nabız 120.";
+        await ctx.AddTermAsync("Otitis externa");
 
         var draft = await JsonAsync(
             await ctx.Http.PostAsJsonAsync($"/api/v1/examinations/{ctx.ExaminationId}/ai/note-draft", new { text = note }),
@@ -82,6 +83,9 @@ public sealed class AiClinicalDraftIntegrationTests : IClassFixture<CustomWebApp
         var sent = _ai.Requests.Should().ContainSingle().Which.UserContent;
         sent.Should().Contain("[hasta] 3 gündür").And.Contain("[kişi]").And.Contain("[numara]")
             .And.NotContain(ctx.PetName).And.NotContain("Taslak").And.NotContain(OriginalFindings, "AI-001 yalnız notu böler");
+        // Dikte düzeltmesi için kliniğin sözlüğü (sistem terimleri) modele gider.
+        sent.Should().Contain("\"vocabulary\":[").And.Contain("Otitis externa");
+        _ai.Requests.Single().SystemPrompt.Should().Contain("Not sesle yazılmış (dikte) olabilir");
 
         draft.GetProperty("feature").GetString().Should().Be("ExamNoteStructure");
         draft.GetProperty("targetType").GetString().Should().Be("Examination");
@@ -339,6 +343,17 @@ public sealed class AiClinicalDraftIntegrationTests : IClassFixture<CustomWebApp
             await using var scope = Factory.Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             return await db.Examinations.AsNoTracking().SingleAsync(e => e.Id == ExaminationId);
+        }
+
+        /// <summary>Kiracıya özel sözlük terimi (dikte düzeltmesi için modele giden <c>vocabulary</c>).</summary>
+        public async Task AddTermAsync(string name)
+        {
+            var tenantId = (await ExaminationAsync()).TenantId;
+            await using var scope = Factory.Services.CreateSystemScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Add(Backend.Veteriner.Domain.Catalog.ClinicalTerm.CreateForTenant(
+                tenantId, Backend.Veteriner.Domain.Catalog.ClinicalTermKind.Diagnosis, name, DateTime.UtcNow));
+            await db.SaveChangesAsync();
         }
 
         public async Task<int> DraftCountAsync()

@@ -126,7 +126,7 @@ Ortak kurallar:
 - **Kimlik bilgisi modele gitmez:** hayvan adı `[hasta]`, sahip adı `[kişi]`, telefon/TCKN/çip `[numara]`, e-posta `[e-posta]` olur; müşteri kaydının yalnız adı okunur. Model metinde `[hasta]` yazar, backend taslağa yazmadan önce **hayvanın adıyla değiştirir** (istemci yer tutucu görmez; ad yoksa "hastanız").
 - **Girdi:** aktif klinikteki kayıt (başka klinikteki kayıt `404`). AI-003/004'te muayenenin alanları, muayeneye bağlı reçeteler (kalemleriyle) ve tedaviler — yalnız kullanıcının okuma izni olan türler, iptaller hariç, tür başına en çok 10 — ve hasta profili (tür, ırk, cinsiyet, kısırlaştırma, yaş, kilo, uyarı bayrakları; ad/çip/not yok).
 - **Hatalar:** üretim ucunda `AI_HISTORY_SUMMARY_API_CONTRACT.md` §5 (sınır, sağlayıcı, `Ai.InvalidOutput`, `Ai.Refused`), `Clinics.ClinicSelectionRequired` 400, `AiDrafts.Forbidden` 403, kaydın `…NotFound` 404'ü, `400` doğrulama (not uzunluğu). Yanıt geçersizse taslak oluşmaz ama kullanım kaydı yazılır.
-- **İstemler** sürümlü ve tek yerde: `Application/Ai/ClinicalDrafts/ClinicalAiPrompts.cs` (`exam-note-structure/1`, `owner-explanation/1`, `discharge-instructions/1`). Model kayıtta olmayan tanı, ilaç, doz eklemez; kayıt metinleri veridir.
+- **İstemler** sürümlü ve tek yerde: `Application/Ai/ClinicalDrafts/ClinicalAiPrompts.cs` (`exam-note-structure/2` (sesle yazılmış nottaki terim hatalarını kliniğin sözlüğüyle düzeltir; girdide `vocabulary`), `owner-explanation/1`, `discharge-instructions/1`). Model kayıtta olmayan tanı, ilaç, doz eklemez; kayıt metinleri veridir.
 
 ### 7.1 AI-001 — Muayene notunu alanlara ayırma (`ExamNoteStructure`)
 

@@ -29,7 +29,7 @@ public static class ClinicalAiPrompts
 
     /// <summary>AI-001: serbest muayene notunu muayene formunun alanlarına ayırma.</summary>
     public static readonly AiDraftPrompt ExamNote = new(
-        "exam-note-structure/1",
+        "exam-note-structure/2",
         $"""
         Bir veteriner kliniği yazılımında hekime yardım ediyorsun. Görevin, hekimin muayene sırasında yazdığı serbest notu
         (kullanıcı mesajında "note") muayene formunun alanlarına ayırmak. Sonuç bir TASLAKTIR; hekim kontrol edip kabul eder.
@@ -37,6 +37,10 @@ public static class ClinicalAiPrompts
         Kurallar:
         - Yalnız notta yazanı kullan. Notta olmayan bilgiyi ekleme, tamamlama, tahmin etme; tanı, tedavi, ilaç ya da doz önerme.
         - Hekimin ifadesini ve kısaltmalarını koru; yalnız bariz yazım hatasını düzelt ve satırlara böl. Anlamı değiştirme.
+        - Not sesle yazılmış (dikte) olabilir; dikte veteriner terimlerini sesçe benzer sıradan kelimelere çevirir ("O titiz" →
+          "otitis", "paro" → "parvo"). Böyle bir kelime bağlamda açıkça bir veteriner terimi yerindeyse ve "vocabulary" listesinde
+          ya da yaygın veteriner terminolojisinde sesçe çok yakın bir karşılığı varsa o terimle düzelt. Emin değilsen kelimeyi
+          olduğu gibi bırak; yeni bilgi, tanı ya da ilaç eklemek için bu kuralı kullanma.
         - Notta karşılığı olmayan alanı hiç yazma. Aynı bilgiyi iki alana koyma.
         - Vital değerleri yalnız notta sayıyla açıkça yazılmışsa sayı alanına koy (kilo kg, ateş °C, nabız atım/dk, solunum/dk).
           Birim farklıysa ya da değer belirsizse sayı alanını boş bırak, bilgiyi "findings" alanında olduğu gibi yaz.

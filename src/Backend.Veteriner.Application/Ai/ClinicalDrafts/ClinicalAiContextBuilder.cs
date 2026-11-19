@@ -96,6 +96,9 @@ public sealed class ClinicalAiContextBuilder
     /// <c>false</c>: muayene yalnız hedef/kaynak olarak kullanılır, alanları ve bağlı kayıtları gönderilmez (AI-001 yalnız notu böler).
     /// </param>
     /// <param name="userNote">Kullanıcının yazdığı serbest not (temizlenerek <c>note</c> alanına konur).</param>
+    /// <param name="vocabulary">
+    /// Kliniğin sözlük terimleri (<c>vocabulary</c>); sesle yazılmış nottaki terim hatalarını düzeltmek için (AI-001). Kişi verisi içermez.
+    /// </param>
     public async Task<ClinicalAiContext> BuildAsync(
         Guid tenantId,
         Guid petId,
@@ -103,7 +106,8 @@ public sealed class ClinicalAiContextBuilder
         Hospitalization? hospitalization,
         bool includeExaminationFields,
         string? userNote,
-        CancellationToken ct)
+        CancellationToken ct,
+        IReadOnlyList<string>? vocabulary = null)
     {
         var pet = await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, petId), ct);
         var client = pet is null ? null : await _clients.FirstOrDefaultAsync(new ClientByIdSpec(tenantId, pet.ClientId), ct);
@@ -161,6 +165,9 @@ public sealed class ClinicalAiContextBuilder
 
         if (Clip(AiTextRedactor.Redact(userNote, names, patientNames), int.MaxValue) is { } note)
             input["note"] = note;
+
+        if (vocabulary is { Count: > 0 })
+            input["vocabulary"] = new JsonArray(vocabulary.Select(t => (JsonNode?)JsonValue.Create(t)).ToArray());
 
         return new ClinicalAiContext(PetHistoryAiContextBuilder.Compact(input).ToJsonString(JsonOptions), sources, pet?.Name);
     }

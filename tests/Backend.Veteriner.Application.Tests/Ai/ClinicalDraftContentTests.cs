@@ -102,7 +102,8 @@ public sealed class ClinicalDraftContentTests
     {
         var prompts = new[] { ClinicalAiPrompts.ExamNote, ClinicalAiPrompts.OwnerExplanation, ClinicalAiPrompts.DischargeInstructions };
 
-        prompts.Select(p => p.Version).Should().OnlyHaveUniqueItems().And.OnlyContain(v => v.EndsWith("/1"));
+        prompts.Select(p => p.Version).Should().OnlyHaveUniqueItems().And.OnlyContain(v => System.Text.RegularExpressions.Regex.IsMatch(v, "^[a-z-]+/[0-9]+$"));
+        ClinicalAiPrompts.ExamNote.Version.Should().Be("exam-note-structure/2", "dikte düzeltme kuralı eklendi (2026-11-19)");
         prompts.Should().OnlyContain(p => p.Schema()["additionalProperties"]!.GetValue<bool>() == false);
         prompts.Should().OnlyContain(p => p.System.Contains(AiTextRedactor.PatientMask) && !p.System.Contains('{'));
         ExamNoteDraftContent.Schema()["properties"]!.AsObject().Select(p => p.Key)

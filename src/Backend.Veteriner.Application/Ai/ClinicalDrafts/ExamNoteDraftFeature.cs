@@ -2,10 +2,12 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Backend.Veteriner.Application.Ai.Drafts;
 using Backend.Veteriner.Application.Auth;
+using Backend.Veteriner.Application.ClinicalTerms.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.Examinations.Commands.Update;
 using Backend.Veteriner.Domain.Ai;
+using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Shared;
 using FluentValidation;
@@ -39,13 +41,18 @@ public sealed class GenerateExamNoteDraftCommandValidator : AbstractValidator<Ge
 
 public sealed class GenerateExamNoteDraftCommandHandler : IRequestHandler<GenerateExamNoteDraftCommand, Result<AiDraftDto>>
 {
+    /// <summary>Dikte düzeltmesi için modele giden kliniğin aktif sözlük terimleri (sistem + kliniğe özel) üst sınırı.</summary>
+    public const int MaxVocabularyTerms = 400;
+
     private readonly AiDraftGenerator _generator;
     private readonly ClinicalAiContextBuilder _context;
+    private readonly IReadRepository<ClinicalTerm> _terms;
 
-    public GenerateExamNoteDraftCommandHandler(AiDraftGenerator generator, ClinicalAiContextBuilder context)
+    public GenerateExamNoteDraftCommandHandler(AiDraftGenerator generator, ClinicalAiContextBuilder context, IReadRepository<ClinicalTerm> terms)
     {
         _generator = generator;
         _context = context;
+        _terms = terms;
     }
 
     public async ValueTask<Result<AiDraftDto>> Handle(GenerateExamNoteDraftCommand request, CancellationToken ct)
@@ -57,9 +64,14 @@ public sealed class GenerateExamNoteDraftCommandHandler : IRequestHandler<Genera
             if (exam.Value!.IsFinalized)
                 return Result<AiDraftRequest>.Failure(ExamNoteDraftApplier.FinalizedError);
 
-            // Model yalnız notu böler: muayenenin mevcut alanları gönderilmez (hasta profili yalnız bağlam).
+            // Model yalnız notu böler: muayenenin mevcut alanları gönderilmez (hasta profili yalnız bağlam). Sözlük, sesle yazılmış
+            // nottaki terim hatalarını ("O titiz" → otitis) düzeltmek içindir (kullanıcı kararı 2026-11-19).
+            var vocabulary = (await _terms.ListAsync(
+                    new ClinicalTermsFilteredPagedSpec(caller.TenantId, null, false, [], 1, MaxVocabularyTerms), token))
+                .Select(t => t.Name)
+                .ToList();
             var input = await _context.BuildAsync(
-                caller.TenantId, exam.Value.PetId, exam.Value, null, includeExaminationFields: false, request.Text, token);
+                caller.TenantId, exam.Value.PetId, exam.Value, null, includeExaminationFields: false, request.Text, token, vocabulary);
             return Result<AiDraftRequest>.Success(new AiDraftRequest(
                 new AiDraftTarget(nameof(Examination), exam.Value.Id),
                 exam.Value.PetId,
