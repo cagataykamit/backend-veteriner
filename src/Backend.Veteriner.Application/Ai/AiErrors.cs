@@ -56,4 +56,16 @@ public static class AiErrors
         new("AiDrafts.FeatureNotSupported", "Bu AI özelliği için taslak kabulü desteklenmiyor.");
 
     public static Error InvalidDraftContent(string message) => new("AiDrafts.Validation", message);
+
+    // ----- Doğal dille hasta araması (AI-006; docs/AI_PATIENT_SEARCH_API_CONTRACT.md §5). -----
+
+    public static readonly Error SearchQueryRequired =
+        new("AiSearch.Validation", "Aramak istediğinizi yazın.");
+
+    public static readonly Error SearchFilterEmpty =
+        new("AiSearch.Validation", "En az bir filtre gerekir.");
+
+    /// <summary>Filtrede kullanıcının okuma izni olmayan kayıt türüne dayanan ölçüt var (ölçüt sessizce atılmaz: sonuç genişlerdi).</summary>
+    public static Error SearchForbidden(string recordTypes) =>
+        new("AiSearch.Forbidden", $"Bu filtre için yetkiniz yok: {recordTypes}.");
 }

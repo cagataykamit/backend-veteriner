@@ -14,6 +14,9 @@ public enum AiFeature
 
     /// <summary>Taburcu / evde bakım talimatı (AI-004; taslak, AI-009).</summary>
     DischargeInstructions = 4,
+
+    /// <summary>Doğal dille hasta araması: cümleyi yapılandırılmış filtreye çevirme (AI-006). Taslak kaydı oluşturmaz.</summary>
+    PetSearch = 5,
 }
 
 /// <summary>AI taslağının durumu (AI-009; veritabanında int, mevcut değerler değişmez).</summary>
