@@ -212,10 +212,22 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
                         && !charged.Contains(v.Id));
     }
 
-    /// <summary>Tamamlanmamış geliş (madde 1): <c>IncompleteBeforeUtc</c>'den önce gelip tamamlanmamış, yanlış işaretsiz ziyaretler.</summary>
+    /// <summary>
+    /// Tamamlanmamış geliş (madde 1): <c>IncompleteBeforeUtc</c>'den önce gelip tamamlanmamış, yanlış işaretsiz ziyaretler. Hayvanı
+    /// aktif yatıştaysa geliş taburcuya kadar bilerek açık kalır ve sayılmaz (kullanıcı kararı 2026-11-19).
+    /// </summary>
     private IQueryable<Visit> IncompleteVisits(OpenItemsSummaryRequest request)
-        => OpenVisits(request.Scope)
-            .Where(v => v.CareStatus != VisitCareStatus.Completed && v.ArrivedAtUtc < request.IncompleteBeforeUtc);
+    {
+        var scope = request.Scope;
+        var hospitalizedPets = _db.Hospitalizations.AsNoTracking()
+            .Where(h => h.TenantId == scope.TenantId && h.ClinicId == scope.ClinicId && h.DischargedAtUtc == null && h.CancelledAtUtc == null)
+            .Select(h => h.PetId);
+
+        return OpenVisits(scope)
+            .Where(v => v.CareStatus != VisitCareStatus.Completed
+                        && v.ArrivedAtUtc < request.IncompleteBeforeUtc
+                        && !hospitalizedPets.Contains(v.PetId));
+    }
 
     /// <summary>
     /// Ücret varsa açık tutara, yoksa işlemin varlığına göre ziyaret ücret durumu (tek yer). Tamamlanmış ve bilinçli ücretsiz kapatılmamış

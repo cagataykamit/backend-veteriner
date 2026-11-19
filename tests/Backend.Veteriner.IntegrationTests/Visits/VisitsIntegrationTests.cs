@@ -761,6 +761,26 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
     }
 
     [Fact]
+    public async Task Carried_Over_Visit_Of_Hospitalized_Pet_Should_Not_Count_As_Incomplete()
+    {
+        var ctx = await SeedAsync();
+        var hospitalizedPet = await ctx.SeedPetAsync();
+        var otherPet = await ctx.SeedPetAsync();
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Visits.Add(new Visit(ctx.TenantId, ctx.ClinicId, hospitalizedPet, null, null, ctx.UserId, DateTime.UtcNow.AddDays(-2)));
+            db.Visits.Add(new Visit(ctx.TenantId, ctx.ClinicId, otherPet, null, null, ctx.UserId, DateTime.UtcNow.AddDays(-2)));
+            await db.SaveChangesAsync();
+        }
+
+        await ctx.SeedActiveHospitalizationAsync(hospitalizedPet);
+
+        // Yatıştaki hastanın gelişi taburcuya kadar bilerek açık kalır; yalnız diğeri "önceki günden açık" sayılır.
+        (await ctx.GetTodayAsync()).OpenItems!.IncompleteVisitCount.Should().Be(1);
+    }
+
+    [Fact]
     public async Task Appointment_Veterinarian_Should_Show_On_Planned_Row_And_Pass_To_Visit_When_None_Chosen()
     {
         var ctx = await SeedAsync();
@@ -1224,7 +1244,8 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         var otherVisitId = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = otherPet })).Result!.Visit.Id;
         var examinationId = await ctx.CreateExaminationAsync(visitId);
         await ctx.CreateExaminationAsync(otherVisitId);
-        await ctx.CreateExaminationAsync(visitId: null, petId: ctx.PetId);
+        // Gelişsiz muayene başka bir hayvanda: kendi gelişini açar, bu gelişin listesine girmez.
+        await ctx.CreateExaminationAsync(visitId: null, petId: await ctx.SeedPetAsync());
 
         var page = await ctx.Http.GetFromJsonAsync<PagedResult<ExaminationListItemDto>>(
             $"/api/v1/examinations?clinicId={ctx.ClinicId}&visitId={visitId}");
@@ -1233,6 +1254,41 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
         page.Items[0].Id.Should().Be(examinationId);
         page.Items[0].VisitId.Should().Be(visitId);
         page.TotalItems.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Examination_Without_Visit_Should_Link_Open_Visit_Or_Open_New_Visit_Today_Only()
+    {
+        var ctx = await SeedAsync();
+
+        // Hayvanın açık (bekleyen) gelişi varsa muayene ona bağlanır ve geliş başlar.
+        var waitingVisit = (await ctx.PostVisitAsync(new { clinicId = ctx.ClinicId, petId = ctx.PetId })).Result!.Visit.Id;
+        var linkedExam = await ctx.CreateExaminationAsync(visitId: null, petId: ctx.PetId);
+
+        // Gelişi olmayan hayvanda bugünkü muayene yeni (randevusuz) geliş açar ve başlatır.
+        var newPet = await ctx.SeedPetAsync();
+        var openedExam = await ctx.CreateExaminationAsync(visitId: null, petId: newPet);
+
+        // Geçmiş tarihli muayene arşiv kaydıdır: geliş açmaz.
+        var oldPet = await ctx.SeedPetAsync();
+        var pastExam = await ctx.CreateExaminationAsync(visitId: null, petId: oldPet, examinedAtUtc: DateTime.UtcNow.AddDays(-3));
+
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var ids = new[] { linkedExam, openedExam, pastExam };
+        var exams = await db.Examinations.AsNoTracking().Where(e => ids.Contains(e.Id)).ToDictionaryAsync(e => e.Id);
+
+        exams[linkedExam].VisitId.Should().Be(waitingVisit);
+        (await db.Visits.AsNoTracking().SingleAsync(v => v.Id == waitingVisit)).CareStatus.Should().Be(VisitCareStatus.InProgress);
+
+        var openedVisitId = exams[openedExam].VisitId;
+        var opened = await db.Visits.AsNoTracking().SingleAsync(v => v.Id == openedVisitId);
+        opened.PetId.Should().Be(newPet);
+        opened.AppointmentId.Should().BeNull();
+        opened.CareStatus.Should().Be(VisitCareStatus.InProgress);
+
+        exams[pastExam].VisitId.Should().BeNull();
+        (await db.Visits.AsNoTracking().AnyAsync(v => v.PetId == oldPet)).Should().BeFalse();
     }
 
     [Fact]
@@ -1398,14 +1454,14 @@ public sealed class VisitsIntegrationTests : IClassFixture<CustomWebApplicationF
             return (await response.Content.ReadFromJsonAsync<TodayDto>())!;
         }
 
-        public async Task<Guid> CreateExaminationAsync(Guid? visitId, Guid? petId = null)
+        public async Task<Guid> CreateExaminationAsync(Guid? visitId, Guid? petId = null, DateTime? examinedAtUtc = null)
         {
             var response = await Http.PostAsJsonAsync("/api/v1/examinations", new
             {
                 visitId,
                 clinicId = visitId is null ? ClinicId : (Guid?)null,
                 petId,
-                examinedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+                examinedAtUtc = examinedAtUtc ?? DateTime.UtcNow.AddMinutes(-5),
                 visitReason = "Kontrol",
             });
             response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
