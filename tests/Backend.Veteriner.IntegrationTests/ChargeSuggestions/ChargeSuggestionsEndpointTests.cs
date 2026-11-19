@@ -70,6 +70,34 @@ public sealed class ChargeSuggestionsEndpointTests : IClassFixture<CustomWebAppl
     }
 
     [Fact]
+    public async Task Today_Open_Items_Should_Count_Pending_Charge_Items_Until_Converted()
+    {
+        var ctx = await SeedAsync();
+        var client = await ClientAsync(ctx, ReceptionPermissions);
+        await AdministerAsync(client, ctx, 2m);
+
+        // Bugün özeti ile aynı okuyucu ve pencere (OpenItemsSummaryRequest.ForToday).
+        async Task<int?> PendingItemsAsync()
+        {
+            await using var scope = _factory.Services.CreateSystemScope();
+            var reader = scope.ServiceProvider.GetRequiredService<Backend.Veteriner.Application.Visits.ReadModels.IVisitOpenItemsReader>();
+            var openScope = new Backend.Veteriner.Application.Visits.ReadModels.OpenItemsScope(
+                ctx.TenantId, ctx.ClinicId, Backend.Veteriner.Application.Visits.ReadModels.OpenItemSources.Charges);
+            var summary = await reader.GetSummaryAsync(
+                Backend.Veteriner.Application.Visits.ReadModels.OpenItemsSummaryRequest.ForToday(openScope, DateTime.UtcNow));
+            return summary.PendingChargeItemCount;
+        }
+
+        (await PendingItemsAsync()).Should().Be(1);
+
+        var id = Id((await PendingAsync(client, ctx)).Single());
+        (await client.PostAsJsonAsync($"/api/v1/charge-suggestions/{id}/convert", new { requestId = Guid.NewGuid() }))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+
+        (await PendingItemsAsync()).Should().Be(0);
+    }
+
+    [Fact]
     public async Task Convert_Should_Create_One_Charge_From_Prefilled_Values_And_Replay_By_RequestId()
     {
         var ctx = await SeedAsync();

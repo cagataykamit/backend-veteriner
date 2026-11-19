@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Hbs;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.ReadModels;
+using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Vaccinations;
@@ -83,10 +84,20 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
         int? outstandingVisits = null;
         decimal? outstandingAmount = null;
         int? awaitingLabs = null;
+        int? pendingChargeItems = null;
 
         if (scope.Sees(OpenItemSources.Charges))
         {
             uncharged = await UnchargedVisits(request).CountAsync(ct);
+
+            // Ücrete çevrilmeyi bekleyen kalemler (madde 1b): ziyarette tek ücret olsa da "Ücret yok"a girmeyen kısmi ücretlendirme
+            // kaybolmasın; aynı 30 gün penceresi.
+            pendingChargeItems = await _db.ChargeSuggestions.AsNoTracking()
+                .CountAsync(s => s.TenantId == scope.TenantId
+                                 && s.ClinicId == scope.ClinicId
+                                 && s.Status == ChargeSuggestionStatus.Pending
+                                 && s.OccurredAtUtc >= request.UnchargedFromUtc
+                                 && s.OccurredAtUtc < request.UnchargedToUtc, ct);
 
             // Borçlu çıkan: tamamlanmış ziyaretin açık tutarı > 0. Yalnız açık ücretler (AllocatedAmount < Amount) toplanır:
             // tahsisi tamamlanmış ücret toplama 0 katar (CK_Charges_AllocatedAmount_Range), bu yüzden sonuç aynıdır ama
@@ -138,7 +149,7 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
             }
         }
 
-        return new OpenItemsSummaryDto(uncharged, outstandingVisits, outstandingAmount, awaitingLabs, incomplete, hbsPrescriptions, hbsVaccinations);
+        return new OpenItemsSummaryDto(uncharged, outstandingVisits, outstandingAmount, awaitingLabs, incomplete, hbsPrescriptions, hbsVaccinations, pendingChargeItems);
     }
 
     public async Task<OpenItemVisitsReadResult> ListVisitsAsync(

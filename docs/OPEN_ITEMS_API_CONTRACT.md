@@ -57,6 +57,7 @@ Yalnızca **Visit satırlarında** dolu olabilir; planlı (Visit'siz) randevu sa
 | Alan | Tip | Tanım | Görme izni |
 |---|---|---|---|
 | `unchargedVisitCount` | int? | "Ücret yok" olan Visit sayısı; **yalnızca son 30 İstanbul günü** (aşağıya bakın) | `Charges.Read` |
+| `pendingChargeItemCount` | int? | Ücrete çevrilmeyi bekleyen kalem (`ChargeSuggestion.Pending`) sayısı, aynı 30 gün penceresi (kalemin işlem anı). Ziyarette tek ücret olsa da kalan kalemler kaybolmasın diye (madde 1b, 2026-11-19); panel "Ücret bekliyor: N kalem" çipiyle Ücretlendir ekranına götürür | `Charges.Read` |
 | `outstandingVisitCount` | int? | Borçlu çıkan Visit sayısı (madde 1) | `Charges.Read` |
 | `outstandingAmount` | decimal? | Borçlu çıkan Visit'lerin toplam açık tutarı (TRY) | `Charges.Read` |
 | `awaitingLabCount` | int? | Klinikteki tüm `Requested` lab kayıtları (ziyarete bağlı olmayanlar dahil) | `LabResults.Read` |

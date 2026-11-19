@@ -25,7 +25,8 @@ public sealed record OpenItemsSummaryDto(
     int? AwaitingLabCount,
     int IncompleteVisitCount,
     int? HbsNotEnteredPrescriptionCount = null,
-    int? HbsNotEnteredVaccinationCount = null);
+    int? HbsNotEnteredVaccinationCount = null,
+    int? PendingChargeItemCount = null);
 
 /// <summary>Listesi açılabilen özet sayısı: <c>Uncharged</c> = <see cref="OpenItemsSummaryDto.UnchargedVisitCount"/>, <c>Incomplete</c> = <see cref="OpenItemsSummaryDto.IncompleteVisitCount"/>.</summary>
 public enum OpenItemVisitKind
