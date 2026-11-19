@@ -41,6 +41,7 @@ Yalnızca **Visit satırlarında** dolu olabilir; planlı (Visit'siz) randevu sa
 | `chargeIndicator` | enum? | `NoChargeableWork` \| `ChargeMissing` \| `PaymentPending` \| `PartiallyPaid` \| `Paid`. Önce ücret varlığına bakılır: ücret varsa açık tutara göre `Paid`/`PartiallyPaid`/`PaymentPending`; ücret yoksa işlem varsa ya da ziyaret tamamlanmış ve ücretsiz işaretlenmemişse (madde 1a) `ChargeMissing`, yoksa `NoChargeableWork`. **`Charges.Read` yoksa `null`** |
 | `chargeableWorkCount` | int? | Madde 2'deki kayıt sayısı (yalnız kullanıcının görebildiği türler). `Charges.Read` yoksa `null` |
 | `awaitingLabCount` | int? | Ziyarete bağlı `Requested` lab sayısı. `LabResults.Read` yoksa `null` |
+| `latestExaminationId` | guid? | Ziyarete bağlı en son muayene (2026-11-19); panelde "Muayene aç" yeni muayene yerine bunu açar. Muayene yoksa ya da `Examinations.Read` yoksa `null` |
 
 - Mevcut `chargedAmount`, `allocatedAmount`, `outstandingAmount` artık ziyarete **muayene üzerinden bağlı ücretleri de** kapsar (`visitId ?? examination.visitId`); önceden yalnızca doğrudan `visitId` taşıyan ücretler toplanıyordu (düzeltme: gösterge ile tutarın aynı kuralı kullanması için). `Charges.Read` yoksa aynen `null`.
 - `paymentIndicator` (tahsilat kaydı var/yok) **değişmez**; ücret/borç sorusunu `chargeIndicator` yanıtlar. İkisi farklı sorulardır (ilki randevu/muayene bağlı tahsilat kaydı, ikincisi ücret–tahsis).

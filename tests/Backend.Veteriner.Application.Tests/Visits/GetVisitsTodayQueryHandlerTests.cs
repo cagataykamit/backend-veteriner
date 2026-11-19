@@ -43,6 +43,7 @@ public sealed class GetVisitsTodayQueryHandlerTests
             _openItems.Object,
             new Mock<IReadRepository<Backend.Veteriner.Domain.Charges.Charge>>().Object,
             new Mock<IReadRepository<Backend.Veteriner.Domain.ChargeSuggestions.ChargeSuggestion>>().Object,
+            VisitHandlerTestSupport.EmptyExaminations(),
             new Mock<ICurrentUserPermissionChecker>().Object,
             _veterinarians.Object,
             VisitHandlerTestSupport.FixedClock);

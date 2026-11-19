@@ -11,6 +11,15 @@ internal static class VisitHandlerTestSupport
     public static Visit NewVisit(Guid tenantId, Guid clinicId, Guid? petId = null, Guid? appointmentId = null)
         => new(tenantId, clinicId, petId ?? Guid.NewGuid(), appointmentId, null, Guid.NewGuid(), FixedNowUtc);
 
+    /// <summary>Hiç muayene döndürmeyen depo (Bugün satırının en son muayene alanı boş kalır).</summary>
+    public static Backend.Veteriner.Application.Common.Abstractions.IReadRepository<Backend.Veteriner.Domain.Examinations.Examination> EmptyExaminations()
+    {
+        var mock = new Moq.Mock<Backend.Veteriner.Application.Common.Abstractions.IReadRepository<Backend.Veteriner.Domain.Examinations.Examination>>();
+        mock.Setup(r => r.ListAsync(Moq.It.IsAny<Ardalis.Specification.ISpecification<Backend.Veteriner.Domain.Examinations.Examination>>(), Moq.It.IsAny<CancellationToken>()))
+            .Returns(Task.FromResult(new List<Backend.Veteriner.Domain.Examinations.Examination>()));
+        return mock.Object;
+    }
+
     private sealed class FixedTimeProvider(DateTime utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => new(utcNow, TimeSpan.Zero);

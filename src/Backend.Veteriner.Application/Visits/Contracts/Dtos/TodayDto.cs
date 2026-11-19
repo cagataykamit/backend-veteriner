@@ -66,6 +66,12 @@ public sealed record TodayItemDto(
 
     /// <summary>Sahip hatırlatma bağlantısıyla geleceğini onayladı (TIER-019); randevusuz satırda null. Durumu değiştirmez.</summary>
     public DateTime? OwnerConfirmedAtUtc { get; init; }
+
+    /// <summary>
+    /// Gelişe bağlı en son muayene (yoksa null); "Muayene aç" yeni muayene yerine bunu açar (2026-11-19). <c>Examinations.Read</c>
+    /// yoksa null.
+    /// </summary>
+    public Guid? LatestExaminationId { get; init; }
 }
 
 public sealed record TodayHospitalizationDto(

@@ -81,6 +81,18 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
     }
 
     [Fact]
+    public async Task Today_Row_Should_Carry_Latest_Examination_Of_Visit()
+    {
+        var ctx = await SeedAsync();
+        var visitId = await ctx.CreateVisitAsync();
+        (await ctx.GetTodayAsync()).Items.Single(i => i.VisitId == visitId).LatestExaminationId.Should().BeNull();
+
+        var examinationId = await ctx.CreateExaminationAsync(visitId);
+
+        (await ctx.GetTodayAsync()).Items.Single(i => i.VisitId == visitId).LatestExaminationId.Should().Be(examinationId);
+    }
+
+    [Fact]
     public async Task Visit_Without_Work_Should_Be_NoChargeableWork_And_Not_Counted_As_Uncharged()
     {
         var ctx = await SeedAsync();

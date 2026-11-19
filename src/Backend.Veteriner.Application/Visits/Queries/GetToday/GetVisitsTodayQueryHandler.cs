@@ -4,12 +4,14 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
+using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.ReadModels;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Appointments;
+using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Visits;
 using Mediator;
 
@@ -27,6 +29,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
     private readonly IVisitOpenItemsReader _openItems;
     private readonly IReadRepository<Charge> _charges;
     private readonly IReadRepository<ChargeSuggestion> _chargeSuggestions;
+    private readonly IReadRepository<Examination> _examinations;
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IClinicVeterinarianReader _veterinarians;
     private readonly TimeProvider _timeProvider;
@@ -39,10 +42,12 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
         IVisitOpenItemsReader openItems,
         IReadRepository<Charge> charges,
         IReadRepository<ChargeSuggestion> chargeSuggestions,
+        IReadRepository<Examination> examinations,
         ICurrentUserPermissionChecker permissions,
         IClinicVeterinarianReader veterinarians,
         TimeProvider timeProvider)
     {
+        _examinations = examinations;
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
@@ -144,6 +149,13 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
         if (visitIds.Length > 0 && scope.Visible != OpenItemSources.None)
             visitOpenItems = await _openItems.GetForVisitsAsync(scope, visitIds, ct);
 
+        // "Muayene aç" gelişin mevcut muayenesini açsın (mükerrer muayene olmasın): en yeni muayene, spec sırası en yeni önce.
+        var latestExamination = visitIds.Length > 0 && scope.Sees(OpenItemSources.Examinations)
+            ? (await _examinations.ListAsync(new ExaminationsByVisitIdsSpec(scope.TenantId, visitIds, scope.ClinicId, null), ct))
+                .GroupBy(e => e.VisitId!.Value)
+                .ToDictionary(g => g.Key, g => g.First().Id)
+            : new Dictionary<Guid, Guid>();
+
         Dictionary<Guid, decimal>? clientOutstanding = null;
         Dictionary<Guid, int>? pendingByVisit = null;
         if (scope.Sees(OpenItemSources.Charges))
@@ -171,6 +183,8 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
                 if (i.VisitId is not { } visitId)
                     return row;
 
+                if (latestExamination.TryGetValue(visitId, out var examinationId))
+                    row = row with { LatestExaminationId = examinationId };
                 if (pendingByVisit is not null)
                     row = row with { PendingChargeCount = pendingByVisit.GetValueOrDefault(visitId) };
                 if (!visitOpenItems.TryGetValue(visitId, out var open))
