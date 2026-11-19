@@ -4,6 +4,7 @@ using Backend.Veteriner.Api.Common.Extensions;
 using Backend.Veteriner.Application.Ai;
 using Backend.Veteriner.Application.Ai.ClinicalDrafts;
 using Backend.Veteriner.Application.Ai.Drafts;
+using Backend.Veteriner.Application.Ai.PatientSearch;
 using Backend.Veteriner.Application.Ai.PetHistorySummary;
 using Backend.Veteriner.Application.Auth;
 using Mediator;
@@ -50,6 +51,38 @@ public sealed class AiController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> GeneratePetHistorySummary([FromRoute] Guid id, CancellationToken ct)
         => (await _mediator.Send(new GeneratePetHistorySummaryCommand(id), ct)).ToActionResult(this);
+
+    /// <summary>
+    /// Doğal dille hasta araması, 1. adım (AI-006): cümleyi yapılandırılmış filtreye çevirir; arama yapmaz. Model yalnız cümleyi,
+    /// bugünün tarihini, tür listesini ve şikâyet/tanı sözlüğünü görür. Kota harcar. Sözleşme: docs/AI_PATIENT_SEARCH_API_CONTRACT.md §3.
+    /// </summary>
+    [HttpPost("ai/pet-search/interpret")]
+    [Authorize(Policy = PermissionCatalog.Pets.Read)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(PetSearchInterpretationDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status502BadGateway)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> InterpretPetSearch([FromBody] AiPetSearchInterpretBody body, CancellationToken ct)
+        => (await _mediator.Send(new InterpretPetSearchCommand(body.Query ?? string.Empty), ct)).ToActionResult(this);
+
+    /// <summary>
+    /// Doğal dille hasta araması, 2. adım (AI-006): yapılandırılmış filtreyle arar; AI çağırmaz, kota harcamaz. Klinik ölçütler aktif
+    /// kliniğin kayıtlarında ve okuma izni olan türlerde aranır. Sözleşme: docs/AI_PATIENT_SEARCH_API_CONTRACT.md §4.
+    /// </summary>
+    [HttpPost("ai/pet-search/results")]
+    [Authorize(Policy = PermissionCatalog.Pets.Read)]
+    [Consumes("application/json")]
+    [ProducesResponseType(typeof(PetSearchResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> SearchPets([FromBody] AiPetSearchBody body, CancellationToken ct)
+        => (await _mediator.Send(
+            new SearchPetsQuery(body.Filter ?? new PetSearchFilter(), body.Page ?? 1, body.PageSize ?? PetSearchRunner.DefaultPageSize),
+            ct)).ToActionResult(this);
 
     /// <summary>
     /// Muayene notu taslağı (AI-001): hekimin serbest notunu muayene alanlarına ayırır. Muayeneye yazmaz; kabul
@@ -181,6 +214,22 @@ public sealed class AiDraftAcceptBody
 {
     /// <summary>Kullanıcının düzenlediği içerik (taslakla aynı şemada); <c>null</c> ise üretilen içerik olduğu gibi kabul edilir.</summary>
     public JsonObject? EditedContent { get; init; }
+}
+
+public sealed class AiPetSearchInterpretBody
+{
+    /// <summary>Kullanıcının arama cümlesi (zorunlu, en çok 500 karakter). Saklanmaz.</summary>
+    public string? Query { get; init; }
+}
+
+public sealed class AiPetSearchBody
+{
+    /// <summary>Yapılandırılmış filtre (<c>interpret</c> yanıtındaki ya da kullanıcının düzenlediği). Bilinmeyen alan yok sayılır.</summary>
+    public PetSearchFilter? Filter { get; init; }
+
+    public int? Page { get; init; }
+
+    public int? PageSize { get; init; }
 }
 
 public sealed class AiNoteDraftBody

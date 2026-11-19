@@ -146,6 +146,9 @@ public static class DependencyInjection
         services.AddScoped<Ai.Drafts.IAiProvenanceReader, Ai.Drafts.AiProvenanceReader>();
         // Taslak üreten klinik özellikler (AI-001/003/004): ortak girdi ve özellik başına uygulayıcı.
         services.AddScoped<Ai.ClinicalDrafts.ClinicalAiContextBuilder>();
+        // Doğal dille hasta araması (AI-006): ortak bağlam ve yapılandırılmış arama.
+        services.AddScoped<Ai.PatientSearch.PetSearchContext>();
+        services.AddScoped<Ai.PatientSearch.PetSearchRunner>();
         services.AddScoped<Ai.Drafts.IAiDraftApplier, Ai.ClinicalDrafts.ExamNoteDraftApplier>();
         services.AddScoped<Ai.Drafts.IAiDraftApplier, Ai.ClinicalDrafts.OwnerExplanationDraftApplier>();
         services.AddScoped<Ai.Drafts.IAiDraftApplier, Ai.ClinicalDrafts.DischargeInstructionsDraftApplier>();
