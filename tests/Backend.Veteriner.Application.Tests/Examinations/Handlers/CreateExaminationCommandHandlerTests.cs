@@ -43,6 +43,9 @@ public sealed class CreateExaminationCommandHandlerTests
             _appointmentsWrite.Object,
             _examinationsWrite.Object,
             _visits.Object,
+            new Mock<IRepository<Visit>>().Object,
+            Mock.Of<IClientContext>(c => c.UserId == (Guid?)Guid.Parse("00000000-0000-0000-0000-0000000000aa")),
+            new Mock<Backend.Veteriner.Application.Clinics.Veterinarians.IClinicVeterinarianReader>().Object,
             TimeProvider.System);
 
     private static CreateExaminationCommand Cmd(
