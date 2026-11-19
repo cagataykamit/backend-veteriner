@@ -20,10 +20,13 @@ public sealed class TransitionVisitCommandHandlerTests
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private readonly Mock<IReadRepository<Visit>> _visitsRead = new();
     private readonly Mock<IRepository<Visit>> _visitsWrite = new();
+    private readonly Mock<IClientContext> _clientContext = new();
+    private readonly Guid _userId = Guid.NewGuid();
 
     public TransitionVisitCommandHandlerTests()
     {
         _tenantContext.SetupGet(t => t.TenantId).Returns(_tenantId);
+        _clientContext.SetupGet(c => c.UserId).Returns(_userId);
     }
 
     private TransitionVisitCommandHandler CreateHandler()
@@ -34,7 +37,8 @@ public sealed class TransitionVisitCommandHandlerTests
             _visitsRead.Object,
             _visitsWrite.Object,
             VisitHandlerTestSupport.FixedClock,
-            VeterinarianReaderMock.Create().Object);
+            VeterinarianReaderMock.Create().Object,
+            _clientContext.Object);
 
     private Visit WaitingVisit() => VisitHandlerTestSupport.NewVisit(_tenantId, _clinicId);
 

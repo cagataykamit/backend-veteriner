@@ -9,7 +9,8 @@ Backend tek doğruluk kaynağıdır. Kaynak: vetinity-product `ux/HEDEF-IS-AKISL
 ## 1) Kavramlar
 
 - **Ücretlendirilebilir işlem:** Hekimin kaydettiği, normalde müşteriye ücret doğuran iş. Hekim ücret ekleyemez (ADR-012); bu yüzden işlem var ama ücret yoksa iş resepsiyonun önüne düşmez (B-02). Kapsam madde 2'de.
-- **Ücret yok (`ChargeMissing`):** Ziyarette en az bir ücretlendirilebilir işlem var, ama ziyarete bağlı (iptal edilmemiş) **hiç ücret kaydı yok**. Kalem düzeyi yoktur: tek bir ücret kaydı varsa (tutarı işlemleri karşılasa da karşılamasa da) "ücret yok" sayılmaz. Kalem düzeyi D4 (ücret önerisi) kapsamıdır.
+- **Ücret yok (`ChargeMissing`):** Ziyarete bağlı (iptal edilmemiş) **hiç ücret kaydı yok** ve ya ziyarette en az bir ücretlendirilebilir işlem var, ya da ziyaret **tamamlanmış ve bilinçli ücretsiz kapatılmamış** (`Visit.NoChargeConfirmedAtUtc` boş; madde 1a). Kalem düzeyi yoktur: tek bir ücret kaydı varsa (tutarı işlemleri karşılasa da karşılamasa da) "ücret yok" sayılmaz. Kalem düzeyi D4 (ücret önerisi) kapsamıdır.
+- **1a. Ücretsiz tamamlama (2026-11-19):** `POST /api/v1/visits/{id}/complete` isteğe bağlı gövde `{ "withoutCharge": true }` alır: ziyaret tamamlanır ve bilinçli ücretsiz kapatıldığı (zaman + kullanıcı) kaydedilir; tamamlanmış ziyarette de sonradan işaretlenebilir (idempotent). Bakım durumu düzeltmeyle tamamlanmamışa dönerse işaret temizlenir. Böyle ziyaret ücretsiz kalsa da "Ücret yok" sayılmaz (`NoChargeableWork`). Panel: muayene ve ücret kaydı olmayan ziyarette "Tamamla" önce "Muayene aç / Ücret ekle / Ücretsiz tamamla" sorar.
 - **Ödeme bekliyor / kısmi:** Ziyarete bağlı ücret var ve açık tutar (`Σ amount − Σ allocatedAmount`) > 0. Hiç tahsis yoksa `PaymentPending`, bir kısmı tahsis edilmişse `PartiallyPaid`, açık tutar 0 ise `Paid`.
 - **Lab bekliyor:** `status = Requested` LabResult (istendi, sonuç girilmedi). `Cancelled` ve `Resulted` sayılmaz. "Değerlendirme bekliyor" (`awaitingInterpretation`) bu sayıya girmez.
 - **Tamamlanmamış geliş:** Yanlış geliş işaretsiz, `careStatus` ≠ `Completed` ve geliş zamanı **içinde bulunulan İstanbul gününün başlangıcından önce** olan Visit (önceki günden kalan açık geliş). Satır düzeyinde göstergesi mevcut `isCarriedOver` alanıdır.
@@ -37,7 +38,7 @@ Yalnızca **Visit satırlarında** dolu olabilir; planlı (Visit'siz) randevu sa
 
 | Alan | Tip | Not |
 |---|---|---|
-| `chargeIndicator` | enum? | `NoChargeableWork` \| `ChargeMissing` \| `PaymentPending` \| `PartiallyPaid` \| `Paid`. Önce ücret varlığına bakılır: ücret varsa açık tutara göre `Paid`/`PartiallyPaid`/`PaymentPending`; ücret yoksa işlem varsa `ChargeMissing`, yoksa `NoChargeableWork`. **`Charges.Read` yoksa `null`** |
+| `chargeIndicator` | enum? | `NoChargeableWork` \| `ChargeMissing` \| `PaymentPending` \| `PartiallyPaid` \| `Paid`. Önce ücret varlığına bakılır: ücret varsa açık tutara göre `Paid`/`PartiallyPaid`/`PaymentPending`; ücret yoksa işlem varsa ya da ziyaret tamamlanmış ve ücretsiz işaretlenmemişse (madde 1a) `ChargeMissing`, yoksa `NoChargeableWork`. **`Charges.Read` yoksa `null`** |
 | `chargeableWorkCount` | int? | Madde 2'deki kayıt sayısı (yalnız kullanıcının görebildiği türler). `Charges.Read` yoksa `null` |
 | `awaitingLabCount` | int? | Ziyarete bağlı `Requested` lab sayısı. `LabResults.Read` yoksa `null` |
 
@@ -98,6 +99,7 @@ Kural tek bileşendedir: `IVisitOpenItemsReader` (Application, `Visits/ReadModel
 - **K-D2-2:** "Ücret yok" ziyaret düzeyindedir (kalem yok), tek ücret kaydı yeterlidir. Pilot-öncesi küçük sürüm kararı (HEDEF §1.4).
 - **K-D2-3:** Tamamlanmamış geliş = önceki günden açık kalan. Aynı gün açık olan zaten Bugün kuyruğundadır.
 - **K-D2-4:** Özet klinik geneli, hekim/tarih süzgecinden bağımsızdır; ücretsiz ziyaret sayımı 30 gün pencerelidir.
+- **K-D2-7 (2026-11-19, kullanıcı):** Muayene ve ücret kaydı olmadan tamamlanan ziyaret sessizce kapanmaz; ücretsiz bırakılacaksa kullanıcı bunu "Ücretsiz tamamla" ile bilerek seçer (madde 1a), aksi halde "Ücret yok" listesine girer. Neden: kısa kontrol, tırnak kesimi gibi muayenesiz gelişlerde ücret unutuluyordu.
 - **K-D2-6 (2026-11-18):** Bugün şeridindeki her açık iş sayısı bir yere götürür. Liste sayfası olmayan iki sayı (ücret yok, önceki günden açık geliş) için ayrı sayfa değil, çipten açılan küçük liste (madde 10); en eski önce, en çok 200 satır. Rakip pratiği: açık kabul/ücretsiz işlem listesi günlük ekrandan açılır ve satırdan işe gidilir.
 - **K-D2-5:** Borçlu çıkan yalnız Visit'e bağlı ücretlerden hesaplanır; ziyaretsiz müşteri borcu için mevcut `clientOutstandingAmount`, bakiye ve borç raporu (`OUTSTANDING_BALANCE_REPORT_API_CONTRACT.md`) geçerlidir.
 

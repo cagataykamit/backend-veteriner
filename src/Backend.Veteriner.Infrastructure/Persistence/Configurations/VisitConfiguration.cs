@@ -37,6 +37,8 @@ public sealed class VisitConfiguration : IEntityTypeConfiguration<Visit>
         b.Property(x => x.CreatedByUserId).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.ArrivalReason).HasMaxLength(Visit.MaxArrivalReasonLength);
+        b.Property(x => x.NoChargeConfirmedAtUtc);
+        b.Property(x => x.NoChargeConfirmedByUserId);
 
         // Şablon silinmez (yalnız pasifleşir); FK yok, AppointmentId ile aynı düzen.
         b.Property(x => x.PreparedExaminationTemplateId);

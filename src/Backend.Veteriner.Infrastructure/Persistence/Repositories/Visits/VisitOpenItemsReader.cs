@@ -30,6 +30,13 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
             return new Dictionary<Guid, VisitOpenItems>();
 
         var ids = visitIds.ToList();
+        // Tamamlanmış ve bilinçli ücretsiz kapatılmamış ziyaretler: işlemi olmasa da ücretsiz kalırsa "ücret yok" sayılır.
+        var completedUnconfirmed = scope.Sees(OpenItemSources.Charges)
+            ? (await _db.Visits.AsNoTracking()
+                .Where(v => ids.Contains(v.Id) && v.CareStatus == VisitCareStatus.Completed && v.NoChargeConfirmedAtUtc == null)
+                .Select(v => v.Id)
+                .ToListAsync(ct)).ToHashSet()
+            : [];
         var workCounts = scope.Visible == OpenItemSources.None
             ? new Dictionary<Guid, int>()
             : await WorkVisitIds(scope, ids)
@@ -61,7 +68,7 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
 
             var hasCharge = charges.TryGetValue(id, out var totals);
             return new VisitOpenItems(
-                Classify(hasCharge, totals.Charged, totals.Allocated, work),
+                Classify(hasCharge, totals.Charged, totals.Allocated, work, completedUnconfirmed.Contains(id)),
                 work,
                 totals.Charged,
                 totals.Allocated,
@@ -178,8 +185,8 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
     }
 
     /// <summary>
-    /// "Ücret yok" ziyaretleri (madde 1): pencere içinde gelmiş, görünür ücretlendirilebilir işlemi olan, ziyarete bağlı hiç ücreti olmayan.
-    /// Özet sayısı ve liste bu tek parçadan beslenir.
+    /// "Ücret yok" ziyaretleri (madde 1): pencere içinde gelmiş, ziyarete bağlı hiç ücreti olmayan ve ya görünür ücretlendirilebilir
+    /// işlemi olan ya da tamamlanmış ama bilinçli ücretsiz kapatılmamış (madde 1a, 2026-11-19). Özet sayısı ve liste bu tek parçadan beslenir.
     /// </summary>
     private IQueryable<Visit> UnchargedVisits(OpenItemsSummaryRequest request)
     {
@@ -189,7 +196,8 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
         return OpenVisits(scope)
             .Where(v => v.ArrivedAtUtc >= request.UnchargedFromUtc
                         && v.ArrivedAtUtc < request.UnchargedToUtc
-                        && work.Contains(v.Id)
+                        && (work.Contains(v.Id)
+                            || (v.CareStatus == VisitCareStatus.Completed && v.NoChargeConfirmedAtUtc == null))
                         && !charged.Contains(v.Id));
     }
 
@@ -198,11 +206,14 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
         => OpenVisits(request.Scope)
             .Where(v => v.CareStatus != VisitCareStatus.Completed && v.ArrivedAtUtc < request.IncompleteBeforeUtc);
 
-    /// <summary>Ücret varsa açık tutara, yoksa işlemin varlığına göre ziyaret ücret durumu (tek yer).</summary>
-    private static VisitChargeIndicator Classify(bool hasCharge, decimal charged, decimal allocated, int workCount)
+    /// <summary>
+    /// Ücret varsa açık tutara, yoksa işlemin varlığına göre ziyaret ücret durumu (tek yer). Tamamlanmış ve bilinçli ücretsiz kapatılmamış
+    /// ziyaret işlemi olmasa da <see cref="VisitChargeIndicator.ChargeMissing"/> sayılır.
+    /// </summary>
+    private static VisitChargeIndicator Classify(bool hasCharge, decimal charged, decimal allocated, int workCount, bool completedUnconfirmed)
     {
         if (!hasCharge)
-            return workCount > 0 ? VisitChargeIndicator.ChargeMissing : VisitChargeIndicator.NoChargeableWork;
+            return workCount > 0 || completedUnconfirmed ? VisitChargeIndicator.ChargeMissing : VisitChargeIndicator.NoChargeableWork;
 
         if (charged - allocated <= 0)
             return VisitChargeIndicator.Paid;

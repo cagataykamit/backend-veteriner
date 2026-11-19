@@ -7761,6 +7761,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("bigint")
                         .HasDefaultValue(0L);
 
+                    b.Property<DateTime?>("NoChargeConfirmedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("NoChargeConfirmedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("PetId")
                         .HasColumnType("uniqueidentifier");
 

@@ -20,6 +20,7 @@ public sealed class TransitionVisitCommandHandler : IRequestHandler<TransitionVi
     private readonly IRepository<Visit> _visitsWrite;
     private readonly TimeProvider _timeProvider;
     private readonly IClinicVeterinarianReader _veterinarians;
+    private readonly IClientContext _clientContext;
 
     public TransitionVisitCommandHandler(
         ITenantContext tenantContext,
@@ -28,8 +29,10 @@ public sealed class TransitionVisitCommandHandler : IRequestHandler<TransitionVi
         IReadRepository<Visit> visitsRead,
         IRepository<Visit> visitsWrite,
         TimeProvider timeProvider,
-        IClinicVeterinarianReader veterinarians)
+        IClinicVeterinarianReader veterinarians,
+        IClientContext clientContext)
     {
+        _clientContext = clientContext;
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
@@ -61,9 +64,17 @@ public sealed class TransitionVisitCommandHandler : IRequestHandler<TransitionVi
 
         var sequenceBefore = visit.MutationSequence;
         var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
+        Guid? noChargeBy = null;
+        if (request.WithoutCharge && request.Target == VisitCareStatus.Completed)
+        {
+            if (_clientContext.UserId is not { } userId)
+                return Result<VisitDto>.Failure("Auth.UserMissing", "Kullanıcı bilgisi yok.");
+            noChargeBy = userId;
+        }
+
         var transition = request.Target == VisitCareStatus.InProgress
             ? visit.Start(nowUtc)
-            : visit.Complete(nowUtc);
+            : visit.Complete(nowUtc, noChargeBy);
         if (!transition.IsSuccess)
             return Result<VisitDto>.Failure(transition.Error);
 

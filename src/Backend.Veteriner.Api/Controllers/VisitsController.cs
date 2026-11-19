@@ -88,15 +88,21 @@ public sealed class VisitsController : ControllerBase
     public Task<IActionResult> Start([FromRoute] Guid id, CancellationToken ct)
         => Transition(id, VisitCareStatus.InProgress, ct);
 
-    /// <summary>Devam ediyor → Tamamlandı. Zaten tamamlandıysa 200 ve mevcut kayıt.</summary>
+    /// <summary>
+    /// Devam ediyor → Tamamlandı. Zaten tamamlandıysa 200 ve mevcut kayıt. Gövde isteğe bağlı: <c>{ "withoutCharge": true }</c> ziyareti
+    /// bilinçli ücretsiz kapatır (Açık işler "Ücret yok"a girmez; tamamlanmış ziyarette de işaretlenebilir).
+    /// </summary>
     [HttpPost("{id:guid}/complete")]
     [Authorize(Policy = PermissionCatalog.Visits.Update)]
     [ProducesResponseType(typeof(VisitDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
-    public Task<IActionResult> Complete([FromRoute] Guid id, CancellationToken ct)
-        => Transition(id, VisitCareStatus.Completed, ct);
+    public Task<IActionResult> Complete(
+        [FromRoute] Guid id,
+        [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] CompleteVisitBody? body,
+        CancellationToken ct)
+        => Transition(id, VisitCareStatus.Completed, ct, body?.WithoutCharge ?? false);
 
     /// <summary>Yanlış geliş veya yanlış durum düzeltmesi; gerekçe zorunlu, audit'e yazılır.</summary>
     [HttpPost("{id:guid}/corrections")]
@@ -228,12 +234,19 @@ public sealed class VisitsController : ControllerBase
         return result.ToActionResult(this);
     }
 
-    private async Task<IActionResult> Transition(Guid id, VisitCareStatus target, CancellationToken ct)
+    private async Task<IActionResult> Transition(Guid id, VisitCareStatus target, CancellationToken ct, bool withoutCharge = false)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
-        var result = await _mediator.Send(new TransitionVisitCommand(id, target), ct);
+        var result = await _mediator.Send(new TransitionVisitCommand(id, target, withoutCharge), ct);
         return result.ToActionResult(this);
     }
+}
+
+/// <summary>POST /visits/{id}/complete gövdesi (isteğe bağlı).</summary>
+public sealed class CompleteVisitBody
+{
+    /// <summary>Muayene ve ücret kaydı yokken bilinçli ücretsiz kapatma.</summary>
+    public bool WithoutCharge { get; init; }
 }

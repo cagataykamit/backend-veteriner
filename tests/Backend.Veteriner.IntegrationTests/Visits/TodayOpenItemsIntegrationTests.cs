@@ -96,6 +96,42 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
     }
 
     [Fact]
+    public async Task Completed_Visit_Without_Work_And_Charge_Should_Be_Uncharged_Until_Confirmed_Free()
+    {
+        var ctx = await SeedAsync();
+        var visitId = await ctx.CreateVisitAsync();
+        await ctx.CompleteVisitAsync(visitId);
+
+        var today = await ctx.GetTodayAsync();
+        today.Items.Single(i => i.VisitId == visitId).ChargeIndicator.Should().Be(VisitChargeIndicator.ChargeMissing);
+        today.OpenItems!.UnchargedVisitCount.Should().Be(1);
+        (await ctx.GetOpenItemVisitsAsync("uncharged")).Items.Select(i => i.VisitId).Should().Equal(visitId);
+
+        // Tamamlanmış ziyarette sonradan "ücretsiz" işaretlenebilir; listeden düşer.
+        await ctx.CompleteWithoutChargeAsync(visitId);
+
+        today = await ctx.GetTodayAsync();
+        today.Items.Single(i => i.VisitId == visitId).ChargeIndicator.Should().Be(VisitChargeIndicator.NoChargeableWork);
+        today.OpenItems!.UnchargedVisitCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Complete_Without_Charge_Should_Close_Visit_And_Keep_It_Out_Of_Uncharged()
+    {
+        var ctx = await SeedAsync();
+        var visitId = await ctx.CreateVisitAsync();
+        (await ctx.Http.PostAsync($"/api/v1/visits/{visitId}/start", null)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await ctx.CompleteWithoutChargeAsync(visitId);
+
+        var today = await ctx.GetTodayAsync();
+        var row = today.Items.Single(i => i.VisitId == visitId);
+        row.CareStatus.Should().Be(VisitCareStatus.Completed);
+        row.ChargeIndicator.Should().Be(VisitChargeIndicator.NoChargeableWork);
+        today.OpenItems!.UnchargedVisitCount.Should().Be(0);
+    }
+
+    [Fact]
     public async Task Work_Scope_Should_Count_Treatment_Hospitalization_Administration_And_Applied_Vaccination_Once()
     {
         var ctx = await SeedAsync();
@@ -422,6 +458,14 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
         {
             (await _http.PostAsync($"/api/v1/visits/{visitId}/start", null)).StatusCode.Should().Be(HttpStatusCode.OK);
             (await _http.PostAsync($"/api/v1/visits/{visitId}/complete", null)).StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        public HttpClient Http => _http;
+
+        public async Task CompleteWithoutChargeAsync(Guid visitId)
+        {
+            var response = await _http.PostAsJsonAsync($"/api/v1/visits/{visitId}/complete", new { withoutCharge = true });
+            response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         }
 
         public async Task<Guid> CreateExaminationAsync(Guid visitId)

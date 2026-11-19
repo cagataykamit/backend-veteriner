@@ -19,6 +19,43 @@ public sealed class VisitTests
     }
 
     [Fact]
+    public void Complete_Without_Charge_Should_Record_User_And_Be_Idempotent_And_Cleared_By_Reopen()
+    {
+        var userId = Guid.NewGuid();
+        var visit = CreateInProgress();
+
+        visit.Complete(Now.AddMinutes(30), userId).IsSuccess.Should().BeTrue();
+        visit.CareStatus.Should().Be(VisitCareStatus.Completed);
+        visit.NoChargeConfirmedAtUtc.Should().Be(Now.AddMinutes(30));
+        visit.NoChargeConfirmedByUserId.Should().Be(userId);
+        var sequence = visit.MutationSequence;
+
+        visit.Complete(Now.AddMinutes(40), Guid.NewGuid()).IsSuccess.Should().BeTrue();
+        visit.MutationSequence.Should().Be(sequence);
+        visit.NoChargeConfirmedByUserId.Should().Be(userId);
+
+        visit.CorrectCareStatus(VisitCareStatus.InProgress, Reason, Now.AddMinutes(50)).IsSuccess.Should().BeTrue();
+        visit.NoChargeConfirmedAtUtc.Should().BeNull();
+        visit.NoChargeConfirmedByUserId.Should().BeNull();
+    }
+
+    [Fact]
+    public void Completed_Visit_Can_Be_Marked_Without_Charge_Later_Once()
+    {
+        var visit = CreateInProgress();
+        visit.Complete(Now.AddMinutes(30));
+        visit.NoChargeConfirmedAtUtc.Should().BeNull();
+        var sequence = visit.MutationSequence;
+
+        visit.Complete(Now.AddMinutes(60), Guid.NewGuid()).IsSuccess.Should().BeTrue();
+
+        visit.NoChargeConfirmedAtUtc.Should().Be(Now.AddMinutes(60));
+        visit.CompletedAtUtc.Should().Be(Now.AddMinutes(30));
+        visit.MutationSequence.Should().Be(sequence + 1);
+        visit.Complete(Now.AddMinutes(70), Guid.Empty).IsSuccess.Should().BeFalse();
+    }
+
+    [Fact]
     public void New_Should_Be_Waiting_With_Zero_Sequence()
     {
         var visit = CreateWaiting();

@@ -42,6 +42,14 @@ public sealed class Visit : AggregateRoot, IClinicScoped, ITenantOwned
     public Guid? PreparedExaminationTemplateId { get; private set; }
 
     /// <summary>
+    /// Muayene ve ücret kaydı olmadan tamamlanırken kullanıcı "Ücretsiz tamamla" dedi (kullanıcı kararı 2026-11-19): bu ziyaret
+    /// Açık işler "Ücret yok" listesine girmez. Bakım durumu tamamlanmamışa düzeltilirse temizlenir.
+    /// </summary>
+    public DateTime? NoChargeConfirmedAtUtc { get; private set; }
+
+    public Guid? NoChargeConfirmedByUserId { get; private set; }
+
+    /// <summary>
     /// Başarılı domain mutasyon sayacı; optimistic concurrency token ve projeksiyon sıralama anahtarı.
     /// Yeni kayıt 0 ile başlar; her başarılı mutasyon 1 artırır.
     /// </summary>
@@ -161,14 +169,27 @@ public sealed class Visit : AggregateRoot, IClinicScoped, ITenantOwned
         return Result.Success();
     }
 
-    /// <summary>Devam ediyor → Tamamlandı. Zaten tamamlandıysa değişiklik olmadan başarı (idempotent).</summary>
-    public Result Complete(DateTime nowUtc)
+    /// <summary>
+    /// Devam ediyor → Tamamlandı. Zaten tamamlandıysa değişiklik olmadan başarı (idempotent). <paramref name="noChargeConfirmedByUserId"/>
+    /// verilirse ziyaret bilinçli ücretsiz kapatılmış sayılır (zaten tamamlanmış ziyarette de işaretlenebilir).
+    /// </summary>
+    public Result Complete(DateTime nowUtc, Guid? noChargeConfirmedByUserId = null)
     {
         if (IsVoided)
             return VoidedFailure();
 
+        if (noChargeConfirmedByUserId == Guid.Empty)
+            return Result.Failure("Visits.Validation", "Kullanıcı geçersiz.");
+
         if (CareStatus == VisitCareStatus.Completed)
+        {
+            if (noChargeConfirmedByUserId is null || NoChargeConfirmedAtUtc.HasValue)
+                return Result.Success();
+
+            ConfirmNoCharge(nowUtc, noChargeConfirmedByUserId.Value);
+            AdvanceMutationSequence();
             return Result.Success();
+        }
 
         if (CareStatus != VisitCareStatus.InProgress)
         {
@@ -179,8 +200,16 @@ public sealed class Visit : AggregateRoot, IClinicScoped, ITenantOwned
 
         CareStatus = VisitCareStatus.Completed;
         CompletedAtUtc = NormalizeUtc(nowUtc);
+        if (noChargeConfirmedByUserId is { } userId)
+            ConfirmNoCharge(nowUtc, userId);
         AdvanceMutationSequence();
         return Result.Success();
+    }
+
+    private void ConfirmNoCharge(DateTime nowUtc, Guid userId)
+    {
+        NoChargeConfirmedAtUtc = NormalizeUtc(nowUtc);
+        NoChargeConfirmedByUserId = userId;
     }
 
     /// <summary>
@@ -208,10 +237,12 @@ public sealed class Visit : AggregateRoot, IClinicScoped, ITenantOwned
             case VisitCareStatus.Waiting:
                 StartedAtUtc = null;
                 CompletedAtUtc = null;
+                ClearNoCharge();
                 break;
             case VisitCareStatus.InProgress:
                 StartedAtUtc ??= now;
                 CompletedAtUtc = null;
+                ClearNoCharge();
                 break;
             case VisitCareStatus.Completed:
                 StartedAtUtc ??= now;
@@ -222,6 +253,12 @@ public sealed class Visit : AggregateRoot, IClinicScoped, ITenantOwned
         CareStatus = target;
         AdvanceMutationSequence();
         return Result.Success();
+    }
+
+    private void ClearNoCharge()
+    {
+        NoChargeConfirmedAtUtc = null;
+        NoChargeConfirmedByUserId = null;
     }
 
     /// <summary>Yanlış geliş işareti: kayıt korunur, kuyruktan ve benzersiz kurallardan çıkar. Gerekçe zorunludur.</summary>
