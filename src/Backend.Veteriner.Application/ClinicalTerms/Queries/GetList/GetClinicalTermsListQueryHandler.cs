@@ -32,10 +32,10 @@ public sealed class GetClinicalTermsListQueryHandler
         var tokens = ClinicalTermSearch.BuildTokenPatterns(request.PageRequest.Search);
 
         var total = await _terms.CountAsync(
-            new ClinicalTermsFilteredCountSpec(tenantId, request.Kind, request.IncludeInactive, tokens), ct);
+            new ClinicalTermsFilteredCountSpec(tenantId, request.Kind, request.IncludeInactive, tokens, request.IsSystem), ct);
 
         var rows = await _terms.ListAsync(
-            new ClinicalTermsFilteredPagedSpec(tenantId, request.Kind, request.IncludeInactive, tokens, page, pageSize), ct);
+            new ClinicalTermsFilteredPagedSpec(tenantId, request.Kind, request.IncludeInactive, tokens, page, pageSize, request.IsSystem), ct);
 
         return Result<PagedResult<ClinicalTermDto>>.Success(
             PagedResult<ClinicalTermDto>.Create(rows.Select(ClinicalTermDto.From).ToList(), total, page, pageSize));

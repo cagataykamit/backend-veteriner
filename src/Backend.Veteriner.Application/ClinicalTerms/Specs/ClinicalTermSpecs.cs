@@ -68,9 +68,16 @@ public static class ClinicalTermSearch
         Guid tenantId,
         ClinicalTermKind? kind,
         bool includeInactive,
-        IReadOnlyList<string> tokenPatterns)
+        IReadOnlyList<string> tokenPatterns,
+        bool? isSystem)
     {
         query.Where(x => x.TenantId == null || x.TenantId == tenantId);
+
+        // Kaynak: sistem terimi kiracısızdır, kliniğe özel terim kiracının kendisidir.
+        if (isSystem == true)
+            query.Where(x => x.TenantId == null);
+        else if (isSystem == false)
+            query.Where(x => x.TenantId == tenantId);
 
         if (kind.HasValue)
             query.Where(x => x.Kind == kind.Value);
@@ -89,9 +96,10 @@ public sealed class ClinicalTermsFilteredCountSpec : Specification<ClinicalTerm>
         Guid tenantId,
         ClinicalTermKind? kind,
         bool includeInactive,
-        IReadOnlyList<string> tokenPatterns)
+        IReadOnlyList<string> tokenPatterns,
+        bool? isSystem = null)
     {
-        ClinicalTermSearch.Apply(Query, tenantId, kind, includeInactive, tokenPatterns);
+        ClinicalTermSearch.Apply(Query, tenantId, kind, includeInactive, tokenPatterns, isSystem);
     }
 }
 
@@ -104,10 +112,11 @@ public sealed class ClinicalTermsFilteredPagedSpec : Specification<ClinicalTerm>
         bool includeInactive,
         IReadOnlyList<string> tokenPatterns,
         int page,
-        int pageSize)
+        int pageSize,
+        bool? isSystem = null)
     {
         Query.AsNoTracking();
-        ClinicalTermSearch.Apply(Query, tenantId, kind, includeInactive, tokenPatterns);
+        ClinicalTermSearch.Apply(Query, tenantId, kind, includeInactive, tokenPatterns, isSystem);
 
         if (tokenPatterns.Count > 0)
         {

@@ -49,6 +49,7 @@ Birden çok seçimi alanda ayırmak (ör. `", "` ile eklemek) ve elle yazmaya de
 | `kind` | `Diagnosis` \| `Complaint` | — (ikisi) | Geçersiz değer `400` |
 | `search` | string | — | Türkçe duyarsız; boşlukla ayrılmış **her kelime** adda geçmeli (sıra serbest, en çok 5 kelime). `"ishal kanli"` → `"Kanlı ishal"` |
 | `includeInactive` | bool | `false` | Seçici `false` kullanır; ayarlar ekranı `true` |
+| `isSystem` | bool | — (ikisi) | `true` yalnız sistem terimleri, `false` yalnız kliniğin eklediği terimler (ayarlar ekranındaki "Kaynak" filtresi) |
 | `page` | int | 1 | |
 | `pageSize` | int | 20 | 1–200 |
 

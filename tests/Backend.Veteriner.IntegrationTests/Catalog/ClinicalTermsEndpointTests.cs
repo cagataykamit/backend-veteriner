@@ -89,6 +89,21 @@ public sealed class ClinicalTermsEndpointTests : IClassFixture<CustomWebApplicat
     }
 
     [Fact]
+    public async Task List_Should_Filter_By_Source()
+    {
+        var client = await ClientAsync(AllPermissions);
+        var create = await client.PostAsJsonAsync(Url, new { kind = "Complaint", name = "İshal ve kusma birlikte" });
+        create.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var clinicOnly = await GetPageAsync(client, "?kind=Complaint&isSystem=false&search=ishal");
+        Names(clinicOnly).Should().Equal("İshal ve kusma birlikte");
+
+        var systemOnly = await GetPageAsync(client, "?kind=Complaint&isSystem=true&search=ishal");
+        Names(systemOnly).Should().Contain("İshal").And.NotContain("İshal ve kusma birlikte");
+        systemOnly.GetProperty("items").EnumerateArray().Should().OnlyContain(i => i.GetProperty("isSystem").GetBoolean());
+    }
+
+    [Fact]
     public async Task Create_Update_Conflict_Deactivate_Activate_Flow_Should_Work()
     {
         var client = await ClientAsync(AllPermissions);

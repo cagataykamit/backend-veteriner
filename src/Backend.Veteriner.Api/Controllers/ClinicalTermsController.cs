@@ -46,13 +46,14 @@ public sealed class ClinicalTermsController : ControllerBase
         [FromQuery] PageRequest page,
         [FromQuery] ClinicalTermKind? kind = null,
         [FromQuery] bool includeInactive = false,
+        [FromQuery] bool? isSystem = null,
         CancellationToken ct = default)
     {
         if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
             return problem!;
 
         var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
-        var result = await _mediator.Send(new GetClinicalTermsListQuery(paging, kind, includeInactive), ct);
+        var result = await _mediator.Send(new GetClinicalTermsListQuery(paging, kind, includeInactive, isSystem), ct);
         return result.ToActionResult(this);
     }
 
