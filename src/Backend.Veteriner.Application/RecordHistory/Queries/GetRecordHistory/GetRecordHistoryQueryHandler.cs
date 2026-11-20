@@ -53,7 +53,7 @@ public sealed class GetRecordHistoryQueryHandler
 
         var rows = await _changes.ListAsync(
             new RecordChangesByRecordSpec(tenantId, request.RecordType, request.RecordId, MaxRows), ct);
-        if (rows.Count == 0 || !InScope(scope.Value!, rows[0].ClinicId))
+        if (rows.Count == 0 || !scope.Value!.Includes(rows[0].ClinicId))
             return Result<IReadOnlyList<RecordChangeDto>>.Success(Array.Empty<RecordChangeDto>());
 
         var names = await _userNames.GetNamesAsync(rows.Select(r => r.ActorUserId).Distinct().ToArray(), ct);
@@ -68,9 +68,4 @@ public sealed class GetRecordHistoryQueryHandler
             .ToList();
         return Result<IReadOnlyList<RecordChangeDto>>.Success(items);
     }
-
-    private static bool InScope(ClinicReadScope scope, Guid clinicId)
-        => scope.SingleClinicId is { } single
-            ? single == clinicId
-            : scope.AccessibleClinicIds is not { } accessible || accessible.Contains(clinicId);
 }

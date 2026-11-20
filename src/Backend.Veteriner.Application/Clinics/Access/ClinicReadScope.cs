@@ -13,4 +13,11 @@ namespace Backend.Veteriner.Application.Clinics.Access;
 /// </remarks>
 public sealed record ClinicReadScope(
     Guid? SingleClinicId,
-    IReadOnlyCollection<Guid>? AccessibleClinicIds);
+    IReadOnlyCollection<Guid>? AccessibleClinicIds)
+{
+    /// <summary>Bellekteki tek kayıt için aynı kapsam kuralı (sorgu süzgecinin karşılığı).</summary>
+    public bool Includes(Guid clinicId)
+        => SingleClinicId is { } single
+            ? single == clinicId
+            : AccessibleClinicIds is not { } accessible || accessible.Contains(clinicId);
+}

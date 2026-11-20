@@ -73,7 +73,7 @@ public sealed class GetVitalSeriesQueryHandler : IRequestHandler<GetVitalSeriesQ
         if (request.HospitalizationId is { } hospitalizationId)
         {
             var h = await _hospitalizations.FirstOrDefaultAsync(new HospitalizationByIdSpec(tenantId, hospitalizationId), ct);
-            if (h is null || h.PetId != request.PetId || !InScope(scope, h.ClinicId))
+            if (h is null || h.PetId != request.PetId || !scope.Includes(h.ClinicId))
                 return Fail("Hospitalizations.NotFound", "Yatış kaydı bulunamadı.");
 
             // Yatış süresi (Hospitalization.CoversInstant): kabul ve taburcu dahil; üst uç yarı açık pencereye bir tik eklenerek çevrilir.
@@ -105,11 +105,6 @@ public sealed class GetVitalSeriesQueryHandler : IRequestHandler<GetVitalSeriesQ
 
         return Result<VitalSeriesDto>.Success(new VitalSeriesDto(ordered, truncated, omitted));
     }
-
-    private static bool InScope(ClinicReadScope scope, Guid clinicId)
-        => scope.SingleClinicId is { } single
-            ? single == clinicId
-            : scope.AccessibleClinicIds is not { } accessible || accessible.Contains(clinicId);
 
     private static DateTime? Max(DateTime? value, DateTime bound) => value is { } v && v > bound ? v : bound;
 
