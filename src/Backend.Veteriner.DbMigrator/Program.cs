@@ -61,11 +61,12 @@ try
             await RunSeedPipelineAsync(db, hasher, logger, CancellationToken.None);
             logger.LogInformation("Seed pipeline completed.");
             break;
+        case "seed-dev-staff":
         case "seed-dev-veterinarian":
             {
-                var seeded = await DevTestVeterinarianSeeder.SeedAsync(
+                var seeded = await DevTestStaffSeeder.SeedAsync(
                     db, hasher, sp.GetRequiredService<IHostEnvironment>(), logger, CancellationToken.None);
-                logger.LogInformation("Dev test veterinarian seed finished (ready: {Ready}).", seeded);
+                logger.LogInformation("Dev test staff seed finished (ready: {Ready}).", seeded);
                 break;
             }
         case "seed-dev-sample-data":
@@ -443,7 +444,8 @@ static void PrintHelp()
           create-platform-admin --email <e-posta> — Ilk PlatformAdmin hesabi (once seed). Parola VETINITY_FIRST_ADMIN_PASSWORD ortam degiskeninden
                            veya etkilesimli (gizli) girilir; loglanmaz
           all            — önce migrate, sonra seed
-          seed-dev-veterinarian — YALNIZCA Development: test hekim kullanıcısı (idempotent; kimlik bilgileri DevTestVeterinarianSeeder.cs)
+          seed-dev-staff — YALNIZCA Development: rol başına test kullanıcısı (hekim, sekreter, klinik yöneticisi, işletme
+                           yöneticisi; idempotent; kimlik bilgileri DevTestStaffSeeder.cs). Eski adı seed-dev-veterinarian da çalışır
           seed-dev-sample-data  — YALNIZCA Development: örnek randevu/ücret/ödeme (idempotent; DevSampleDataSeeder.cs; kimlik bilgisi yok)
           loadtest-seed  — yük testi sentetik veri (yalnızca VetinityCommandDb_LoadTest command DB; profil: small)
           rebuild-appointment-projections — Command DB randevularından Query read-model yeniden oluştur

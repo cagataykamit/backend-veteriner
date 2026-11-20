@@ -42,8 +42,8 @@ namespace Backend.Veteriner.Infrastructure.Persistence.Seeding;
 /// </summary>
 public static class DevSampleDataSeeder
 {
-    public const string TenantName = DevTestVeterinarianSeeder.TenantName;
-    public const string ClinicName = DevTestVeterinarianSeeder.ClinicName;
+    public const string TenantName = DevTestStaffSeeder.TenantName;
+    public const string ClinicName = DevTestStaffSeeder.ClinicName;
 
     private const string Prefix = "ÖRNEK";
     private const int SlotMinutes = 30;

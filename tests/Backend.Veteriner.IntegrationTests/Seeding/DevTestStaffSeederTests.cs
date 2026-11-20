@@ -13,9 +13,9 @@ using Microsoft.Extensions.Hosting;
 
 namespace Backend.IntegrationTests.Seeding;
 
-/// <summary>Dev test hekim seed'i: idempotency, ortam koruması ve hekim kuralıyla uyum. Ayrı LocalDB veritabanı kullanır.</summary>
+/// <summary>Dev test personel seed'i: idempotency, ortam koruması, rol atamaları ve hekim kuralıyla uyum. Ayrı LocalDB veritabanı kullanır.</summary>
 [Collection("admin-seed-orchestration")]
-public sealed class DevTestVeterinarianSeederTests
+public sealed class DevTestStaffSeederTests
 {
     private static readonly string ConnectionString =
         IntegrationTestDatabaseNames.ConnectionString(IntegrationTestDatabaseNames.Command("DevTestVeterinarianSeed"));
@@ -53,38 +53,45 @@ public sealed class DevTestVeterinarianSeederTests
         await DataSeeder.SeedAsync(db, hasher);
         await InviteAssignableOperationClaimsSeeder.SeedAsync(db);
 
-        var tenant = new Tenant(DevTestVeterinarianSeeder.TenantName, DateTime.UtcNow);
+        var tenant = new Tenant(DevTestStaffSeeder.TenantName, DateTime.UtcNow);
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync();
-        var clinic = new Clinic(tenant.Id, DevTestVeterinarianSeeder.ClinicName, "Izmir");
+        var clinic = new Clinic(tenant.Id, DevTestStaffSeeder.ClinicName, "Izmir");
         db.Clinics.Add(clinic);
         await db.SaveChangesAsync();
         return (db, tenant.Id, clinic.Id);
     }
 
     [Fact]
-    public async Task Seed_Should_Create_Confirmed_Veterinarian_Assigned_To_Clinic_And_Be_Idempotent()
+    public async Task Seed_Should_Create_Confirmed_User_Per_Role_Assigned_To_Clinic_And_Be_Idempotent()
     {
         var (db, tenantId, clinicId) = await PrepareAsync();
         await using var _ = db;
         var env = new FakeEnvironment(Environments.Development);
 
-        (await DevTestVeterinarianSeeder.SeedAsync(db, new StubBcryptPasswordHasher(), env)).Should().BeTrue();
-        (await DevTestVeterinarianSeeder.SeedAsync(db, new StubBcryptPasswordHasher(), env)).Should().BeTrue();
+        (await DevTestStaffSeeder.SeedAsync(db, new StubBcryptPasswordHasher(), env)).Should().BeTrue();
+        (await DevTestStaffSeeder.SeedAsync(db, new StubBcryptPasswordHasher(), env)).Should().BeTrue();
 
-        var users = await db.Users.Where(u => u.Email == DevTestVeterinarianSeeder.Email).ToListAsync();
-        users.Should().ContainSingle();
-        var user = users[0];
-        user.EmailConfirmed.Should().BeTrue();
-        user.DisplayName.Should().Be(DevTestVeterinarianSeeder.DisplayName);
-        (await db.UserTenants.CountAsync(x => x.UserId == user.Id && x.TenantId == tenantId)).Should().Be(1);
-        (await db.UserClinics.CountAsync(x => x.UserId == user.Id && x.ClinicId == clinicId)).Should().Be(1);
-        (await db.UserOperationClaims.CountAsync(x => x.UserId == user.Id)).Should().Be(1);
+        foreach (var account in DevTestStaffSeeder.Accounts)
+        {
+            var users = await db.Users.Where(u => u.Email == account.Email).ToListAsync();
+            users.Should().ContainSingle();
+            var user = users[0];
+            user.EmailConfirmed.Should().BeTrue();
+            user.DisplayName.Should().Be(account.DisplayName);
+            (await db.UserTenants.CountAsync(x => x.UserId == user.Id && x.TenantId == tenantId)).Should().Be(1);
+            (await db.UserClinics.CountAsync(x => x.UserId == user.Id && x.ClinicId == clinicId)).Should().Be(1);
+            var claims = await db.UserOperationClaims.Where(x => x.UserId == user.Id)
+                .Join(db.OperationClaims, x => x.OperationClaimId, c => c.Id, (_, c) => c.Name)
+                .ToListAsync();
+            claims.Should().Equal(account.ClaimName);
+        }
 
+        var vet = await db.Users.SingleAsync(u => u.Email == DevTestStaffSeeder.Veterinarian.Email);
         var reader = new ClinicVeterinarianReader(db);
-        (await reader.IsClinicVeterinarianAsync(user.Id, tenantId, clinicId, CancellationToken.None)).Should().BeTrue();
+        (await reader.IsClinicVeterinarianAsync(vet.Id, tenantId, clinicId, CancellationToken.None)).Should().BeTrue();
         var listed = await reader.ListAsync(tenantId, clinicId, CancellationToken.None);
-        listed.Should().ContainSingle(v => v.UserId == user.Id && v.Name == DevTestVeterinarianSeeder.DisplayName);
+        listed.Should().ContainSingle(v => v.UserId == vet.Id && v.Name == DevTestStaffSeeder.Veterinarian.DisplayName);
     }
 
     [Theory]
@@ -95,11 +102,12 @@ public sealed class DevTestVeterinarianSeederTests
         var (db, _, _) = await PrepareAsync();
         await using var _ = db;
 
-        var act = () => DevTestVeterinarianSeeder.SeedAsync(
+        var act = () => DevTestStaffSeeder.SeedAsync(
             db, new StubBcryptPasswordHasher(), new FakeEnvironment(environmentName));
 
         await act.Should().ThrowAsync<InvalidOperationException>();
-        (await db.Users.AnyAsync(u => u.Email == DevTestVeterinarianSeeder.Email)).Should().BeFalse();
+        var emails = DevTestStaffSeeder.Accounts.Select(a => a.Email).ToList();
+        (await db.Users.AnyAsync(u => emails.Contains(u.Email))).Should().BeFalse();
     }
 
     [Fact]
@@ -110,10 +118,11 @@ public sealed class DevTestVeterinarianSeederTests
         await PermissionSeeder.SeedAsync(db);
         await InviteAssignableOperationClaimsSeeder.SeedAsync(db);
 
-        var ready = await DevTestVeterinarianSeeder.SeedAsync(
+        var ready = await DevTestStaffSeeder.SeedAsync(
             db, new StubBcryptPasswordHasher(), new FakeEnvironment(Environments.Development));
 
         ready.Should().BeFalse();
-        (await db.Users.AnyAsync(u => u.Email == DevTestVeterinarianSeeder.Email)).Should().BeFalse();
+        var emails = DevTestStaffSeeder.Accounts.Select(a => a.Email).ToList();
+        (await db.Users.AnyAsync(u => emails.Contains(u.Email))).Should().BeFalse();
     }
 }
