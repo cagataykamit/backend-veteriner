@@ -8101,6 +8101,102 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("Visits", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.VitalMeasurements.VitalMeasurement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("AddedAfterFinalization")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("CancelledAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CancelledByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ExaminationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("HeartRateBpm")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("HospitalizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LateEntryReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("MeasuredAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("PetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("RespiratoryRatePerMin")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<decimal?>("TemperatureC")
+                        .HasPrecision(4, 1)
+                        .HasColumnType("decimal(4,1)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("WeightKg")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("decimal(6,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "ClinicId");
+
+                    b.HasIndex("TenantId", "ExaminationId");
+
+                    b.HasIndex("TenantId", "HospitalizationId");
+
+                    b.HasIndex("TenantId", "PetId", "MeasuredAtUtc");
+
+                    b.ToTable("VitalMeasurements", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_VitalMeasurements_Cancel_Consistent", "([CancelledAtUtc] IS NULL AND [CancelReason] IS NULL AND [CancelledByUserId] IS NULL) OR ([CancelledAtUtc] IS NOT NULL AND [CancelReason] IS NOT NULL AND [CancelledByUserId] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_VitalMeasurements_HasValue", "[TemperatureC] IS NOT NULL OR [HeartRateBpm] IS NOT NULL OR [RespiratoryRatePerMin] IS NOT NULL OR [WeightKg] IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_VitalMeasurements_LateEntry_Consistent", "([AddedAfterFinalization] = 0 AND [LateEntryReason] IS NULL) OR ([AddedAfterFinalization] = 1 AND [LateEntryReason] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_VitalMeasurements_SingleLink", "[HospitalizationId] IS NULL OR [ExaminationId] IS NULL");
+                        });
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Waitlist.WaitlistEntry", b =>
                 {
                     b.Property<Guid>("Id")
