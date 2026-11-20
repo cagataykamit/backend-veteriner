@@ -4,9 +4,11 @@ using System.Net.Http.Json;
 using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Domain.Administrations;
+using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
@@ -363,6 +365,43 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
         (await ctx.GetOpenItemVisitsResponseAsync("unknown")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    [Fact]
+    public async Task Overdue_Appointments_Should_Count_Only_Earlier_Days_Still_Planned_Without_Arrival()
+    {
+        var ctx = await SeedAsync();
+        var todayStart = OperationDayBounds.ForUtcNow(DateTime.UtcNow).DayStartUtc;
+        var deceasedPetId = await ctx.SeedPetAsync(deceased: true);
+        await ctx.SeedAppointmentAsync(todayStart.AddDays(-3).AddHours(7), AppointmentStatus.Scheduled);
+        await ctx.SeedAppointmentAsync(todayStart.AddMinutes(1), AppointmentStatus.Scheduled);
+        await ctx.SeedAppointmentAsync(todayStart.AddDays(-31).AddHours(7), AppointmentStatus.Scheduled);
+        await ctx.SeedAppointmentAsync(todayStart.AddDays(-2).AddHours(7), AppointmentStatus.Cancelled);
+        await ctx.SeedAppointmentAsync(todayStart.AddDays(-2).AddHours(8), AppointmentStatus.Scheduled, petId: deceasedPetId);
+        var arrived = await ctx.SeedAppointmentAsync(todayStart.AddDays(-2).AddHours(9), AppointmentStatus.Scheduled);
+        await ctx.SeedVisitAsync(ctx.PetId, todayStart.AddDays(-2).AddHours(9), VisitCareStatus.Completed, appointmentId: arrived);
+
+        (await ctx.GetTodayAsync()).OpenItems!.OverdueAppointmentCount.Should().BeNull("randevu okuma izni yok");
+
+        var withAppointments = ctx.WithPermissions([.. AllPermissions, PermissionCatalog.Appointments.Read]);
+        (await withAppointments.GetTodayAsync()).OpenItems!.OverdueAppointmentCount
+            .Should().Be(1, "bugünkü, 30 günden eski, iptal, vefat eden hayvanın ve gelişi açılmış randevu sayılmaz");
+    }
+
+    [Fact]
+    public async Task Cancelled_Appointment_Count_Should_Cover_The_Selected_Day_Only()
+    {
+        var ctx = await SeedAsync();
+        var todayStart = OperationDayBounds.ForUtcNow(DateTime.UtcNow).DayStartUtc;
+        await ctx.SeedAppointmentAsync(todayStart.AddMinutes(1), AppointmentStatus.Cancelled);
+        await ctx.SeedAppointmentAsync(todayStart.AddMinutes(2), AppointmentStatus.Scheduled);
+        await ctx.SeedAppointmentAsync(todayStart.AddDays(-1).AddHours(7), AppointmentStatus.Cancelled);
+
+        (await ctx.GetTodayAsync()).CancelledAppointmentCount.Should().BeNull("randevu okuma izni yok");
+
+        var withAppointments = ctx.WithPermissions([.. AllPermissions, PermissionCatalog.Appointments.Read]);
+        (await withAppointments.GetTodayAsync()).CancelledAppointmentCount.Should().Be(1);
+        (await withAppointments.GetTodayAsync(voided: true)).CancelledAppointmentCount.Should().BeNull();
+    }
+
     // ---- Kurulum ----
 
     private async Task<TestContext> SeedAsync()
@@ -492,7 +531,7 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
             return (await response.Content.ReadFromJsonAsync<ExaminationWriteResultDto>())!.Id;
         }
 
-        public async Task<Guid> SeedPetAsync()
+        public async Task<Guid> SeedPetAsync(bool deceased = false)
         {
             await using var scope = Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -501,6 +540,12 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
             await db.SaveChangesAsync();
             var speciesId = await db.Species.OrderBy(s => s.DisplayOrder).Select(s => s.Id).FirstAsync();
             var pet = new Pet(TenantId, client.Id, $"OPet-{Guid.NewGuid():N}"[..12], speciesId);
+            if (deceased)
+            {
+                var today = OperationDayBounds.ToLocalDate(DateTime.UtcNow);
+                pet.SetStatus(PetStatus.Deceased, today, today).IsSuccess.Should().BeTrue();
+            }
+
             db.Pets.Add(pet);
             await db.SaveChangesAsync();
             return pet.Id;
@@ -529,11 +574,11 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
 
         /// <summary>Doğrudan Visit satırı (geçmiş geliş, başka klinik, yanlış geliş gibi API'den kurulamayan durumlar için).</summary>
         public async Task<Guid> SeedVisitAsync(
-            Guid petId, DateTime arrivedAtUtc, VisitCareStatus status, Guid? clinicId = null, bool voided = false)
+            Guid petId, DateTime arrivedAtUtc, VisitCareStatus status, Guid? clinicId = null, bool voided = false, Guid? appointmentId = null)
         {
             await using var scope = Services.CreateSystemScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var visit = new Visit(TenantId, clinicId ?? ClinicId, petId, null, null, UserId, arrivedAtUtc);
+            var visit = new Visit(TenantId, clinicId ?? ClinicId, petId, appointmentId, null, UserId, arrivedAtUtc);
             if (status != VisitCareStatus.Waiting)
             {
                 visit.Start(arrivedAtUtc.AddMinutes(1)).IsSuccess.Should().BeTrue();
@@ -651,6 +696,16 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
             var lab = await db.LabResults.SingleAsync(l => l.Id == labId);
             lab.Cancel(UserId, "Test iptal gerekcesi", DateTime.UtcNow).IsSuccess.Should().BeTrue();
             await db.SaveChangesAsync();
+        }
+
+        public async Task<Guid> SeedAppointmentAsync(DateTime scheduledAtUtc, AppointmentStatus status, Guid? petId = null)
+        {
+            await using var scope = Services.CreateSystemScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var appointment = new Appointment(TenantId, ClinicId, petId ?? PetId, scheduledAtUtc, 30, AppointmentType.Consultation, status);
+            db.Appointments.Add(appointment);
+            await db.SaveChangesAsync();
+            return appointment.Id;
         }
     }
 }
