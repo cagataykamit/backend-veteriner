@@ -4,7 +4,7 @@ namespace Backend.Veteriner.Application.Clinics.KvkkFormTemplate;
 
 /// <summary>
 /// KVKK şablonlarının (açık rıza formu ve aydınlatma metni) varsayılanları ve yer tutucuları (ADR-021, ADR-024). Gövde ürün
-/// deposundaki legal/acik-riza-metni.md ve legal/aydinlatma-metni.md v0.2 ile aynıdır (ADR-036: fatura/e-belge amacı ve
+/// deposundaki legal/acik-riza-metni.md ve legal/aydinlatma-metni.md v1.2 ile aynıdır (ADR-036: fatura/e-belge amacı ve
 /// TCKN/VKN); klinik dilerse Ayarlar'dan kendi metniyle değiştirir. Yalnız klinikte o türde kayıt yokken döner; kayıtlı metni ezmez.
 /// Kliniğin adresi, telefonu ve e-postası varsayılan metne klinik kaydından yazılır; boş olan bilgi cümleden düşer ve
 /// <see cref="MissingDetailsFor"/> ile bildirilir (Ayarlar > KVKK metinleri uyarısı). <c>{{…}}</c> yer tutucuları istemcide
@@ -100,7 +100,10 @@ public static class ClinicKvkkFormTemplateDefaults
         + "kliniğin yetkili çalışanları; hizmet aldığımız yazılım, barındırma, ödeme, e-belge (özel entegratör) ve bildirim (SMS/e-posta) "
         + "sağlayıcıları (veri işleyen "
         + "olarak, yalnız bizim talimatımızla); laboratuvarlar ve sevk edilen sağlık kuruluşları; hukuk, mali müşavirlik ve denetim "
-        + "danışmanlarımız.\n\n"
+        + "danışmanlarımız. Kliniğimiz yapay zekâ destekli özellikleri (örneğin hasta geçmişi özeti veya not taslağı) kullandığında, "
+        + "hayvanınıza ilişkin klinik kayıtlar yazılım sağlayıcımızın alt işleyeni olan yapay zekâ sağlayıcısına (Anthropic PBC, Amerika "
+        + "Birleşik Devletleri) yurt dışına aktarılır; göndermeden önce adınız, iletişim bilgileriniz, kimlik numaranız ve hayvanınızın "
+        + "adı metinden çıkarılır.\n\n"
         + "7. Saklama süresi\n"
         + "Verileriniz, işleme amacının gerektirdiği ve ilgili mevzuatta öngörülen süre boyunca saklanır; süre sonunda silinir, yok "
         + "edilir veya anonim hale getirilir.\n\n"

@@ -17,8 +17,10 @@ public static class LegalDocumentCatalog
         {
             [LegalDocumentType.Terms] = "1.0",
             // 1.1 (2026-11-15): deneme kaydı e-posta kodu, vergi numarasıyla tek deneme ve Cloudflare Turnstile (TRIAL-001).
-            [LegalDocumentType.Privacy] = "1.1",
-            [LegalDocumentType.DataProcessing] = "1.0",
+            // 1.2 (2026-11-20): yapay zekâ kullanım kaydı, kullanıcı bazlı izleme ve yurt dışı aktarım (Anthropic PBC, ABD).
+            [LegalDocumentType.Privacy] = "1.2",
+            // 1.1 (2026-11-20): yapay zekâ özellikleri, alt işleyen Anthropic PBC (ABD) ve gönderilen veri.
+            [LegalDocumentType.DataProcessing] = "1.1",
             [LegalDocumentType.PortalTerms] = "1.0",
             // 1.1 (2026-11-15): portal giriş ve online randevu kodunda Cloudflare Turnstile.
             [LegalDocumentType.PortalPrivacy] = "1.1",
