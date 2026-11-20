@@ -2898,6 +2898,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<int>("DefaultAppointmentDurationMinutes")
                         .HasColumnType("int");
 
+                    b.Property<bool>("EnforceWorkingHours")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("OwnerCancelLinkEnabled")
                         .HasColumnType("bit");
 

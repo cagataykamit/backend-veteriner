@@ -9,4 +9,5 @@ public sealed record ClinicAppointmentSettingsDto(
     int SlotIntervalMinutes,
     bool AllowOverlappingAppointments,
     bool OwnerCancelLinkEnabled,
-    bool WaitlistAutoOfferEnabled);
+    bool WaitlistAutoOfferEnabled,
+    bool EnforceWorkingHours);
