@@ -51,7 +51,7 @@ public sealed class AiUsageGuardTests
 
     private void SetPlan(SubscriptionPlanCode plan)
         => _subscriptions.Setup(s => s.FirstOrDefaultAsync(It.IsAny<ISpecification<TenantSubscription>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(TenantSubscription.StartTrial(TenantId, plan, DateTime.UtcNow, 14));
+            .ReturnsAsync(AiCreditAccountTests.PaidSubscription(TenantId, plan));
 
     private void SetClinicUsage(AiClinicCreditTotals totals)
         => _usage.Setup(u => u.ClinicCreditTotalsAsync(ClinicId, It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))

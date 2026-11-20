@@ -196,7 +196,7 @@ Değerler tek yerde: `appsettings` `Ai` bölümü.
 Kuralın tek yeri `AiClinicQuota` (Application); hesap `AiCreditAccount`.
 
 - **Kredi:** her sağlayıcı çağrısının gerçek token'ından tahmini maliyet → `kredi = maliyet / Ai:CreditValueUsd`, iki ondalık, istek başına yukarı yuvarlanmaz. Standart istek (2.000 giriş + 500 çıkış) Haiku'da 1, Sonnet'te 20 kredi. Başarısız ama token harcayan çağrı da harcar (`AiUsageRecords.Credits`).
-- **Kota:** klinik başına aylık, paket hediyesi (`Ai:PlanMonthlyCredits`, kiracının paketinden; abonelik yoksa 0). Eklenti satışı açılınca eklentinin kredisi buraya eklenecek. İstanbul takvim ayı; devretmez.
+- **Kota:** klinik başına aylık, paket hediyesi (`Ai:PlanMonthlyCredits`, kiracının paketinden; abonelik yoksa 0). **Deneme süresinde (`TenantSubscription.Status = Trialing`) kota 0'dır**; hediye ücretli abonelik başlayınca verilir, denemedeki klinik yalnız platformun eklediği fonu kullanabilir (ADR-044 madde 5, 2026-11-20 kullanıcı kararı). Kural `AiCreditAccount.Build` içinde tektir; klinik durumu ve platform yönetimindeki klinik satırı aynı değeri gösterir. Eklenti satışı açılınca eklentinin kredisi buraya eklenecek. İstanbul takvim ayı; devretmez.
 - **Fon:** `AiCreditGrants` (yalnız eklenir; şimdilik yalnız platform yöneticisi elle, §3). Bakiye = eklenen − harcanan (tüm zamanlar); devreder. Değişen sayaç tutulmaz (eşzamanlı isteklerde kayıp yazma olmaz).
 - **Harcama sırası:** önce kalan aylık kota, artanı fon (`AiUsageRecords.FundCredits`). İstek öncesi onaylandığı için son istek kalanı aşabilir; aşan kısım fondan düşer ve fon eksiye inebilir (sonraki fon eklemesi önce bunu kapatır).
 - **Durma:** kalan kredi (kota + fon) 0 ya da token/$ sigortası dolduysa `429 Ai.ClinicQuotaExceeded`; yalnız AI durur.

@@ -28,10 +28,18 @@ public sealed class AiCreditAccountTests
     public AiCreditAccountTests()
     {
         _subscriptions.Setup(s => s.FirstOrDefaultAsync(It.IsAny<ISpecification<TenantSubscription>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(TenantSubscription.StartTrial(TenantId, SubscriptionPlanCode.Pro, DateTime.UtcNow, 14));
+            .ReturnsAsync(PaidSubscription(TenantId, SubscriptionPlanCode.Pro));
         _settingsRepo.Setup(s => s.FirstOrDefaultAsync(It.IsAny<ISpecification<ClinicAiSettings>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(_settings);
         SetTotals(AiClinicCreditTotals.Zero);
+    }
+
+    /// <summary>Ücretli (Active) abonelik; paket hediyesi yalnız bunda verilir.</summary>
+    internal static TenantSubscription PaidSubscription(Guid tenantId, SubscriptionPlanCode plan)
+    {
+        var subscription = TenantSubscription.StartTrial(tenantId, plan, DateTime.UtcNow, 14);
+        subscription.ActivatePaidPlan(plan, DateTime.UtcNow);
+        return subscription;
     }
 
     private AiCreditAccount Account(AiOptions? options = null)
@@ -64,6 +72,18 @@ public sealed class AiCreditAccountTests
     [InlineData(null, 0)]
     public void Plan_Gift_Comes_From_The_Single_Setting(string? plan, int expected)
         => new AiOptions().MonthlyCreditsFor(plan).Should().Be(expected);
+
+    [Fact]
+    public void Trial_Gets_No_Plan_Gift_Paid_Subscription_Does()
+    {
+        var account = Account();
+        var trial = TenantSubscription.StartTrial(TenantId, SubscriptionPlanCode.Premium, DateTime.UtcNow, 14);
+
+        account.Build(trial, AiClinicCreditTotals.Zero, MonthStart, MonthEnd).MonthlyCredits.Should().Be(0);
+        account.Build(PaidSubscription(TenantId, SubscriptionPlanCode.Premium), AiClinicCreditTotals.Zero, MonthStart, MonthEnd)
+            .MonthlyCredits.Should().Be(2_000);
+        account.Build(null, AiClinicCreditTotals.Zero, MonthStart, MonthEnd).MonthlyCredits.Should().Be(0);
+    }
 
     [Fact]
     public void Credits_Are_Spent_From_Monthly_Quota_First_Then_From_Fund()

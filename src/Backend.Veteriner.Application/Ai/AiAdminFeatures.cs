@@ -67,9 +67,9 @@ public sealed class AiAdminClinicReader
         var clinicIds = clinics.Select(c => c.Id).ToArray();
         var tenantIds = clinics.Select(c => c.TenantId).Distinct().ToArray();
         var tenantNames = (await _tenants.ListAsync(new TenantsForAiAdminSpec(tenantIds), ct)).ToDictionary(t => t.Id, t => t.Name);
-        var plans = (await _subscriptions.ListAsync(new TenantSubscriptionsForAiAdminSpec(tenantIds), ct))
+        var subscriptions = (await _subscriptions.ListAsync(new TenantSubscriptionsForAiAdminSpec(tenantIds), ct))
             .GroupBy(s => s.TenantId)
-            .ToDictionary(g => g.Key, g => g.First().PlanCode);
+            .ToDictionary(g => g.Key, g => g.First());
         var settings = (await _settings.ListAsync(new ClinicAiSettingsByClinicIdsSpec(clinicIds), ct)).ToDictionary(s => s.ClinicId);
         var (monthStart, monthEnd) = _credits.CurrentMonth();
         var totals = await _usage.ClinicsCreditTotalsAsync(clinicIds, monthStart, monthEnd, ct);
@@ -77,8 +77,9 @@ public sealed class AiAdminClinicReader
         return clinics
             .Select(c =>
             {
-                SubscriptionPlanCode? plan = plans.TryGetValue(c.TenantId, out var code) ? code : null;
-                var quota = _credits.Build(plan, totals.GetValueOrDefault(c.Id, AiClinicCreditTotals.Zero), monthStart, monthEnd);
+                var subscription = subscriptions.GetValueOrDefault(c.TenantId);
+                SubscriptionPlanCode? plan = subscription?.PlanCode;
+                var quota = _credits.Build(subscription, totals.GetValueOrDefault(c.Id, AiClinicCreditTotals.Zero), monthStart, monthEnd);
                 var row = settings.GetValueOrDefault(c.Id);
                 return new AiAdminClinicDto(
                     c.TenantId,
