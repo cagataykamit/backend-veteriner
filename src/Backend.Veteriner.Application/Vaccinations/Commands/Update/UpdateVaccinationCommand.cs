@@ -7,7 +7,8 @@ namespace Backend.Veteriner.Application.Vaccinations.Commands.Update;
 
 /// <summary>
 /// PUT /api/v1/vaccinations/{id}. <see cref="RowVersion"/> zorunludur (ADR-043 K5); durum geçişi yalnız Planlı → Uygulandı,
-/// iptal ayrı eylemdir (<c>POST /vaccinations/{id}/cancel</c>).
+/// iptal ayrı eylemdir (<c>POST /vaccinations/{id}/cancel</c>). <see cref="DueTimeSpecified"/>: vadenin saati kullanıcı tarafından
+/// girildi; verilmezse vade değişmedikçe mevcut bayrak korunur (kural <c>Vaccination.UpdateDetails</c>).
 /// </summary>
 public sealed record UpdateVaccinationCommand(
     Guid Id,
@@ -21,5 +22,6 @@ public sealed record UpdateVaccinationCommand(
     string? Notes,
     AdministrationRoute? Route = null,
     string? Site = null,
-    string? RowVersion = null)
+    string? RowVersion = null,
+    bool DueTimeSpecified = false)
     : IRequest<Result>;

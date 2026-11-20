@@ -30,6 +30,12 @@ public sealed class UpdateVaccinationBody
 
     /// <summary>GET'ten alınan sürüm (Base64); zorunlu (ADR-043 K5).</summary>
     public string? RowVersion { get; init; }
+
+    /// <summary>
+    /// <see cref="DueAtUtc"/>'nin saati kullanıcı tarafından girildi mi (panel formu tarih ve saat ister). Verilmezse (eski istemci)
+    /// vade değişmedikçe mevcut bayrak korunur, değişen vade saatsiz sayılır.
+    /// </summary>
+    public bool DueTimeSpecified { get; init; }
 }
 
 /// <summary>POST /api/v1/vaccinations/{id}/cancel body; gerekçe 5-500 karakter, rowVersion zorunlu.</summary>
