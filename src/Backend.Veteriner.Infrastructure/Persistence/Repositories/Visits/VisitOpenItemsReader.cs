@@ -1,9 +1,11 @@
 using Backend.Veteriner.Application.Hbs;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.ReadModels;
+using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.ChargeSuggestions;
 using Backend.Veteriner.Domain.Hbs;
 using Backend.Veteriner.Domain.LabResults;
+using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Domain.Visits;
 using Microsoft.EntityFrameworkCore;
@@ -149,7 +151,26 @@ public sealed class VisitOpenItemsReader : IVisitOpenItemsReader
             }
         }
 
-        return new OpenItemsSummaryDto(uncharged, outstandingVisits, outstandingAmount, awaitingLabs, incomplete, hbsPrescriptions, hbsVaccinations, pendingChargeItems);
+        // Gecikmiş randevu (ADR-052 K5): önceki günlerden kalan planlı randevu; gelişi açılmış olan "tamamlanmamış geliş"te sayılır,
+        // bakım almayan (vefat eden) hayvanın randevusu sayılmaz (ADR-020 S5). Yalnız pencere verilmişse (Bugün).
+        int? overdueAppointments = null;
+        if (request is { OverdueAppointmentsFromUtc: { } overdueFrom, OverdueAppointmentsBeforeUtc: { } overdueBefore }
+            && scope.Sees(OpenItemSources.Appointments))
+        {
+            var petsReceivingCare = _db.Pets.AsNoTracking().Where(Pet.ReceivesCare).Select(p => p.Id);
+            overdueAppointments = await _db.Appointments.AsNoTracking()
+                .CountAsync(a => a.TenantId == scope.TenantId
+                                 && a.ClinicId == scope.ClinicId
+                                 && a.Status == AppointmentStatus.Scheduled
+                                 && a.ScheduledAtUtc >= overdueFrom
+                                 && a.ScheduledAtUtc < overdueBefore
+                                 && petsReceivingCare.Contains(a.PetId)
+                                 && !_db.Visits.Any(v => v.AppointmentId == a.Id && v.VoidedAtUtc == null), ct);
+        }
+
+        return new OpenItemsSummaryDto(
+            uncharged, outstandingVisits, outstandingAmount, awaitingLabs, incomplete, hbsPrescriptions, hbsVaccinations, pendingChargeItems,
+            overdueAppointments);
     }
 
     public async Task<OpenItemVisitsReadResult> ListVisitsAsync(

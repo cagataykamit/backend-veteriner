@@ -82,10 +82,15 @@ public sealed record TodayHospitalizationDto(
     DateTime AdmittedAtUtc,
     DateTime? PlannedDischargeAtUtc);
 
+/// <param name="CancelledAppointmentCount">
+/// Seçili günde planlanmış ve iptal edilmiş randevu (randevu raporunun iptal sayımı; hekim süzgecinden etkilenmez). Liste iptali göstermez;
+/// sayaç gün başlığındadır (ADR-052). <c>Appointments.Read</c> yoksa ya da iptal edilen gelişler görünümünde null.
+/// </param>
 public sealed record TodayDto(
     DateOnly Date,
     Guid ClinicId,
     DateTime GeneratedAtUtc,
     IReadOnlyList<TodayItemDto> Items,
     IReadOnlyList<TodayHospitalizationDto> ActiveHospitalizations,
-    OpenItemsSummaryDto? OpenItems = null);
+    OpenItemsSummaryDto? OpenItems = null,
+    int? CancelledAppointmentCount = null);
