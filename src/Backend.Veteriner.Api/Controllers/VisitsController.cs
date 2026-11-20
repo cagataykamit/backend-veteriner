@@ -11,6 +11,7 @@ using Backend.Veteriner.Application.Visits.Commands.SetUrgency;
 using Backend.Veteriner.Application.Visits.Commands.Transition;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.Queries.GetById;
+using Backend.Veteriner.Application.Visits.Queries.GetCheckoutSummary;
 using Backend.Veteriner.Application.Visits.Queries.GetOpenItemVisits;
 using Backend.Veteriner.Application.Visits.Queries.GetToday;
 using Backend.Veteriner.Domain.Visits;
@@ -193,6 +194,24 @@ public sealed class VisitsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetVisitByIdQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// "Hesabı kapat" paneli okuması (CHECKOUT-001): bekleyen kalemler, gelişin ücretleri, müşterinin diğer açık ücretleri ve kredisi.
+    /// <c>charges</c> yalnız <c>Charges.Read</c> varsa dolar. Sözleşme: <c>docs/VISIT_CHECKOUT_API_CONTRACT.md</c>.
+    /// </summary>
+    [HttpGet("{id:guid}/checkout-summary")]
+    [Authorize(Policy = PermissionCatalog.Visits.Read)]
+    [ProducesResponseType(typeof(VisitCheckoutSummaryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetCheckoutSummary([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetVisitCheckoutSummaryQuery(id), ct);
         return result.ToActionResult(this);
     }
 
