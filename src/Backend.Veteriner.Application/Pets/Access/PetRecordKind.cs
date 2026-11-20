@@ -18,5 +18,8 @@ public enum PetRecordKind
     Imaging = 11,
 
     /// <summary>İçe aktarılmış eski program kaydı (salt okunur klinik geçmiş; ADR-048 T1). Yalnız zaman çizelgesinde.</summary>
-    ImportedClinicalRecord = 12
+    ImportedClinicalRecord = 12,
+
+    /// <summary>Vital ölçümü (HOSP-004, ADR-043 AK-9).</summary>
+    VitalMeasurement = 13
 }
