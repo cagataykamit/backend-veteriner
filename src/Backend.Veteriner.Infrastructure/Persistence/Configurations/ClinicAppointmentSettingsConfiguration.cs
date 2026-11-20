@@ -22,6 +22,8 @@ public sealed class ClinicAppointmentSettingsConfiguration : IEntityTypeConfigur
         b.Property(x => x.OwnerCancelLinkEnabled).IsRequired();
         // Bekleme listesi otomatik teklifi (TIER-018): aynı kural, mevcut satırlar migration'da açık doldurulur.
         b.Property(x => x.WaitlistAutoOfferEnabled).IsRequired();
+        // Çalışma saati kısıtı: aynı kural, mevcut satırlar migration'da açık doldurulur.
+        b.Property(x => x.EnforceWorkingHours).IsRequired();
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc);
 

@@ -157,7 +157,7 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
 
             var hoursRows = await _clinicWorkingHoursRead.ListAsync(
                 new ClinicWorkingHoursByClinicSpec(tenantId, clinicId), ct);
-            var workingHours = AppointmentWorkingHoursValidation.Validate(scheduledUtc, durationMinutes, hoursRows);
+            var workingHours = AppointmentWorkingHoursValidation.Validate(scheduledUtc, durationMinutes, hoursRows, appointmentSettingsRow);
             if (!workingHours.IsSuccess)
                 return Result.Failure(workingHours.Error);
         }

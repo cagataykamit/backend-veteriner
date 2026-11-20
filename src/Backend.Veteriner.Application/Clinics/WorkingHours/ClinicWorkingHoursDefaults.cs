@@ -18,6 +18,15 @@ public static class ClinicWorkingHoursDefaults
                 x.BreakStartsAt,
                 x.BreakEndsAt)).ToList();
 
+    /// <summary>
+    /// Çalışma saati kısıtı kapalı klinikte (<see cref="ClinicAppointmentSettings.EnforceWorkingHours"/>) doluluk hesabının penceresi: her
+    /// gün 08:00-20:00, molasız. Kapalı gün yoktur; randevu bu pencerenin dışına da verilebilir.
+    /// </summary>
+    public static IReadOnlyList<ClinicWorkingHourDto> UnrestrictedWeek()
+        => Enum.GetValues<DayOfWeek>()
+            .Select(day => new ClinicWorkingHourDto(day, false, new TimeOnly(8, 0), new TimeOnly(20, 0), null, null))
+            .ToList();
+
     public static IReadOnlyList<ClinicWorkingHourDto> BuildWeek()
     {
         TimeOnly T(int h, int m = 0) => new(h, m);

@@ -5,6 +5,11 @@ using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Application.Appointments;
 
+/// <summary>
+/// Panelden verilen randevunun çalışma saatine uyumu (kural tek yer: oluşturma, düzenleme, yeniden zamanlama, bekleme listesi teklifi).
+/// Klinik çalışma saati kısıtını kapattıysa (<see cref="ClinicAppointmentSettings.EnforceWorkingHours"/>) yalnız tek yerel gün kuralı
+/// kalır. Online randevu bu sınıfı değil müsaitlik hesabını kullanır; ayardan etkilenmez.
+/// </summary>
 internal static class AppointmentWorkingHoursValidation
 {
     private static readonly TimeZoneInfo ClinicTimeZone = ResolveClinicTimeZone();
@@ -12,7 +17,8 @@ internal static class AppointmentWorkingHoursValidation
     public static Result Validate(
         DateTime scheduledAtUtc,
         int durationMinutes,
-        IReadOnlyList<ClinicWorkingHour> clinicHoursRows)
+        IReadOnlyList<ClinicWorkingHour> clinicHoursRows,
+        ClinicAppointmentSettings? settings)
     {
         var localStart = ToClinicLocal(scheduledAtUtc);
         var localEnd = localStart.AddMinutes(durationMinutes);
@@ -22,6 +28,9 @@ internal static class AppointmentWorkingHoursValidation
                 "Appointments.OutsideWorkingHours",
                 "Randevu aralığı tek bir yerel gün içinde olmalıdır.");
         }
+
+        if (!(settings?.EnforceWorkingHours ?? ClinicAppointmentSettings.DefaultEnforceWorkingHours))
+            return Result.Success();
 
         var day = localStart.DayOfWeek;
         var source = ClinicWorkingHoursDefaults.Effective(clinicHoursRows);

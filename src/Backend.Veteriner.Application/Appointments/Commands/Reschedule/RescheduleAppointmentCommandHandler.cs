@@ -121,7 +121,7 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
 
         var hoursRows = await _clinicWorkingHoursRead.ListAsync(
             new ClinicWorkingHoursByClinicSpec(tenantId, appointment.ClinicId), ct);
-        var workingHours = AppointmentWorkingHoursValidation.Validate(scheduledUtc, appointment.DurationMinutes, hoursRows);
+        var workingHours = AppointmentWorkingHoursValidation.Validate(scheduledUtc, appointment.DurationMinutes, hoursRows, appointmentSettingsRow);
         if (!workingHours.IsSuccess)
             return Result.Failure(workingHours.Error);
 

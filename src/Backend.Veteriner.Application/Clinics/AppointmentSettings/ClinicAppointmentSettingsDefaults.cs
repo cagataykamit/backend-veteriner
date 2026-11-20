@@ -11,7 +11,8 @@ public static class ClinicAppointmentSettingsDefaults
             SlotIntervalMinutes: 15,
             AllowOverlappingAppointments: false,
             OwnerCancelLinkEnabled: ClinicAppointmentSettings.DefaultOwnerCancelLinkEnabled,
-            WaitlistAutoOfferEnabled: ClinicAppointmentSettings.DefaultWaitlistAutoOfferEnabled);
+            WaitlistAutoOfferEnabled: ClinicAppointmentSettings.DefaultWaitlistAutoOfferEnabled,
+            EnforceWorkingHours: ClinicAppointmentSettings.DefaultEnforceWorkingHours);
 
     public static ClinicAppointmentSettingsDto ToDto(ClinicAppointmentSettings row)
         => new(
@@ -19,5 +20,6 @@ public static class ClinicAppointmentSettingsDefaults
             row.SlotIntervalMinutes,
             row.AllowOverlappingAppointments,
             row.OwnerCancelLinkEnabled,
-            row.WaitlistAutoOfferEnabled);
+            row.WaitlistAutoOfferEnabled,
+            row.EnforceWorkingHours);
 }

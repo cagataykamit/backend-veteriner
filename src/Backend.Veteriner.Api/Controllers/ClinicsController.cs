@@ -184,7 +184,8 @@ public sealed class ClinicsController : ControllerBase
             body.SlotIntervalMinutes,
             body.AllowOverlappingAppointments,
             body.OwnerCancelLinkEnabled,
-            body.WaitlistAutoOfferEnabled), ct);
+            body.WaitlistAutoOfferEnabled,
+            body.EnforceWorkingHours), ct);
         return result.ToActionResult(this);
     }
 

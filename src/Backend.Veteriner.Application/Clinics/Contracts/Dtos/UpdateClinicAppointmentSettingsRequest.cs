@@ -9,4 +9,5 @@ public sealed record UpdateClinicAppointmentSettingsRequest(
     int SlotIntervalMinutes,
     bool AllowOverlappingAppointments,
     bool? OwnerCancelLinkEnabled = null,
-    bool? WaitlistAutoOfferEnabled = null);
+    bool? WaitlistAutoOfferEnabled = null,
+    bool? EnforceWorkingHours = null);

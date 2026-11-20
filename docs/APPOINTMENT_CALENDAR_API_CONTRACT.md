@@ -238,6 +238,7 @@ Yanıt (aralıktaki her İstanbul günü, tarih sırasıyla; kapalı gün `0`):
   hizalı kaç başlangıç varsa × kaynak sayısı. Kaynak: klinikteki hekim sayısı; hekim yoksa ya da `veterinarianUserId` verildiyse 1.
 - Doluluk = o günün randevu sayısı (§7 özet `total`) / `capacity`; istemci hesaplar. Kapasite `0` ise gün kapalıdır.
 - Hekim bazında çalışma saati ve tarihe özel kapalı gün modeli yok (§4); kapasite haftanın gününe göre aynıdır.
+- Klinik çalışma saati kısıtını kapattıysa kapasite her gün 08:00-20:00 penceresinden hesaplanır, kapalı gün yoktur (§9).
 
 ### 8.5 Testler
 
@@ -246,3 +247,37 @@ Yanıt (aralıktaki her İstanbul günü, tarih sırasıyla; kapalı gün `0`):
   (`state`), `GetVaccinationsCalendarQueryHandlerTests` (`timeSpecified`), `ImportValueParsersTests` (saat eki), E-vet dönüştürücü
   testleri (sonraki aşı tarihinde saat), içe aktarma doğrulama testleri (saatli vade).
 - Entegrasyon: `AppointmentCalendarFilterEndpointTests` (kapasite ucu).
+
+## 9) Çalışma saati kısıtı (2026-11-20)
+
+Klinik başına tek ayar: `ClinicAppointmentSettings.EnforceWorkingHours` (varsayılan `true`, mevcut davranış). Kural tek yer
+`AppointmentWorkingHoursValidation`. Migration: `AddClinicEnforceWorkingHours` (sütun `bit NOT NULL`, mevcut satırlar `true`).
+
+### 9.1 `GET/PUT /api/v1/clinics/{id}/appointment-settings`
+
+- Yanıta `enforceWorkingHours: boolean` eklendi (kayıt yoksa `true`).
+- İstekte `enforceWorkingHours` isteğe bağlı: gönderilmezse mevcut değer korunur (eski istemciler; `ownerCancelLinkEnabled` ve
+  `waitlistAutoOfferEnabled` ile aynı kural). Yetki değişmedi (`Clinics.Update`).
+
+### 9.2 Kısıt kapalıyken (`enforceWorkingHours = false`)
+
+- Panelden oluşturma (`POST /appointments`), düzenleme (`PUT /appointments/{id}`), yeniden zamanlama ve bekleme listesi teklifi çalışma
+  saati, kapalı gün ve mola denetlemez; `Appointments.ClinicClosed`, `Appointments.BreakTimeConflict` ve çalışma saati kaynaklı
+  `Appointments.OutsideWorkingHours` dönmez. Slot hizası, çakışma ve geçmiş/gelecek sınırları aynen geçerlidir.
+- Randevu yine tek bir yerel gün içinde olmalıdır (aksi halde `Appointments.OutsideWorkingHours`, "tek bir yerel gün"); 23:30'da 60
+  dakikalık randevu verilemez.
+- Günlük kapasite (§8.4) kapalı gün mantığı kullanmaz: pencere her gün 08:00-20:00, molasız
+  (`ClinicWorkingHoursDefaults.UnrestrictedWeek`). Kapasite `0` yalnız kısıt açıkken kapalı gün anlamına gelir.
+- "Boş saat bul" (`GET clinics/{id}/online-booking/availability`) değişmedi: tanımlı çalışma saatlerinde arar.
+- Online randevu (portal, klinik sitesi, Veteriner bul, en yakın boş saat) bu ayardan **etkilenmez**; tanımlı çalışma saatlerine göre
+  sürer.
+- İstemci: takvimde kapalı gün taraması ve mola gölgesi gösterilmez; gün/hafta ızgarası 00-24 kaydırılabilir, açılışta 08:00 civarı
+  görünür; yeni/düzenle formunda günün tüm saatleri seçilebilir.
+
+### 9.3 Testler
+
+- Application: `CreateAppointmentCommandHandlerTests` (kısıt kapalı: kapalı gün ve molada başarı, gün aşımı yine red),
+  `UpdateAppointmentCommandHandlerTests`, `AppointmentLifecycleCommandHandlerTests` (yeniden zamanlama),
+  `UpdateClinicAppointmentSettingsCommandHandlerTests` (alan gönderilmezse korunur), `AppointmentAvailabilityWorkingHoursRestrictionTests`
+  (kapasite penceresi; online müsaitlik tanımlı haftaya göre).
+- Entegrasyon: `AppointmentWorkingHoursRestrictionIntegrationTests` (red → ayarı kapat → aynı randevu 201, kapasite pozitif).

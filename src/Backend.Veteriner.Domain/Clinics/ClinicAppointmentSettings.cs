@@ -33,6 +33,15 @@ public sealed class ClinicAppointmentSettings : ITenantOwned
     /// </summary>
     public bool WaitlistAutoOfferEnabled { get; private set; } = DefaultWaitlistAutoOfferEnabled;
 
+    /// <summary>Çalışma saati kısıtı varsayılan açık (mevcut davranış). Kayıt yoksa da açıktır.</summary>
+    public const bool DefaultEnforceWorkingHours = true;
+
+    /// <summary>
+    /// Panelden verilen randevu çalışma saati ve molaya uymak zorunda. Kapalıysa panelden her güne ve saate randevu verilir; online
+    /// randevu (portal, klinik sitesi) bu ayardan etkilenmez, tanımlı çalışma saatlerine göre sürer.
+    /// </summary>
+    public bool EnforceWorkingHours { get; private set; } = DefaultEnforceWorkingHours;
+
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? UpdatedAtUtc { get; private set; }
 
@@ -46,7 +55,8 @@ public sealed class ClinicAppointmentSettings : ITenantOwned
         bool allowOverlappingAppointments,
         DateTime utcNow,
         bool ownerCancelLinkEnabled = DefaultOwnerCancelLinkEnabled,
-        bool waitlistAutoOfferEnabled = DefaultWaitlistAutoOfferEnabled)
+        bool waitlistAutoOfferEnabled = DefaultWaitlistAutoOfferEnabled,
+        bool enforceWorkingHours = DefaultEnforceWorkingHours)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -64,6 +74,7 @@ public sealed class ClinicAppointmentSettings : ITenantOwned
             AllowOverlappingAppointments = allowOverlappingAppointments,
             OwnerCancelLinkEnabled = ownerCancelLinkEnabled,
             WaitlistAutoOfferEnabled = waitlistAutoOfferEnabled,
+            EnforceWorkingHours = enforceWorkingHours,
             CreatedAtUtc = utcNow,
             UpdatedAtUtc = null,
         };
@@ -75,7 +86,8 @@ public sealed class ClinicAppointmentSettings : ITenantOwned
         bool allowOverlappingAppointments,
         bool ownerCancelLinkEnabled,
         DateTime utcNow,
-        bool? waitlistAutoOfferEnabled = null)
+        bool? waitlistAutoOfferEnabled = null,
+        bool? enforceWorkingHours = null)
     {
         Validate(defaultAppointmentDurationMinutes, slotIntervalMinutes);
         DefaultAppointmentDurationMinutes = defaultAppointmentDurationMinutes;
@@ -83,6 +95,7 @@ public sealed class ClinicAppointmentSettings : ITenantOwned
         AllowOverlappingAppointments = allowOverlappingAppointments;
         OwnerCancelLinkEnabled = ownerCancelLinkEnabled;
         WaitlistAutoOfferEnabled = waitlistAutoOfferEnabled ?? WaitlistAutoOfferEnabled;
+        EnforceWorkingHours = enforceWorkingHours ?? EnforceWorkingHours;
         UpdatedAtUtc = utcNow;
     }
 
