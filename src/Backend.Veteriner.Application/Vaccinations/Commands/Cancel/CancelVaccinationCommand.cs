@@ -8,7 +8,7 @@ namespace Backend.Veteriner.Application.Vaccinations.Commands.Cancel;
 /// POST /api/v1/vaccinations/{id}/cancel (ADR-043 AK-3). Gerekçe 5–500 karakter; <see cref="RowVersion"/> zorunludur.
 /// </summary>
 public sealed record CancelVaccinationCommand(Guid Id, string? Reason, string? RowVersion)
-    : IRequest<Result>, ITransactionalRequest, IAuditableRequest
+    : IRequest<Result>, ITransactionalRollbackOnFailureRequest, IAuditableRequest
 {
     public string AuditAction => "Vaccination.Cancel";
     public string? AuditTarget => $"VaccinationId={Id}";

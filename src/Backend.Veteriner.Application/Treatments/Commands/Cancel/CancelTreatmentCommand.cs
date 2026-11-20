@@ -8,7 +8,7 @@ namespace Backend.Veteriner.Application.Treatments.Commands.Cancel;
 /// POST /api/v1/treatments/{id}/cancel (ADR-043 AK-2). Gerekçe 5–500 karakter; <see cref="RowVersion"/> zorunludur.
 /// </summary>
 public sealed record CancelTreatmentCommand(Guid Id, string? Reason, string? RowVersion)
-    : IRequest<Result>, ITransactionalRequest, IAuditableRequest
+    : IRequest<Result>, ITransactionalRollbackOnFailureRequest, IAuditableRequest
 {
     public string AuditAction => "Treatment.Cancel";
     public string? AuditTarget => $"TreatmentId={Id}";

@@ -255,6 +255,45 @@ public sealed class HospitalizationModelIntegrationTests : IClassFixture<CustomW
     }
 
     [Fact]
+    public async Task Stale_Update_Discharge_And_Cancel_Should_Not_Leave_Record_History_Rows()
+    {
+        // Eşzamanlılık çakışmasında yazılamayan değişiklik geçmişte "olmuş" görünmemeli (RECORD-002).
+        var (client, clinicId, petId) = await AdminClientAsync();
+        var id = await CreateAsync(client, new
+        {
+            ClinicId = clinicId,
+            PetId = petId,
+            AdmittedAtUtc = DateTime.UtcNow.AddHours(-3),
+            Reason = "Gözlem",
+        });
+        var before = await RecordChangeCountAsync(id);
+        var staleVersion = Convert.ToBase64String(new byte[8]);
+
+        var update = await client.PutAsJsonAsync($"/api/v1/hospitalizations/{id}", PutBody(clinicId, petId, staleVersion, reason: "Hiç yazılmadı"));
+        var discharge = await client.PostAsJsonAsync(
+            $"/api/v1/hospitalizations/{id}/discharge",
+            new { DischargedAtUtc = DateTime.UtcNow, DischargeNote = "Hiç yazılmadı", RowVersion = staleVersion });
+        var cancel = await client.PostAsJsonAsync(
+            $"/api/v1/hospitalizations/{id}/cancel",
+            new { Reason = "Yanlış hastaya açıldı", RowVersion = staleVersion });
+
+        foreach (var response in new[] { update, discharge, cancel })
+        {
+            response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+            (await IntegrationTestProblemDetails.ReadCodeAsync(response)).Should().Be("Hospitalizations.ConcurrencyConflict");
+        }
+
+        (await RecordChangeCountAsync(id)).Should().Be(before);
+    }
+
+    private async Task<int> RecordChangeCountAsync(Guid recordId)
+    {
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.RecordChanges.IgnoreQueryFilters().CountAsync(c => c.RecordId == recordId);
+    }
+
+    [Fact]
     public async Task Discharge_With_Legacy_Notes_Field_Should_Not_Overwrite_Admission_Notes()
     {
         var (client, clinicId, petId) = await AdminClientAsync();

@@ -302,6 +302,13 @@ public sealed class VaccinationAdministrationLinkTests : IClassFixture<CustomWeb
         var shortReason = await client.PostAsJsonAsync($"/api/v1/vaccinations/{id:D}/cancel", new { reason = "x", rowVersion = version });
         shortReason.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
+        // Eşzamanlılık çakışmasında yazılamayan iptal geçmişte "olmuş" görünmemeli (RECORD-002).
+        var historyBefore = await RecordChangeCountAsync(id);
+        var staleCancel = await client.PostAsJsonAsync($"/api/v1/vaccinations/{id:D}/cancel", new { reason = "Yanlış hastaya girildi", rowVersion = Convert.ToBase64String(new byte[8]) });
+        staleCancel.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await ReadProblemCodeAsync(staleCancel)).Should().Be("Vaccinations.ConcurrencyConflict");
+        (await RecordChangeCountAsync(id)).Should().Be(historyBefore);
+
         var cancel = await client.PostAsJsonAsync($"/api/v1/vaccinations/{id:D}/cancel", new { reason = "Yanlış hastaya girildi", rowVersion = version });
         cancel.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
@@ -446,6 +453,13 @@ public sealed class VaccinationAdministrationLinkTests : IClassFixture<CustomWeb
     private static async Task<string?> RowVersionAsync(HttpClient client, Guid vaccinationId)
         => (await (await client.GetAsync($"/api/v1/vaccinations/{vaccinationId:D}")).Content.ReadFromJsonAsync<JsonElement>())
             .GetProperty("rowVersion").GetString();
+
+    private async Task<int> RecordChangeCountAsync(Guid recordId)
+    {
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.RecordChanges.IgnoreQueryFilters().CountAsync(c => c.RecordId == recordId);
+    }
 
     private static async Task<string?> ReadProblemCodeAsync(HttpResponseMessage response)
     {

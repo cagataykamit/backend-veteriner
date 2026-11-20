@@ -14,7 +14,7 @@ public sealed record DischargeHospitalizationCommand(
     DateTime DischargedAtUtc,
     string? DischargeNote,
     string? RowVersion = null)
-    : IRequest<Result<HospitalizationWriteResultDto>>, ITransactionalRequest, IAuditableRequest
+    : IRequest<Result<HospitalizationWriteResultDto>>, ITransactionalRollbackOnFailureRequest, IAuditableRequest
 {
     public string AuditAction => "Hospitalization.Discharge";
     public string? AuditTarget => $"HospitalizationId={Id}";

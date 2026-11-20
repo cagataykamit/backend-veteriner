@@ -9,7 +9,7 @@ namespace Backend.Veteriner.Application.Hospitalizations.Commands.Cancel;
 /// POST /api/v1/hospitalizations/{id}/cancel (ADR-043 AK-5). Gerekçe 5–500 karakter; <see cref="RowVersion"/> zorunludur.
 /// </summary>
 public sealed record CancelHospitalizationCommand(Guid Id, string? Reason, string? RowVersion)
-    : IRequest<Result<HospitalizationWriteResultDto>>, ITransactionalRequest, IAuditableRequest
+    : IRequest<Result<HospitalizationWriteResultDto>>, ITransactionalRollbackOnFailureRequest, IAuditableRequest
 {
     public string AuditAction => "Hospitalization.Cancel";
     public string? AuditTarget => $"HospitalizationId={Id}";

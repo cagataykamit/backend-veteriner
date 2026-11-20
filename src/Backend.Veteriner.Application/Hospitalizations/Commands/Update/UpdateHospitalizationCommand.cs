@@ -25,7 +25,7 @@ public sealed record UpdateHospitalizationCommand(
     string? RowVersion = null,
     Guid? RoomId = null,
     bool ClearRoom = false)
-    : IRequest<Result<HospitalizationWriteResultDto>>, ITransactionalRequest, IAuditableRequest
+    : IRequest<Result<HospitalizationWriteResultDto>>, ITransactionalRollbackOnFailureRequest, IAuditableRequest
 {
     public string AuditAction => "Hospitalization.Update";
     public string? AuditTarget => $"HospitalizationId={Id}";

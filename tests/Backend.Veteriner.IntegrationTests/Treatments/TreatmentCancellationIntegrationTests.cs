@@ -7,6 +7,7 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Infrastructure.Persistence;
 using AwesomeAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Backend.IntegrationTests.Treatments;
@@ -100,6 +101,30 @@ public sealed class TreatmentCancellationIntegrationTests : IClassFixture<Custom
 
         var timeline = await client.GetFromJsonAsync<JsonElement>($"/api/v1/pets/{petId:D}/timeline");
         timeline.GetProperty("items").EnumerateArray().Select(r => r.GetProperty("sourceId").GetGuid()).Should().NotContain(id);
+    }
+
+    [Fact]
+    public async Task Stale_Cancel_Should_Not_Leave_Record_History_Row()
+    {
+        // Eşzamanlılık çakışmasında yazılamayan iptal geçmişte "olmuş" görünmemeli (RECORD-002).
+        var (client, clinicId, petId) = await AuthorizedClientAsync();
+        var id = await CreateAsync(client, clinicId, petId);
+        var before = await RecordChangeCountAsync(id);
+
+        var stale = await client.PostAsJsonAsync(
+            $"/api/v1/treatments/{id}/cancel",
+            new { reason = "Yanlış hastaya girildi", rowVersion = Convert.ToBase64String(new byte[8]) });
+
+        stale.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(stale)).Should().Be("Treatments.ConcurrencyConflict");
+        (await RecordChangeCountAsync(id)).Should().Be(before);
+    }
+
+    private async Task<int> RecordChangeCountAsync(Guid recordId)
+    {
+        await using var scope = _factory.Services.CreateSystemScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.RecordChanges.IgnoreQueryFilters().CountAsync(c => c.RecordId == recordId);
     }
 
     [Fact]
