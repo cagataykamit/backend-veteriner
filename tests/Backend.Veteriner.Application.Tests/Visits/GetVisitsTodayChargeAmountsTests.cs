@@ -53,7 +53,8 @@ public sealed class GetVisitsTodayChargeAmountsTests
             .ReturnsAsync(new VisitTodayReadResult(items, []));
         var handler = new GetVisitsTodayQueryHandler(
             _tenantContext.Object, _clinicContext.Object, _scopeResolver.Object, _reader.Object, _openItems.Object,
-            _charges.Object, _chargeSuggestions.Object, VisitHandlerTestSupport.EmptyExaminations(), _permissions.Object, _veterinarians.Object, VisitHandlerTestSupport.FixedClock);
+            _charges.Object, _chargeSuggestions.Object, VisitHandlerTestSupport.EmptyExaminations(),
+            new Mock<IReadRepository<Backend.Veteriner.Domain.Appointments.Appointment>>().Object, _permissions.Object, _veterinarians.Object, VisitHandlerTestSupport.FixedClock);
         return handler.Handle(new GetVisitsTodayQuery(_clinicId, null, Voided: voided), CancellationToken.None);
     }
 

@@ -2,9 +2,11 @@ using Backend.Veteriner.Application.Charges.Specs;
 using Backend.Veteriner.Application.ChargeSuggestions.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
+using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Examinations.Specs;
+using Backend.Veteriner.Application.Reports.Appointments.Specs;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Application.Visits.ReadModels;
 using Backend.Veteriner.Domain.Charges;
@@ -30,6 +32,7 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
     private readonly IReadRepository<Charge> _charges;
     private readonly IReadRepository<ChargeSuggestion> _chargeSuggestions;
     private readonly IReadRepository<Examination> _examinations;
+    private readonly IReadRepository<Appointment> _appointments;
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IClinicVeterinarianReader _veterinarians;
     private readonly TimeProvider _timeProvider;
@@ -43,11 +46,13 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
         IReadRepository<Charge> charges,
         IReadRepository<ChargeSuggestion> chargeSuggestions,
         IReadRepository<Examination> examinations,
+        IReadRepository<Appointment> appointments,
         ICurrentUserPermissionChecker permissions,
         IClinicVeterinarianReader veterinarians,
         TimeProvider timeProvider)
     {
         _examinations = examinations;
+        _appointments = appointments;
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
@@ -125,13 +130,23 @@ public sealed class GetVisitsTodayQueryHandler : IRequestHandler<GetVisitsTodayQ
             ? null
             : await _openItems.GetSummaryAsync(OpenItemsSummaryRequest.ForToday(openScope, nowUtc), ct);
 
+        // Liste iptal randevuyu göstermez; sayaç randevu raporunun iptal sayımıdır (bağlantı o güne açılır).
+        int? cancelledAppointments = null;
+        if (!request.Voided && _permissions.HasPermission(PermissionCatalog.Appointments.Read))
+        {
+            cancelledAppointments = await _appointments.CountAsync(
+                new AppointmentsReportFilteredCountSpec(
+                    tenantId, clinicId, null, null, AppointmentStatus.Cancelled, dayStartUtc, dayEndUtc.AddTicks(-1), null, []), ct);
+        }
+
         return Result<TodayDto>.Success(new TodayDto(
             date,
             clinicId,
             nowUtc,
             request.Voided ? items.OrderByDescending(i => i.ArrivedAtUtc).ToList() : Order(items),
             data.ActiveHospitalizations,
-            openItems));
+            openItems,
+            cancelledAppointments));
     }
 
     /// <summary>

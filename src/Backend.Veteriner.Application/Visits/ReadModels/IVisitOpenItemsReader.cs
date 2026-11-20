@@ -18,7 +18,8 @@ public enum OpenItemSources
     Hospitalizations = 16,
     LabResults = 32,
     Charges = 64,
-    Prescriptions = 128
+    Prescriptions = 128,
+    Appointments = 256
 }
 
 public sealed record OpenItemsScope(Guid TenantId, Guid ClinicId, OpenItemSources Visible)
@@ -37,6 +38,7 @@ public sealed record OpenItemsScope(Guid TenantId, Guid ClinicId, OpenItemSource
         Add(OpenItemSources.LabResults, PermissionCatalog.LabResults.Read);
         Add(OpenItemSources.Charges, PermissionCatalog.Charges.Read);
         Add(OpenItemSources.Prescriptions, PermissionCatalog.Prescriptions.Read);
+        Add(OpenItemSources.Appointments, PermissionCatalog.Appointments.Read);
         return new OpenItemsScope(tenantId, clinicId, visible);
 
         void Add(OpenItemSources source, string permission)
@@ -63,28 +65,35 @@ public sealed record VisitOpenItems(
 /// <param name="IncompleteBeforeUtc">Bu andan önce gelip tamamlanmamış geliş sayılır (içinde bulunulan günün başlangıcı).</param>
 /// <param name="HbsFromUtc">"HBS'e girilmedi" sayım penceresi başlangıcı (dahil); null ise HBS sayıları hesaplanmaz (gün sonu).</param>
 /// <param name="HbsToUtc">"HBS'e girilmedi" sayım penceresi sonu (hariç).</param>
+/// <param name="OverdueAppointmentsFromUtc">Gecikmiş randevu sayım penceresi başlangıcı (dahil); null ise sayılmaz (gün sonu).</param>
+/// <param name="OverdueAppointmentsBeforeUtc">Bu andan önceki planlı randevu gecikmiştir (içinde bulunulan günün başlangıcı).</param>
 public sealed record OpenItemsSummaryRequest(
     OpenItemsScope Scope,
     DateTime UnchargedFromUtc,
     DateTime UnchargedToUtc,
     DateTime IncompleteBeforeUtc,
     DateTime? HbsFromUtc = null,
-    DateTime? HbsToUtc = null)
+    DateTime? HbsToUtc = null,
+    DateTime? OverdueAppointmentsFromUtc = null,
+    DateTime? OverdueAppointmentsBeforeUtc = null)
 {
     /// <summary>
-    /// Bugün pencereleri (tek yer): ücretsiz ziyaret ve "HBS'e girilmedi" son 30 İstanbul günü, tamamlanmamış geliş = bugünden önceki açık geliş.
-    /// Bugün özeti ve açık iş listesi aynı pencereyi buradan alır; sayı ile liste hep tutar.
+    /// Bugün pencereleri (tek yer): ücretsiz ziyaret, "HBS'e girilmedi" ve gecikmiş randevu son 30 İstanbul günü; tamamlanmamış geliş ve
+    /// gecikmiş randevu bugünden öncesi. Bugün özeti ve açık iş listesi aynı pencereyi buradan alır; sayı ile liste hep tutar.
     /// </summary>
     public static OpenItemsSummaryRequest ForToday(OpenItemsScope scope, DateTime nowUtc)
     {
         var todayLocal = OperationDayBounds.ToLocalDate(nowUtc);
+        var todayStartUtc = OperationDayBounds.ForLocalDate(todayLocal).DayStartUtc;
         return new OpenItemsSummaryRequest(
             scope,
             OperationDayBounds.ForLocalDate(todayLocal.AddDays(-OpenItemsDefaults.UnchargedLookbackDays)).DayStartUtc,
             nowUtc,
-            OperationDayBounds.ForLocalDate(todayLocal).DayStartUtc,
+            todayStartUtc,
             OperationDayBounds.ForLocalDate(todayLocal.AddDays(-OpenItemsDefaults.HbsLookbackDays)).DayStartUtc,
-            nowUtc);
+            nowUtc,
+            OperationDayBounds.ForLocalDate(todayLocal.AddDays(-OpenItemsDefaults.OverdueAppointmentLookbackDays)).DayStartUtc,
+            todayStartUtc);
     }
 }
 

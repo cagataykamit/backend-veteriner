@@ -18,6 +18,7 @@ public enum VisitChargeIndicator
 /// <summary>
 /// Klinik geneli açık iş sayıları. Kullanıcının okuma izni olmayan kayıt türüne bağlı alanlar null'dır.
 /// </summary>
+/// <param name="OverdueAppointmentCount">Önceki günlerden kalan, hâlâ planlı, gelişi açılmamış randevu (yalnız Bugün; <c>Appointments.Read</c>).</param>
 public sealed record OpenItemsSummaryDto(
     int? UnchargedVisitCount,
     int? OutstandingVisitCount,
@@ -26,7 +27,8 @@ public sealed record OpenItemsSummaryDto(
     int IncompleteVisitCount,
     int? HbsNotEnteredPrescriptionCount = null,
     int? HbsNotEnteredVaccinationCount = null,
-    int? PendingChargeItemCount = null);
+    int? PendingChargeItemCount = null,
+    int? OverdueAppointmentCount = null);
 
 /// <summary>Listesi açılabilen özet sayısı: <c>Uncharged</c> = <see cref="OpenItemsSummaryDto.UnchargedVisitCount"/>, <c>Incomplete</c> = <see cref="OpenItemsSummaryDto.IncompleteVisitCount"/>.</summary>
 public enum OpenItemVisitKind
@@ -65,4 +67,7 @@ public static class OpenItemsDefaults
 
     /// <summary>"HBS'e girilmedi" sayımının geriye bakış penceresi (İstanbul günü); HBS yardımcısı öncesi kayıtlar sayıma girmez (ADR-036).</summary>
     public const int HbsLookbackDays = 30;
+
+    /// <summary>Gecikmiş randevu sayımının geriye bakış penceresi (İstanbul günü); yıllar önce unutulmuş planlı randevu sayılmaz (ADR-052).</summary>
+    public const int OverdueAppointmentLookbackDays = 30;
 }
