@@ -205,6 +205,8 @@ public sealed class ClientPetSummaryScopeIdorIntegrationTests : IClassFixture<Cu
         await db.Payments.Where(p => p.TenantId == tenant.Id).ExecuteDeleteAsync();
         await db.AppointmentRequests.Where(a => a.TenantId == tenant.Id).ExecuteDeleteAsync();
         await db.Appointments.Where(a => a.TenantId == tenant.Id).ExecuteDeleteAsync();
+        // Muayeneye bağlı sahibe açıklamalar (AI-003) önce silinir; aynı koleksiyondaki AI testleri bunları ortak kiracıda oluşturur.
+        await db.OwnerExplanations.Where(o => o.TenantId == tenant.Id).ExecuteDeleteAsync();
         await db.Examinations.Where(e => e.TenantId == tenant.Id).ExecuteDeleteAsync();
     }
 
