@@ -192,8 +192,14 @@ Kaynak: kullanıcı seçimi 2026-11-18 (ürün deposu `ux/takvim-yeniden-tasarim
   bayrak `true` olur; saat eki yoksa vade bugünkü gibi günün 12:00'si (İstanbul) ve bayrak `false`. E-vet dönüştürücüsü "Yapılacak"
   aşı görevinin başlangıç saatini artık `SonrakiAsiTarihi`'ne yazar (önce yalnız gün yazılıyordu). E-vet görev saati gerçek saat sayılır
   (kullanıcı kararı 2026-11-18; "00:00 ise saatsiz" kuralı kırılgan olduğu için elendi).
-- **Panel:** aşı oluşturma bayrağı `false` yazar. Düzenlemede vade değişmezse bayrak korunur, vade değişirse `false` olur (kural tek
-  yer `Vaccination.UpdateDetails`). Panel formunda "saat gerçek" seçimi ilk sürümde yok.
+- **Panel (2026-11-20 değişti):** `POST /vaccinations` ve `PUT /vaccinations/{id}` gövdesine isteğe bağlı `dueTimeSpecified` (bool,
+  varsayılan `false`) eklendi. Panel formu vadeyi tarih **ve saat** olarak ister; panel, kullanıcının girdiği ya da değiştirdiği vade
+  için `true` gönderir. Önce bayrak panelden hep `false` yazılıyordu: formda girilen saat kaydediliyor ama takvimde "Saatsiz"
+  görünüyordu (pilot hazırlık listesi kapı 3).
+  - Oluşturma: bayrak `dueTimeSpecified && dueAtUtc != null`.
+  - Düzenleme: `dueTimeSpecified: true` ise bayrak `true`; verilmezse vade değişmedikçe mevcut bayrak korunur, vade değişirse
+    `false` olur (eski istemci). Kural tek yer `Vaccination.UpdateDetails`.
+  - Aşı planı uygulama (`VACCINATION_SCHEDULE_API_CONTRACT.md`) gün bazlıdır, bayrak `false` kalır.
 - Vade, gecikme, hatırlatma, çakışma ve boş saat kuralları değişmedi: hepsi gün bazlıdır (ADR-028). Saat yalnız sıralama ve gösterim
   içindir.
 - Yayındaki eski aktarmalarda saat yoktur. Güncelleme aktarması (ADR-051) mevcut aşıyı mükerrer sayıp atladığı için saati getirmez;
