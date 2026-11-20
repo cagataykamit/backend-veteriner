@@ -10,6 +10,10 @@ Backend tek doğruluk kaynağıdır. Kaynak: backlog REPORT-003 ve REPORT-004 (�
 - Kimlik: personel JWT, `[Authorize]`. Ayrı izin yoktur: kayıt rapor verisi açmaz. Raporun Rapor Merkezi'nde görünüp açılması paneldeki izin kuralına (REPORT-006) bağlıdır; panel izni olmayan raporun favorisini göstermez.
 - Rapor kataloğu panelde tutulur; backend yalnız **rapor anahtarının biçimini** doğrular (`Domain/Reports/ReportKey`): 1–100 karakter, küçük harf, rakam, `-` ve `.`; ayraçla başlayıp bitemez. Panel anahtarı rapor adresinden türetir: `/panel/reports/` sonrası, `/` → `.` (ör. `payments`, `end-of-day`, `registers.examinations`).
 - Deneme sona erip kiracı salt okunur olduğunda yazma uçları abonelik yazma korumasına takılır (diğer yazma uçlarıyla aynı); okuma çalışır.
+- **Rapor dışı ekranlar (APPT-026, 2026-11-21):** kayıtlı filtre deposunu ekran anahtarıyla da kullanır; backend değişmedi.
+  - `screens.appointments-calendar`: randevu takvimi; `vet`, `types`, `states` kaydedilir, tarih ve görünüm kaydedilmez.
+  - `screens.appointment-requests`: online randevu talep listesi; `status` (enum adı ya da `All`).
+  - Backend anahtarı yalnız biçimce doğrular. Aynı ad çakışmasında hata metni rapor diliyle gelebilir ("Bu raporda…").
 
 ## 2) Favoriler
 
