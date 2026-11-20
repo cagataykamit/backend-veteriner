@@ -48,13 +48,13 @@ public sealed class AiCreditAccount
         var (start, end) = CurrentMonth();
         var totals = await _usage.ClinicCreditTotalsAsync(clinicId, start, end, ct);
         var subscription = await _subscriptions.FirstOrDefaultAsync(new TenantSubscriptionByTenantIdSpec(tenantId), ct);
-        return Build(subscription?.PlanCode, totals, start, end);
+        return Build(subscription, totals, start, end);
     }
 
     /// <summary>Toplamlardan kota durumu (platform yönetimi birden çok kliniği tek seferde okur).</summary>
-    public AiClinicQuota Build(SubscriptionPlanCode? plan, AiClinicCreditTotals totals, DateTime monthStartUtc, DateTime monthEndUtc)
+    public AiClinicQuota Build(TenantSubscription? subscription, AiClinicCreditTotals totals, DateTime monthStartUtc, DateTime monthEndUtc)
         => new(
-            _options.MonthlyCreditsFor(plan is { } code ? SubscriptionPlanCatalog.ToApiCode(code) : null),
+            MonthlyCreditsOf(subscription),
             totals.MonthCredits - totals.MonthFundCredits,
             totals.MonthFundCredits,
             totals.FundGranted - totals.FundUsed,
@@ -64,6 +64,15 @@ public sealed class AiCreditAccount
             _options.ClinicMonthlyCostLimitUsd,
             monthStartUtc,
             monthEndUtc);
+
+    /// <summary>
+    /// Paket hediyesi ücretli abonelikle başlar: deneme süresindeki (<see cref="TenantSubscriptionStatus.Trialing"/>) kiracıya
+    /// aylık kota verilmez, yalnız fon kullanılabilir (ADR-044 madde 5, 2026-11-20 kullanıcı kararı).
+    /// </summary>
+    private int MonthlyCreditsOf(TenantSubscription? subscription)
+        => subscription is { Status: not TenantSubscriptionStatus.Trialing }
+            ? _options.MonthlyCreditsFor(SubscriptionPlanCatalog.ToApiCode(subscription.PlanCode))
+            : 0;
 
     /// <summary>
     /// Tamamlanan isteğin kredisini hesaplar ve kota/fon olarak böler; eşik aşıldıysa klinik yöneticilerine ayda bir kez uyarı
