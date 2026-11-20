@@ -203,7 +203,8 @@ public sealed class UpdateVaccinationCommandHandler : IRequestHandler<UpdateVacc
             appliedUtc,
             dueUtc,
             request.Notes,
-            utcNow);
+            utcNow,
+            request.DueTimeSpecified);
 
         if (!domain.IsSuccess)
             return Result.Failure(domain.Error);

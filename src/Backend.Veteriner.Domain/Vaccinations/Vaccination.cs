@@ -27,7 +27,8 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned, IC
 
     /// <summary>
     /// <see cref="DueAtUtc"/>'nin saati gerçek mi (takvimde saatiyle durur); değilse yalnız gün bilinir. Vadesiz kayıtta her zaman false.
-    /// Vade ve gecikme kuralı gün bazlıdır (ADR-028); saat yalnız sıralama ve gösterim içindir.
+    /// Panelden tarih ve saatle girilen vade ve saatli içe aktarma true yazar; gün bazlı aşı planı false. Vade ve gecikme kuralı gün
+    /// bazlıdır (ADR-028); saat yalnız sıralama ve gösterim içindir.
     /// </summary>
     public bool DueTimeSpecified { get; private set; }
 
@@ -94,7 +95,8 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned, IC
         DateTime? appliedAtUtc,
         DateTime? dueAtUtc,
         string? notes,
-        DateTime utcNow)
+        DateTime utcNow,
+        bool dueTimeSpecified = false)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId geçersiz.", nameof(tenantId));
@@ -116,6 +118,7 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned, IC
         Status = status;
         AppliedAtUtc = appliedAtUtc.HasValue ? NormalizeUtc(appliedAtUtc.Value) : null;
         DueAtUtc = dueAtUtc.HasValue ? NormalizeUtc(dueAtUtc.Value) : null;
+        DueTimeSpecified = DueAtUtc.HasValue && dueTimeSpecified;
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
         CreatedAtUtc = utcNow;
         UpdatedAtUtc = null;
@@ -143,10 +146,9 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned, IC
 
         return new Vaccination(
             tenantId, petId, clinicId, examinationId: null, vaccineDefinitionId, vaccineNameSnapshot,
-            VaccinationStatus.Applied, appliedAtUtc, dueAtUtc, notes, utcNow)
+            VaccinationStatus.Applied, appliedAtUtc, dueAtUtc, notes, utcNow, dueTimeSpecified)
         {
             ImportBatchId = importBatchId,
-            DueTimeSpecified = dueAtUtc.HasValue && dueTimeSpecified,
         };
     }
 
@@ -160,7 +162,8 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned, IC
         DateTime? appliedAtUtc,
         DateTime? dueAtUtc,
         string? notes,
-        DateTime utcNow)
+        DateTime utcNow,
+        bool dueTimeSpecified = false)
     {
         if (petId == Guid.Empty)
             return Result.Failure("Vaccinations.Validation", "Geçerli bir hasta seçin.");
@@ -188,8 +191,9 @@ public sealed class Vaccination : AggregateRoot, IClinicScoped, ITenantOwned, IC
         VaccineName = vaccineNameSnapshot.Trim();
         Status = status;
         AppliedAtUtc = appliedAtUtc.HasValue ? NormalizeUtc(appliedAtUtc.Value) : null;
-        // Vade değişmezse saatin gerçekliği korunur; değişen vade panelden gelir ve saati gerçek sayılmaz.
-        DueTimeSpecified = DueTimeSpecified && newDueAtUtc is not null && newDueAtUtc == DueAtUtc;
+        // Saat gerçek: çağıran bildirirse (panel formunda tarih ve saat girilir) ya da vade değişmeden önceden gerçekse. Bildirilmeyen
+        // değişen vade (eski istemci, gün bazlı plan) saati gerçek sayılmaz.
+        DueTimeSpecified = newDueAtUtc is not null && (dueTimeSpecified || (DueTimeSpecified && newDueAtUtc == DueAtUtc));
         DueAtUtc = newDueAtUtc;
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
         UpdatedAtUtc = utcNow;

@@ -4,8 +4,9 @@ using AwesomeAssertions;
 namespace Backend.Veteriner.Domain.Tests.Vaccinations;
 
 /// <summary>
-/// Vade saatinin gerçekliği (APPOINTMENT_CALENDAR_API_CONTRACT.md §8.1): içe aktarılan saatli vade işaretlenir; panelden girilen vade
-/// saatsizdir; düzenlemede vade değişmezse bayrak korunur, değişirse düşer.
+/// Vade saatinin gerçekliği (APPOINTMENT_CALENDAR_API_CONTRACT.md §8.1): içe aktarılan saatli vade ve panelden tarih ve saatle girilen
+/// vade işaretlenir; bildirilmeyen vade (gün bazlı plan, eski istemci) saatsizdir; düzenlemede bildirilmeyen vade değişmezse bayrak
+/// korunur, değişirse düşer.
 /// </summary>
 public sealed class VaccinationDueTimeTests
 {
@@ -16,17 +17,20 @@ public sealed class VaccinationDueTimeTests
         => Vaccination.CreateImported(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Karma", Now.AddDays(-30), due, null,
             Guid.NewGuid(), Now, timeSpecified);
 
-    private static void UpdateDue(Vaccination v, DateTime? due)
+    private static Vaccination Created(DateTime? due, bool timeSpecified = false)
+        => new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, Guid.NewGuid(), "Kuduz", VaccinationStatus.Scheduled,
+            null, due, null, Now, timeSpecified);
+
+    private static void UpdateDue(Vaccination v, DateTime? due, bool timeSpecified = false)
         => v.UpdateDetails(v.PetId, v.ClinicId, null, v.VaccineDefinitionId!.Value, v.VaccineName, v.Status, v.AppliedAtUtc, due, "not",
-            Now).IsSuccess.Should().BeTrue();
+            Now, timeSpecified).IsSuccess.Should().BeTrue();
 
     [Fact]
-    public void Panel_created_vaccination_has_no_specified_time()
+    public void Created_vaccination_has_specified_time_only_when_caller_says_so()
     {
-        var v = new Vaccination(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, Guid.NewGuid(), "Kuduz", VaccinationStatus.Scheduled,
-            null, Due, null, Now);
-
-        v.DueTimeSpecified.Should().BeFalse();
+        Created(Due).DueTimeSpecified.Should().BeFalse("gün bazlı plan ve eski istemci bildirmez");
+        Created(Due, timeSpecified: true).DueTimeSpecified.Should().BeTrue("panel formu tarih ve saat ister");
+        Created(null, timeSpecified: true).DueTimeSpecified.Should().BeFalse("vadesiz kayıtta saat yoktur");
     }
 
     [Fact]
@@ -37,7 +41,7 @@ public sealed class VaccinationDueTimeTests
     }
 
     [Fact]
-    public void Update_keeps_flag_when_due_unchanged_and_drops_it_when_due_changes()
+    public void Update_without_flag_keeps_it_when_due_unchanged_and_drops_it_when_due_changes()
     {
         var v = Imported(Due, timeSpecified: true);
 
@@ -45,9 +49,21 @@ public sealed class VaccinationDueTimeTests
         v.DueTimeSpecified.Should().BeTrue("yalnız not değişti");
 
         UpdateDue(v, Due.AddDays(1));
-        v.DueTimeSpecified.Should().BeFalse("panelden girilen vade saatsiz sayılır");
+        v.DueTimeSpecified.Should().BeFalse("bildirilmeyen yeni vade saatsiz sayılır");
 
         UpdateDue(v, Due);
-        v.DueTimeSpecified.Should().BeFalse("bayrak geri gelmez");
+        v.DueTimeSpecified.Should().BeFalse("bayrak kendiliğinden geri gelmez");
+    }
+
+    [Fact]
+    public void Update_with_flag_marks_time_and_clearing_due_drops_it()
+    {
+        var v = Created(Due);
+
+        UpdateDue(v, Due.AddHours(2), timeSpecified: true);
+        v.DueTimeSpecified.Should().BeTrue("panelde saat girilerek değişti");
+
+        UpdateDue(v, null, timeSpecified: true);
+        v.DueTimeSpecified.Should().BeFalse("vadesiz kayıtta saat yoktur");
     }
 }

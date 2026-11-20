@@ -206,7 +206,8 @@ public sealed class CreateVaccinationCommandHandler : IRequestHandler<CreateVacc
             appliedUtc,
             dueUtc,
             request.Notes,
-            utcNow);
+            utcNow,
+            request.DueTimeSpecified);
         var routeSite = vaccination.SetRouteAndSite(request.Route, request.Site);
         if (!routeSite.IsSuccess)
             return Result<VaccinationCreateResultDto>.Failure(routeSite.Error);
