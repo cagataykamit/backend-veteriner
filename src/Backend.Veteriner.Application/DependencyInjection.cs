@@ -14,6 +14,7 @@ using Backend.Veteriner.Application.ClinicSites.Public;
 using Backend.Veteriner.Application.VetFinder.Public;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Billing;
+using Backend.Veteriner.Application.Reports.Hub;
 using Backend.Veteriner.Application.Files;
 using Backend.Veteriner.Application.Files.Access;
 using Backend.Veteriner.Application.Hospitalizations.Wards.Access;
@@ -118,6 +119,9 @@ public static class DependencyInjection
         services.AddScoped<StaffAppointmentRequestMapper>();
         services.AddScoped<StockBatchResolver>();
         services.AddScoped<ExpiredStockReader>();
+        // Rapor Merkezi ana ekran özeti (ADR-052): bölüm yükleyicileri.
+        services.AddScoped<ReportHubFinanceLoader>();
+        services.AddScoped<ReportHubWorkLoader>();
         services.AddScoped<SaleDtoAssembler>();
 
         // e-belge (ADR-036 Dilim 3–4): sağlayıcı seçimi, şifreli kimlik bilgisi geçidi, taslak, gönderim ve bağlantı.
