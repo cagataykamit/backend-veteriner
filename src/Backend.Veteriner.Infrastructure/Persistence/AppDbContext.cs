@@ -41,6 +41,7 @@ using Backend.Veteriner.Domain.RecordHistory;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Reports;
 using Backend.Veteriner.Domain.Treatments;
+using Backend.Veteriner.Domain.VitalMeasurements;
 using Backend.Veteriner.Domain.Users;
 using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Infrastructure.Persistence.Entities;
@@ -188,6 +189,7 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<HospitalizationWard> HospitalizationWards => Set<HospitalizationWard>();
     public DbSet<HospitalizationRoom> HospitalizationRooms => Set<HospitalizationRoom>();
     public DbSet<CareInstruction> CareInstructions => Set<CareInstruction>();
+    public DbSet<VitalMeasurement> VitalMeasurements => Set<VitalMeasurement>();
     public DbSet<OwnerExplanation> OwnerExplanations => Set<OwnerExplanation>();
     public DbSet<TenantBillingProfile> TenantBillingProfiles => Set<TenantBillingProfile>();
     public DbSet<TenantReminderSettings> TenantReminderSettings => Set<TenantReminderSettings>();

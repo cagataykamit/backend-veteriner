@@ -30,6 +30,7 @@ public static class ImportRollbackReasons
     public const string HasHospitalizations = "HasHospitalizations";
     public const string HasAdministrations = "HasAdministrations";
     public const string HasCareInstructions = "HasCareInstructions";
+    public const string HasVitalMeasurements = "HasVitalMeasurements";
     public const string HasChargeSuggestions = "HasChargeSuggestions";
     public const string HasOtherVaccinations = "HasOtherVaccinations";
     public const string HasKeptVaccinations = "HasKeptVaccinations";

@@ -57,6 +57,13 @@ public sealed class Hospitalization : AggregateRoot, IClinicScoped, ITenantOwned
     /// <summary><see cref="IsActiveExpression"/> ile aynı kural, bellekteki kayıt için.</summary>
     public bool IsActive => DischargedAtUtc is null && !IsCancelled;
 
+    /// <summary>
+    /// Yatış süresi (tek yer, HOSP-004): kabulden taburcuya, iki uç dahil; taburcu yoksa üst sınır yok. Yatışa bağlı vital ölçümü
+    /// bu aralıkta olmalıdır; yatış eğilimi bu aralıktan okunur.
+    /// </summary>
+    public bool CoversInstant(DateTime atUtc)
+        => atUtc >= AdmittedAtUtc && (DischargedAtUtc is null || atUtc <= DischargedAtUtc.Value);
+
     /// <summary>SQL Server rowversion — eşzamanlı güncelleme için.</summary>
     public byte[] RowVersion { get; private set; } = default!;
 

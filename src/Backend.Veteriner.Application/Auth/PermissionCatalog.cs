@@ -254,6 +254,13 @@ public static class PermissionCatalog
         public const string Update = "CareInstructions.Update";
     }
 
+    public static class VitalMeasurements
+    {
+        public const string Read = "VitalMeasurements.Read";
+        public const string Create = "VitalMeasurements.Create";
+        public const string Update = "VitalMeasurements.Update";
+    }
+
     public static class ProductCategories
     {
         public const string Read = "ProductCategories.Read";
@@ -487,6 +494,10 @@ public static class PermissionCatalog
         new(CareInstructions.Read, "Bakım talimatlarını listeleme ve görüntüleme yetkisi", "CareInstructions"),
         new(CareInstructions.Create, "Bakım talimatı oluşturma yetkisi", "CareInstructions"),
         new(CareInstructions.Update, "Bakım talimatı güncelleme yetkisi", "CareInstructions"),
+
+        new(VitalMeasurements.Read, "Vital ölçümlerini ve eğilimini listeleme ve görüntüleme yetkisi", "VitalMeasurements"),
+        new(VitalMeasurements.Create, "Vital ölçümü kaydetme yetkisi", "VitalMeasurements"),
+        new(VitalMeasurements.Update, "Vital ölçümünü güncelleme ve gerekçeyle iptal etme yetkisi", "VitalMeasurements"),
 
         new(ProductCategories.Read, "Ürün kategorilerini listeleme ve görüntüleme yetkisi", "ProductCategories"),
         new(ProductCategories.Create, "Ürün kategorisi oluşturma yetkisi", "ProductCategories"),

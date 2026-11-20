@@ -22,6 +22,7 @@ using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Domain.Visits;
+using Backend.Veteriner.Domain.VitalMeasurements;
 using AwesomeAssertions;
 using Moq;
 
@@ -52,6 +53,7 @@ public sealed class PetTimelineHandlerTests
     private readonly List<Product> _products = [];
     private readonly List<ImagingRecord> _imaging = [];
     private readonly List<ImportedClinicalRecord> _imported = [];
+    private readonly List<VitalMeasurement> _vitals = [];
 
     public PetTimelineHandlerTests()
     {
@@ -83,7 +85,8 @@ public sealed class PetTimelineHandlerTests
                 new HospitalizationTimelineSource(InMemory(_hosp).Object),
                 new AdministrationTimelineSource(InMemory(_administrations).Object, InMemory(_products).Object),
                 new ImagingTimelineSource(InMemory(_imaging).Object),
-                new ImportedClinicalRecordTimelineSource(InMemory(_imported).Object)
+                new ImportedClinicalRecordTimelineSource(InMemory(_imported).Object),
+                new VitalMeasurementTimelineSource(InMemory(_vitals).Object)
             ]);
 
     /// <summary>Spec'i bellekte değerlendirir (EF'e çeviri entegrasyon testinde doğrulanır).</summary>
@@ -418,6 +421,45 @@ public sealed class PetTimelineHandlerTests
         xrayRow.RelatedExaminationId.Should().Be(examId);
         xrayRow.AddedAfterFinalization.Should().BeTrue();
         shown.Value!.Items.Single(i => i.SourceId == cancelled.Id).IsVoided.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task VitalMeasurement_Row_Shows_Values_Summary_And_Hides_Cancelled_By_Default()
+    {
+        var examId = Guid.NewGuid();
+        VitalMeasurement New(DateTime at, VitalSigns values, Guid? exam = null)
+            => VitalMeasurement.Create(_tenantId, _clinicId, _petId, null, exam, at, values, "Not timeline'a girmez", Guid.NewGuid(), at).Value!;
+
+        var full = New(T0, VitalSigns.Create(38.6m, 120, 24, 12.45m).Value!, examId);
+        var weightOnly = New(T0.AddHours(1), VitalSigns.Create(null, null, null, 12m).Value!);
+        var cancelled = New(T0.AddHours(2), VitalSigns.Create(39m, null, null, null).Value!);
+        cancelled.Cancel(Guid.NewGuid(), "Yanlış hastaya girildi", T0.AddHours(3)).IsSuccess.Should().BeTrue();
+        _vitals.AddRange([full, weightOnly, cancelled]);
+
+        var hidden = await CreateHandler().Handle(new GetPetTimelineQuery(_petId, Types: ["VitalMeasurement"]), CancellationToken.None);
+        var shown = await CreateHandler().Handle(new GetPetTimelineQuery(_petId, Types: ["VitalMeasurement"], IncludeVoided: true), CancellationToken.None);
+
+        hidden.Value!.Items.Select(i => i.SourceId).Should().Equal(weightOnly.Id, full.Id);
+        var row = hidden.Value.Items.Single(i => i.SourceId == full.Id);
+        row.Type.Should().Be(PetRecordKind.VitalMeasurement);
+        row.Title.Should().Be("Vital ölçümü");
+        row.Summary.Should().Be("38,6 °C · Nabız 120/dk · Solunum 24/dk · 12,45 kg");
+        row.RelatedExaminationId.Should().Be(examId);
+        row.LinkRef!.Type.Should().Be(PetRecordKind.VitalMeasurement);
+        hidden.Value.Items.Single(i => i.SourceId == weightOnly.Id).Summary.Should().Be("12 kg");
+        var cancelledRow = shown.Value!.Items.Single(i => i.SourceId == cancelled.Id);
+        cancelledRow.IsVoided.Should().BeTrue();
+        cancelledRow.Status.Should().Be("Cancelled");
+    }
+
+    [Fact]
+    public async Task VitalMeasurement_Without_Permission_Should_Be_Omitted()
+    {
+        _permissions.Setup(p => p.HasPermission(PermissionCatalog.VitalMeasurements.Read)).Returns(false);
+
+        var result = await CreateHandler().Handle(new GetPetTimelineQuery(_petId), CancellationToken.None);
+
+        result.Value!.OmittedTypes.Should().Equal("VitalMeasurement");
     }
 
     [Fact]

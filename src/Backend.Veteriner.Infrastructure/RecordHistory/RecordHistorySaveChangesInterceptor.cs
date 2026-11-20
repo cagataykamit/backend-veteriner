@@ -10,6 +10,7 @@ using Backend.Veteriner.Domain.RecordHistory;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Vaccinations;
+using Backend.Veteriner.Domain.VitalMeasurements;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -36,6 +37,7 @@ public sealed class RecordHistorySaveChangesInterceptor : SaveChangesInterceptor
         [typeof(Administration)] = RecordHistoryTypes.Administration,
         [typeof(Hospitalization)] = RecordHistoryTypes.Hospitalization,
         [typeof(ImagingRecord)] = RecordHistoryTypes.Imaging,
+        [typeof(VitalMeasurement)] = RecordHistoryTypes.VitalMeasurement,
     };
 
     /// <summary>Kimlik, kiracı, eşzamanlılık ve zaman damgası gibi klinik anlamı olmayan alanlar.</summary>

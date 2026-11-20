@@ -32,6 +32,7 @@ public sealed class ImportRollbackDependencyReader : IImportRollbackDependencyRe
         (ImportRollbackReasons.HasHospitalizations, (db, t, ids, _) => db.Hospitalizations.Where(x => x.TenantId == t && ids.Contains(x.PetId)).Select(x => x.PetId)),
         (ImportRollbackReasons.HasAdministrations, (db, t, ids, _) => db.Administrations.Where(x => x.TenantId == t && ids.Contains(x.PetId)).Select(x => x.PetId)),
         (ImportRollbackReasons.HasCareInstructions, (db, t, ids, _) => db.CareInstructions.Where(x => x.TenantId == t && ids.Contains(x.PetId)).Select(x => x.PetId)),
+        (ImportRollbackReasons.HasVitalMeasurements, (db, t, ids, _) => db.VitalMeasurements.Where(x => x.TenantId == t && ids.Contains(x.PetId)).Select(x => x.PetId)),
         (ImportRollbackReasons.HasChargeSuggestions, (db, t, ids, _) => db.ChargeSuggestions.Where(x => x.TenantId == t && ids.Contains(x.PetId)).Select(x => x.PetId)),
         (ImportRollbackReasons.HasCharges, (db, t, ids, _) => db.Charges.IgnoreQueryFilters(QueryFilterNames.Ignorable)
             .Where(x => x.TenantId == t && x.PetId != null && ids.Contains(x.PetId.Value)).Select(x => x.PetId!.Value)),

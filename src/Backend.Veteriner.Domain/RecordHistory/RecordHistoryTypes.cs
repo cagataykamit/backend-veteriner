@@ -11,4 +11,5 @@ public static class RecordHistoryTypes
     public const string Administration = "administration";
     public const string Hospitalization = "hospitalization";
     public const string Imaging = "imaging";
+    public const string VitalMeasurement = "vitalMeasurement";
 }

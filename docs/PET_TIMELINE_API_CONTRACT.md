@@ -6,7 +6,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: `docs/ASAMA4_DISCOVERY.md` §5 dili
 
 | # | Karar | Sonuç |
 |---|---|---|
-| D2 | Kilo geçmişi | `Examination.WeightKg` + `VitalsMeasuredAtUtc`'den **türetilir**; ek tablo yok. `Pet.Weight` ayrı, tarihsiz "profil kilosu" olarak kalır. |
+| D2 | Kilo geçmişi | `Examination.WeightKg` + `VitalsMeasuredAtUtc`'den **türetilir**; ek tablo yok. `Pet.Weight` ayrı, tarihsiz "profil kilosu" olarak kalır. **HOSP-004 (2026-11-20):** kilo ve vital eğilimi muayene vitalleri ile vital ölçümü kaydını birleştiren `GET /vital-measurements/series` ucundadır (`VITAL_SIGNS_API_CONTRACT.md` §6); bu sözleşmedeki `latestWeight` değişmedi. |
 | D3 | "Veri alınamadı" | **Tek özet ucu**, bölüm başına `state` ve kısmi yanıt. "Kayıt yok" (`Empty`), "yetki yok" (`Forbidden`), "okunamadı" (`Unavailable`) ayrıdır. |
 | D4 | Timeline kapsamı | muayene, tedavi, reçete, lab, **uygulanan** aşı, yatış (tek olay), geliş (Visit; randevu Visit içine katlanır). **Ödeme sonra eklenir** (Aşama 3 sonrası). İptal/yanlış işaretli kayıtlar varsayılan gizli, filtreyle açılır. |
 | — | Sayfalama | Opak imleç; offset ve toplam sayım **yok**. |
@@ -26,6 +26,7 @@ Ortak kurallar:
 | `Vaccination` | `Vaccinations.Read` |
 | `Hospitalization` | `Hospitalizations.Read` |
 | `Administration` | `Administrations.Read` |
+| `VitalMeasurement` (HOSP-004) | `VitalMeasurements.Read` |
 | `Appointment` (yalnız `history-summary`) | `Appointments.Read` |
 | `Payment` (yalnız `history-summary`) | `Payments.Read` |
 
@@ -134,6 +135,7 @@ Alanlar:
 - **`Administration` (uygulama kaydı, ADR-013):** aşı kaydına bağlı uygulama (`vaccinationId` dolu) **bu türde gösterilmez**, olay `Vaccination` satırıdır (çift satır yok). `Administrations.Read` ister; izin yoksa `omittedTypes` içine düşer. `eventAtUtc` = `administeredAtUtc`; `title` = ürünün adı; `summary` = `"<miktar> <birim>"` (ör. `"1.5 şişe"`; serbest klinik metin değil); `status` = `Active` | `Voided`; `relatedExaminationId` = uygulamanın bağlı muayenesi (yoksa `null`); `linkRef` = `{ type: "Administration", id }`. İptal edilenler varsayılan gizli, `includeVoided=true` ile `isVoided=true` olarak gelir. Klinik kapsamı diğer türlerle aynıdır.
 - `addedAfterFinalization` (bool): `Administration`, `Prescription`, `Treatment`, `Vaccination`, `LabResult` (ADR-043, 2026-11-14) ve `Imaging` satırlarında anlamlıdır; bağlı muayene kayıt anında kesinleşmişse `true` ("Kesinleştirmeden sonra eklendi" rozeti). Diğer türlerde her zaman `false`. Gerekçe (`lateEntryReason`) timeline'a konmaz; kaydın detay ucuyla alınır.
 - **`ImportedClinicalRecord` (eski program kaydı, ADR-048 T1; `IMPORT_API_CONTRACT.md` §12.8):** içe aktarılmış salt okunur klinik geçmiş. `Examinations.Read` ister (izin yoksa `omittedTypes`). `eventAtUtc` = kaydın günü İstanbul 12:00 (09:00 UTC); `title` = eski programdaki kayıt türü (`KayitTuru`), yoksa `"Eski program kaydı"`; `summary` = tanı, yoksa şikâyet, en çok 200 karakter (bu türde istisna olarak klinik metin taşır: eski kaydın başka ayrıntı ucu yalnız liste ucudur); `status` `null`, `isVoided` `false`, ilişkili kimlikler `null`; **`linkRef` `null`** (ayrıntı `GET /pets/{id}/imported-clinical-records`). Varsayılan tür kümesindedir; `typeOrder` = 12.
+- **`VitalMeasurement` (vital ölçümü, HOSP-004, 2026-11-20; `VITAL_SIGNS_API_CONTRACT.md` §5):** `VitalMeasurements.Read` ister (izin yoksa `omittedTypes`). `eventAtUtc` = `measuredAtUtc`; `title` = `"Vital ölçümü"`; `summary` = dolu değerlerin kısa metni (ör. `"38,6 °C · Nabız 120/dk · Solunum 24/dk · 12,45 kg"`; not konmaz); `status` iptalde `"Cancelled"`, aksi halde `null`; iptal edilen varsayılan gizli (`includeVoided=true` ile `isVoided=true`); `relatedExaminationId` = bağlı muayene; `addedAfterFinalization` anlamlıdır; `linkRef` = `{ type: "VitalMeasurement", id }`. Varsayılan tür kümesindedir; `typeOrder` = 13.
 - `omittedTypes`: **yetki yok** nedeniyle sorguya girmeyen türler. İstenen `types` içinden izni olmayanlar da buraya düşer. Boş liste = hiçbir tür yetkisizlikten çıkarılmadı. Böylece "kayıt yok" (boş `items`, tür `omittedTypes`'ta değil) ile "yetki yok" ayrılır.
 
 Sıralama ve sayfalama:

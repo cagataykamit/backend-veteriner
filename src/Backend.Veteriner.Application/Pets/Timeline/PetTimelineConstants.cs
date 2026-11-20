@@ -19,6 +19,7 @@ public static class PetTimelineConstants
         PetRecordKind.Hospitalization,
         PetRecordKind.Administration,
         PetRecordKind.Imaging,
-        PetRecordKind.ImportedClinicalRecord
+        PetRecordKind.ImportedClinicalRecord,
+        PetRecordKind.VitalMeasurement
     ];
 }

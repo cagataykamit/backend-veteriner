@@ -189,6 +189,7 @@ public static class DependencyInjection
         services.AddScoped<IPetTimelineSource, AdministrationTimelineSource>();
         services.AddScoped<IPetTimelineSource, ImagingTimelineSource>();
         services.AddScoped<IPetTimelineSource, ImportedClinicalRecordTimelineSource>();
+        services.AddScoped<IPetTimelineSource, VitalMeasurementTimelineSource>();
 
         // Dosya katmanı (IMAGING_API_CONTRACT.md): sahip türü başına erişim kuralı, ortak okuma, iptalde erişim kapatma ve tüm
         // yüklemelerin virüs taraması kuralı.

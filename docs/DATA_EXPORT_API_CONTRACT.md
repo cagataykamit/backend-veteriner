@@ -142,6 +142,7 @@ dosyanın sütun açıklamaları. CRLF, UTF-8 BOM'lu.
 | `dosyalar.csv` | Yüklenen dosyaların kaydı: bağlı kayıt, dosya adı, tür, boyut, durum | Dosya içeriği, depo anahtarı, SHA-256 |
 | `yatislar.csv` | Yatışlar: zamanlar, neden, konum, not, taburcu notu, iptal zamanı ve gerekçesi | Oda kimliği |
 | `bakim_talimatlari.csv` | Bakım talimatları | — |
+| `vital_olcumleri.csv` | Vital ölçümleri (HOSP-004): hasta, yatış/muayene bağı, ölçüm zamanı, ateş, nabız, solunum, kilo, not, kaydeden, geç giriş, iptal zamanı ve gerekçesi | — |
 | `ucretler.csv` | Ücretler: açıklama, tür, miktar, birim fiyat, tutar, KDV, para birimi, kapanan tutar, iptal; devir bakiyesinde içe aktarma partisi (`IceAktarmaPartisiId`, ADR-048) | İstek anahtarı, değişiklik sayacı |
 | `eski-program-hareketleri.csv` | Eski program hesap hareketleri (içe aktarılmış, salt okunur; bakiyeyi etkilemez, ADR-048): tarih, borç/tahsilat, tutar, açıklama, ödeme şekli, belge no, hasta adı | İçe aktarma partisi kimliği |
 | `odemeler.csv` | Ödemeler: tutar, yöntem, nakdin kasası (`KasaId`; nakitte boşsa Ana kasa), zaman, dağıtılan ve krediye kalan, not, iptal | İstek anahtarı ve özeti, değişiklik sayacı |
