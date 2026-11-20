@@ -25,6 +25,7 @@ using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Domain.Imports;
 using Backend.Veteriner.Domain.Visits;
+using Backend.Veteriner.Domain.VitalMeasurements;
 using Backend.Veteriner.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -464,6 +465,28 @@ public static class DataExportTables
                 DataExportColumn<CareInstruction>.Text("Metin", "Talimat metni.", x => x.Text),
                 DataExportColumn<CareInstruction>.Instant("Olusturma", "Kayıt zamanı.", x => x.CreatedAtUtc),
                 DataExportColumn<CareInstruction>.Instant("Guncelleme", "Son güncelleme zamanı.", x => x.UpdatedAtUtc),
+            ]),
+
+        new DataExportTable<VitalMeasurement>("vital_olcumleri.csv", "Vital ölçümleri (ateş, nabız, solunum, kilo)",
+            (db, t) => db.VitalMeasurements.Where(x => x.TenantId == t),
+            [
+                DataExportColumn<VitalMeasurement>.Id("Id", "Ölçüm kimliği.", x => x.Id),
+                DataExportColumn<VitalMeasurement>.Id("KlinikId", ClinicRef, x => x.ClinicId),
+                DataExportColumn<VitalMeasurement>.Id("HastaId", PetRef, x => x.PetId),
+                DataExportColumn<VitalMeasurement>.Id("YatisId", "Bağlı yatış (yatislar.csv Id).", x => x.HospitalizationId),
+                DataExportColumn<VitalMeasurement>.Id("MuayeneId", ExaminationRef, x => x.ExaminationId),
+                DataExportColumn<VitalMeasurement>.Instant("Olcum", "Ölçüm zamanı.", x => x.MeasuredAtUtc),
+                DataExportColumn<VitalMeasurement>.Number("AtesC", "Ateş (°C).", x => x.TemperatureC),
+                DataExportColumn<VitalMeasurement>.Number("NabizDk", "Nabız (atım/dk).", x => x.HeartRateBpm),
+                DataExportColumn<VitalMeasurement>.Number("SolunumDk", "Solunum (/dk).", x => x.RespiratoryRatePerMin),
+                DataExportColumn<VitalMeasurement>.Number("KiloKg", "Kilo (kg).", x => x.WeightKg),
+                DataExportColumn<VitalMeasurement>.Text("Not", "Not.", x => x.Note),
+                DataExportColumn<VitalMeasurement>.Id("KaydedenId", UserRef, x => x.CreatedByUserId),
+                DataExportColumn<VitalMeasurement>.Instant("Olusturma", "Kayıt zamanı.", x => x.CreatedAtUtc),
+                DataExportColumn<VitalMeasurement>.Boolean("KesinlestirmeSonrasi", "Muayene kesinleştikten sonra eklendi.", x => x.AddedAfterFinalization),
+                DataExportColumn<VitalMeasurement>.Text("GecGirisNedeni", "Geç giriş gerekçesi.", x => x.LateEntryReason),
+                DataExportColumn<VitalMeasurement>.Instant("Iptal", "İptal zamanı.", x => x.CancelledAtUtc),
+                DataExportColumn<VitalMeasurement>.Text("IptalNedeni", "İptal gerekçesi.", x => x.CancelReason),
             ]),
 
         new DataExportTable<Charge>("ucretler.csv", "Ücretler (hizmet ve ürün bedelleri)",

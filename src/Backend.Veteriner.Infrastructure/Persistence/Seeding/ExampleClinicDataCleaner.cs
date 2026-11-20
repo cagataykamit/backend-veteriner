@@ -25,6 +25,7 @@ using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Reminders;
 using Backend.Veteriner.Domain.Sales;
 using Backend.Veteriner.Domain.Treatments;
+using Backend.Veteriner.Domain.VitalMeasurements;
 using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Domain.Visits;
 using Microsoft.EntityFrameworkCore;
@@ -125,6 +126,7 @@ public sealed class ExampleClinicDataCleaner : IExampleClinicCleaner
         other += await scope.ChargeSuggestions.ExecuteDeleteAsync(ct);
         other += await scope.Administrations.ExecuteDeleteAsync(ct);
         other += await scope.CareInstructions.ExecuteDeleteAsync(ct);
+        other += await scope.VitalMeasurements.ExecuteDeleteAsync(ct);
         await scope.PrescriptionItems.ExecuteDeleteAsync(ct);
         other += await scope.Prescriptions.ExecuteDeleteAsync(ct);
         var payments = await scope.Payments.ExecuteDeleteAsync(ct);
@@ -311,6 +313,7 @@ public sealed class ExampleClinicDataCleaner : IExampleClinicCleaner
         public IQueryable<ImagingRecord> ImagingRecords => db.ImagingRecords.Where(x => x.TenantId == TenantId && PetIds.Contains(x.PetId));
         public IQueryable<Hospitalization> Hospitalizations => db.Hospitalizations.Where(x => x.TenantId == TenantId && PetIds.Contains(x.PetId));
         public IQueryable<CareInstruction> CareInstructions => db.CareInstructions.Where(x => x.TenantId == TenantId && PetIds.Contains(x.PetId));
+        public IQueryable<VitalMeasurement> VitalMeasurements => db.VitalMeasurements.Where(x => x.TenantId == TenantId && PetIds.Contains(x.PetId));
         public IQueryable<Administration> Administrations => db.Administrations.Where(x => x.TenantId == TenantId && PetIds.Contains(x.PetId));
         public IQueryable<ChargeSuggestion> ChargeSuggestions => db.ChargeSuggestions.Where(x => x.TenantId == TenantId && PetIds.Contains(x.PetId));
         public IQueryable<Prescription> Prescriptions => db.Prescriptions.Where(x => x.TenantId == TenantId && PetIds.Contains(x.PetId));
@@ -362,6 +365,7 @@ public sealed class ExampleClinicDataCleaner : IExampleClinicCleaner
             yield return ct => ChargeSuggestions.CountAsync(ct);
             yield return ct => Administrations.CountAsync(ct);
             yield return ct => CareInstructions.CountAsync(ct);
+            yield return ct => VitalMeasurements.CountAsync(ct);
             yield return ct => Prescriptions.CountAsync(ct);
             yield return ct => ImagingRecords.CountAsync(ct);
             yield return ct => Hospitalizations.CountAsync(ct);
