@@ -530,7 +530,7 @@ public static class PermissionCatalog
 
         new(Ai.Use, "AI taslak özelliklerini (hasta geçmişi özeti) kullanma yetkisi", "Ai"),
 
-        new(Admin.Diagnostics,"Tanılama ve yönetim kontrollerine erişim yetkisi", "Diagnostics"),
+        new(Admin.Diagnostics, "Tanılama ve yönetim kontrollerine erişim yetkisi", "Diagnostics"),
 
         new(Test.FeatureRun, "Test amaçlı özellikleri çalıştırma yetkisi", "Test"),
         new(Test.ForbiddenProbe, "Forbidden test endpoint", "Test"),
