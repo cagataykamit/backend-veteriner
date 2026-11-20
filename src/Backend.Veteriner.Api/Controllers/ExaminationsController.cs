@@ -19,6 +19,7 @@ using Backend.Veteriner.Application.Examinations.Queries.GetList;
 using Backend.Veteriner.Application.Examinations.Queries.GetRelatedSummary;
 using Backend.Veteriner.Application.ExaminationTemplates.Commands.Apply;
 using Backend.Veteriner.Application.ExaminationTemplates.Contracts.Dtos;
+using Backend.Veteriner.Application.OwnerExplanations;
 using Backend.Veteriner.Domain.Shared;
 using Mediator;
 using Microsoft.AspNetCore.Authorization;
@@ -213,6 +214,24 @@ public sealed class ExaminationsController : ControllerBase
             return problem!;
 
         var result = await _mediator.Send(new GetExaminationAddendaQuery(id), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Muayenenin hasta sahibine açıklamaları (AI-003), yeniden eskiye; her biri "AI taslağından" iziyle. Bkz.
+    /// docs/AI_DRAFTS_API_CONTRACT.md §7.2.
+    /// </summary>
+    [HttpGet("{id:guid}/owner-explanations")]
+    [Authorize(Policy = PermissionCatalog.Examinations.Read)]
+    [ProducesResponseType(typeof(IReadOnlyList<OwnerExplanationDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetOwnerExplanations([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetOwnerExplanationsQuery(id), ct);
         return result.ToActionResult(this);
     }
 

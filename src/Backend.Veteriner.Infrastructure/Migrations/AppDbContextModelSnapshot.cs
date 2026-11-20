@@ -145,6 +145,247 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Ai.AiCreditGrant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Credits")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("TenantId", "ClinicId", "CreatedAtUtc");
+
+                    b.ToTable("AiCreditGrants", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Ai.AiDraft", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("AppliedRecordId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Content")
+                        .HasMaxLength(50000)
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("ContentJson");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("DecidedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("DecidedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Feature")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PromptVersion")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("SourceRefs")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("SourceRefsJson");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TargetType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("Status", "ExpiresAtUtc");
+
+                    b.HasIndex("TenantId", "AppliedRecordId")
+                        .HasFilter("[AppliedRecordId] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "ClinicId", "TargetType", "TargetId", "Status");
+
+                    b.ToTable("AiDrafts", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Ai.AiUsageRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("CostUsd")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("Credits")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid?>("DraftId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("DurationMs")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Feature")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("FundCredits")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("InputTokens")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Outcome")
+                        .HasColumnType("int");
+
+                    b.Property<int>("OutputTokens")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PromptVersion")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("SourceRefs")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("SourceRefsJson");
+
+                    b.Property<Guid?>("SubjectId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("DraftId")
+                        .HasFilter("[DraftId] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "ClinicId", "CreatedAtUtc");
+
+                    b.HasIndex("TenantId", "UserId", "CreatedAtUtc");
+
+                    b.ToTable("AiUsageRecords", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Ai.ClinicAiSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("QuotaWarningLevel")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("QuotaWarningMonthStartUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("TenantId", "ClinicId")
+                        .IsUnique();
+
+                    b.ToTable("ClinicAiSettings", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.AppointmentRequests.AppointmentRequest", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4940,6 +5181,52 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("UserNotifications", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.OwnerExplanations.OwnerExplanation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ExaminationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("SourceAiDraftId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("ExaminationId");
+
+                    b.HasIndex("SourceAiDraftId");
+
+                    b.HasIndex("TenantId", "ExaminationId");
+
+                    b.HasIndex("TenantId", "PetId");
+
+                    b.ToTable("OwnerExplanations", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.OwnerPortal.MarketingOptOutLink", b =>
                 {
                     b.Property<Guid>("Id")
@@ -8197,6 +8484,47 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.Ai.AiCreditGrant", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Ai.AiDraft", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Ai.AiUsageRecord", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.Ai.AiDraft", null)
+                        .WithMany()
+                        .HasForeignKey("DraftId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Ai.ClinicAiSettings", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.AppointmentRequests.AppointmentRequest", b =>
                 {
                     b.HasOne("Backend.Veteriner.Domain.Appointments.Appointment", null)
@@ -8807,6 +9135,26 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasForeignKey("ImportBatchId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.OwnerExplanations.OwnerExplanation", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.Examinations.Examination", null)
+                        .WithMany()
+                        .HasForeignKey("ExaminationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.Ai.AiDraft", null)
+                        .WithMany()
+                        .HasForeignKey("SourceAiDraftId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.OwnerPortal.MarketingOptOutLink", b =>

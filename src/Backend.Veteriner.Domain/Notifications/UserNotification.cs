@@ -40,6 +40,12 @@ public enum UserNotificationType
 
     /// <summary>Ticari e-Fatura alıcı tarafından reddedildi; ücretler serbest kaldı (ADR-036; belge kesme izni olanlara).</summary>
     EDocumentRejectedByBuyer = 11,
+
+    /// <summary>Kliniğin bu ayki AI kredisinin %80'i kullanıldı (ADR-044 madde 7; klinik ayarını değiştirebilenlere, ayda bir kez).</summary>
+    AiQuotaNearlyUsed = 12,
+
+    /// <summary>Kliniğin AI kredisi bitti; AI özellikleri ay yenilenene kadar durdu (ADR-044 madde 7; ayda bir kez).</summary>
+    AiQuotaExhausted = 13,
 }
 
 /// <summary>

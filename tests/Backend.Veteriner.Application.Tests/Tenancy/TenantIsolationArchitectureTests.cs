@@ -47,6 +47,8 @@ public sealed class TenantIsolationArchitectureTests
         ["Backend.Veteriner.Api/Controllers/ClinicSitesAdminController.cs"] = "Adres değiştirme hakkı desteği (platform yöneticisi)",
         ["Backend.Veteriner.Api/Controllers/CustomDevelopmentRequestsAdminController.cs"] = "Özel geliştirme talepleri (platform yöneticisi)",
         ["Backend.Veteriner.Infrastructure/Tenants/TrialActivationMetricsReader.cs"] = "Deneme metrikleri (platform yöneticisi)",
+        ["Backend.Veteriner.Api/Controllers/AiAdminController.cs"] = "AI denemesi: klinik açma/kapama ve kullanım (platform yöneticisi)",
+        ["Backend.Veteriner.Infrastructure/Ai/AiUsageReader.cs"] = "AI sistem harcama sınırı tüm kiracılarda toplanır; klinik dökümü (platform yöneticisi)",
         // Arka plan ve bakım
         ["Backend.Veteriner.Application/Waitlist/WaitlistOfferProcessor.cs"] = "Bekleme listesi işleyicisi: sıradaki kaydı ya da açık teklifi olan kiracıları tarar",
         ["Backend.Veteriner.Infrastructure/Imports/ImportValidationProcessor.cs"] = "Kuyruk taraması",
@@ -56,6 +58,7 @@ public sealed class TenantIsolationArchitectureTests
         ["Backend.Veteriner.Infrastructure/Files/StoredFileMaintenanceProcessor.cs"] = "Bakım taraması",
         ["Backend.Veteriner.Infrastructure/DataExports/DataExportProcessor.cs"] = "Tüm veri dışa aktarma: kuyruk ve süre dolumu taraması",
         ["Backend.Veteriner.Infrastructure/AppointmentRequests/AppointmentRequestExpiryHostedService.cs"] = "Süresi dolan randevu talepleri taraması",
+        ["Backend.Veteriner.Infrastructure/Ai/AiDraftExpiryHostedService.cs"] = "Süresi dolan AI taslakları taraması",
         ["Backend.Veteriner.Infrastructure/Billing/ScheduledPlanChangeProcessorHostedService.cs"] = "Vadesi gelen plan değişiklikleri",
         ["Backend.Veteriner.Infrastructure/Billing/CheckoutReconciliationProcessor.cs"] = "Ödeme oturumlarının sağlayıcıyla uzlaştırması",
         ["Backend.Veteriner.Infrastructure/EDocuments/EDocumentStatusProcessor.cs"] = "Bekleyen e-belgeler: sonucu gelmeyen ve iptali süren belgelerin taraması",

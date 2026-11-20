@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Ai.Drafts;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
@@ -26,6 +27,7 @@ public sealed class GetExaminationByIdQueryHandler
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
     private readonly IClinicVeterinarianReader _userNames;
+    private readonly IAiProvenanceReader _aiProvenance;
 
     public GetExaminationByIdQueryHandler(
         ITenantContext tenantContext,
@@ -36,8 +38,10 @@ public sealed class GetExaminationByIdQueryHandler
         IReadRepository<Examination> examinations,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients,
-        IClinicVeterinarianReader userNames)
+        IClinicVeterinarianReader userNames,
+        IAiProvenanceReader aiProvenance)
     {
+        _aiProvenance = aiProvenance;
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clientContext = clientContext;
@@ -128,7 +132,8 @@ public sealed class GetExaminationByIdQueryHandler
             e.Status,
             e.FinalizedAtUtc,
             e.FinalizedByUserId,
-            finalizedByName);
+            finalizedByName,
+            await _aiProvenance.ForRecordAsync(tenantId, e.Id, ct));
         return Result<ExaminationDetailDto>.Success(dto);
     }
 }

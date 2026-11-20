@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Ai.Drafts;
 using Backend.Veteriner.Application.CareInstructions.Contracts.Dtos;
 using Backend.Veteriner.Application.CareInstructions.Queries.GetById;
 using Backend.Veteriner.Application.CareInstructions.Specs;
@@ -17,17 +18,20 @@ public sealed class GetCareInstructionsListQueryHandler
     private readonly IClinicContext _clinicContext;
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<CareInstruction> _careInstructions;
+    private readonly IAiProvenanceReader _aiProvenance;
 
     public GetCareInstructionsListQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
-        IReadRepository<CareInstruction> careInstructions)
+        IReadRepository<CareInstruction> careInstructions,
+        IAiProvenanceReader aiProvenance)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
         _careInstructions = careInstructions;
+        _aiProvenance = aiProvenance;
     }
 
     public async ValueTask<Result<PagedResult<CareInstructionDto>>> Handle(
@@ -74,9 +78,13 @@ public sealed class GetCareInstructionsListQueryHandler
                 tenantId, clinicId, accessibleClinicIds, request.PetId, request.HospitalizationId, request.ExaminationId, request.VisitId,
                 page, pageSize),
             ct);
+        var provenance = await _aiProvenance.ForRecordsAsync(tenantId, rows.Select(r => r.Id).ToList(), ct);
 
         return Result<PagedResult<CareInstructionDto>>.Success(
             PagedResult<CareInstructionDto>.Create(
-                rows.Select(CareInstructionMapping.ToDto).ToList(), total, page, pageSize));
+                rows.Select(r => CareInstructionMapping.ToDto(r, provenance.GetValueOrDefault(r.Id) ?? [])).ToList(),
+                total,
+                page,
+                pageSize));
     }
 }

@@ -134,6 +134,25 @@ public static class DependencyInjection
         services.AddScoped<EDocuments.Connections.EDocumentConnectionService>();
         services.AddScoped<RegisterReportRunner>();
 
+        // AI (ADR-008, ADR-044): kredi hesabı (AI-007), sınır denetimi ve hasta geçmişi özeti girdisi; sağlayıcı istemcisi Infrastructure'da.
+        services.AddScoped<Ai.AiCreditAccount>();
+        services.AddScoped<Ai.AiUsageGuard>();
+        services.AddScoped<Ai.AiAdminClinicReader>();
+        services.AddScoped<Ai.PetHistorySummary.PetHistoryAiContextBuilder>();
+        // AI çağrısı + kullanım/denetim kaydı (AI-010) ve taslak erişimi (AI-009). Özellik uygulayıcıları (IAiDraftApplier) özellikle birlikte eklenir.
+        services.AddScoped<Ai.AiInvoker>();
+        services.AddScoped<Ai.Drafts.AiDraftAccess>();
+        services.AddScoped<Ai.Drafts.AiDraftGenerator>();
+        services.AddScoped<Ai.Drafts.IAiProvenanceReader, Ai.Drafts.AiProvenanceReader>();
+        // Taslak üreten klinik özellikler (AI-001/003/004): ortak girdi ve özellik başına uygulayıcı.
+        services.AddScoped<Ai.ClinicalDrafts.ClinicalAiContextBuilder>();
+        // Doğal dille hasta araması (AI-006): ortak bağlam ve yapılandırılmış arama.
+        services.AddScoped<Ai.PatientSearch.PetSearchContext>();
+        services.AddScoped<Ai.PatientSearch.PetSearchRunner>();
+        services.AddScoped<Ai.Drafts.IAiDraftApplier, Ai.ClinicalDrafts.ExamNoteDraftApplier>();
+        services.AddScoped<Ai.Drafts.IAiDraftApplier, Ai.ClinicalDrafts.OwnerExplanationDraftApplier>();
+        services.AddScoped<Ai.Drafts.IAiDraftApplier, Ai.ClinicalDrafts.DischargeInstructionsDraftApplier>();
+
         // Hasta sahibi portalı (ADR-031): sahiplik kontrolü, davet çözümü, oturum ve kod.
         services.AddScoped<OwnerPortalAccess>();
         services.AddScoped<ClinicPortalGate>();

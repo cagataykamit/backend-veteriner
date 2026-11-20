@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Ai.Drafts;
 using Backend.Veteriner.Application.CareInstructions.Contracts.Dtos;
 using Backend.Veteriner.Application.CareInstructions.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
@@ -16,17 +17,20 @@ public sealed class GetCareInstructionByIdQueryHandler
     private readonly IClinicContext _clinicContext;
     private readonly IClinicReadScopeResolver _clinicScopeResolver;
     private readonly IReadRepository<CareInstruction> _careInstructions;
+    private readonly IAiProvenanceReader _aiProvenance;
 
     public GetCareInstructionByIdQueryHandler(
         ITenantContext tenantContext,
         IClinicContext clinicContext,
         IClinicReadScopeResolver clinicScopeResolver,
-        IReadRepository<CareInstruction> careInstructions)
+        IReadRepository<CareInstruction> careInstructions,
+        IAiProvenanceReader aiProvenance)
     {
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
         _clinicScopeResolver = clinicScopeResolver;
         _careInstructions = careInstructions;
+        _aiProvenance = aiProvenance;
     }
 
     public async ValueTask<Result<CareInstructionDto>> Handle(GetCareInstructionByIdQuery request, CancellationToken ct)
@@ -47,7 +51,8 @@ public sealed class GetCareInstructionByIdQueryHandler
         if (!scope.IsSuccess)
             return NotFound();
 
-        return Result<CareInstructionDto>.Success(CareInstructionMapping.ToDto(row));
+        return Result<CareInstructionDto>.Success(
+            CareInstructionMapping.ToDto(row, await _aiProvenance.ForRecordAsync(tenantId, row.Id, ct)));
     }
 
     private static Result<CareInstructionDto> NotFound()
@@ -56,7 +61,7 @@ public sealed class GetCareInstructionByIdQueryHandler
 
 internal static class CareInstructionMapping
 {
-    public static CareInstructionDto ToDto(CareInstruction x)
+    public static CareInstructionDto ToDto(CareInstruction x, IReadOnlyList<AiProvenanceDto> aiProvenance)
         => new(
             x.Id,
             x.TenantId,
@@ -70,5 +75,6 @@ internal static class CareInstructionMapping
             x.CreatedAtUtc,
             x.UpdatedByUserId,
             x.UpdatedAtUtc,
-            ExaminationRowVersion.Encode(x.RowVersion));
+            ExaminationRowVersion.Encode(x.RowVersion),
+            aiProvenance);
 }
