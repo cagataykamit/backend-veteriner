@@ -31,7 +31,7 @@ namespace Backend.IntegrationTests.Ai;
 /// <summary>
 /// Doğal dille hasta araması (AI_PATIENT_SEARCH_API_CONTRACT.md): HTTP + gerçek SQL Server (LocalDB), sağlayıcı sahte. Modele
 /// giden girdi (kayıt yok, kimlik temizliği), filtre doğrulaması, ölçütlerin VE birleşimi, izin, klinik ve kiracı yalıtımı.
-/// Her test kendi kiracısını (Premium deneme: AI kredisi var) ve kliniğini kurar; kiracı geneli hayvan araması başka testten etkilenmez.
+/// Her test kendi kiracısını (ücretli Premium: AI kredisi var) ve kliniğini kurar; kiracı geneli hayvan araması başka testten etkilenmez.
 /// </summary>
 [Collection("pilot-smoke-api")]
 public sealed class AiPetSearchIntegrationTests : IClassFixture<CustomWebApplicationFactory>
@@ -269,7 +269,10 @@ public sealed class AiPetSearchIntegrationTests : IClassFixture<CustomWebApplica
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tenant = new Tenant($"AiAra-{Guid.NewGuid():N}"[..16], DateTime.UtcNow);
             db.Tenants.Add(tenant);
-            db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Premium, DateTime.UtcNow, 14));
+            // Paket hediyesi yalnız ücretli abonelikte (denemede kota 0, ADR-044 madde 5).
+            var subscription = TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Premium, DateTime.UtcNow, 14);
+            subscription.ActivatePaidPlan(SubscriptionPlanCode.Premium, DateTime.UtcNow);
+            db.TenantSubscriptions.Add(subscription);
             var clinic = new Clinic(tenant.Id, $"Ara-{Guid.NewGuid():N}"[..14], "Izmir");
             var otherClinic = new Clinic(tenant.Id, $"Ara2-{Guid.NewGuid():N}"[..14], "Izmir");
             db.Clinics.AddRange(clinic, otherClinic);
