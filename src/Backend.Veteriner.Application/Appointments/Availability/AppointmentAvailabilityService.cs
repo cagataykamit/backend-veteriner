@@ -92,7 +92,8 @@ public sealed class AppointmentAvailabilityService
 
     /// <summary>
     /// Günlük kapasite (§8.4): <paramref name="fromLocalDate"/>'den itibaren <paramref name="days"/> gün. Süre kliniğin varsayılan
-    /// randevu süresi; kaynak klinikteki hekim sayısı (hekim yoksa ya da tek hekim istenirse 1).
+    /// randevu süresi; kaynak klinikteki hekim sayısı (hekim yoksa ya da tek hekim istenirse 1). Çalışma saati kısıtı kapalı
+    /// klinikte pencere <see cref="ClinicWorkingHoursDefaults.UnrestrictedWeek"/> (kapalı gün yok).
     /// </summary>
     public async Task<IReadOnlyList<(DateOnly Date, int Capacity)>> GetDailyCapacityAsync(
         Guid tenantId,
@@ -102,9 +103,10 @@ public sealed class AppointmentAvailabilityService
         int days,
         CancellationToken ct)
     {
-        var hours = ClinicWorkingHoursDefaults.Effective(
-            await _workingHours.ListAsync(new ClinicWorkingHoursByClinicSpec(tenantId, clinicId), ct));
         var settings = await _appointmentSettings.FirstOrDefaultAsync(new ClinicAppointmentSettingsByClinicSpec(tenantId, clinicId), ct);
+        var hours = (settings?.EnforceWorkingHours ?? ClinicAppointmentSettings.DefaultEnforceWorkingHours)
+            ? ClinicWorkingHoursDefaults.Effective(await _workingHours.ListAsync(new ClinicWorkingHoursByClinicSpec(tenantId, clinicId), ct))
+            : ClinicWorkingHoursDefaults.UnrestrictedWeek();
         var defaults = ClinicAppointmentSettingsDefaults.Build();
         var resources = singleVeterinarian ? 1 : (await _veterinarians.ListAsync(tenantId, clinicId, ct)).Count;
 

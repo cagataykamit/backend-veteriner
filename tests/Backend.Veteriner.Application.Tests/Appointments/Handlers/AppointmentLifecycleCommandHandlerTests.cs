@@ -225,6 +225,38 @@ public sealed class AppointmentLifecycleCommandHandlerTests
     }
 
     [Fact]
+    public async Task Reschedule_Should_Succeed_OnClosedDay_When_WorkingHoursRestrictionDisabled()
+    {
+        var handler = CreateRescheduleHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var when = MondayUtc(19, 0); // 22:00 local
+        var appt = new Appointment(tid, cid, Guid.NewGuid(), SlotAlignedUtcPlusDays(1), 30, AppointmentType.Other, null, null);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(appt);
+        _clinicAppointmentSettings.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicAppointmentSettingsByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ClinicAppointmentSettings.Create(tid, cid, 30, 15, false, DateTime.UtcNow, enforceWorkingHours: false));
+        _clinicWorkingHoursRead.Setup(r => r.ListAsync(It.IsAny<ClinicWorkingHoursByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicWorkingHour>
+            {
+                ClinicWorkingHour.Create(tid, cid, DayOfWeek.Monday, true, null, null, null, null, DateTime.UtcNow)
+            });
+        _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Appointment?)null);
+        _read.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingForPetSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Appointment?)null);
+
+        var result = await handler.Handle(
+            new RescheduleAppointmentCommand(appt.Id, when),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        appt.ScheduledAtUtc.Should().Be(when);
+    }
+
+    [Fact]
     public async Task Reschedule_Should_Succeed_When_NoConflict()
     {
         var handler = CreateRescheduleHandler();

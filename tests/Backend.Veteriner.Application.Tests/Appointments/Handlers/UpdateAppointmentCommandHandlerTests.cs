@@ -339,6 +339,40 @@ public sealed class UpdateAppointmentCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Should_Succeed_When_NewTime_OutsideWorkingHours_And_RestrictionDisabled()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var aid = Guid.NewGuid();
+        var scheduledUtc = MondayUtc(15, 30); // 18:30 local
+
+        var appt = new Appointment(tid, cid, pid, SlotAlignedUtcPlusDays(1), 30, AppointmentType.Examination, null, null);
+        typeof(Appointment).GetProperty(nameof(Appointment.Id))!.SetValue(appt, aid);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(appt);
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Clinic(tid, "K", "X"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync((Appointment?)null);
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingForPetSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync((Appointment?)null);
+        _clinicAppointmentSettings.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicAppointmentSettingsByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ClinicAppointmentSettings.Create(tid, cid, 30, 15, false, DateTime.UtcNow, enforceWorkingHours: false));
+        _clinicWorkingHoursRead.Setup(r => r.ListAsync(It.IsAny<ClinicWorkingHoursByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicWorkingHour>
+            {
+                ClinicWorkingHour.Create(tid, cid, DayOfWeek.Monday, false, new TimeOnly(9, 0), new TimeOnly(18, 0), null, null, DateTime.UtcNow)
+            });
+
+        var cmd = new UpdateAppointmentCommand(aid, cid, pid, scheduledUtc, AppointmentType.Examination, AppointmentStatus.Scheduled, null, DurationMinutes: 30);
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        appt.ScheduledAtUtc.Should().Be(scheduledUtc);
+    }
+
+    [Fact]
     public async Task Handle_Should_Fail_When_NewTime_NotAlignedToSlotInterval()
     {
         var tid = Guid.NewGuid();

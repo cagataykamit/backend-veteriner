@@ -43,7 +43,7 @@ internal static class AppointmentSlotRules
             return conflicts;
 
         var hoursRows = await workingHours.ListAsync(new ClinicWorkingHoursByClinicSpec(tenantId, clinicId), ct);
-        return AppointmentWorkingHoursValidation.Validate(startUtc, durationMinutes, hoursRows);
+        return AppointmentWorkingHoursValidation.Validate(startUtc, durationMinutes, hoursRows, settingsRow);
     }
 
     /// <summary>

@@ -821,6 +821,62 @@ public sealed class CreateAppointmentCommandHandlerTests
         result.Error.Code.Should().Be("Appointments.OutsideWorkingHours");
     }
 
+    [Theory]
+    [InlineData(19, 0, true)] // 22:00 local, kapalı gün
+    [InlineData(9, 15, false)] // 12:15 local, mola
+    public async Task Handle_Should_Succeed_OutsideWorkingHours_When_ClinicDisabledWorkingHoursRestriction(int utcHour, int utcMinute, bool closedDay)
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var cmd = new CreateAppointmentCommand(cid, pid, MondayUtc(utcHour, utcMinute), AppointmentType.Examination, null, null, DurationMinutes: 30);
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Tenant("A", DateTime.UtcNow));
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _clinicAppointmentSettings.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicAppointmentSettingsByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ClinicAppointmentSettingsEntity.Create(tid, cid, 30, 15, false, DateTime.UtcNow, enforceWorkingHours: false));
+        _clinicWorkingHoursRead.Setup(r => r.ListAsync(It.IsAny<ClinicWorkingHoursByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicWorkingHour>
+            {
+                closedDay
+                    ? ClinicWorkingHour.Create(tid, cid, DayOfWeek.Monday, true, null, null, null, null, DateTime.UtcNow)
+                    : ClinicWorkingHour.Create(tid, cid, DayOfWeek.Monday, false, new TimeOnly(9, 0), new TimeOnly(18, 0), new TimeOnly(12, 0), new TimeOnly(13, 0), DateTime.UtcNow)
+            });
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingAtClinicSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync((Appointment?)null);
+        _appointmentsRead.Setup(r => r.FirstOrDefaultAsync(It.IsAny<AppointmentOverlappingForPetSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync((Appointment?)null);
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Handle_Should_Fail_When_LocalEndFallsOnNextDay_Even_When_WorkingHoursRestrictionDisabled()
+    {
+        var handler = CreateHandler();
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var pid = Guid.NewGuid();
+        var cmd = new CreateAppointmentCommand(cid, pid, MondayUtc(20, 30), AppointmentType.Examination, null, null, DurationMinutes: 60); // 23:30 local
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _tenants.Setup(r => r.FirstOrDefaultAsync(It.IsAny<TenantByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Tenant("A", DateTime.UtcNow));
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Clinic(tid, "K", "İstanbul"));
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Pet(tid, Guid.NewGuid(), "P", TestSpeciesIds.Cat, null, null));
+        _clinicAppointmentSettings.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicAppointmentSettingsByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ClinicAppointmentSettingsEntity.Create(tid, cid, 30, 15, false, DateTime.UtcNow, enforceWorkingHours: false));
+        _clinicWorkingHoursRead.Setup(r => r.ListAsync(It.IsAny<ClinicWorkingHoursByClinicSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClinicWorkingHour>());
+
+        var result = await handler.Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Appointments.OutsideWorkingHours");
+    }
+
     [Fact]
     public async Task Handle_Should_Fail_When_NotAlignedToSlotInterval_Default15()
     {
