@@ -21,7 +21,7 @@ namespace Backend.Veteriner.Application.Auth;
 ///   <c>Tenants.*</c> / <c>Subscriptions.Manage</c> / <c>Roles.*</c> / <c>Permissions.*</c> / <c>Users.*</c>
 ///   / <c>Outbox.*</c> / <c>Admin.Diagnostics</c>.</item>
 ///   <item><c>Veteriner</c>: tıbbi operasyon rolü. Klinik kayıtlarının (muayene, aşı, tedavi, reçete, lab,
-///   yatış) Read/Create/Update; randevu Read/Create/Complete/Reschedule (Cancel verilmez); pet okuma + güncelleme
+///   yatış, vital ölçümü) Read/Create/Update; randevu Read/Create/Complete/Reschedule (Cancel verilmez); pet okuma + güncelleme
 ///   (kilo/medikal not). <b>Verilmez:</b> müşteri C/U, ödeme C/U, klinik/tenant/abonelik ve sistem yetkileri,
     ///   düzeltme izinleri (<c>*.Correct</c>; yönetici düzeyi: Admin, Owner, ClinicAdmin).</item>
 ///   <item><c>Sekreter</c>: resepsiyon/operasyon rolü. Müşteri/pet R/C/U; randevu R/C/Cancel/Reschedule
@@ -143,6 +143,9 @@ public static class RolePermissionBindings
                 PermissionCatalog.CareInstructions.Read,
                 PermissionCatalog.CareInstructions.Create,
                 PermissionCatalog.CareInstructions.Update,
+                PermissionCatalog.VitalMeasurements.Read,
+                PermissionCatalog.VitalMeasurements.Create,
+                PermissionCatalog.VitalMeasurements.Update,
 
                 PermissionCatalog.Clinics.Read,
                 PermissionCatalog.Clinics.Create,
@@ -306,6 +309,9 @@ public static class RolePermissionBindings
                 PermissionCatalog.CareInstructions.Read,
                 PermissionCatalog.CareInstructions.Create,
                 PermissionCatalog.CareInstructions.Update,
+                PermissionCatalog.VitalMeasurements.Read,
+                PermissionCatalog.VitalMeasurements.Create,
+                PermissionCatalog.VitalMeasurements.Update,
 
                 PermissionCatalog.Clinics.Read,
                 PermissionCatalog.Clinics.Create,
@@ -475,6 +481,9 @@ public static class RolePermissionBindings
                 PermissionCatalog.CareInstructions.Read,
                 PermissionCatalog.CareInstructions.Create,
                 PermissionCatalog.CareInstructions.Update,
+                PermissionCatalog.VitalMeasurements.Read,
+                PermissionCatalog.VitalMeasurements.Create,
+                PermissionCatalog.VitalMeasurements.Update,
 
                 PermissionCatalog.Species.Read,
                 PermissionCatalog.Species.Create,
@@ -592,6 +601,9 @@ public static class RolePermissionBindings
                 PermissionCatalog.CareInstructions.Read,
                 PermissionCatalog.CareInstructions.Create,
                 PermissionCatalog.CareInstructions.Update,
+                PermissionCatalog.VitalMeasurements.Read,
+                PermissionCatalog.VitalMeasurements.Create,
+                PermissionCatalog.VitalMeasurements.Update,
 
                 PermissionCatalog.Payments.Read,
 
@@ -658,6 +670,7 @@ public static class RolePermissionBindings
                 PermissionCatalog.Imaging.Read,
                 PermissionCatalog.Hospitalizations.Read,
                 PermissionCatalog.CareInstructions.Read,
+                PermissionCatalog.VitalMeasurements.Read,
 
                 PermissionCatalog.Payments.Read,
                 PermissionCatalog.Payments.Create,
