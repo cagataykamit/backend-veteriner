@@ -2,7 +2,7 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-052-ozet-kaldirilir-rapor-merkezi-sorular.md` (K3–K7), tasarım FE deposu `design/raporlar/B.html` ve `README.md` (B · Sorular). Hata zarfı standart `ProblemDetails` + `extensions.code` (`BACKEND-CONTRACT-STANDARD.md` §9).
 
-> **Durum:** taslak, onay bekliyor (2026-11-20). Dal `feature/rapor-merkezi-ozet`. Migration yok, yeni izin yok, yeni hesap kuralı yok: her sayı, aynı veriyi gösteren raporun ya da sayfanın kuralından gelir.
+> **Durum:** onaylandı (2026-11-20, kullanıcı: "Onaylıyorum"; açık noktalar öneriye göre, §10). Dal `feature/rapor-merkezi-ozet`. Migration yok, yeni izin yok, yeni hesap kuralı yok: her sayı, aynı veriyi gösteren raporun ya da sayfanın kuralından gelir.
 
 ## 0) Karar: tek uç
 
@@ -96,7 +96,7 @@ Nokta şekli: `{ "from": "2026-11-17", "to": "2026-11-17", "value": 0 }`. `from`
 | Bölüm / alan | İzin | Kart | Kaynak (hesap tek yerde) |
 |---|---|---|---|
 | `todayCash` | `Payments.Read` | Bugünün kasası tuttu mu? | Kasa özeti (`CashSummaryLoader`): bugünün `totals.netAmount`, `collectedCount`; `last7Days` = son 7 günün `byDay.netAmount` |
-| `todayCash.mainRegisterBalance` | `CashRegisters.Read` + paket `CashManagement` | aynı | Ana kasanın (`CashRegister.IsMain`) şu anki bakiyesi, `CashRegisterRules.LoadTotalsAsync` (`NetAmount`). Ana kasa yoksa `null` |
+| `todayCash.mainRegisterBalance` | `CashRegisters.Read` | aynı | Ana kasanın şu anki bakiyesi, `CashRegisterRules.LoadTotalsAsync` (`NetAmount`); kasa raporunun kapanış bakiyesiyle aynı. Paket istemez (kasa raporu da istemez). Klinikte kasa kaydı yoksa sanal Ana kasa (kasasız nakit) |
 | `turnover` | `Payments.Read` **ve** `Charges.Read` | Bu dönem nasıl geçti? | Gün sonu dökümünün `totals.netChargeAmount`'u (`IDailyTransactionsReader`), performans özetiyle aynı. Seri: her noktanın penceresi için aynı toplam |
 | `collections` | `Payments.Read` | Para hangi yolla geldi? | Kasa özeti, dönem penceresi: `totals.netAmount`, `collectedCount`, `byMethod[].netAmount`. Yüzde istemcide türetilir |
 | `outstanding` | `Charges.Read` | Kimin bize borcu var? | Borç raporu (`IOutstandingBalancesReportReader`): toplam ve müşteri sayısı; `maxClientOutstandingAmount` = en yüksek borçlu müşterinin tutarı (raporun ilk satırı). Borç yoksa `0` |
@@ -127,7 +127,7 @@ Nokta şekli: `{ "from": "2026-11-17", "to": "2026-11-17", "value": 0 }`. `from`
 ## 6) Güvenlik ve performans
 
 - Her sorgu `TenantId` + tek `ClinicId` ile süzülür. İzinsiz bölüm için sorgu **çalışmaz**.
-- Seriler nokta başına ayrı sorgu değil, pencere başına tek sorgu + bellekte İstanbul gününe gruplama ile hesaplanır (Özet'in `BuildDailyCounts` yöntemi). Bir istekte en çok ~16 sorgu.
+- Seri noktası, raporun kendi okuyucusu ya da sayım spec'iyle nokta başına bir sorgudur (en çok 7 nokta); kural kopyalanmaz. Tam yetkili kullanıcıda bir istek ~40 küçük `COUNT`/`SUM` sorgusu çalıştırır.
 - Önbellek yok. Yeni indeks ve migration yok. Gerçek veri hacminde ölçülmedi (bilinen eksik).
 
 ## 7) Bugün: zamanı geçmiş randevular (K5)
@@ -143,6 +143,18 @@ Nokta şekli: `{ "from": "2026-11-17", "to": "2026-11-17", "value": 0 }`. `from`
 - **Neden geliş hariç:** Gelişi açılmış randevu "Önceki günden açık geliş" (`incompleteVisitCount`) olarak zaten sayılır.
 - **Neden 30 gün:** Diğer açık iş sayılarıyla aynı pencere (`OpenItemsDefaults`); sınırsız sayım yıllar önce unutulmuş randevuları da toplar.
 - Tarih ve hekim süzgecinden etkilenmez (diğer `openItems` alanları gibi). Panel bağlantısı: Randevu takvimi, Durum: Gecikmiş.
+- Hesap tek yerde: `IVisitOpenItemsReader.GetSummaryAsync`; pencere `OpenItemsSummaryRequest.ForToday` (`OpenItemsDefaults.OverdueAppointmentLookbackDays`). Gün sonu raporunda `null`.
+
+### 7.1 Bugün: iptal edilen randevular (§10 madde 1)
+
+`TodayDto` yanıtına alan eklenir:
+
+| Alan | Tip | Tanım | İzin |
+|---|---|---|---|
+| `cancelledAppointmentCount` | int? | Seçili günde (`localDate`) planlanmış ve iptal edilmiş randevu sayısı | `Appointments.Read` |
+
+- Randevu raporunun iptal sayımıyla aynı (`AppointmentsReportFilteredCountSpec`, `status = Cancelled`, `ScheduledAtUtc` gün içinde); panel bağlantısı o günün Randevu raporu, durum İptal.
+- Hekim süzgecinden etkilenmez (bağlandığı rapor hekime göre süzmez). `voided=true` görünümünde `null`.
 
 ## 8) Kabul (testler)
 
@@ -161,7 +173,7 @@ Birim testleri: `ReportHubPeriod` (ay sonu kırpma, hafta başı Pazartesi, Paza
 - Bugün "Açık işler" satırına "Gecikmiş randevu: N" çipi.
 - Mevcut uçlar değişmez. `/dashboard/*` uçları Özet kaldırılana kadar aynen çalışır.
 
-## 10) Açık noktalar (onayda karara bağlanacak)
+## 10) Açık noktalar (kararlar, 2026-11-20: "açık noktaları da önerine göre yap")
 
-1. **Bugün iptal edilen randevular:** Bugün listesi iptal edilen randevuyu göstermiyor (`VisitTodayReader`, `Status != Cancelled`). ADR-052 "yoksa Bugün'e" diyor. Öneri: bu sözleşmeye eklenmez; Bugün'ün gün listesi başlığına ayrı küçük iş olarak "N randevu iptal edildi" sayacı (`TodayDto` alanı) eklenir. Onay gerekir.
-2. **Aşı eğilim serisi:** Taslakta "Klinikte ne kadar iş yaptık?" kartında tek çizgi var (muayene). Aşı serisi bu yüzden eklenmedi; gerekirse sonradan eklenir.
+1. **Bugün iptal edilen randevular:** Bugün listesi iptal edilen randevuyu göstermiyordu (`VisitTodayReader`, `Status != Cancelled`). ADR-052 "yoksa Bugün'e" diyor. Karar: gün listesi başlığında "N randevu iptal edildi" sayacı (§7.1).
+2. **Aşı eğilim serisi:** Taslakta "Klinikte ne kadar iş yaptık?" kartında tek çizgi var (muayene). Karar: aşı serisi eklenmez; gerekirse sonradan eklenir.
