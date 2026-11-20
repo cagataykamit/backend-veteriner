@@ -5,6 +5,7 @@ using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
+using Backend.Veteriner.Domain.VitalMeasurements;
 using FluentValidation;
 
 namespace Backend.Veteriner.Application.Imports.Validation;
@@ -41,7 +42,7 @@ public static class ImportValueParsers
     public const int MaxEmailLength = 320;
     public const int MaxMicrochipLength = 50;
     public const int StandardMicrochipLength = 15;
-    public const decimal MaxWeight = 9999.99m;
+    public const decimal MaxWeight = VitalSigns.MaxWeightKg;
 
     /// <summary>Uygulama tarihi alt sınırı (IMPORT_API_CONTRACT.md §4.3).</summary>
     public static readonly DateOnly MinVaccinationDate = new(1990, 1, 1);
@@ -310,8 +311,8 @@ public static class ImportValueParsers
         if (!decimal.TryParse(text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var temperature))
             return (null, false);
 
-        temperature = Math.Round(temperature, 1, MidpointRounding.AwayFromZero);
-        return temperature is < 25m or > 45m ? (null, false) : (temperature, true);
+        temperature = Math.Round(temperature, VitalSigns.TemperatureDecimals, MidpointRounding.AwayFromZero);
+        return temperature is < VitalSigns.MinTemperatureC or > VitalSigns.MaxTemperatureC ? (null, false) : (temperature, true);
     }
 
     /// <summary>
