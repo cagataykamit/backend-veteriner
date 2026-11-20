@@ -28,9 +28,17 @@ var builder = Host.CreateApplicationBuilder(args);
 if (builder.Environment.IsDevelopment())
     builder.Configuration.AddUserSecrets<Program>();
 
-// Infrastructure bazı uygulama servislerine bağlıdır (ör. ödeme uzlaştırma); Development DI doğrulaması onları da çözmeli.
+// Infrastructure bazı uygulama servislerine bağlıdır (ör. ödeme uzlaştırma).
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// Mediator yalnız API'de kayıtlıdır; ISender isteyen uygulama servisleri (ör. AI taslakları) bu araçta hiç çözülmez.
+// Açılıştaki tam DI doğrulaması Development'ta bu yüzden komutları düşürüyordu; Production'daki gibi kapalı, kapsam doğrulaması açık.
+builder.ConfigureContainer(new DefaultServiceProviderFactory(new ServiceProviderOptions
+{
+    ValidateOnBuild = false,
+    ValidateScopes = builder.Environment.IsDevelopment(),
+}));
 
 using var host = builder.Build();
 
