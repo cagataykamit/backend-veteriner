@@ -18,7 +18,7 @@ public sealed record UpdateVitalMeasurementCommand(
     decimal? WeightKg,
     string? Note,
     string? RowVersion)
-    : IRequest<Result<VitalMeasurementWriteResultDto>>, ITransactionalRequest, IAuditableRequest
+    : IRequest<Result<VitalMeasurementWriteResultDto>>, ITransactionalRollbackOnFailureRequest, IAuditableRequest
 {
     public string AuditAction => "VitalMeasurement.Update";
     public string? AuditTarget => $"VitalMeasurementId={Id}";
