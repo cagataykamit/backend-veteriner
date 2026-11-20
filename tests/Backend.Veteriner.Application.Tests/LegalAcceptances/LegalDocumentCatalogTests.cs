@@ -61,8 +61,9 @@ public sealed class LegalDocumentCatalogTests
     {
         var submitted = new[]
         {
-            new LegalDocumentAcceptanceInput(LegalDocumentType.Terms, "1.0"),
-            new LegalDocumentAcceptanceInput(LegalDocumentType.Privacy, " 1.1 "),
+            new LegalDocumentAcceptanceInput(LegalDocumentType.Terms, LegalDocumentCatalog.CurrentVersion(LegalDocumentType.Terms)),
+            // Baştaki/sondaki boşluk yok sayılır.
+            new LegalDocumentAcceptanceInput(LegalDocumentType.Privacy, $" {LegalDocumentCatalog.CurrentVersion(LegalDocumentType.Privacy)} "),
             new LegalDocumentAcceptanceInput(LegalDocumentType.DataProcessing, "0.0"),
         };
 
