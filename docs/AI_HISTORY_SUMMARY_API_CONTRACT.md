@@ -159,13 +159,15 @@ Fon hareketleri, yeniden eskiye, en çok 100: `[{ "id", "kind": "Manual", "credi
   },
   "clinics": [ { "tenantId": "…", "tenantName": "…", "clinicId": "…", "clinicName": "…", "isEnabled": true, "usage": { /* system ile aynı alanlar */ } } ],
   "features": [ { "feature": "PetHistorySummary", "usage": { … } } ],
-  "models": [ { "model": "claude-haiku-5-5", "usage": { … } } ]
+  "models": [ { "model": "claude-haiku-5-5", "usage": { … } } ],
+  "users": [ { "userId": "…", "userName": "…", "email": "…", "tenantId": "…", "tenantName": "…", "clinicId": "…", "clinicName": "…", "usage": { … } } ]
 }
 ```
 
 - `usage` / `system` alanları: istek sayısı, başarısız istek (`Outcome != Succeeded`), gerçek giriş/çıkış token, harcanan kredi, fondan karşılanan kredi, tahmini $.
 - `budget`: sistem aylık sınırına uzaklık (`Ai:SystemMonthlyCostLimitUsd`).
 - `clinics`, `features`, `models` maliyete göre azalan. Bu ay için AI'si açık olup henüz kullanmayan klinikler de sıfırlarla gelir; geçmiş aylarda yalnız kullananlar.
+- `users` (2026-11-20, kötüye kullanım takibi): ayın en çok harcayan **50** kullanıcı–klinik satırı, maliyete sonra istek sayısına göre azalan. Kullanıcı birden çok klinikte kullandıysa her klinik ayrı satırdır. `userName` görünen ad (yoksa boş), `email` hesabın e-postası. Klinik metni dönmez. Kullanıcı başına dakikada `userRequestsPerMinute` sınırı ayrıca geçerlidir.
 - `feature` değerleri: `PetHistorySummary`, `ExamNoteStructure`, `OwnerExplanation`, `DischargeInstructions`.
 
 ## 4) Sınırlar ve kullanım kaydı (ADR-044 madde 8)

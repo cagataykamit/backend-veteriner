@@ -67,9 +67,17 @@ public sealed record AiFeatureUsageRow(AiFeature Feature, AiUsageStats Stats);
 
 public sealed record AiModelUsageRow(string Model, AiUsageStats Stats);
 
-/// <summary>Satırlar maliyete göre azalan.</summary>
+/// <summary>Kötüye kullanım takibi: kullanıcının bir klinikteki kullanımı (kullanıcı birden çok klinikte ayrı satırdır).</summary>
+public sealed record AiUserUsageRow(
+    Guid UserId, string UserName, string Email, Guid TenantId, string TenantName, Guid ClinicId, string ClinicName, AiUsageStats Stats);
+
+/// <summary>Satırlar maliyete göre azalan; kullanıcı satırları en çok <see cref="MaxUserRows"/>.</summary>
 public sealed record AiUsageBreakdown(
     AiUsageStats Total,
     IReadOnlyList<AiClinicUsageRow> Clinics,
     IReadOnlyList<AiFeatureUsageRow> Features,
-    IReadOnlyList<AiModelUsageRow> Models);
+    IReadOnlyList<AiModelUsageRow> Models,
+    IReadOnlyList<AiUserUsageRow> Users)
+{
+    public const int MaxUserRows = 50;
+}

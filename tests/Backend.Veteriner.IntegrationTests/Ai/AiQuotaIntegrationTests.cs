@@ -177,12 +177,19 @@ public sealed class AiQuotaIntegrationTests : IClassFixture<CustomWebApplication
         clinicUsage.GetProperty("costUsd").GetDecimal().Should().Be(0.00015m);
         usage.GetProperty("features").EnumerateArray().Should().Contain(f => f.GetProperty("feature").GetString() == "PetHistorySummary");
         usage.GetProperty("models").EnumerateArray().Should().Contain(m => m.GetProperty("model").GetString() == "claude-haiku-5-5");
+        var userRow = usage.GetProperty("users").EnumerateArray()
+            .Should().ContainSingle(u => u.GetProperty("userId").GetGuid() == ctx.UserId, "kullanıcı kırılımı kötüye kullanımı gösterir").Which;
+        userRow.GetProperty("clinicId").GetGuid().Should().Be(ctx.ClinicId);
+        userRow.GetProperty("email").GetString().Should().NotBeNullOrWhiteSpace();
+        userRow.GetProperty("usage").GetProperty("requests").GetInt32().Should().Be(1);
+        userRow.GetProperty("usage").GetProperty("credits").GetDecimal().Should().Be(0.33m);
         usage.GetRawText().Should().NotContain("sections").And.NotContain(ctx.PetName, "klinik metin dönmez");
 
         var past = await JsonAsync(await admin.GetAsync("/api/v1/admin/ai/usage?month=2020-01"), HttpStatusCode.OK);
         past.GetProperty("isCurrentMonth").GetBoolean().Should().BeFalse();
         past.GetProperty("system").GetProperty("requests").GetInt32().Should().Be(0);
         past.GetProperty("clinics").GetArrayLength().Should().Be(0);
+        past.GetProperty("users").GetArrayLength().Should().Be(0);
         (await admin.GetAsync("/api/v1/admin/ai/usage?month=2026-13")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 

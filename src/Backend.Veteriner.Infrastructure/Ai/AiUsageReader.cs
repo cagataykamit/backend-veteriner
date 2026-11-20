@@ -66,6 +66,20 @@ public sealed class AiUsageReader : IAiUsageReader
         var byClinic = await GroupAsync(month, r => new { r.TenantId, r.ClinicId }, ct);
         var byFeature = await GroupAsync(month, r => r.Feature, ct);
         var byModel = await GroupAsync(month, r => r.Model, ct);
+        var byUser = (await GroupAsync(month, r => new { r.UserId, r.TenantId, r.ClinicId }, ct))
+            .OrderByDescending(x => x.Stats.CostUsd)
+            .ThenByDescending(x => x.Stats.Requests)
+            .Take(AiUsageBreakdown.MaxUserRows)
+            .ToList();
+
+        var userIds = byUser.Select(x => x.Key.UserId).Distinct().ToList();
+        var users = userIds.Count == 0
+            ? new Dictionary<Guid, (string Name, string Email)>()
+            : (await _db.Users.AsNoTracking()
+                    .Where(u => userIds.Contains(u.Id))
+                    .Select(u => new { u.Id, u.DisplayName, u.Email })
+                    .ToListAsync(ct))
+                .ToDictionary(u => u.Id, u => (u.DisplayName ?? string.Empty, u.Email));
 
         var clinicIds = byClinic.Select(x => x.Key.ClinicId).ToList();
         var tenantIds = byClinic.Select(x => x.Key.TenantId).Distinct().ToList();
@@ -88,7 +102,22 @@ public sealed class AiUsageReader : IAiUsageReader
                     x.Stats))
                 .ToList(),
             byFeature.OrderByDescending(x => x.Stats.CostUsd).Select(x => new AiFeatureUsageRow(x.Key, x.Stats)).ToList(),
-            byModel.OrderByDescending(x => x.Stats.CostUsd).Select(x => new AiModelUsageRow(x.Key, x.Stats)).ToList());
+            byModel.OrderByDescending(x => x.Stats.CostUsd).Select(x => new AiModelUsageRow(x.Key, x.Stats)).ToList(),
+            byUser
+                .Select(x =>
+                {
+                    var (name, email) = users.TryGetValue(x.Key.UserId, out var user) ? user : (string.Empty, string.Empty);
+                    return new AiUserUsageRow(
+                        x.Key.UserId,
+                        name,
+                        email,
+                        x.Key.TenantId,
+                        tenantNames.GetValueOrDefault(x.Key.TenantId, string.Empty),
+                        x.Key.ClinicId,
+                        clinicNames.GetValueOrDefault(x.Key.ClinicId, string.Empty),
+                        x.Stats);
+                })
+                .ToList());
     }
 
     private async Task<Dictionary<Guid, AiClinicCreditTotals>> CreditTotalsAsync(

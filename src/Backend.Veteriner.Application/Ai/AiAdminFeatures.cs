@@ -331,6 +331,10 @@ public sealed record AiAdminFeatureUsageDto(string Feature, AiAdminTotalsDto Usa
 
 public sealed record AiAdminModelUsageDto(string Model, AiAdminTotalsDto Usage);
 
+/// <summary>Kullanıcı kırılımı (kötüye kullanım takibi): ayın en çok harcayan kullanıcıları, klinik başına ayrı satır.</summary>
+public sealed record AiAdminUserUsageDto(
+    Guid UserId, string UserName, string Email, Guid TenantId, string TenantName, Guid ClinicId, string ClinicName, AiAdminTotalsDto Usage);
+
 /// <summary>Platform yönetimi (AI-008): ayın kullanımı ve maliyeti; maliyet ayardaki fiyatla tahmindir, fatura değildir.</summary>
 /// <param name="Month">İstanbul takvim ayı, <c>yyyy-MM</c>.</param>
 public sealed record AiAdminUsageDto(
@@ -345,7 +349,8 @@ public sealed record AiAdminUsageDto(
     AiAdminLimitsDto Limits,
     IReadOnlyList<AiAdminClinicUsageDto> Clinics,
     IReadOnlyList<AiAdminFeatureUsageDto> Features,
-    IReadOnlyList<AiAdminModelUsageDto> Models);
+    IReadOnlyList<AiAdminModelUsageDto> Models,
+    IReadOnlyList<AiAdminUserUsageDto> Users);
 
 /// <param name="Month"><c>yyyy-MM</c> (İstanbul takvim ayı); boşsa bu ay.</param>
 public sealed record GetAiAdminUsageQuery(string? Month = null) : IRequest<Result<AiAdminUsageDto>>;
@@ -453,6 +458,10 @@ public sealed class GetAiAdminUsageQueryHandler : IRequestHandler<GetAiAdminUsag
                 new Dictionary<string, int>(_options.PlanMonthlyCredits, StringComparer.OrdinalIgnoreCase)),
             clinics,
             breakdown.Features.Select(f => new AiAdminFeatureUsageDto(f.Feature.ToString(), AiAdminTotalsDto.From(f.Stats))).ToList(),
-            breakdown.Models.Select(m => new AiAdminModelUsageDto(m.Model, AiAdminTotalsDto.From(m.Stats))).ToList()));
+            breakdown.Models.Select(m => new AiAdminModelUsageDto(m.Model, AiAdminTotalsDto.From(m.Stats))).ToList(),
+            breakdown.Users
+                .Select(u => new AiAdminUserUsageDto(
+                    u.UserId, u.UserName, u.Email, u.TenantId, u.TenantName, u.ClinicId, u.ClinicName, AiAdminTotalsDto.From(u.Stats)))
+                .ToList()));
     }
 }
