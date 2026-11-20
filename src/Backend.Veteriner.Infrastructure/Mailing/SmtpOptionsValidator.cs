@@ -19,6 +19,9 @@ public sealed class SmtpOptionsValidator : IValidateOptions<SmtpOptions>
         if (!string.IsNullOrWhiteSpace(options.User) && string.IsNullOrWhiteSpace(options.Pass))
             return ValidateOptionsResult.Fail("Smtp:User girildiyse Smtp:Pass da girilmelidir.");
 
+        if (string.IsNullOrWhiteSpace(options.LocalDomain))
+            return ValidateOptionsResult.Fail("Smtp:LocalDomain boş olamaz (boşsa posta başlıklarına sunucunun adı yazılır).");
+
         return ValidateOptionsResult.Success;
     }
 }

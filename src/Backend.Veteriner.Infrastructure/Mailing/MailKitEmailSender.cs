@@ -3,6 +3,7 @@ using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Options;
 using MimeKit;
+using MimeKit.Utils;
 using Serilog;
 
 namespace Backend.Veteriner.Infrastructure.Mailing;
@@ -48,6 +49,8 @@ public sealed class MailKitEmailSender : IEmailSenderImmediate
                 : new MailboxAddress(_opt.FromName, _opt.From));
         message.To.Add(MailboxAddress.Parse(to));
         message.Subject = subject ?? string.Empty;
+        // Varsayılan Message-Id makine adını taşır (bkz. SmtpOptions.LocalDomain).
+        message.MessageId = MimeUtils.GenerateMessageId(_opt.LocalDomain);
 
         var builder = new BodyBuilder
         {
@@ -76,7 +79,7 @@ public sealed class MailKitEmailSender : IEmailSenderImmediate
 
         message.Body = builder.ToMessageBody();
 
-        using var client = new SmtpClient();
+        using var client = new SmtpClient { LocalDomain = _opt.LocalDomain };
 
         // Port bazlı güvenli bağlantı seçimi:
         // - 587: STARTTLS
