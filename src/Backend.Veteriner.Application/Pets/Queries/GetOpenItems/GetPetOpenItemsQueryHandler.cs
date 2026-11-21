@@ -105,19 +105,20 @@ public sealed class GetPetOpenItemsQueryHandler : IRequestHandler<GetPetOpenItem
                 if (!pet.IsReceivingCare)
                     return null;
 
-                // Gün bazlı (ADR-028): gecikmiş = vade bugünün başından önce; yaklaşan = bugün dahil 30 takvim günü.
-                var overdueBeforeUtc = VaccinationDueRule.OverdueBeforeUtc(nowUtc);
+                // Gün bazlı (ADR-028): gecikmiş = vade son 1 takvim ayında ve bugünün başından önce (daha eskisi gösterilmez);
+                // yaklaşan = bugün dahil 30 takvim günü.
+                var overdueWindow = VaccinationDueRule.OverdueWindow(nowUtc);
                 var (_, upcomingToUtcExclusive) = VaccinationDueRule.UpcomingWindow(nowUtc, UpcomingVaccinationDays);
                 var rows = await _vaccinations.ListAsync(
                     new ScheduledVaccinationsDueForPetSpec(
-                        tenantId, clinicId, pet.Id, upcomingToUtcExclusive, accessibleClinicIds), ct);
+                        tenantId, clinicId, pet.Id, overdueWindow.FromUtc, upcomingToUtcExclusive, accessibleClinicIds), ct);
                 if (rows.Count == 0)
                     return null;
 
                 var items = rows.Select(v => new PetOpenItemsVaccinationDto(v.Id, v.VaccineName, v.DueAtUtc!.Value, v.ClinicId)).ToList();
                 return new PetOpenItemsVaccinationsDto(
-                    items.Where(v => VaccinationDueRule.IsOverdueAt(v.DueAtUtc, overdueBeforeUtc)).ToList(),
-                    items.Where(v => !VaccinationDueRule.IsOverdueAt(v.DueAtUtc, overdueBeforeUtc)).ToList());
+                    items.Where(v => VaccinationDueRule.IsOverdueAt(v.DueAtUtc, overdueWindow)).ToList(),
+                    items.Where(v => !VaccinationDueRule.IsOverdueAt(v.DueAtUtc, overdueWindow)).ToList());
             }, _logger, "Vaccinations", ct);
 
         var labResults = await PetSectionLoader.LoadAsync(

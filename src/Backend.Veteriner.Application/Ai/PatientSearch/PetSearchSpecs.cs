@@ -14,8 +14,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Backend.Veteriner.Application.Ai.PatientSearch;
 
 /// <summary>Bir ölçüte uyan klinik kayıt (yalnız hayvan kimliği, kayıt kimliği, tarih ve kısa metin).</summary>
-/// <param name="IsOverdue">Planlı aşının vadesi geçmiş (yalnız aşıda).</param>
-public sealed record PetSearchMatchRow(Guid PetId, Guid Id, DateTime? OccurredAtUtc, string Text, bool IsOverdue = false);
+/// <param name="ScheduledDueAtUtc">Planlı aşının vadesi (yalnız aşıda); gecikme <see cref="VaccinationDueRule.IsOverdueAt"/> ile bellekte hesaplanır.</param>
+public sealed record PetSearchMatchRow(Guid PetId, Guid Id, DateTime? OccurredAtUtc, string Text, DateTime? ScheduledDueAtUtc = null);
 
 /// <summary>Arama sonucundaki hayvan satırı.</summary>
 public sealed record PetSearchPetRow(
@@ -81,7 +81,6 @@ public sealed class VaccinationsForPetSearchSpec : Specification<Vaccination, Pe
         DateTime utcNow,
         int take)
     {
-        var overdueBeforeUtc = VaccinationDueRule.OverdueBeforeUtc(utcNow);
         Query.AsNoTracking();
         Query.Where(v => v.TenantId == tenantId && v.Status != VaccinationStatus.Cancelled);
         Query.ApplyClinicScope(clinicId, accessibleClinicIds);
@@ -100,7 +99,7 @@ public sealed class VaccinationsForPetSearchSpec : Specification<Vaccination, Pe
                 Query.Where(v => v.Status == VaccinationStatus.Scheduled);
                 break;
             case PetSearchVaccineState.Overdue:
-                Query.Where(VaccinationDueRule.IsOverdue(overdueBeforeUtc));
+                Query.Where(VaccinationDueRule.IsOverdue(VaccinationDueRule.OverdueWindow(utcNow)));
                 break;
         }
 
@@ -125,7 +124,7 @@ public sealed class VaccinationsForPetSearchSpec : Specification<Vaccination, Pe
             v.Id,
             v.Status == VaccinationStatus.Applied ? v.AppliedAtUtc : v.DueAtUtc,
             v.VaccineName,
-            v.Status == VaccinationStatus.Scheduled && v.DueAtUtc != null && v.DueAtUtc < overdueBeforeUtc));
+            v.Status == VaccinationStatus.Scheduled ? v.DueAtUtc : null));
     }
 }
 

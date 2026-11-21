@@ -7,6 +7,7 @@ using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
+using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
@@ -120,6 +121,24 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
             .Should().Contain(ctx.DeceasedPetScheduledId.Value);
     }
 
+    [Fact]
+    public async Task GetList_OnlyOverdueTrue_Excludes_Due_Older_Than_One_Calendar_Month_But_Status_List_Keeps_It()
+    {
+        var ctx = await SeedOverdueScenarioAsync(withTooOldScheduled: true);
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ctx.Token);
+
+        var overdue = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/v1/vaccinations?page=1&pageSize=50&onlyOverdue=true&clinicId={ctx.ClinicId:D}");
+        var scheduled = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/v1/vaccinations?page=1&pageSize=50&status=0&clinicId={ctx.ClinicId:D}");
+
+        overdue.GetProperty("items").EnumerateArray().Select(e => e.GetProperty("id").GetGuid())
+            .Should().Equal(ctx.OverdueScheduledId);
+        scheduled.GetProperty("items").EnumerateArray().Select(e => e.GetProperty("id").GetGuid())
+            .Should().Contain(ctx.TooOldScheduledId!.Value);
+    }
+
     private sealed record OverdueSeedCtx(
         string Token,
         Guid ClinicId,
@@ -128,9 +147,10 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
         Guid NullDueScheduledId,
         Guid AppliedPastDueId,
         Guid CancelledPastDueId,
-        Guid? DeceasedPetScheduledId = null);
+        Guid? DeceasedPetScheduledId = null,
+        Guid? TooOldScheduledId = null);
 
-    private async Task<OverdueSeedCtx> SeedOverdueScenarioAsync(bool withDeceasedPetScheduled = false)
+    private async Task<OverdueSeedCtx> SeedOverdueScenarioAsync(bool withDeceasedPetScheduled = false, bool withTooOldScheduled = false)
     {
         using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -236,6 +256,19 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
             db.AddRange(deceasedPet, deceasedScheduled);
             deceasedPetScheduledId = deceasedScheduled.Id;
         }
+
+        Guid? tooOldScheduledId = null;
+        if (withTooOldScheduled)
+        {
+            // Vadesi gecikmiş penceresinin (son 1 takvim ayı) başından bir gün önce (İstanbul öğlesi).
+            var today = OperationDayBounds.ToLocalDate(now);
+            var tooOld = new Vaccination(
+                tenant.Id, pet.Id, clinic.Id, null, catalogVaccine.Id, "TooOldCase", VaccinationStatus.Scheduled, null,
+                OperationDayBounds.NoonUtcForLocalDate(today.AddMonths(-1).AddDays(-1)), null, DateTime.UtcNow);
+            db.Add(tooOld);
+            tooOldScheduledId = tooOld.Id;
+        }
+
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 400));
         await db.SaveChangesAsync();
 
@@ -257,6 +290,7 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
             nullDue.Id,
             appliedPast.Id,
             cancelledPast.Id,
-            deceasedPetScheduledId);
+            deceasedPetScheduledId,
+            tooOldScheduledId);
     }
 }

@@ -116,6 +116,22 @@ public sealed class GetPortalPetVaccinationsQueryHandlerTests
     }
 
     [Fact]
+    public async Task Scheduled_Due_Older_Than_One_Calendar_Month_Should_Not_Be_Listed()
+    {
+        GivenPet();
+        // Bugün İstanbul 16.10.2026 → gecikmiş penceresi başı İstanbul 16.09.2026 00:00 = 15.09.2026 21:00 UTC (2026-11-21 kararı).
+        var now = new DateTime(2026, 10, 16, 9, 0, 0, DateTimeKind.Utc);
+        var firstWindowDay = Scheduled("Pencere başı", new DateTime(2026, 9, 15, 21, 0, 0, DateTimeKind.Utc));
+        Scheduled("Bir dakika eski", new DateTime(2026, 9, 15, 20, 59, 0, DateTimeKind.Utc));
+        Scheduled("Bir yıl eski", new DateTime(2025, 10, 16, 9, 0, 0, DateTimeKind.Utc));
+        var undated = Scheduled("Vadesiz", null);
+
+        var result = await SendAsync(now);
+
+        result.Value!.Upcoming.Select(v => (v.VaccinationId, v.IsOverdue)).Should().Equal((firstWindowDay, true), (undated, false));
+    }
+
+    [Fact]
     public async Task Deceased_Pet_Should_Have_History_But_No_Upcoming_Or_Overdue()
     {
         GivenPet(deceased: true);

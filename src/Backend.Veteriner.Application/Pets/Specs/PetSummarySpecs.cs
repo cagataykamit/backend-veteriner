@@ -47,19 +47,21 @@ public sealed class LastAppliedVaccinationForPetSpec : Specification<Vaccination
     }
 }
 
-/// <summary>Planlı aşılar içinde en erken vadeli (gecikmiş olabilir).</summary>
+/// <summary>Vadesi <paramref name="dueFromUtc"/> ve sonrası olan planlı aşılar içinde en erken vadeli (gecikmiş olabilir).</summary>
 public sealed class NextDueVaccinationForPetSpec : Specification<Vaccination>
 {
     public NextDueVaccinationForPetSpec(
         Guid tenantId,
         Guid? clinicId,
         Guid petId,
+        DateTime dueFromUtc,
         IReadOnlyCollection<Guid>? accessibleClinicIds)
     {
         Query.Where(v => v.TenantId == tenantId
                          && v.PetId == petId
                          && v.Status == VaccinationStatus.Scheduled
-                         && v.DueAtUtc != null);
+                         && v.DueAtUtc != null
+                         && v.DueAtUtc >= dueFromUtc);
         Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderBy(v => v.DueAtUtc)
             .ThenBy(v => v.Id)

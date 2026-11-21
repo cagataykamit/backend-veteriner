@@ -142,7 +142,7 @@ public sealed class ReportHubWorkLoader
             vaccinations = new ReportHubPendingDto(read.TotalCount, read.Items.FirstOrDefault()?.AppliedAtUtc);
             overdueVaccinations = await _vaccinations.CountAsync(
                 new DashboardOverdueVaccinationsCountSpec(
-                    tenantId, clinicId, VaccinationDueRule.OverdueBeforeUtc(nowUtc), null, petIdsNotReceivingCare), ct);
+                    tenantId, clinicId, VaccinationDueRule.OverdueWindow(nowUtc), null, petIdsNotReceivingCare), ct);
         }
 
         int? uncharged = null;
