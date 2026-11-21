@@ -56,13 +56,13 @@ public sealed class DashboardOverdueVaccinationsCountSpec : Specification<Vaccin
     public DashboardOverdueVaccinationsCountSpec(
         Guid tenantId,
         Guid? clinicId,
-        DateTime overdueBeforeUtc,
+        VaccinationOverdueWindow overdueWindow,
         IReadOnlyCollection<Guid>? accessibleClinicIds = null,
         IReadOnlyCollection<Guid>? excludedPetIds = null)
     {
         Query.AsNoTracking();
         Query.Where(v => v.TenantId == tenantId);
-        Query.Where(VaccinationDueRule.IsOverdue(overdueBeforeUtc));
+        Query.Where(VaccinationDueRule.IsOverdue(overdueWindow));
         if (excludedPetIds is { Count: > 0 })
             Query.Where(v => !excludedPetIds.Contains(v.PetId));
         Query.ApplyClinicScope(clinicId, accessibleClinicIds);

@@ -17,7 +17,8 @@ namespace Backend.Veteriner.Application.Vaccinations.Queries.GetCalendar;
 
 /// <summary>
 /// Takvim aşı katmanı: klinikte aralıktaki planlı aşılar, sonraki uygulama tarihleri ve uygulanan aşılar. Gecikmiş aşı yalnız vadesi
-/// görüntülenen aralıktaysa gelir (bugüne taşınmaz). Karşılanmış sonraki tarih ve vefat eden hayvanın vadesi gösterilmez. "Durum" filtresi
+/// görüntülenen aralıktaysa gelir (bugüne taşınmaz); vadesi son 1 takvim ayından eski olan vadeli satır hiç gelmez. Karşılanmış sonraki
+/// tarih ve vefat eden hayvanın vadesi gösterilmez. "Durum" filtresi
 /// (<c>States</c>) sunucuda uygulanır.
 /// Kurallar <see cref="VaccinationCalendarRules"/>.
 /// </summary>
@@ -108,8 +109,10 @@ public sealed class GetVaccinationsCalendarQueryHandler
             return Result<IReadOnlyList<VaccinationCalendarItemDto>>.Success(Array.Empty<VaccinationCalendarItemDto>());
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var overdueWindow = VaccinationDueRule.OverdueWindow(utcNow);
         var states = request.States is { Count: > 0 } s ? s.ToHashSet() : null;
         var entries = Expand(rows, fromUtc, toUtc)
+            .Where(e => VaccinationCalendarRules.IsShown(e.Kind, e.AtUtc, overdueWindow))
             .Where(e => states is null || states.Contains(VaccinationCalendarRules.State(e.Kind, e.AtUtc, utcNow)))
             .ToList();
 

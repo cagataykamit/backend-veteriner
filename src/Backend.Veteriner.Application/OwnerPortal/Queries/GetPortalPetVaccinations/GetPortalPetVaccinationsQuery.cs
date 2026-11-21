@@ -12,7 +12,8 @@ namespace Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalPetVaccinat
 
 /// <summary>
 /// Hayvanın aşı geçmişi (uygulanan; iptal edilen gösterilmez, <see cref="PortalVaccinationsForPetSpec"/>) ve planlı aşıları (docs/PORTAL_API_CONTRACT.md §6.3). Gecikme ADR-028
-/// <see cref="VaccinationDueRule"/>; vefat eden hayvanın planlı aşısı ne gecikmiş ne yaklaşan sayılır (<see cref="Pet.ReceivesCare"/>).
+/// <see cref="VaccinationDueRule"/>; vadesi gecikmiş penceresinden (son 1 takvim ayı) eski planlı aşı gösterilmez. Vefat eden hayvanın
+/// planlı aşısı ne gecikmiş ne yaklaşan sayılır (<see cref="Pet.ReceivesCare"/>).
 /// </summary>
 public sealed record GetPortalPetVaccinationsQuery(Guid OwnerAccountId, Guid LinkId, Guid PetId)
     : IRequest<Result<PortalPetVaccinationsDto>>, IAuditableRequest
@@ -61,10 +62,11 @@ public sealed class GetPortalPetVaccinationsQueryHandler
             .Select(v => new PortalVaccinationHistoryItemDto(v.Id, v.VaccineName, v.Status, v.AppliedAtUtc, v.DueAtUtc))
             .ToArray();
 
-        var overdueBeforeUtc = VaccinationDueRule.OverdueBeforeUtc(_timeProvider.GetUtcNow().UtcDateTime);
+        var overdueWindow = VaccinationDueRule.OverdueWindow(_timeProvider.GetUtcNow().UtcDateTime);
         var upcoming = pet.IsReceivingCare
             ? rows
-                .Where(v => v.Status == VaccinationStatus.Scheduled)
+                .Where(v => v.Status == VaccinationStatus.Scheduled
+                            && !(v.DueAtUtc is { } due && VaccinationDueRule.IsBeforeOverdueWindow(due, overdueWindow)))
                 .OrderBy(v => v.DueAtUtc is null)
                 .ThenBy(v => v.DueAtUtc)
                 .ThenBy(v => v.Id)
@@ -72,7 +74,7 @@ public sealed class GetPortalPetVaccinationsQueryHandler
                     v.Id,
                     v.VaccineName,
                     v.DueAtUtc,
-                    v.DueAtUtc is { } due && VaccinationDueRule.IsOverdueAt(due, overdueBeforeUtc)))
+                    v.DueAtUtc is { } due && VaccinationDueRule.IsOverdueAt(due, overdueWindow)))
                 .ToArray()
             : [];
 

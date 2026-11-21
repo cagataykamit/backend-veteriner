@@ -168,7 +168,8 @@ public sealed class GetPetOpenItemsQueryHandlerTests
     [Fact]
     public async Task Vaccinations_Split_Overdue_And_Upcoming_Within_30_Days()
     {
-        var overdueOld = AddVaccination(VaccinationStatus.Scheduled, Now.AddDays(-40));
+        AddVaccination(VaccinationStatus.Scheduled, Now.AddDays(-40)); // 1 aydan eski: hiç görünmez
+        var overdueOld = AddVaccination(VaccinationStatus.Scheduled, Now.AddDays(-25));
         var overdue = AddVaccination(VaccinationStatus.Scheduled, Now.AddDays(-1));
         var upcoming = AddVaccination(VaccinationStatus.Scheduled, Now.AddDays(29));
         AddVaccination(VaccinationStatus.Scheduled, Now.AddDays(31));
@@ -199,6 +200,21 @@ public sealed class GetPetOpenItemsQueryHandlerTests
         var data = result.Value!.Vaccinations.Data!;
         data.Overdue.Select(v => v.Id).Should().Equal(yesterdayLate.Id);
         data.Upcoming.Select(v => v.Id).Should().Equal(todayPastHour.Id, lastWindowDay.Id);
+    }
+
+    // 2026-11-21 kararı: gecikmiş yalnız son 1 takvim ayı. Bugün İstanbul 2026-10-11 → pencere başı İstanbul 2026-09-11 00:00 (2026-09-10 21:00 UTC).
+    [Fact]
+    public async Task Overdue_Vaccinations_Older_Than_One_Calendar_Month_Are_Not_Shown()
+    {
+        var windowStartUtc = new DateTime(2026, 9, 10, 21, 0, 0, DateTimeKind.Utc);
+        var firstWindowDay = AddVaccination(VaccinationStatus.Scheduled, windowStartUtc);
+        AddVaccination(VaccinationStatus.Scheduled, windowStartUtc.AddMinutes(-1));
+
+        var result = await Run(CreateHandler());
+
+        var data = result.Value!.Vaccinations.Data!;
+        data.Overdue.Select(v => v.Id).Should().Equal(firstWindowDay.Id);
+        data.Upcoming.Should().BeEmpty();
     }
 
     [Fact]

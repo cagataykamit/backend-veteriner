@@ -232,6 +232,30 @@ public sealed class GetPetSummaryQueryHandlerTests
         result.Value!.Vaccinations.Data!.NextDue!.IsOverdue.Should().BeTrue();
     }
 
+    // 2026-11-21 kararı: bugün İstanbul 2026-10-11 → gecikmiş penceresi başı İstanbul 2026-09-11 00:00 (2026-09-10 21:00 UTC).
+    [Fact]
+    public async Task Next_Due_Skips_Vaccinations_Older_Than_One_Calendar_Month()
+    {
+        var windowStartUtc = new DateTime(2026, 9, 10, 21, 0, 0, DateTimeKind.Utc);
+        AddVaccination(VaccinationStatus.Scheduled, null, windowStartUtc.AddMinutes(-1), "Eski");
+        var firstWindowDay = AddVaccination(VaccinationStatus.Scheduled, null, windowStartUtc, "Pencere başı");
+
+        var result = await Run(CreateHandler());
+
+        result.Value!.Vaccinations.Data!.NextDue!.Id.Should().Be(firstWindowDay.Id);
+        result.Value.Vaccinations.Data.NextDue.IsOverdue.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Only_Vaccinations_Older_Than_One_Month_Leave_No_Next_Due()
+    {
+        AddVaccination(VaccinationStatus.Scheduled, null, Now.AddMonths(-3));
+
+        var result = await Run(CreateHandler());
+
+        result.Value!.Vaccinations.State.Should().Be(PetSummarySectionState.Empty);
+    }
+
     [Fact]
     public async Task Deceased_Pet_Next_Due_Vaccination_Is_Not_Overdue_And_Status_Is_Returned()
     {

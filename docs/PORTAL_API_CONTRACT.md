@@ -350,8 +350,8 @@ Detay: liste öğesi + `isNeutered` (bool), `colorName` (katalog rengi veya `nul
 ```
 
 - `history`: `Applied` kayıtlar (iptal edilen aşı dönmez); en yeni önce (uygulama tarihi, yoksa vade, yoksa oluşturma zamanı).
-- `upcoming`: `Scheduled` kayıtlar, vadeye göre artan (vadesiz planlı kayıt sonda, `dueAtUtc: null`, `isOverdue: false`).
-- `isOverdue`: **ADR-028 gün bazlı tanım, tek kural `VaccinationDueRule`**: vade, İstanbul gününün başından (UTC) önceyse gecikmiş; bugün vadesi olan aşı saati geçse de gecikmiş değildir.
+- `upcoming`: `Scheduled` kayıtlar, vadeye göre artan (vadesiz planlı kayıt sonda, `dueAtUtc: null`, `isOverdue: false`). Vadesi son 1 takvim ayından eski planlı kayıt dönmez (2026-11-21).
+- `isOverdue`: **ADR-028 gün bazlı tanım, tek kural `VaccinationDueRule`**: vade son 1 takvim ayı içinde ve İstanbul gününün başından (UTC) önceyse gecikmiş; bugün vadesi olan aşı saati geçse de gecikmiş değildir.
 - Vefat eden hayvanda `upcoming` boş (ortak kurallar).
 
 ### 6.4 `GET /links/{linkId}/appointments`

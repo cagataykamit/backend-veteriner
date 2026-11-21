@@ -1,5 +1,7 @@
 using Backend.Veteriner.Application.Common.Time;
+using Backend.Veteriner.Application.Vaccinations;
 using Backend.Veteriner.Application.Vaccinations.Calendar;
+using Backend.Veteriner.Domain.Appointments;
 using AwesomeAssertions;
 
 namespace Backend.Veteriner.Application.Tests.Vaccinations.Calendar;
@@ -22,6 +24,26 @@ public sealed class VaccinationCalendarRulesTests
     [Fact]
     public void DueState_Should_Keep_TodayDue_As_Today_After_Its_Time_Passed()
         => CalendarItemStateRule.ForDue(NowUtc.AddHours(-2), NowUtc).Should().Be(CalendarItemState.DueToday);
+
+    [Fact]
+    public void Appointment_Overdue_State_Should_Have_No_Lower_Bound()
+        => CalendarItemStateRule.ForAppointment(AppointmentStatus.Scheduled, TodayStartUtc.AddYears(-2), NowUtc)
+            .Should().Be(CalendarItemState.Overdue);
+
+    // 2026-11-21 kararı: bugün İstanbul 2026-11-16 → gecikmiş penceresi başı İstanbul 2026-10-16 00:00 (2026-10-15 21:00 UTC).
+    [Theory]
+    [InlineData(VaccinationCalendarKind.Planned, 0, true)] // tam 1 ay önce
+    [InlineData(VaccinationCalendarKind.Planned, -1, false)] // bir dakika daha eski
+    [InlineData(VaccinationCalendarKind.NextDue, 0, true)]
+    [InlineData(VaccinationCalendarKind.NextDue, -1, false)]
+    [InlineData(VaccinationCalendarKind.Applied, -1, true)] // uygulanan aşı geçmişi pencereye girmez
+    public void Due_Rows_Older_Than_Overdue_Window_Should_Not_Be_Shown(VaccinationCalendarKind kind, int minutesFromWindowStart, bool expected)
+    {
+        var windowStartUtc = new DateTime(2026, 10, 15, 21, 0, 0, DateTimeKind.Utc);
+
+        VaccinationCalendarRules.IsShown(kind, windowStartUtc.AddMinutes(minutesFromWindowStart), VaccinationDueRule.OverdueWindow(NowUtc))
+            .Should().Be(expected);
+    }
 
     [Fact]
     public void LocalDate_Should_Be_IstanbulDate()

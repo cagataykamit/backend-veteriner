@@ -8,6 +8,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Pets.Access;
 using Backend.Veteriner.Application.Pets.Specs;
+using Backend.Veteriner.Application.Vaccinations;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Hospitalizations;
@@ -209,6 +210,7 @@ public sealed class PetHistoryAiContextBuilder
         {
             var applied = await _vaccinations.ListAsync(new AppliedVaccinationsForPetAiSpec(tenantId, clinicId, petId, TakePerType, clinicIds), ct);
             var scheduled = await _vaccinations.ListAsync(new ScheduledVaccinationsForPetAiSpec(tenantId, clinicId, petId, ScheduledVaccinationsTake, clinicIds), ct);
+            var overdueWindow = VaccinationDueRule.OverdueWindow(today);
             var index = 0;
             foreach (var v in applied.Concat(scheduled))
             {
@@ -220,7 +222,7 @@ public sealed class PetHistoryAiContextBuilder
                     ["status"] = isScheduled ? "Scheduled" : "Applied",
                     ["appliedDate"] = Date(v.AppliedAtUtc),
                     ["dueDate"] = Date(v.DueAtUtc),
-                    ["overdue"] = isScheduled && pet.Status == PetStatus.Active && v.DueAtUtc is { } due && OperationDayBounds.ToLocalDate(due) < today ? true : null,
+                    ["overdue"] = isScheduled && pet.Status == PetStatus.Active && v.DueAtUtc is { } due && VaccinationDueRule.IsOverdueAt(due, overdueWindow) ? true : null,
                     ["notes"] = Text(v.Notes),
                 })));
             }

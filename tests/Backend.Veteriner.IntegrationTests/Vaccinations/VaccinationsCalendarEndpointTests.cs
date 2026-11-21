@@ -69,6 +69,25 @@ public sealed class VaccinationsCalendarEndpointTests : IClassFixture<CustomWebA
     }
 
     [Fact]
+    public async Task GetCalendar_Hides_Due_Older_Than_One_Calendar_Month()
+    {
+        var ctx = await SeedAsync(PermissionCatalog.Vaccinations.Read);
+        var http = Client(ctx.Token);
+        var windowStartDay = ctx.Today.AddMonths(-1);
+        var from = OperationDayBounds.ForLocalDate(windowStartDay.AddDays(-10)).DayStartUtc;
+        var to = OperationDayBounds.ForLocalDate(windowStartDay.AddDays(1)).DayStartUtc;
+        var query = $"/api/v1/vaccinations/calendar?dateFromUtc={from:O}&dateToUtc={to:O}&clinicId={ctx.ClinicId:D}";
+
+        var items = await http.GetFromJsonAsync<JsonElement>(query);
+        var summary = await http.GetFromJsonAsync<JsonElement>(query.Replace("/calendar?", "/calendar/summary?"));
+
+        var only = items.EnumerateArray().Single();
+        only.GetProperty("vaccinationId").GetGuid().Should().Be(ctx.WindowStartNextDueId);
+        only.GetProperty("state").GetString().Should().Be("Overdue");
+        summary.EnumerateArray().Sum(d => d.GetProperty("total").GetInt32()).Should().Be(1);
+    }
+
+    [Fact]
     public async Task GetCalendar_Without_VaccinationsRead_Is_Forbidden()
     {
         var ctx = await SeedAsync(PermissionCatalog.Appointments.Read);
@@ -111,7 +130,8 @@ public sealed class VaccinationsCalendarEndpointTests : IClassFixture<CustomWebA
         Guid PlannedTomorrowId,
         Guid ImportedNextDueTodayId,
         Guid AppliedTodayId,
-        Guid OverdueId);
+        Guid OverdueId,
+        Guid WindowStartNextDueId);
 
     private async Task<SeedCtx> SeedAsync(string permission)
     {
@@ -144,6 +164,12 @@ public sealed class VaccinationsCalendarEndpointTests : IClassFixture<CustomWebA
         var plannedTomorrow = Make(kuduz, "Kuduz", VaccinationStatus.Scheduled, null, todayNoonUtc.AddDays(1));
         var importedNextDueToday = Vaccination.CreateImported(tenant.Id, pet.Id, clinic.Id, karma, "Karma", todayNoonUtc.AddYears(-1), todayNoonUtc, null, importBatch.Id, now);
         var appliedToday = Make(parazit, "İç parazit", VaccinationStatus.Applied, OperationDayBounds.ForLocalDate(today).DayStartUtc.AddMinutes(1), null);
+        // 1 aylık gecikmiş penceresi (2026-11-21): pencere başı günündeki vade görünür, bir gün öncesi görünmez.
+        var windowStartNextDue = Vaccination.CreateImported(
+            tenant.Id, pet.Id, clinic.Id, kuduz, "Kuduz", todayNoonUtc.AddYears(-2),
+            OperationDayBounds.ForLocalDate(today.AddMonths(-1)).DayStartUtc, null, importBatch.Id, now);
+        // Planlı kayıt karşılanma kuralına girmez; görünmemesinin tek nedeni pencere olsun.
+        var tooOldPlanned = Make(karma, "Karma", VaccinationStatus.Scheduled, null, OperationDayBounds.NoonUtcForLocalDate(today.AddMonths(-1).AddDays(-1)));
         var overdue = Make(kuduz, "Kuduz", VaccinationStatus.Scheduled, null, todayNoonUtc.AddDays(-3));
         // Karşılanmış sonraki tarih: aynı aşı sonradan yeniden uygulanmış (o uygulama aralık dışında).
         var fulfilledSource = Make(parazit, "İç parazit", VaccinationStatus.Applied, todayNoonUtc.AddMonths(-6), todayNoonUtc.AddDays(2));
@@ -152,7 +178,8 @@ public sealed class VaccinationsCalendarEndpointTests : IClassFixture<CustomWebA
         var otherClinicPlanned = Make(kuduz, "Kuduz", VaccinationStatus.Scheduled, null, todayNoonUtc.AddDays(2), otherClinic.Id);
 
         db.AddRange(tenant, clinic, otherClinic, owner, pet, importBatch,
-            plannedTomorrow, importedNextDueToday, appliedToday, overdue, fulfilledSource, laterDose, cancelled, otherClinicPlanned);
+            plannedTomorrow, importedNextDueToday, appliedToday, overdue, fulfilledSource, laterDose, cancelled, otherClinicPlanned,
+            windowStartNextDue, tooOldPlanned);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 400));
         await db.SaveChangesAsync();
 
@@ -160,6 +187,6 @@ public sealed class VaccinationsCalendarEndpointTests : IClassFixture<CustomWebA
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
         var token = await IntegrationTestAuthHelper.SeedScopedListReaderAndIssueTokenAsync(db, jwt, hasher, tenant.Id, clinic.Id, permission);
 
-        return new SeedCtx(token, clinic.Id, today, plannedTomorrow.Id, importedNextDueToday.Id, appliedToday.Id, overdue.Id);
+        return new SeedCtx(token, clinic.Id, today, plannedTomorrow.Id, importedNextDueToday.Id, appliedToday.Id, overdue.Id, windowStartNextDue.Id);
     }
 }

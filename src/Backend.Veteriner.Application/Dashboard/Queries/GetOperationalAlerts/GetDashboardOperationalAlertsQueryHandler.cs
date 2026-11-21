@@ -79,7 +79,7 @@ public sealed class GetDashboardOperationalAlertsQueryHandler
         var next24HoursUtcExclusive = nowUtc.AddHours(24);
         var (dayStartUtc, dayEndUtc) = OperationDayBounds.ForUtcNow(nowUtc);
         // Aşı gecikmiş/yaklaşan tanımı gün bazlıdır (ADR-028); randevu sayaçları saat bazlı kalır.
-        var overdueVaccinationsBeforeUtc = VaccinationDueRule.OverdueBeforeUtc(nowUtc);
+        var overdueVaccinationsWindow = VaccinationDueRule.OverdueWindow(nowUtc);
         var (upcomingVaccinationsFromUtc, upcomingVaccinationsToUtcExclusive) =
             VaccinationDueRule.UpcomingWindow(nowUtc, VaccinationDueRule.DashboardUpcomingDays);
 
@@ -95,7 +95,7 @@ public sealed class GetDashboardOperationalAlertsQueryHandler
                 tenantId, singleClinicId, nowUtc, next24HoursUtcExclusive, accessibleClinicIds), ct);
         var overdueVaccinationsCount = await _vaccinations.CountAsync(
             new DashboardOverdueVaccinationsCountSpec(
-                tenantId, singleClinicId, overdueVaccinationsBeforeUtc, accessibleClinicIds, petIdsNotReceivingCare), ct);
+                tenantId, singleClinicId, overdueVaccinationsWindow, accessibleClinicIds, petIdsNotReceivingCare), ct);
         var upcomingVaccinationsNext7DaysCount = await _vaccinations.CountAsync(
             new DashboardUpcomingVaccinationsNext7DaysCountSpec(
                 tenantId,

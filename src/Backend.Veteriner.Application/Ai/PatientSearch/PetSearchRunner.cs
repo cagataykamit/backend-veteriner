@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
+using Backend.Veteriner.Application.Vaccinations;
 using Backend.Veteriner.Domain.Catalog;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Examinations;
@@ -227,6 +228,8 @@ public sealed class PetSearchRunner
             }
         }
 
+        var overdueWindow = VaccinationDueRule.OverdueWindow(utcNow);
+
         Dictionary<Guid, List<PetSearchMatchDto>> Group(string type, IReadOnlyList<PetSearchMatchRow> rows)
         {
             truncated |= rows.Count >= MaxRowsPerCriterion;
@@ -235,7 +238,9 @@ public sealed class PetSearchRunner
                 .ToDictionary(
                     g => g.Key,
                     g => g.Take(MaxMatchesPerType)
-                        .Select(r => new PetSearchMatchDto(type, r.Id, r.OccurredAtUtc, r.Text, r.IsOverdue))
+                        .Select(r => new PetSearchMatchDto(
+                            type, r.Id, r.OccurredAtUtc, r.Text,
+                            r.ScheduledDueAtUtc is { } due && VaccinationDueRule.IsOverdueAt(due, overdueWindow)))
                         .ToList());
         }
 

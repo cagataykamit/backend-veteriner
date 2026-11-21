@@ -106,7 +106,7 @@ Nokta şekli: `{ "from": "2026-11-17", "to": "2026-11-17", "value": 0 }`. `from`
 | `attention.hbsNotEnteredPrescriptions` | `Prescriptions.Read` | HBS'e girilmemiş kayıt kaldı mı? + bant | HBS kuralı (`HbsTracking`), **Bugün'deki sayıyla aynı pencere**: son 30 İstanbul günü (`OpenItemsDefaults.HbsLookbackDays`). `oldestAtUtc` = penceredeki en eski reçete tarihi; sayı 0 ise `null` |
 | `attention.hbsNotEnteredVaccinations` | `Vaccinations.Read` | aynı | Aynı kural ve pencere; tarih `AppliedAtUtc` |
 | `attention.endOfDayUnchargedVisitCount` | `Visits.Read` **ve** `Charges.Read` | Bugünün kasası + bant | Gün sonu açık işlerinin "Ücret yok" sayısı, bugünün penceresi (`IVisitOpenItemsReader`, `GET /reports/end-of-day/open-items` ile aynı) |
-| `attention.overdueVaccinationCount` | `Vaccinations.Read` | bant | `VaccinationDueRule.IsOverdue`; vefat eden hayvanlar hariç (Özet uyarısıyla aynı spec) |
+| `attention.overdueVaccinationCount` | `Vaccinations.Read` | bant | `VaccinationDueRule.IsOverdue` (vadesi son 1 takvim ayı içinde geçmiş; daha eskisi sayılmaz); vefat eden hayvanlar hariç (Özet uyarısıyla aynı spec) |
 | `attention.lowStockProductCount` | `Products.Read` | bant | `ProductStockMinimumFilter` (Stok durumu "Düşük stok" süzgeciyle aynı): elde − süresi geçmiş parti < asgari stok |
 
 - "Denetim gelse defterler hazır mı?" kartı sayı istemez (sabit "6 yasal defter"); BE alanı yoktur.

@@ -7,13 +7,16 @@ using Backend.Veteriner.Application.Common.Specifications;
 
 namespace Backend.Veteriner.Application.Pets.Specs;
 
-/// <summary>Vadesi <paramref name="dueBeforeUtc"/>'den önce olan planlı aşılar (gecikmiş dahil); en erken vade önce, sınırsız.</summary>
+/// <summary>
+/// Vadesi <c>[dueFromUtc, dueBeforeUtc)</c> içindeki planlı aşılar (gecikmiş penceresindekiler dahil); en erken vade önce, sınırsız.
+/// </summary>
 public sealed class ScheduledVaccinationsDueForPetSpec : Specification<Vaccination>
 {
     public ScheduledVaccinationsDueForPetSpec(
         Guid tenantId,
         Guid? clinicId,
         Guid petId,
+        DateTime dueFromUtc,
         DateTime dueBeforeUtc,
         IReadOnlyCollection<Guid>? accessibleClinicIds)
     {
@@ -21,6 +24,7 @@ public sealed class ScheduledVaccinationsDueForPetSpec : Specification<Vaccinati
                          && v.PetId == petId
                          && v.Status == VaccinationStatus.Scheduled
                          && v.DueAtUtc != null
+                         && v.DueAtUtc >= dueFromUtc
                          && v.DueAtUtc < dueBeforeUtc);
         Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderBy(v => v.DueAtUtc)
