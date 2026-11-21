@@ -16,8 +16,9 @@ public enum CalendarItemState
 }
 
 /// <summary>
-/// Durumun tek yeri. Gün sınırı ve gecikme tanımı <see cref="VaccinationDueRule"/> (ADR-028, İstanbul günü): bugünün başından önceki vade
-/// gecikmiş, bugün içindeki vade saati geçse de "bugün".
+/// Durumun tek yeri. Gün sınırı <see cref="VaccinationDueRule"/> (ADR-028, İstanbul günü): bugünün başından önceki vade gecikmiş, bugün
+/// içindeki vade saati geçse de "bugün". Aşının 1 aylık gecikmiş penceresi burada değil, takvime girişte uygulanır
+/// (<see cref="Vaccinations.Calendar.VaccinationCalendarRules.IsShown"/>); randevuda alt sınır yoktur.
 /// </summary>
 public static class CalendarItemStateRule
 {
@@ -25,7 +26,7 @@ public static class CalendarItemStateRule
     public static CalendarItemState ForDue(DateTime dueAtUtc, DateTime utcNow)
     {
         var (todayStartUtc, tomorrowStartUtc) = VaccinationDueRule.UpcomingWindow(utcNow, 1);
-        if (VaccinationDueRule.IsOverdueAt(dueAtUtc, todayStartUtc))
+        if (dueAtUtc < todayStartUtc)
             return CalendarItemState.Overdue;
 
         return dueAtUtc < tomorrowStartUtc ? CalendarItemState.DueToday : CalendarItemState.Upcoming;

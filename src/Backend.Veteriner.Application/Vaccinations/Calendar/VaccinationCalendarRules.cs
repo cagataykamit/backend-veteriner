@@ -18,12 +18,17 @@ public enum VaccinationCalendarKind
 
 /// <summary>
 /// Takvim aşı katmanının kuralları (tek yer). Durum (renk) <see cref="CalendarItemStateRule"/>: uygulanan aşı tamamlanan, vadeli aşı
-/// vadesine göre bugün, gelecek ya da gecikmiş. Aşı randevu değildir: saat dilimini doldurmaz, çakışma ve boş saat hesabına girmez,
-/// randevu hatırlatması üretmez.
+/// vadesine göre bugün, gelecek ya da gecikmiş. Vadesi gecikmiş penceresinden (<see cref="VaccinationDueRule.OverdueWindow(DateTime)"/>,
+/// son 1 takvim ayı) eski vadeli satır gösterilmez (<see cref="IsShown"/>). Aşı randevu değildir: saat dilimini doldurmaz, çakışma ve boş
+/// saat hesabına girmez, randevu hatırlatması üretmez.
 /// </summary>
 public static class VaccinationCalendarRules
 {
     private static readonly CompareInfo TurkishCompare = CultureInfo.GetCultureInfo("tr-TR").CompareInfo;
+
+    /// <summary>Satır takvimde görünür mü: uygulanan aşı her zaman; vadeli satır (planlı, sonraki tarih) vadesi pencereden eski değilse.</summary>
+    public static bool IsShown(VaccinationCalendarKind kind, DateTime atUtc, VaccinationOverdueWindow overdueWindow)
+        => kind == VaccinationCalendarKind.Applied || !VaccinationDueRule.IsBeforeOverdueWindow(atUtc, overdueWindow);
 
     public static CalendarItemState State(VaccinationCalendarKind kind, DateTime atUtc, DateTime utcNow)
         => kind == VaccinationCalendarKind.Applied ? CalendarItemState.Completed : CalendarItemStateRule.ForDue(atUtc, utcNow);

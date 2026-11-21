@@ -162,6 +162,29 @@ public sealed class GetVaccinationsCalendarQueryHandlerTests
         result.Value!.Single().State.Should().Be(CalendarItemState.Overdue);
     }
 
+    // 2026-11-21 kararı: bugün İstanbul 2026-11-16 → pencere başı İstanbul 2026-10-16 00:00 (2026-10-15 21:00 UTC).
+    [Fact]
+    public async Task Handle_Should_Hide_Due_Rows_Older_Than_One_Calendar_Month()
+    {
+        var windowStartUtc = new DateTime(2026, 10, 15, 21, 0, 0, DateTimeKind.Utc);
+        var viewFrom = windowStartUtc.AddDays(-14);
+        var oldApplied = windowStartUtc.AddDays(-3);
+        Rows(
+            Row(VaccinationStatus.Scheduled, null, windowStartUtc, "Kuduz"),
+            Row(VaccinationStatus.Scheduled, null, windowStartUtc.AddMinutes(-1), "Karma"),
+            Row(VaccinationStatus.Applied, NowUtc.AddYears(-1), windowStartUtc.AddDays(-1), "Lyme"),
+            Row(VaccinationStatus.Applied, oldApplied, null, "İç parazit"));
+
+        var all = await CreateHandler().Handle(new GetVaccinationsCalendarQuery(viewFrom, viewFrom.AddDays(28)), CancellationToken.None);
+        var upcomingOnly = await CreateHandler().Handle(
+            new GetVaccinationsCalendarQuery(viewFrom, viewFrom.AddDays(28), States: [CalendarItemState.Upcoming]), CancellationToken.None);
+
+        all.Value!.Select(i => (i.Kind, i.State, i.VaccineName)).Should().Equal(
+            (VaccinationCalendarKind.Applied, CalendarItemState.Completed, "İç parazit"),
+            (VaccinationCalendarKind.Planned, CalendarItemState.Overdue, "Kuduz"));
+        upcomingOnly.Value!.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task Handle_Should_Hide_NextDue_Fulfilled_By_Later_Dose()
     {
