@@ -78,7 +78,7 @@ ikisi de yoksa 400 `Vaccinations.ClinicScopeRequired`; bağlamla çelişirse 400
 | Alan | Anlam |
 |---|---|
 | `kind` | `Planned`: planlı aşı kaydı (`Scheduled`, tarih `dueAtUtc`). `NextDue`: uygulanmış aşının sonraki uygulama tarihi (`Applied` + `dueAtUtc`; E-vet aktarmasının "sonraki aşı tarihi" buradan görünür). `Applied`: o gün uygulanan aşı (tarih `appliedAtUtc`). |
-| `state` | Ortak takvim durumu (§6): `Completed` (uygulandı, yeşil), `DueToday` (sarı), `Upcoming` (gelecek, siyah), `Overdue` (kırmızı). Gün sınırı ve gecikme tanımı `VaccinationDueRule` (ADR-028, İstanbul günü): bugünün başından önceki vade gecikmiş, bugün içindeki vade saati geçse de "bugün". Kural `CalendarItemStateRule`. |
+| `state` | Ortak takvim durumu (§6): `Completed` (uygulandı, yeşil), `DueToday` (sarı), `Upcoming` (gelecek, siyah), `Overdue` (kırmızı). Gün sınırı ve gecikme tanımı `VaccinationDueRule` (ADR-028, İstanbul günü): bugünün başından önceki vade gecikmiş, bugün içindeki vade saati geçse de "bugün"; vadesi son 1 takvim ayından eski satır gelmez (aşağıda). Kural `CalendarItemStateRule`. |
 | `date` | Satırın göründüğü İstanbul günü. |
 | `atUtc` | Vade ya da uygulama anı. Saat yalnız `timeSpecified: true` ise gerçektir (§8.2); değilse istemci satırı "Saatsiz" grubunda gösterir. |
 
@@ -91,6 +91,10 @@ Kurallar (tek yer `VaccinationCalendarRules`):
   olsa da) görünür; aktarma kuralı değişmedi.
 - **Gecikmiş aşı:** yalnız vadesi görüntülenen aralıktaysa gelir; bugüne taşınmaz, ayrı bir "eski gecikmişler" listesi yoktur.
   Gecikmiş aşı listesi için mevcut `GET /vaccinations?onlyOverdue=true`.
+- **1 aylık gecikmiş penceresi (2026-11-21):** bugün T (İstanbul günü) ise vadesi `T.AddMonths(-1)` gününden önce olan `Planned`/`NextDue`
+  satırı hiç gelmez (ne `Overdue` ne `Upcoming`; ay özeti de saymaz). Takvim ayıdır, sabit gün sayısı değil (31 Mart → 28/29 Şubat).
+  `Applied` geçmişi bu kurala girmez. Kural `VaccinationDueRule.OverdueWindow` + `VaccinationCalendarRules.IsShown`; randevu durumu
+  (`CalendarItemStateRule.ForAppointment`) değişmez, randevuda alt sınır yoktur.
 - **Karşılanmış sonraki tarih:** aynı hayvana aynı aşı (aşı tanımı kimliği; tanımsız eski kayıtta ad, büyük/küçük harf duyarsız) bu
   uygulamadan sonra yeniden uygulanmışsa `NextDue` satırı çıkmaz. Yeniden uygulama kullanıcının okuyabildiği tüm kliniklerden sayılır.
   Planlı kayıt bu kurala girmez; uygulanınca durumu `Applied` olur.
@@ -107,7 +111,7 @@ her vadeli satırda "Randevu ver" → yeni randevu (`?petId&clientId&date&type=V
 - Application: `VaccinationCalendarRulesTests`, `GetVaccinationsCalendarQueryHandlerTests`, `GetAppointmentsCalendarQueryHandlerTests`
   (neden adı ve not; okuma modeli yolunda tamamlama).
 - Entegrasyon: `VaccinationsCalendarEndpointTests` (kaynaklar ve durumlar, içe aktarılan sonraki tarih, karşılanmış tarih, iptal ve
-  başka klinik dışarıda, gecikmiş, yetki, 45 gün sınırı).
+  başka klinik dışarıda, gecikmiş, 1 aydan eski gecikmiş dışarıda, yetki, 45 gün sınırı).
 
 ## 6) Takvim filtreleri (2026-11-16)
 

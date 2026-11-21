@@ -39,7 +39,7 @@ geçersiz değer hata değildir, atılır ve `dropped[]`'a gerekçesiyle yazıl�
   parametresi olarak (kaçışlı, "içinde geçer") kullanılır.
 - Tarih aralığı: muayenede muayene tarihine, reçetede reçete tarihine, tedavide tedavi tarihine, aşıda uygulanmışsa uygulama,
   planlıysa vade tarihine bakar. Başka klinik ölçüt yokken yalnız tarih aralığı = "o aralıkta muayenesi olan hayvanlar".
-- `Overdue`: planlı ve vadesi bugünün (İstanbul) başından önce (`VaccinationDueRule`); vefat eden hayvan sayılmaz.
+- `Overdue`: planlı ve vadesi son 1 takvim ayı içinde, bugünün (İstanbul) başından önce (`VaccinationDueRule.OverdueWindow`); vefat eden hayvan sayılmaz. Eşleşmedeki `isOverdue` de aynı kuraldır.
 - İptal edilmiş aşı, reçete ve tedavi aranmaz.
 - Desteklenmeyenler (model `unsupported[]`'a yazar): ad ile arama, olumsuz ölçüt ("aşısı olmayan"), ödeme/borç, lab, yatış, randevu.
 
