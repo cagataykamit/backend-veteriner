@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Backend.Veteriner.Application.Common;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.OwnerPortal;
 using Backend.Veteriner.Domain.AppointmentRequests;
@@ -90,7 +91,7 @@ public static class AppointmentRequestEmails
         {
             [OwnerNamePlaceholder] = values.OwnerName,
             [ClinicNamePlaceholder] = values.ClinicName,
-            [ClinicPhonePlaceholder] = OrDash(values.ClinicPhone),
+            [ClinicPhonePlaceholder] = OrDash(PhoneDisplay.Format(values.ClinicPhone)),
             [DatePlaceholder] = local.ToString("d MMMM yyyy dddd", Turkish),
             [TimePlaceholder] = local.ToString("HH:mm", Turkish),
             [ReasonPlaceholder] = values.Reason,
