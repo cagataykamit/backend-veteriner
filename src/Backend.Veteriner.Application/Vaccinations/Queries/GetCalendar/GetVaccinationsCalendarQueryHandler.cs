@@ -121,7 +121,7 @@ public sealed class GetVaccinationsCalendarQueryHandler
         {
             var duePetIds = dueEntries.Select(e => e.Row.PetId).Distinct().ToArray();
             var notReceivingCare = (await _pets.ListAsync(new PetIdsNotReceivingCareSpec(tenantId, duePetIds), ct)).ToHashSet();
-            var fulfilled = await FulfilledNextDueIdsAsync(tenantId, dueEntries, scopeResult.Value.AccessibleClinicIds, ct);
+            var fulfilled = await FulfilledNextDueIdsAsync(tenantId, dueEntries, ct);
             entries.RemoveAll(e => e.Kind != VaccinationCalendarKind.Applied
                                    && (notReceivingCare.Contains(e.Row.PetId) || (e.Kind == VaccinationCalendarKind.NextDue && fulfilled.Contains(e.Row.Id))));
         }
@@ -188,7 +188,6 @@ public sealed class GetVaccinationsCalendarQueryHandler
     private async Task<HashSet<Guid>> FulfilledNextDueIdsAsync(
         Guid tenantId,
         IReadOnlyCollection<CalendarEntry> dueEntries,
-        IReadOnlyCollection<Guid>? accessibleClinicIds,
         CancellationToken ct)
     {
         var sources = dueEntries
@@ -199,18 +198,9 @@ public sealed class GetVaccinationsCalendarQueryHandler
             return [];
 
         var later = await _vaccinations.ListAsync(
-            new AppliedVaccinationDosesForPetsSpec(
-                tenantId,
-                sources.Select(s => s.PetId).Distinct().ToArray(),
-                sources.Min(s => s.AppliedAtUtc),
-                accessibleClinicIds),
+            new AppliedVaccinationDosesForPetsSpec(tenantId, sources.Select(s => s.PetId).Distinct().ToArray(), sources.Min(s => s.AppliedAtUtc)),
             ct);
-        var laterByPet = later.ToLookup(d => d.PetId);
-
-        return sources
-            .Where(s => VaccinationCalendarRules.IsNextDueFulfilled(s, laterByPet[s.PetId]))
-            .Select(s => s.Id)
-            .ToHashSet();
+        return VaccinationDueRule.FulfilledNextDueIds(sources, later);
     }
 
     private static DateTime NormalizeToUtc(DateTime value)

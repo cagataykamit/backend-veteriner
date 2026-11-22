@@ -81,7 +81,8 @@ public sealed record PortalVaccinationRow(
     VaccinationStatus Status,
     DateTime? AppliedAtUtc,
     DateTime? DueAtUtc,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    Guid? VaccineDefinitionId = null);
 
 /// <summary>
 /// Hayvanın portalda görünen aşıları. İptal edilmiş aşı hasta sahibine hiç gösterilmez (kullanıcı kararı 2026-11-16, ADR-043
@@ -93,7 +94,7 @@ public sealed class PortalVaccinationsForPetSpec : Specification<Vaccination, Po
     {
         Query.AsNoTracking();
         Query.Where(v => v.TenantId == tenantId && v.PetId == petId && v.Status != VaccinationStatus.Cancelled);
-        Query.Select(v => new PortalVaccinationRow(v.Id, v.VaccineName, v.Status, v.AppliedAtUtc, v.DueAtUtc, v.CreatedAtUtc));
+        Query.Select(v => new PortalVaccinationRow(v.Id, v.VaccineName, v.Status, v.AppliedAtUtc, v.DueAtUtc, v.CreatedAtUtc, v.VaccineDefinitionId));
     }
 }
 

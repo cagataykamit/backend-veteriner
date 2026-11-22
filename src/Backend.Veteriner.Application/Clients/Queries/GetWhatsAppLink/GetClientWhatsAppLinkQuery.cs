@@ -153,8 +153,9 @@ public sealed class GetClientWhatsAppLinkQueryHandler : IRequestHandler<GetClien
 
         var vaccination = await _vaccinations.FirstOrDefaultAsync(new VaccinationByIdSpec(tenantId, vaccinationId), ct);
         var pet = vaccination is null ? null : await _pets.FirstOrDefaultAsync(new PetByIdSpec(tenantId, vaccination.PetId), ct);
-        if (vaccination is null || pet is null || pet.ClientId != client.Id || vaccination.Status != VaccinationStatus.Scheduled)
-            return Result<string>.Failure("Clients.WhatsAppTargetNotFound", "Planlı aşı bulunamadı.");
+        if (vaccination is null || pet is null || pet.ClientId != client.Id
+            || !(vaccination.Status == VaccinationStatus.Scheduled || (vaccination.Status == VaccinationStatus.Applied && vaccination.DueAtUtc is not null)))
+            return Result<string>.Failure("Clients.WhatsAppTargetNotFound", "Planlı ya da sonraki tarihi olan aşı bulunamadı.");
 
         var clinicName = await ClinicNameAsync(tenantId, vaccination.ClinicId, ct);
         var due = vaccination.DueAtUtc is { } d ? $" ({OperationDayBounds.ToLocal(d).ToString("dd.MM.yyyy", Turkish)})" : string.Empty;

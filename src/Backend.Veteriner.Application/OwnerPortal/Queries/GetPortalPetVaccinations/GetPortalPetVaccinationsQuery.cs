@@ -12,7 +12,8 @@ namespace Backend.Veteriner.Application.OwnerPortal.Queries.GetPortalPetVaccinat
 
 /// <summary>
 /// Hayvanın aşı geçmişi (uygulanan; iptal edilen gösterilmez, <see cref="PortalVaccinationsForPetSpec"/>) ve planlı aşıları (docs/PORTAL_API_CONTRACT.md §6.3). Gecikme ADR-028
-/// <see cref="VaccinationDueRule"/>; vadesi gecikmiş penceresinden (son 1 takvim ayı) eski planlı aşı gösterilmez. Vefat eden hayvanın
+/// <see cref="VaccinationDueRule"/>; planlıların yanında uygulanmış aşının karşılanmamış sonraki tarihi de gelir; vadesi gecikmiş
+/// penceresinden (son 1 takvim ayı) eski vade gösterilmez. Vefat eden hayvanın
 /// planlı aşısı ne gecikmiş ne yaklaşan sayılır (<see cref="Pet.ReceivesCare"/>).
 /// </summary>
 public sealed record GetPortalPetVaccinationsQuery(Guid OwnerAccountId, Guid LinkId, Guid PetId)
@@ -63,9 +64,15 @@ public sealed class GetPortalPetVaccinationsQueryHandler
             .ToArray();
 
         var overdueWindow = VaccinationDueRule.OverdueWindow(_timeProvider.GetUtcNow().UtcDateTime);
+        // Yaklaşan: planlı aşı ve uygulanmış aşının karşılanmamış sonraki tarihi (VaccinationDueRule; satırlar hayvanın bütün aşıları).
+        var doses = rows
+            .Where(v => v.Status == VaccinationStatus.Applied && v.AppliedAtUtc is not null)
+            .Select(v => new VaccinationDose(v.Id, pet.Id, v.VaccineDefinitionId, v.VaccineName, v.AppliedAtUtc!.Value))
+            .ToList();
+        var fulfilled = VaccinationDueRule.FulfilledNextDueIds(doses, doses);
         var upcoming = pet.IsReceivingCare
             ? rows
-                .Where(v => v.Status == VaccinationStatus.Scheduled
+                .Where(v => VaccinationDueRule.IsOpenDue(v.Id, v.Status, v.AppliedAtUtc, v.DueAtUtc, fulfilled)
                             && !(v.DueAtUtc is { } due && VaccinationDueRule.IsBeforeOverdueWindow(due, overdueWindow)))
                 .OrderBy(v => v.DueAtUtc is null)
                 .ThenBy(v => v.DueAtUtc)

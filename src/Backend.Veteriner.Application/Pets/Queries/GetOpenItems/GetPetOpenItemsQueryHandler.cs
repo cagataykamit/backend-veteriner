@@ -109,9 +109,12 @@ public sealed class GetPetOpenItemsQueryHandler : IRequestHandler<GetPetOpenItem
                 // yaklaşan = bugün dahil 30 takvim günü.
                 var overdueWindow = VaccinationDueRule.OverdueWindow(nowUtc);
                 var (_, upcomingToUtcExclusive) = VaccinationDueRule.UpcomingWindow(nowUtc, UpcomingVaccinationDays);
+                // Planlı aşı ve uygulanmış aşının karşılanmamış sonraki tarihi (VaccinationDueRule).
+                var fulfilled = await _vaccinations.FulfilledNextDueIdsAsync(
+                    tenantId, clinicId, accessibleClinicIds, overdueWindow.FromUtc, upcomingToUtcExclusive, ct, petIds: [pet.Id]);
                 var rows = await _vaccinations.ListAsync(
-                    new ScheduledVaccinationsDueForPetSpec(
-                        tenantId, clinicId, pet.Id, overdueWindow.FromUtc, upcomingToUtcExclusive, accessibleClinicIds), ct);
+                    new OpenDueVaccinationsForPetSpec(
+                        tenantId, clinicId, pet.Id, overdueWindow.FromUtc, upcomingToUtcExclusive, accessibleClinicIds, fulfilled), ct);
                 if (rows.Count == 0)
                     return null;
 

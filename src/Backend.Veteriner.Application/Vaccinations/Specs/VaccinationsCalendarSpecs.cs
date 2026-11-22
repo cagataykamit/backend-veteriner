@@ -1,6 +1,4 @@
 using Ardalis.Specification;
-using Backend.Veteriner.Application.Common.Specifications;
-using Backend.Veteriner.Application.Vaccinations.Calendar;
 using Backend.Veteriner.Domain.Vaccinations;
 
 namespace Backend.Veteriner.Application.Vaccinations.Specs;
@@ -45,28 +43,3 @@ public sealed class VaccinationsCalendarSpec : Specification<Vaccination, Vaccin
             v.DueTimeSpecified));
     }
 }
-
-/// <summary>
-/// Hayvanların <paramref name="appliedAfterUtc"/>'den sonra uygulanmış aşıları (sonraki tarihin karşılanıp karşılanmadığı için);
-/// kullanıcının okuyabildiği kliniklerden.
-/// </summary>
-public sealed class AppliedVaccinationDosesForPetsSpec : Specification<Vaccination, VaccinationDose>
-{
-    public AppliedVaccinationDosesForPetsSpec(
-        Guid tenantId,
-        IReadOnlyCollection<Guid> petIds,
-        DateTime appliedAfterUtc,
-        IReadOnlyCollection<Guid>? accessibleClinicIds)
-    {
-        var ids = petIds.ToArray();
-        Query.AsNoTracking();
-        Query.Where(v => v.TenantId == tenantId
-                         && ids.Contains(v.PetId)
-                         && v.Status == VaccinationStatus.Applied
-                         && v.AppliedAtUtc != null
-                         && v.AppliedAtUtc > appliedAfterUtc);
-        Query.ApplyClinicScope(null, accessibleClinicIds);
-        Query.Select(v => new VaccinationDose(v.Id, v.PetId, v.VaccineDefinitionId, v.VaccineName, v.AppliedAtUtc!.Value));
-    }
-}
-

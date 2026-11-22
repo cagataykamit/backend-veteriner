@@ -93,9 +93,12 @@ public sealed class GetDashboardOperationalAlertsQueryHandler
         var upcomingAppointmentsNext24HoursCount = await _appointments.CountAsync(
             new DashboardUpcomingAppointmentsNext24HoursCountSpec(
                 tenantId, singleClinicId, nowUtc, next24HoursUtcExclusive, accessibleClinicIds), ct);
+        // Uygulanmış aşının sonraki tarihi de vadelidir; aynı aşı sonra uygulandıysa sayılmaz (VaccinationDueRule).
+        var fulfilledNextDueIds = await _vaccinations.FulfilledNextDueIdsAsync(
+            tenantId, singleClinicId, accessibleClinicIds, overdueVaccinationsWindow.FromUtc, upcomingVaccinationsToUtcExclusive, ct);
         var overdueVaccinationsCount = await _vaccinations.CountAsync(
             new DashboardOverdueVaccinationsCountSpec(
-                tenantId, singleClinicId, overdueVaccinationsWindow, accessibleClinicIds, petIdsNotReceivingCare), ct);
+                tenantId, singleClinicId, overdueVaccinationsWindow, accessibleClinicIds, petIdsNotReceivingCare, fulfilledNextDueIds), ct);
         var upcomingVaccinationsNext7DaysCount = await _vaccinations.CountAsync(
             new DashboardUpcomingVaccinationsNext7DaysCountSpec(
                 tenantId,
@@ -103,7 +106,8 @@ public sealed class GetDashboardOperationalAlertsQueryHandler
                 upcomingVaccinationsFromUtc,
                 upcomingVaccinationsToUtcExclusive,
                 accessibleClinicIds,
-                petIdsNotReceivingCare), ct);
+                petIdsNotReceivingCare,
+                fulfilledNextDueIds), ct);
 
         var dto = new DashboardOperationalAlertsDto(
             OverdueScheduledAppointmentsCount: overdueScheduledAppointmentsCount,

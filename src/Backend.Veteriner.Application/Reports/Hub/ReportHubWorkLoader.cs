@@ -109,8 +109,9 @@ public sealed class ReportHubWorkLoader
         var applied = await _vaccinations.CountAsync(
             new VaccinationsReportFilteredCountSpec(tenantId, clinicId, null, null, VaccinationStatus.Applied, w.FromUtc, Inclusive(w), null, []), ct);
         var (fromUtc, toUtc) = VaccinationDueRule.UpcomingWindow(nowUtc, VaccinationDueRule.DashboardUpcomingDays);
+        var fulfilled = await _vaccinations.FulfilledNextDueIdsAsync(tenantId, clinicId, null, fromUtc, toUtc, ct);
         var upcoming = await _vaccinations.CountAsync(
-            new DashboardUpcomingVaccinationsNext7DaysCountSpec(tenantId, clinicId, fromUtc, toUtc, null, petIdsNotReceivingCare), ct);
+            new DashboardUpcomingVaccinationsNext7DaysCountSpec(tenantId, clinicId, fromUtc, toUtc, null, petIdsNotReceivingCare, fulfilled), ct);
 
         return new ReportHubVaccinationsDto(applied, upcoming);
     }
@@ -140,9 +141,10 @@ public sealed class ReportHubWorkLoader
         {
             var read = await _hbsVaccinations.ReadAsync(HbsRequest(tenantId, clinicId, hbsFromUtc, hbsToUtc), ct);
             vaccinations = new ReportHubPendingDto(read.TotalCount, read.Items.FirstOrDefault()?.AppliedAtUtc);
+            var overdueWindow = VaccinationDueRule.OverdueWindow(nowUtc);
+            var fulfilled = await _vaccinations.FulfilledNextDueIdsAsync(tenantId, clinicId, null, overdueWindow, ct);
             overdueVaccinations = await _vaccinations.CountAsync(
-                new DashboardOverdueVaccinationsCountSpec(
-                    tenantId, clinicId, VaccinationDueRule.OverdueWindow(nowUtc), null, petIdsNotReceivingCare), ct);
+                new DashboardOverdueVaccinationsCountSpec(tenantId, clinicId, overdueWindow, null, petIdsNotReceivingCare, fulfilled), ct);
         }
 
         int? uncharged = null;

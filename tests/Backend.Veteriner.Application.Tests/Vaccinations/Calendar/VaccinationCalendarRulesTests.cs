@@ -56,7 +56,7 @@ public sealed class VaccinationCalendarRulesTests
         var definitionId = Guid.NewGuid();
         var source = new VaccinationDose(Guid.NewGuid(), petId, definitionId, "Karma", NowUtc.AddYears(-1));
 
-        VaccinationCalendarRules.IsNextDueFulfilled(source, [new(Guid.NewGuid(), petId, definitionId, "Karma (yeni ad)", NowUtc.AddDays(-3))])
+        VaccinationDueRule.IsNextDueFulfilled(source, [new(Guid.NewGuid(), petId, definitionId, "Karma (yeni ad)", NowUtc.AddDays(-3))])
             .Should().BeTrue();
     }
 
@@ -67,7 +67,7 @@ public sealed class VaccinationCalendarRulesTests
         var definitionId = Guid.NewGuid();
         var source = new VaccinationDose(Guid.NewGuid(), petId, definitionId, "Karma", NowUtc.AddYears(-1));
 
-        VaccinationCalendarRules.IsNextDueFulfilled(source,
+        VaccinationDueRule.IsNextDueFulfilled(source,
         [
             new(Guid.NewGuid(), petId, Guid.NewGuid(), "Kuduz", NowUtc.AddDays(-3)),
             new(Guid.NewGuid(), Guid.NewGuid(), definitionId, "Karma", NowUtc.AddDays(-3)),
@@ -82,7 +82,7 @@ public sealed class VaccinationCalendarRulesTests
         var petId = Guid.NewGuid();
         var source = new VaccinationDose(Guid.NewGuid(), petId, null, "İç Parazit", NowUtc.AddMonths(-3));
 
-        VaccinationCalendarRules.IsNextDueFulfilled(source, [new(Guid.NewGuid(), petId, null, " iç parazit ", NowUtc.AddDays(-1))])
+        VaccinationDueRule.IsNextDueFulfilled(source, [new(Guid.NewGuid(), petId, null, " iç parazit ", NowUtc.AddDays(-1))])
             .Should().BeTrue();
     }
 }

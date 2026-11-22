@@ -161,6 +161,29 @@ public sealed class GetPortalPetVaccinationsQueryHandlerTests
     }
 
     [Fact]
+    public async Task Applied_NextDue_Should_Be_Upcoming_Until_Same_Vaccine_Is_Applied_Again()
+    {
+        GivenPet();
+        // Tam test 2026-11-22: FVRCP "Uygulandı" + sonraki 22.12.2026 portalda "Planlanmış aşı yok" diyordu.
+        var now = new DateTime(2026, 11, 22, 9, 0, 0, DateTimeKind.Utc);
+        var fvrcp = Guid.NewGuid();
+        var kuduz = Guid.NewGuid();
+        var open = Guid.NewGuid();
+        var fulfilled = Guid.NewGuid();
+        var again = Guid.NewGuid();
+        _rows.Add(new PortalVaccinationRow(open, "FVRCP", VaccinationStatus.Applied, now.AddDays(-1), new DateTime(2026, 12, 22, 7, 30, 0, DateTimeKind.Utc), now, fvrcp));
+        _rows.Add(new PortalVaccinationRow(fulfilled, "Kuduz", VaccinationStatus.Applied, now.AddYears(-1), now.AddDays(-5), now, kuduz));
+        _rows.Add(new PortalVaccinationRow(again, "Kuduz", VaccinationStatus.Applied, now.AddDays(-2), null, now, kuduz));
+
+        var result = await SendAsync(now);
+
+        var upcoming = result.Value!.Upcoming.Should().ContainSingle().Subject;
+        upcoming.VaccinationId.Should().Be(open);
+        upcoming.IsOverdue.Should().BeFalse();
+        result.Value.History.Should().HaveCount(3);
+    }
+
+    [Fact]
     public async Task Pet_Not_Of_Link_Client_Should_Be_Not_Found()
     {
         _pet = null;

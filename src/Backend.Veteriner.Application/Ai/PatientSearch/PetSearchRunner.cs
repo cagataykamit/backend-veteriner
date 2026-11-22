@@ -255,11 +255,14 @@ public sealed class PetSearchRunner
 
         if (filter.HasVaccineCriterion && result is not { Count: 0 })
         {
+            // Gecikme uygulanmış aşının karşılanmamış sonraki tarihini de kapsar (VaccinationDueRule).
+            var fulfilled = await _vaccinations.FulfilledNextDueIdsAsync(
+                tenantId, scope.SingleClinicId, scope.AccessibleClinicIds, overdueWindow, ct);
             Intersect(Group(VaccinationType, await _vaccinations.ListAsync(
                 new VaccinationsForPetSearchSpec(
                     tenantId, scope.SingleClinicId, scope.AccessibleClinicIds,
                     PetSearchExpressions.LikePatterns(filter.VaccineTerms),
-                    filter.VaccineState ?? PetSearchVaccineState.Any, period, utcNow, MaxRowsPerCriterion),
+                    filter.VaccineState ?? PetSearchVaccineState.Any, period, utcNow, MaxRowsPerCriterion, fulfilled),
                 ct)));
         }
 

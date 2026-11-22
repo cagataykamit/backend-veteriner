@@ -14,7 +14,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Backend.Veteriner.Application.Ai.PatientSearch;
 
 /// <summary>Bir ölçüte uyan klinik kayıt (yalnız hayvan kimliği, kayıt kimliği, tarih ve kısa metin).</summary>
-/// <param name="ScheduledDueAtUtc">Planlı aşının vadesi (yalnız aşıda); gecikme <see cref="VaccinationDueRule.IsOverdueAt"/> ile bellekte hesaplanır.</param>
+/// <param name="ScheduledDueAtUtc">Vadeli aşının (planlı ya da karşılanmamış sonraki tarih, <see cref="VaccinationDueRule"/>) vadesi (yalnız aşıda); gecikme <see cref="VaccinationDueRule.IsOverdueAt"/> ile bellekte hesaplanır.</param>
 public sealed record PetSearchMatchRow(Guid PetId, Guid Id, DateTime? OccurredAtUtc, string Text, DateTime? ScheduledDueAtUtc = null);
 
 /// <summary>Arama sonucundaki hayvan satırı.</summary>
@@ -79,7 +79,8 @@ public sealed class VaccinationsForPetSearchSpec : Specification<Vaccination, Pe
         PetSearchVaccineState state,
         PetSearchPeriod period,
         DateTime utcNow,
-        int take)
+        int take,
+        IReadOnlyCollection<Guid>? fulfilledNextDueIds = null)
     {
         Query.AsNoTracking();
         Query.Where(v => v.TenantId == tenantId && v.Status != VaccinationStatus.Cancelled);
@@ -99,7 +100,7 @@ public sealed class VaccinationsForPetSearchSpec : Specification<Vaccination, Pe
                 Query.Where(v => v.Status == VaccinationStatus.Scheduled);
                 break;
             case PetSearchVaccineState.Overdue:
-                Query.Where(VaccinationDueRule.IsOverdue(VaccinationDueRule.OverdueWindow(utcNow)));
+                Query.Where(VaccinationDueRule.IsOverdue(VaccinationDueRule.OverdueWindow(utcNow), fulfilledNextDueIds));
                 break;
         }
 
@@ -118,13 +119,17 @@ public sealed class VaccinationsForPetSearchSpec : Specification<Vaccination, Pe
                     && (to == null || v.DueAtUtc < to)));
         }
 
+        var fulfilled = fulfilledNextDueIds ?? [];
         Query.OrderByDescending(v => v.AppliedAtUtc ?? v.DueAtUtc).ThenByDescending(v => v.Id).Take(take);
         Query.Select(v => new PetSearchMatchRow(
             v.PetId,
             v.Id,
             v.Status == VaccinationStatus.Applied ? v.AppliedAtUtc : v.DueAtUtc,
             v.VaccineName,
-            v.Status == VaccinationStatus.Scheduled ? v.DueAtUtc : null));
+            v.Status == VaccinationStatus.Scheduled
+            || (v.Status == VaccinationStatus.Applied && v.AppliedAtUtc != null && !fulfilled.Contains(v.Id))
+                ? v.DueAtUtc
+                : null));
     }
 }
 

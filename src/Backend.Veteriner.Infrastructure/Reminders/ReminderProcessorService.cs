@@ -3,6 +3,10 @@ using Backend.Veteriner.Application.Appointments.OwnerLinks;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.OwnerPortal.MarketingOptOut;
 using Backend.Veteriner.Application.Tenants;
+using Backend.Veteriner.Application.Vaccinations;
+using Backend.Veteriner.Application.Vaccinations.Specs;
+using Ardalis.Specification.EntityFrameworkCore;
+using Backend.Veteriner.Infrastructure.Persistence.Repositories;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Pets;
@@ -343,14 +347,17 @@ public sealed partial class ReminderProcessorService
         var maxDueUtc = nowUtc.AddDays(daysBefore);
         var dedupeSuffix = VaccinationDedupeSuffix(daysBefore);
         var eligiblePetIds = ReminderEligiblePetIds(tenantId);
+        var excludedNextDueIds = await NextDueIdsWithoutReminderAsync(tenantId, nowUtc, maxDueUtc, ct);
 
         // ADR-019 K3 (dışlamanın tek yeri): içe aktarılan aşı, partisinin hatırlatmaları yönetici tarafından serbest
         // bırakılana kadar aday değildir; dışlanan kayıt için dispatch log da yazılmaz. Günlüğü yazılmış aday tur
         // sınırına sayılmaz (randevu ile aynı gerekçe; içe aktarılan aşıların vadesi aynı ana düşer).
+        // Vadeli aşı tanımı VaccinationDueRule: planlı aşı ve karşılanmamış sonraki tarih (dışlananlar NextDueIdsWithoutReminderAsync).
         var candidates = await _db.Vaccinations
             .AsNoTracking()
             .Where(v => v.TenantId == tenantId
-                && (v.Status == VaccinationStatus.Scheduled || v.Status == VaccinationStatus.Applied)
+                && (v.Status == VaccinationStatus.Scheduled
+                    || (v.Status == VaccinationStatus.Applied && v.AppliedAtUtc != null && !excludedNextDueIds.Contains(v.Id)))
                 && v.DueAtUtc.HasValue
                 && v.DueAtUtc.Value > nowUtc
                 && v.DueAtUtc.Value <= maxDueUtc
@@ -485,6 +492,49 @@ public sealed partial class ReminderProcessorService
             if (await TryInsertLogAsync(log, ct, detachOutboxMessageIdOnConflict: log.OutboxMessageId))
                 dedupeSet.Add(dedupeKey);
         }
+    }
+
+    /// <summary>
+    /// Vadesi <c>(nowUtc, maxDueUtc]</c> içindeki sonraki tarihlerden hatırlatılmayacak olanlar: aynı aşı hayvana sonra uygulanmışsa
+    /// (karşılanmış, <see cref="VaccinationDueRule.IsNextDueFulfilled"/>) ya da aynı aşının aynı penceredeki planlı kaydı varsa (aynı aşı
+    /// iki kez hatırlatılmaz; hatırlatma planlı kayıttan gider).
+    /// </summary>
+    private async Task<HashSet<Guid>> NextDueIdsWithoutReminderAsync(Guid tenantId, DateTime nowUtc, DateTime maxDueUtc, CancellationToken ct)
+    {
+        var sources = await _db.Vaccinations
+            .AsNoTracking()
+            .Where(v => v.TenantId == tenantId
+                && v.Status == VaccinationStatus.Applied
+                && v.AppliedAtUtc != null
+                && v.DueAtUtc > nowUtc
+                && v.DueAtUtc <= maxDueUtc)
+            .Select(v => new VaccinationDose(v.Id, v.PetId, v.VaccineDefinitionId, v.VaccineName, v.AppliedAtUtc!.Value))
+            .ToListAsync(ct);
+        if (sources.Count == 0)
+            return [];
+
+        var petIds = sources.Select(s => s.PetId).Distinct().ToArray();
+        var later = await _db.Vaccinations
+            .WithSpecification(
+                new AppliedVaccinationDosesForPetsSpec(tenantId, petIds, sources.Min(s => s.AppliedAtUtc)),
+                TenantSafeSpecificationEvaluator.Instance)
+            .ToListAsync(ct);
+        var planned = await _db.Vaccinations
+            .AsNoTracking()
+            .Where(v => v.TenantId == tenantId
+                && petIds.Contains(v.PetId)
+                && v.Status == VaccinationStatus.Scheduled
+                && v.DueAtUtc > nowUtc
+                && v.DueAtUtc <= maxDueUtc)
+            .Select(v => new { v.PetId, v.VaccineDefinitionId, v.VaccineName })
+            .ToListAsync(ct);
+
+        var excluded = VaccinationDueRule.FulfilledNextDueIds(sources, later);
+        excluded.UnionWith(sources
+            .Where(s => planned.Any(p => p.PetId == s.PetId
+                                         && VaccinationDueRule.IsSameVaccine(p.VaccineDefinitionId, p.VaccineName, s.VaccineDefinitionId, s.VaccineName)))
+            .Select(s => s.Id));
+        return excluded;
     }
 
     /// <summary>
