@@ -189,6 +189,17 @@ public static class DataExportTables
                 DataExportColumn<AppointmentReason>.Boolean("Etkin", "Etkin mi.", x => x.IsActive),
             ]),
 
+        new DataExportTable<AppointmentResource>("randevu_kaynaklari.csv", "Oda ve cihazlar (randevu kaynakları)",
+            (db, t) => db.AppointmentResources.Where(x => x.TenantId == t),
+            [
+                DataExportColumn<AppointmentResource>.Id("Id", "Oda ya da cihaz kimliği.", x => x.Id),
+                DataExportColumn<AppointmentResource>.Id("KlinikId", ClinicRef, x => x.ClinicId),
+                DataExportColumn<AppointmentResource>.Text("Ad", "Oda ya da cihaz adı.", x => x.Name),
+                DataExportColumn<AppointmentResource>.Code("Tur", "Room (oda) ya da Equipment (cihaz).", x => x.Type),
+                DataExportColumn<AppointmentResource>.Number("Kapasite", "Aynı anda en çok kaç randevu.", x => x.Capacity),
+                DataExportColumn<AppointmentResource>.Boolean("Etkin", "Etkin mi.", x => x.IsActive),
+            ]),
+
         new DataExportTable<Appointment>("randevular.csv", "Randevular",
             (db, t) => db.Appointments.Where(x => x.TenantId == t),
             [
@@ -201,6 +212,8 @@ public static class DataExportTables
                 DataExportColumn<Appointment>.Code("Durum", "Randevu durumu.", x => x.Status),
                 DataExportColumn<Appointment>.Id("RandevuNedeniId", "Randevu nedeni (randevu_nedenleri.csv Id).", x => x.ReasonId),
                 DataExportColumn<Appointment>.Id("HekimId", UserRef, x => x.VeterinarianUserId),
+                DataExportColumn<Appointment>.Id("OdaId", "Randevunun odası (randevu_kaynaklari.csv Id).", x => x.RoomResourceId),
+                DataExportColumn<Appointment>.Id("CihazId", "Randevunun cihazı (randevu_kaynaklari.csv Id).", x => x.EquipmentResourceId),
                 DataExportColumn<Appointment>.Text("Not", "Randevu notu.", x => x.Notes),
                 DataExportColumn<Appointment>.Instant("SahipOnayi", "Sahibin hatırlatmadan onayladığı zaman.", x => x.OwnerConfirmedAtUtc),
             ]),
