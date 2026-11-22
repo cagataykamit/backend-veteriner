@@ -31,6 +31,10 @@ public sealed class UpdateAppointmentCommandValidator : AbstractValidator<Update
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
             .WithMessage("VeterinarianUserId geçersiz.");
 
+        RuleFor(x => x.Resources)
+            .Must(r => r.IsValid)
+            .WithMessage("Oda ya da cihaz kimliği geçersiz.");
+
         RuleFor(x => x.DurationMinutes)
             .Must(d => !d.HasValue || Appointment.IsValidDurationMinutes(d.Value))
             .WithMessage("Randevu süresi 5-240 dakika arasında olmalıdır.");

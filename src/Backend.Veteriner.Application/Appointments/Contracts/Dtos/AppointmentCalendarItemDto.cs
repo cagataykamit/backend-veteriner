@@ -10,6 +10,10 @@ namespace Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 /// <param name="ReasonName">Nedenin adı (takvim ayrıntı balonu); bulunamazsa boş.</param>
 /// <param name="Notes">Randevu notu (takvim ayrıntı balonu).</param>
 /// <param name="State">Takvim durumu (§6.1, §8.3; <see cref="CalendarItemStateRule.ForAppointment"/>); iptal ve gelmedi randevuda boş.</param>
+/// <param name="RoomResourceId">Randevunun odası (ADR-053); yoksa boş. Kaynak sütunlu takvim görünümü bu alanla çizer.</param>
+/// <param name="RoomResourceName">Odanın adı (pasif oda da adıyla); bulunamazsa boş.</param>
+/// <param name="EquipmentResourceId">Randevunun cihazı; yoksa boş.</param>
+/// <param name="EquipmentResourceName">Cihazın adı; bulunamazsa boş.</param>
 public sealed record AppointmentCalendarItemDto(
     Guid Id,
     Guid ClinicId,
@@ -27,4 +31,8 @@ public sealed record AppointmentCalendarItemDto(
     Guid? ReasonId = null,
     string? ReasonName = null,
     string? Notes = null,
-    [property: JsonConverter(typeof(JsonStringEnumConverter))] CalendarItemState? State = null);
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] CalendarItemState? State = null,
+    Guid? RoomResourceId = null,
+    string? RoomResourceName = null,
+    Guid? EquipmentResourceId = null,
+    string? EquipmentResourceName = null);

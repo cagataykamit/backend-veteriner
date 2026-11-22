@@ -108,6 +108,8 @@ public sealed class RevertAppointmentCancellationCommandHandler : IRequestHandle
             appointment.PetId,
             appointment.VeterinarianUserId,
             appointment.VeterinarianUserId,
+            appointment.Resources,
+            appointment.Resources,
             appointment.ScheduledAtUtc,
             appointment.ScheduledEndUtc,
             appointment.Id,

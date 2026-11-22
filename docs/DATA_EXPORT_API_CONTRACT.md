@@ -127,7 +127,8 @@ dosyanın sütun açıklamaları. CRLF, UTF-8 BOM'lu.
 | `musteriler.csv` | Müşteriler: ad, iletişim, adres, tercih kanalı, hatırlatma tercihi, KVKK rıza durumu/tarihi/sürümü, fatura kimliği (TCKN, VKN, vergi dairesi, unvan, fatura adresi), müşteri notu (`Not`, 2026-11-12) | Normalize telefon, rıza formu özeti (hash) |
 | `hastalar.csv` | Hastalar: sahip, ad, tür, ırk, renk, cinsiyet, doğum tarihi, kilo, kısırlık, çip/pasaport/protokol/HBS no, uyarılar ve notu, not, durum, vefat | — |
 | `randevu_nedenleri.csv` | Randevu nedenleri | Hekim eşleşmeleri |
-| `randevular.csv` | Randevular: hasta, zaman, süre, tür, durum, neden, hekim, not, sahip onayı | Değişiklik sayacı |
+| `randevu_kaynaklari.csv` | Oda ve cihazlar (ADR-053): ad, tür, kapasite, etkin | Sıra |
+| `randevular.csv` | Randevular: hasta, zaman, süre, tür, durum, neden, hekim, oda, cihaz, not, sahip onayı | Değişiklik sayacı |
 | `gelisler.csv` | Gelişler: hasta, randevu, hekim, zamanlar, durum, acil, neden, hatalı işaretleme | Değişiklik sayacı |
 | `muayeneler.csv` | Muayeneler: tüm metin alanları (şikâyet, anamnez, bulgular, değerlendirme, plan, not), vital bulgular, durum, kesinleştirme zamanı ve kişi | — |
 | `muayene_ek_notlari.csv` | Kesinleşmiş muayene ek notları: gerekçe, metin, ekleyen | — |

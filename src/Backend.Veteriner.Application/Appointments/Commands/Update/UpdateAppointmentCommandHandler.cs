@@ -148,6 +148,8 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
                 request.PetId,
                 request.VeterinarianUserId,
                 appointment.VeterinarianUserId,
+                request.Resources,
+                appointment.Resources,
                 scheduledUtc,
                 endUtc,
                 appointment.Id,
@@ -175,7 +177,8 @@ public sealed class UpdateAppointmentCommandHandler : IRequestHandler<UpdateAppo
             request.AppointmentType,
             request.Notes,
             request.ReasonId,
-            request.VeterinarianUserId);
+            request.VeterinarianUserId,
+            request.Resources);
         if (!domain.IsSuccess)
             return Result.Failure(domain.Error);
 

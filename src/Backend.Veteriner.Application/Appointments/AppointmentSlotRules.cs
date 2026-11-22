@@ -11,7 +11,7 @@ namespace Backend.Veteriner.Application.Appointments;
 /// <summary>
 /// Planlı randevunun saatte yer alabilmesi — tek yer: klinik içi oluşturma ve bekleme listesi teklifinin kabulü (TIER-018) kullanır.
 /// Sıra korunur: slot hizası → klinik çakışması (hekimsiz randevuda, üst üste binmeye izin yoksa) → hayvan çakışması → hekim (kliniğin aktif hekimi ve
-/// boş) → çalışma saati. Çakışma denetimleri çalışma saatinden önce çalışır; aksi halde asıl çakışma hatası gölgelenir (Faz 4B-7).
+/// boş) → oda ve cihaz (kapasite) → çalışma saati. Çakışma denetimleri çalışma saatinden önce çalışır; aksi halde asıl çakışma hatası gölgelenir (Faz 4B-7).
 /// </summary>
 internal static class AppointmentSlotRules
 {
@@ -26,6 +26,7 @@ internal static class AppointmentSlotRules
         Guid? veterinarianUserId,
         DateTime startUtc,
         int durationMinutes,
+        AppointmentResourceIds resources,
         CancellationToken ct)
     {
         var defaults = ClinicAppointmentSettingsDefaults.Build();
@@ -38,7 +39,7 @@ internal static class AppointmentSlotRules
             return slotAlignment;
 
         var conflicts = await EnsureNoConflictAsync(
-            appointments, assignment, allowClinicOverlap, tenantId, clinicId, petId, veterinarianUserId, null, startUtc, endUtc, null, ct);
+            appointments, assignment, allowClinicOverlap, tenantId, clinicId, petId, veterinarianUserId, null, resources, default, startUtc, endUtc, null, ct);
         if (!conflicts.IsSuccess)
             return conflicts;
 
@@ -55,10 +56,11 @@ internal static class AppointmentSlotRules
         => !allowClinicOverlap && !hasVeterinarian;
 
     /// <summary>
-    /// Yalnız çakışmalar: klinik (<see cref="ClinicOverlapBlocks"/>) → hayvan → hekim. Oluşturma, düzenleme, yeniden zamanlama, teklif
+    /// Yalnız çakışmalar: klinik (<see cref="ClinicOverlapBlocks"/>) → hayvan → hekim → oda ve cihaz (ADR-053 K4). Oluşturma, düzenleme, yeniden zamanlama, teklif
     /// kabulü ve iptali geri alma kullanır; geri almada slot hizası ve çalışma saati yeniden denetlenmez (randevu bu kurallarla açılmıştı).
     /// </summary>
     /// <param name="keepVeterinarianUserId">Mevcut randevunun hekimi; hekim yetkisi kalkmış olsa da korunur.</param>
+    /// <param name="keepResources">Mevcut randevunun oda ve cihazı; pasifleşmiş olsa da korunur.</param>
     /// <param name="excludeAppointmentId">Denetlenen randevunun kendisi.</param>
     public static async Task<Result> EnsureNoConflictAsync(
         IReadRepository<Appointment> appointments,
@@ -69,6 +71,8 @@ internal static class AppointmentSlotRules
         Guid petId,
         Guid? veterinarianUserId,
         Guid? keepVeterinarianUserId,
+        AppointmentResourceIds resources,
+        AppointmentResourceIds keepResources,
         DateTime startUtc,
         DateTime endUtc,
         Guid? excludeAppointmentId,
@@ -95,7 +99,12 @@ internal static class AppointmentSlotRules
                 "Bu zaman aralığında hayvanın başka bir planlı randevusu var.");
         }
 
-        return await assignment.EnsureVeterinarianAsync(
+        var vet = await assignment.EnsureVeterinarianAsync(
             tenantId, clinicId, veterinarianUserId, keepVeterinarianUserId, startUtc, endUtc, excludeAppointmentId, ct);
+        if (!vet.IsSuccess)
+            return vet;
+
+        return await assignment.EnsureResourcesAsync(
+            tenantId, clinicId, resources, keepResources, startUtc, endUtc, excludeAppointmentId, ct);
     }
 }

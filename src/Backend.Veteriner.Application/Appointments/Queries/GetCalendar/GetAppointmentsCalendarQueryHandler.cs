@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Appointments.Calendar;
 using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Appointments.ReadModels;
+using Backend.Veteriner.Application.Appointments.Resources;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
@@ -33,6 +34,7 @@ public sealed class GetAppointmentsCalendarQueryHandler
     private readonly QueryReadModelsOptions _queryReadModelsOptions;
     private readonly IClinicVeterinarianReader _veterinarians;
     private readonly IReadRepository<AppointmentReason> _reasons;
+    private readonly IReadRepository<AppointmentResource> _resources;
     private readonly TimeProvider _timeProvider;
 
     public GetAppointmentsCalendarQueryHandler(
@@ -46,6 +48,7 @@ public sealed class GetAppointmentsCalendarQueryHandler
         IOptions<QueryReadModelsOptions> queryReadModelsOptions,
         IClinicVeterinarianReader veterinarians,
         IReadRepository<AppointmentReason> reasons,
+        IReadRepository<AppointmentResource> resources,
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
@@ -58,6 +61,7 @@ public sealed class GetAppointmentsCalendarQueryHandler
         _queryReadModelsOptions = queryReadModelsOptions.Value;
         _veterinarians = veterinarians;
         _reasons = reasons;
+        _resources = resources;
         _timeProvider = timeProvider;
     }
 
@@ -198,14 +202,16 @@ public sealed class GetAppointmentsCalendarQueryHandler
                 clientName,
                 r.VeterinarianUserId,
                 ReasonId: r.ReasonId,
-                Notes: r.Notes);
+                Notes: r.Notes,
+                RoomResourceId: r.RoomResourceId,
+                EquipmentResourceId: r.EquipmentResourceId);
         }).ToList();
 
         return Result<IReadOnlyList<AppointmentCalendarItemDto>>.Success(WithState(await WithNamesAsync(tenantId, items, ct), utcNow));
     }
 
     /// <summary>
-    /// Okuma modeli hekim, neden ve not taşımaz: bunlar komut veritabanından tamamlanır (Query DB şeması değişmez).
+    /// Okuma modeli hekim, neden, not, oda ve cihaz taşımaz: bunlar komut veritabanından tamamlanır (Query DB şeması değişmez).
     /// </summary>
     private async Task<IReadOnlyList<AppointmentCalendarItemDto>> WithDetailsFromCommandDbAsync(
         Guid tenantId,
@@ -222,13 +228,20 @@ public sealed class GetAppointmentsCalendarQueryHandler
         return await WithNamesAsync(
             tenantId,
             items.Select(i => details.TryGetValue(i.Id, out var d)
-                    ? i with { VeterinarianUserId = d.VeterinarianUserId, ReasonId = d.ReasonId, Notes = d.Notes }
+                    ? i with
+                    {
+                        VeterinarianUserId = d.VeterinarianUserId,
+                        ReasonId = d.ReasonId,
+                        Notes = d.Notes,
+                        RoomResourceId = d.RoomResourceId,
+                        EquipmentResourceId = d.EquipmentResourceId,
+                    }
                     : i with { VeterinarianUserId = null })
                 .ToList(),
             ct);
     }
 
-    /// <summary>Hekim ve randevu nedeni adları.</summary>
+    /// <summary>Hekim, randevu nedeni, oda ve cihaz adları.</summary>
     private async Task<IReadOnlyList<AppointmentCalendarItemDto>> WithNamesAsync(
         Guid tenantId,
         IReadOnlyList<AppointmentCalendarItemDto> items,
@@ -236,19 +249,32 @@ public sealed class GetAppointmentsCalendarQueryHandler
     {
         var vetIds = items.Where(i => i.VeterinarianUserId is not null).Select(i => i.VeterinarianUserId!.Value).Distinct().ToArray();
         var reasonIds = items.Where(i => i.ReasonId is not null).Select(i => i.ReasonId!.Value).Distinct().ToArray();
-        if (vetIds.Length == 0 && reasonIds.Length == 0)
+        var resourceIds = items
+            .SelectMany(i => new[] { i.RoomResourceId, i.EquipmentResourceId })
+            .Where(id => id is not null)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToArray();
+        if (vetIds.Length == 0 && reasonIds.Length == 0 && resourceIds.Length == 0)
             return items;
 
         IReadOnlyDictionary<Guid, string?> vetNames = vetIds.Length == 0 ? new Dictionary<Guid, string?>() : await _veterinarians.GetNamesAsync(vetIds, ct);
         var reasonNames = reasonIds.Length == 0
             ? new Dictionary<Guid, string>()
             : (await _reasons.ListAsync(new AppointmentReasonNamesByIdsSpec(tenantId, reasonIds), ct)).ToDictionary(r => r.Id, r => r.Name);
+        var resourceNames = resourceIds.Length == 0
+            ? new Dictionary<Guid, string>()
+            : (await _resources.ListAsync(new AppointmentResourcesByIdsSpec(tenantId, resourceIds), ct)).ToDictionary(r => r.Id, r => r.Name);
 
         return items
             .Select(i => i with
             {
                 VeterinarianName = i.VeterinarianUserId is { } v && vetNames.TryGetValue(v, out var vetName) ? vetName : i.VeterinarianName,
                 ReasonName = i.ReasonId is { } r && reasonNames.TryGetValue(r, out var reasonName) ? reasonName : i.ReasonName,
+                RoomResourceName = i.RoomResourceId is { } room && resourceNames.TryGetValue(room, out var roomName) ? roomName : i.RoomResourceName,
+                EquipmentResourceName = i.EquipmentResourceId is { } equipment && resourceNames.TryGetValue(equipment, out var equipmentName)
+                    ? equipmentName
+                    : i.EquipmentResourceName,
             })
             .ToList();
     }

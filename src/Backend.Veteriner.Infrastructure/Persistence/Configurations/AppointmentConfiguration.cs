@@ -62,6 +62,23 @@ public sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appointm
             .WithMany()
             .HasForeignKey(x => x.ReasonId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Oda ve cihaz (ADR-053): kapasite denetimi kaynağı kullanan randevuları tarihle arar.
+        b.Ignore(x => x.Resources);
+        b.Property(x => x.RoomResourceId);
+        b.Property(x => x.EquipmentResourceId);
+        b.HasIndex(x => new { x.TenantId, x.RoomResourceId, x.ScheduledAtUtc }).HasFilter("[RoomResourceId] IS NOT NULL");
+        b.HasIndex(x => new { x.TenantId, x.EquipmentResourceId, x.ScheduledAtUtc }).HasFilter("[EquipmentResourceId] IS NOT NULL");
+        b.HasOne<AppointmentResource>()
+            .WithMany()
+            .HasForeignKey(x => x.RoomResourceId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+        b.HasOne<AppointmentResource>()
+            .WithMany()
+            .HasForeignKey(x => x.EquipmentResourceId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
         // Dashboard clinic-scope: TenantId+ClinicId seek, PetId DISTINCT/GROUP BY, ScheduledAtUtc MAX (covering).
         b.HasIndex(x => new { x.TenantId, x.ClinicId, x.PetId })
             .IncludeProperties(x => x.ScheduledAtUtc);

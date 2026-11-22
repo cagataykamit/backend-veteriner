@@ -5,6 +5,7 @@ namespace Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 /// <summary>
 /// <see cref="Status"/> yaşam döngüsü; <see cref="AppointmentType"/> randevu türü; <see cref="SpeciesName"/> hayvan türü etiketidir.
 /// <see cref="OwnerConfirmedAtUtc"/>: sahip hatırlatma bağlantısıyla geleceğini onayladı (TIER-019); durumu değiştirmez.
+/// <see cref="RoomResourceId"/> ve <see cref="EquipmentResourceId"/>: randevunun odası ve cihazı (ADR-053); adları kaynak listesinden.
 /// </summary>
 public sealed record AppointmentDetailDto(
     Guid Id,
@@ -25,4 +26,6 @@ public sealed record AppointmentDetailDto(
     string? Notes,
     Guid? ReasonId = null,
     Guid? VeterinarianUserId = null,
-    DateTime? OwnerConfirmedAtUtc = null);
+    DateTime? OwnerConfirmedAtUtc = null,
+    Guid? RoomResourceId = null,
+    Guid? EquipmentResourceId = null);

@@ -295,3 +295,9 @@ Klinik başına tek ayar: `ClinicAppointmentSettings.EnforceWorkingHours` (varsa
   `UpdateClinicAppointmentSettingsCommandHandlerTests` (alan gönderilmezse korunur), `AppointmentAvailabilityWorkingHoursRestrictionTests`
   (kapasite penceresi; online müsaitlik tanımlı haftaya göre).
 - Entegrasyon: `AppointmentWorkingHoursRestrictionIntegrationTests` (red → ayarı kapat → aynı randevu 201, kapasite pozitif).
+
+## 10) Oda ve cihaz sütunları (2026-11-22, ADR-053 önerildi)
+
+Takvim yanıtına `roomResourceId`, `roomResourceName`, `equipmentResourceId`, `equipmentResourceName` eklendi; randevuda oda ve cihaz,
+kaynak çakışması (409 `Appointments.ResourceTimeConflict`) ve tanım uçları `APPOINTMENT_RESOURCES_API_CONTRACT.md` içindedir. §2 sırası:
+klinik → hasta → hekim → oda ve cihaz.
