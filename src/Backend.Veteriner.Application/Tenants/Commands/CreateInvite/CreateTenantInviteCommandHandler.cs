@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Auth.Specs;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Users.Specs;
@@ -12,6 +13,7 @@ using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
 using Mediator;
+using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.Tenants.Commands.CreateInvite;
 
@@ -28,6 +30,8 @@ public sealed class CreateTenantInviteCommandHandler
     private readonly IReadRepository<TenantInvite> _invitesRead;
     private readonly IRepository<TenantInvite> _invitesWrite;
     private readonly ITokenHashService _tokenHash;
+    private readonly IEmailSender _email;
+    private readonly AppOptions _appOptions;
     private readonly IUnitOfWork _uow;
     private readonly TimeProvider _timeProvider;
 
@@ -42,6 +46,8 @@ public sealed class CreateTenantInviteCommandHandler
         IReadRepository<TenantInvite> invitesRead,
         IRepository<TenantInvite> invitesWrite,
         ITokenHashService tokenHash,
+        IEmailSender email,
+        IOptions<AppOptions> appOptions,
         IUnitOfWork uow,
         TimeProvider timeProvider)
     {
@@ -55,6 +61,8 @@ public sealed class CreateTenantInviteCommandHandler
         _invitesRead = invitesRead;
         _invitesWrite = invitesWrite;
         _tokenHash = tokenHash;
+        _email = email;
+        _appOptions = appOptions.Value;
         _uow = uow;
         _timeProvider = timeProvider;
     }
@@ -164,6 +172,10 @@ public sealed class CreateTenantInviteCommandHandler
             request.OperationClaimId,
             expires,
             utcNow);
+
+        // Davet e-postası (outbox) davet kaydıyla aynı kayıtta yazılır.
+        var message = TenantInviteEmails.Invite(clinic.Name, TenantInviteEmails.JoinLink(_appOptions, rawToken), invite.ExpiresAtUtc);
+        await _email.SendAsync(invite.Email, message.Subject, message.Body, ct);
 
         await _invitesWrite.AddAsync(invite, ct);
         await _uow.SaveChangesAsync(ct);

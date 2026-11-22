@@ -1,16 +1,20 @@
 using System.Security.Cryptography;
 using Backend.Veteriner.Application.Auth;
+using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Mediator;
+using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.Tenants.Commands.ResendInvite;
 
 /// <summary>
-/// Mevcut bekleyen davetin token'ını yeniden üretir ve expiry'yi yeniler (aynı Id korunur).
+/// Mevcut bekleyen davetin token'ını yeniden üretir, expiry'yi yeniler (aynı Id korunur) ve yeni bağlantıyı e-postayla gönderir.
 /// Accepted/Revoked davette çalışmaz. Create akışına dokunmaz; duplicate pending kuralı ilgilendirmez (aynı kayıt üzerinde).
 /// Read-only/cancelled abonelikler için pipeline guard engeller.
 /// </summary>
@@ -22,6 +26,9 @@ public sealed class ResendTenantInviteCommandHandler
     private readonly IReadRepository<TenantInvite> _invitesRead;
     private readonly IRepository<TenantInvite> _invitesWrite;
     private readonly ITokenHashService _tokenHash;
+    private readonly IReadRepository<Clinic> _clinicsRead;
+    private readonly IEmailSender _email;
+    private readonly AppOptions _appOptions;
     private readonly IUnitOfWork _uow;
     private readonly TimeProvider _timeProvider;
 
@@ -31,6 +38,9 @@ public sealed class ResendTenantInviteCommandHandler
         IReadRepository<TenantInvite> invitesRead,
         IRepository<TenantInvite> invitesWrite,
         ITokenHashService tokenHash,
+        IReadRepository<Clinic> clinicsRead,
+        IEmailSender email,
+        IOptions<AppOptions> appOptions,
         IUnitOfWork uow,
         TimeProvider timeProvider)
     {
@@ -39,6 +49,9 @@ public sealed class ResendTenantInviteCommandHandler
         _invitesRead = invitesRead;
         _invitesWrite = invitesWrite;
         _tokenHash = tokenHash;
+        _clinicsRead = clinicsRead;
+        _email = email;
+        _appOptions = appOptions.Value;
         _uow = uow;
         _timeProvider = timeProvider;
     }
@@ -99,6 +112,11 @@ public sealed class ResendTenantInviteCommandHandler
         var tokenHash = _tokenHash.ComputeSha256(rawToken);
 
         invite.Reissue(tokenHash, expires, utcNow);
+
+        // Yeni bağlantı e-postayla gider (outbox, aynı kayıtta); eski bağlantı geçersizleşir.
+        var clinic = await _clinicsRead.FirstOrDefaultAsync(new ClinicByIdSpec(invite.TenantId, invite.ClinicId), ct);
+        var message = TenantInviteEmails.Invite(clinic?.Name ?? "Kliniğiniz", TenantInviteEmails.JoinLink(_appOptions, rawToken), invite.ExpiresAtUtc);
+        await _email.SendAsync(invite.Email, message.Subject, message.Body, ct);
         await _invitesWrite.UpdateAsync(invite, ct);
         await _uow.SaveChangesAsync(ct);
 
