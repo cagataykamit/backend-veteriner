@@ -331,7 +331,7 @@ Detay örneği:
   "isNeutered": true, "colorName": "Siyah" }
 ```
 
-- `breedName`: katalog ırkı varsa onun adı, yoksa serbest metin ırk; ikisi de yoksa `null`. `gender`: `Male`/`Female`/`null`. `status`: `Active`/`Deceased`. `weightKg`: klinikteki son kayıtlı kilo (kg) veya `null`.
+- `breedName`: katalog ırkı varsa onun adı, yoksa serbest metin ırk; ikisi de yoksa `null`. `gender`: `Male`/`Female`/`null`. `status`: `Active`/`Deceased`. `weightKg`: listede hasta profilindeki kilo; ayrıntıda (`GET …/pets/{petId}`) son kilo ölçülmüş muayenenin kilosu, yoksa profil kilosu (kg; 2026-11-22) veya `null`.
 
 Detay: liste öğesi + `isNeutered` (bool), `colorName` (katalog rengi veya `null`). Karne/küpe ve özel protokol numarası, uyarı bayrakları/notu, klinik notu, vefat tarihi **dönmez**.
 
