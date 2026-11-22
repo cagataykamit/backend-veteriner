@@ -5,9 +5,11 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Queries.GetById;
 using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Clients;
+using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
 using AwesomeAssertions;
@@ -25,6 +27,7 @@ public sealed class GetExaminationByIdQueryHandlerTests
     private readonly Mock<IReadRepository<Examination>> _examinations = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
+    private readonly Mock<IReadRepository<Clinic>> _clinics = new();
     private readonly Mock<IClinicVeterinarianReader> _userNames = new();
     private readonly Mock<IAiProvenanceReader> _aiProvenance = AiProvenanceReaderMock.Empty();
 
@@ -48,6 +51,7 @@ public sealed class GetExaminationByIdQueryHandlerTests
             _examinations.Object,
             _pets.Object,
             _clients.Object,
+            _clinics.Object,
             _userNames.Object,
             _aiProvenance.Object);
 
@@ -253,11 +257,14 @@ public sealed class GetExaminationByIdQueryHandlerTests
         var entity = BuildExamination(tid, clinicId, petId);
         SetupExaminationFound(entity);
         SetupDetailGraph(tid, petId, clientId);
+        _clinics.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "Merkez Pati", "İzmir"));
 
         var result = await CreateHandler().Handle(new GetExaminationByIdQuery(entity.Id), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.Id.Should().Be(entity.Id);
+        result.Value.ClinicName.Should().Be("Merkez Pati");
         result.Value.TenantId.Should().Be(tid);
         result.Value.VisitReason.Should().Be("Şikayet");
         result.Value.PetName.Should().Be("Pamuk");

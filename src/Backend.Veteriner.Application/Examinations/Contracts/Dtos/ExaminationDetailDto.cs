@@ -5,6 +5,7 @@ using Backend.Veteriner.Domain.Examinations;
 namespace Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 
 /// <param name="AiProvenance">Muayeneye kabul edilmiş AI taslakları ("AI taslağından" izi, AI-010); yoksa boş.</param>
+/// <param name="ClinicName">Muayenenin kliniğinin adı; klinik okunamazsa boş.</param>
 public sealed record ExaminationDetailDto(
     Guid Id,
     Guid TenantId,
@@ -34,4 +35,5 @@ public sealed record ExaminationDetailDto(
     DateTime? FinalizedAtUtc = null,
     Guid? FinalizedByUserId = null,
     string? FinalizedByName = null,
-    IReadOnlyList<AiProvenanceDto>? AiProvenance = null);
+    IReadOnlyList<AiProvenanceDto>? AiProvenance = null,
+    string ClinicName = "");
