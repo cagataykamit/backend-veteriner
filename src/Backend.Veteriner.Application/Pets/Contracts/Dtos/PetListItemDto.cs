@@ -6,11 +6,13 @@ namespace Backend.Veteriner.Application.Pets.Contracts.Dtos;
 /// <summary>
 /// Hayvan liste satırı. <see cref="Status"/> komut veritabanından gelir (Query DB okuma modelinde durum kolonu yoktur;
 /// okuma modeli yolunda işleyici sayfadaki satırların durumunu ayrıca doldurur).
+/// <see cref="ClientName"/> aynı adlı hastaları listede ayırt etmek içindir; <see cref="Weight"/> bilinmiyorsa null.
 /// </summary>
 public sealed record PetListItemDto(
     Guid Id,
     Guid TenantId,
     Guid ClientId,
+    string ClientName,
     string Name,
     Guid SpeciesId,
     string SpeciesName,

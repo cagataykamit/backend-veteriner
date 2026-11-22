@@ -148,18 +148,25 @@ public sealed class GetPetsListQueryHandler
                 petIdsFromClientText),
             ct);
 
+        var ownerIds = rows.Select(r => r.ClientId).Distinct().ToArray();
+        var clientNameById = ownerIds.Length == 0
+            ? new Dictionary<Guid, string>()
+            : (await _clients.ListAsync(new ClientsByTenantIdsNameSpec(tenantId, ownerIds), ct))
+                .ToDictionary(c => c.Id, c => c.FullName);
+
         var items = rows
             .Select(r => new PetListItemDto(
                 r.Id,
                 r.TenantId,
                 r.ClientId,
+                clientNameById.GetValueOrDefault(r.ClientId, string.Empty),
                 r.Name,
                 r.SpeciesId,
                 r.SpeciesName,
                 r.ColorId,
                 r.ColorName,
                 r.Breed,
-                r.Weight ?? 0,
+                r.Weight,
                 r.Status))
             .ToList();
 

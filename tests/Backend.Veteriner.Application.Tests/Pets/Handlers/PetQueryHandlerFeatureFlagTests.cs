@@ -140,8 +140,8 @@ public sealed class PetQueryHandlerFeatureFlagTests
         _readModelReader.Setup(r => r.GetListAsync(It.IsAny<PetListReadRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PetListReadResult(
                 [
-                    new PetListItemDto(deceased.Id, tid, deceased.ClientId, "Boncuk", TestSpeciesIds.Dog, "Köpek", null, null, null, 0),
-                    new PetListItemDto(active.Id, tid, active.ClientId, "Pamuk", TestSpeciesIds.Dog, "Köpek", null, null, null, 0),
+                    new PetListItemDto(deceased.Id, tid, deceased.ClientId, "Ayşe Yılmaz", "Boncuk", TestSpeciesIds.Dog, "Köpek", null, null, null, 0),
+                    new PetListItemDto(active.Id, tid, active.ClientId, "Ali Can", "Pamuk", TestSpeciesIds.Dog, "Köpek", null, null, null, 0),
                 ],
                 2));
         _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantIdsSpec>(), It.IsAny<CancellationToken>()))
