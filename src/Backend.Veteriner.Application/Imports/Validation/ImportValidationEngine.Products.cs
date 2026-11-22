@@ -39,11 +39,14 @@ public sealed partial class ImportValidationEngine
     {
         var issues = new List<ImportIssue>();
 
-        var name = ImportValueParsers.NormalizeText(reader.Raw("Ad"));
+        // Büyük harfle yazılıp Türkçe küçültülmüş adın noktasız ı'sı onarılır ("Flexı Mavı" → "Flexi Mavi").
+        var name = ImportValueParsers.NormalizeText(reader.Raw("Ad")) is { } rawName ? ProductNameSpelling.Correct(rawName) : null;
         if (name is null)
             issues.Add(ImportRules.RequiredMissing.At("Ad"));
         else if (name.Length > MaxProductNameLength)
             issues.Add(ImportRules.FieldTooLong.At("Ad", $"Ürün adı en fazla {MaxProductNameLength} karakter olabilir."));
+        else if (ProductNameSpelling.SuspiciousWords(name) is { Count: > 0 } suspicious)
+            issues.Add(ImportRules.ProductNameSpellingSuspect.At("Ad", value: string.Join(", ", suspicious)));
 
         var kind = ProductKind.Other;
         if (reader.Raw("UrunTuru") is { } rawKind)

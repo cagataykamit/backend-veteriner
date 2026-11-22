@@ -224,6 +224,8 @@ public static class ImportRules
         "KDV oranı okunamadı (0-100 arası, en çok 2 ondalık; örnek: 20 veya %20); ürün klinik varsayılan KDV'siyle aktarılacak.");
     public static readonly ImportRule PurchasePriceInvalid = new("Imports.PurchasePriceInvalid", ImportIssueSeverity.Warning,
         "Alış fiyatı okunamadı (örnek: 1.250,50); alış fiyatı boş aktarılacak.");
+    public static readonly ImportRule ProductNameSpellingSuspect = new("Imports.ProductNameSpellingSuspect", ImportIssueSeverity.Warning,
+        "Ürün adında yazımı şüpheli kelime var (i yerine ı olabilir); ad olduğu gibi aktarılacak, kontrol edin.");
 
     // Uygulama (B4; satır sonucu yazılırken sorun listesine eklenir, doğrulama durumu değişmez)
     public static readonly ImportRule OwnerUnitFailed = new("Imports.OwnerUnitFailed", ImportIssueSeverity.Error,
