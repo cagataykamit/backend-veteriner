@@ -278,6 +278,12 @@ public static class PermissionCatalog
         public const string Deactivate = "ClinicalTerms.Deactivate";
     }
 
+    /// <summary>İlaç rehberi (REF-001, ADR-049): global ruhsatlı ürün kataloğunu okuma; her rolde.</summary>
+    public static class DrugGuide
+    {
+        public const string Read = "DrugGuide.Read";
+    }
+
     /// <summary>
     /// Klinik metin parçaları (EXAM-011/012): <c>#kısayol</c> ile muayene metin alanına eklenen hazır metinler. Etkinleştirme de
     /// <see cref="Deactivate"/> ile yapılır. Ekleme istemci tarafındadır; <see cref="Read"/> seçici için yeter.
@@ -508,6 +514,8 @@ public static class PermissionCatalog
         new(ClinicalTerms.Create, "Kliniğe özel tanı/şikâyet sözlük kaydı ekleme yetkisi", "ClinicalTerms"),
         new(ClinicalTerms.Update, "Kliniğe özel tanı/şikâyet sözlük kaydının adını düzeltme yetkisi", "ClinicalTerms"),
         new(ClinicalTerms.Deactivate, "Kliniğe özel tanı/şikâyet sözlük kaydını pasifleştirme ve yeniden etkinleştirme yetkisi", "ClinicalTerms"),
+
+        new(DrugGuide.Read, "İlaç rehberini (ruhsatlı ürün kataloğu) arama ve okuma yetkisi", "DrugGuide"),
 
         new(ClinicalSnippets.Read, "Klinik metin parçalarını listeleme ve muayenede kullanma yetkisi", "ClinicalSnippets"),
         new(ClinicalSnippets.Create, "Klinik metin parçası ekleme yetkisi", "ClinicalSnippets"),

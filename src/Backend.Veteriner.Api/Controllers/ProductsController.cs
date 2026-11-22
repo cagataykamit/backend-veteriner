@@ -7,6 +7,7 @@ using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Products.Commands.Activate;
 using Backend.Veteriner.Application.Products.Commands.Create;
 using Backend.Veteriner.Application.Products.Commands.Deactivate;
+using Backend.Veteriner.Application.Products.Commands.LinkLicensedProduct;
 using Backend.Veteriner.Application.Products.Commands.Update;
 using Backend.Veteriner.Application.Products.Contracts.Dtos;
 using Backend.Veteriner.Application.ProductStocks.Contracts.Dtos;
@@ -205,4 +206,29 @@ public sealed class ProductsController : ControllerBase
         var result = await _mediator.Send(new DeactivateProductCommand(id), ct);
         return result.ToActionResult(this);
     }
+
+    /// <summary>
+    /// Ürün kartının ilaç rehberi bağını kurar ya da (<c>licensedProductId: null</c>) kaldırır
+    /// (REF-001 Dilim 2; docs/LICENSED_DRUG_GUIDE_API_CONTRACT.md §4).
+    /// </summary>
+    [HttpPut("{id:guid}/licensed-product")]
+    [Authorize(Policy = PermissionCatalog.Products.Update)]
+    [Consumes("application/json")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> LinkLicensedProduct([FromRoute] Guid id, [FromBody] LinkLicensedProductBody body, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new LinkLicensedProductCommand(id, body.LicensedProductId), ct);
+        return result.ToActionResult(this);
+    }
+}
+
+/// <summary>PUT /api/v1/products/{id}/licensed-product gövdesi; null bağı kaldırır.</summary>
+public sealed class LinkLicensedProductBody
+{
+    public Guid? LicensedProductId { get; init; }
 }
