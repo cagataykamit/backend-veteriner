@@ -28,4 +28,5 @@ public sealed record LabResultDetailDto(
     Guid? CancelledByUserId,
     string? CancelReason,
     string RowVersion,
-    bool AddedAfterFinalization = false);
+    bool AddedAfterFinalization,
+    IReadOnlyList<LabResultLineDto> Lines);

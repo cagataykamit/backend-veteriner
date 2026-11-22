@@ -11,6 +11,7 @@ public sealed class LabResultForUpdateByIdSpec : Specification<LabResult>
 {
     public LabResultForUpdateByIdSpec(Guid tenantId, Guid id)
     {
-        Query.Where(x => x.TenantId == tenantId && x.Id == id);
+        Query.Where(x => x.TenantId == tenantId && x.Id == id)
+            .Include(x => x.Lines);
     }
 }

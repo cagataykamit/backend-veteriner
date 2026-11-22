@@ -1,3 +1,5 @@
+using Backend.Veteriner.Application.LabResults.Contracts.Dtos;
+
 namespace Backend.Veteriner.Api.Controllers;
 
 /// <summary>PUT /api/v1/lab-results/{id} body; route id is source of truth.</summary>
@@ -15,6 +17,9 @@ public sealed class UpdateLabResultBody
     public string? ResultText { get; init; }
     public string? Interpretation { get; init; }
     public string? Notes { get; init; }
+
+    /// <summary>Değer satırları; null ise mevcut satırlara dokunulmaz, boş liste hepsini siler.</summary>
+    public IReadOnlyList<LabResultLineRequest>? Lines { get; init; }
 
     /// <summary>GET ile alınan Base64 sürüm; zorunlu.</summary>
     public string? RowVersion { get; init; }

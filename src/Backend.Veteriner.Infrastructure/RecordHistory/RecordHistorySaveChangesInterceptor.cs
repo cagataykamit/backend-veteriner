@@ -27,6 +27,17 @@ public sealed class RecordHistorySaveChangesInterceptor : SaveChangesInterceptor
     /// <summary>Reçete satırları reçetenin tek bir alanı gibi izlenir.</summary>
     public const string PrescriptionItemsField = "items";
 
+    /// <summary>Lab değer satırları (REF-001 Dilim 3) lab kaydının tek bir alanı gibi izlenir.</summary>
+    public const string LabResultLinesField = "lines";
+
+    private sealed record ChildLineKind(Type Type, string ParentIdProperty, string Field, Func<PropertyValues, string> Describe);
+
+    private static readonly ChildLineKind[] ChildLineKinds =
+    [
+        new(typeof(PrescriptionItem), nameof(PrescriptionItem.PrescriptionId), PrescriptionItemsField, ItemLine),
+        new(typeof(LabResultLine), nameof(LabResultLine.LabResultId), LabResultLinesField, LabLine),
+    ];
+
     private static readonly IReadOnlyDictionary<Type, string> TrackedTypes = new Dictionary<Type, string>
     {
         [typeof(Examination)] = RecordHistoryTypes.Examination,
@@ -77,7 +88,7 @@ public sealed class RecordHistorySaveChangesInterceptor : SaveChangesInterceptor
 
         context.ChangeTracker.DetectChanges();
         var entries = context.ChangeTracker.Entries().ToList();
-        var itemChanges = PrescriptionItemChanges(entries);
+        var itemChanges = ChildLineChanges(entries);
         var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
         var rows = new List<RecordChange>();
 
@@ -131,38 +142,51 @@ public sealed class RecordHistorySaveChangesInterceptor : SaveChangesInterceptor
     }
 
     /// <summary>
-    /// Satırı eklenen, silinen veya değişen reçeteler için satır listesinin önceki ve yeni metni. Satırlar silinip
-    /// yeniden eklense de metin aynıysa değişiklik sayılmaz.
+    /// Satırı eklenen, silinen veya değişen kayıtlar (reçete kalemleri, lab değer satırları) için satır listesinin önceki
+    /// ve yeni metni. Satırlar silinip yeniden eklense de metin aynıysa değişiklik sayılmaz.
     /// </summary>
-    private static Dictionary<Guid, RecordFieldChange> PrescriptionItemChanges(IReadOnlyList<EntityEntry> entries)
+    private static Dictionary<Guid, RecordFieldChange> ChildLineChanges(IReadOnlyList<EntityEntry> entries)
     {
         var result = new Dictionary<Guid, RecordFieldChange>();
-        var groups = entries
-            .Where(e => e.Entity is PrescriptionItem)
-            .GroupBy(e => ((PrescriptionItem)e.Entity).PrescriptionId);
-
-        foreach (var group in groups)
+        foreach (var kind in ChildLineKinds)
         {
-            if (group.All(e => e.State == EntityState.Unchanged))
-                continue;
+            var groups = entries
+                .Where(e => e.Entity.GetType() == kind.Type)
+                .GroupBy(e => (Guid)e.Property(kind.ParentIdProperty).CurrentValue!);
 
-            var before = ItemsText(group.Where(e => e.State != EntityState.Added), current: false);
-            var after = ItemsText(group.Where(e => e.State != EntityState.Deleted), current: true);
-            if (!string.Equals(before, after, StringComparison.Ordinal))
-                result[group.Key] = new RecordFieldChange(PrescriptionItemsField, before, after);
+            foreach (var group in groups)
+            {
+                if (group.All(e => e.State == EntityState.Unchanged))
+                    continue;
+
+                var before = LinesText(kind, group.Where(e => e.State != EntityState.Added), current: false);
+                var after = LinesText(kind, group.Where(e => e.State != EntityState.Deleted), current: true);
+                if (!string.Equals(before, after, StringComparison.Ordinal))
+                    result[group.Key] = new RecordFieldChange(kind.Field, before, after);
+            }
         }
 
         return result;
     }
 
-    private static string? ItemsText(IEnumerable<EntityEntry> items, bool current)
+    private static string? LinesText(ChildLineKind kind, IEnumerable<EntityEntry> items, bool current)
     {
         var lines = items
             .Select(e => current ? e.CurrentValues : e.OriginalValues)
-            .OrderBy(v => v.GetValue<int>(nameof(PrescriptionItem.SortOrder)))
-            .Select(ItemLine)
+            .OrderBy(v => v.GetValue<int>("SortOrder"))
+            .Select(kind.Describe)
             .ToList();
         return lines.Count == 0 ? null : string.Join("\n", lines);
+    }
+
+    private static string LabLine(PropertyValues v)
+    {
+        var unit = v.GetValue<string?>(nameof(LabResultLine.Unit));
+        var text = $"{v.GetValue<string>(nameof(LabResultLine.ParameterName))}: {Format(v.GetValue<decimal>(nameof(LabResultLine.Value)))}"
+                   + (unit is null ? string.Empty : " " + unit);
+        var low = v.GetValue<decimal?>(nameof(LabResultLine.ReferenceLow));
+        var high = v.GetValue<decimal?>(nameof(LabResultLine.ReferenceHigh));
+        return low is null && high is null ? text : $"{text} · referans {Format(low)}–{Format(high)}";
     }
 
     private static string ItemLine(PropertyValues v)

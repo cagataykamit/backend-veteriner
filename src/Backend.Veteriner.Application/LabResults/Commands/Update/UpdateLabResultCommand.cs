@@ -7,6 +7,7 @@ namespace Backend.Veteriner.Application.LabResults.Commands.Update;
 /// <summary>
 /// Tam güncelleme; <see cref="RowVersion"/> zorunludur. <c>Requested</c> kayda sonuç yazılırsa kayıt <c>Resulted</c> olur.
 /// <see cref="VisitId"/> verilmezse muayene değişmediyse mevcut bağ korunur, değiştiyse yeni muayeneden miras alınır.
+/// <see cref="Lines"/> null ise değer satırlarına dokunulmaz, boş liste hepsini siler.
 /// </summary>
 public sealed record UpdateLabResultCommand(
     Guid Id,
@@ -19,5 +20,6 @@ public sealed record UpdateLabResultCommand(
     string? Interpretation,
     string? Notes,
     string? RowVersion,
-    Guid? VisitId = null)
+    Guid? VisitId = null,
+    IReadOnlyList<LabResultLineRequest>? Lines = null)
     : IRequest<Result<LabResultWriteResultDto>>;

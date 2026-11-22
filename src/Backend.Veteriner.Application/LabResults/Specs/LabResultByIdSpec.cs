@@ -7,6 +7,7 @@ public sealed class LabResultByIdSpec : Specification<LabResult>
 {
     public LabResultByIdSpec(Guid tenantId, Guid id)
     {
-        Query.Where(x => x.TenantId == tenantId && x.Id == id);
+        Query.Where(x => x.TenantId == tenantId && x.Id == id)
+            .Include(x => x.Lines);
     }
 }

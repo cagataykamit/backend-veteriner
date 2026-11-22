@@ -1,3 +1,5 @@
+using Backend.Veteriner.Application.LabResults.Lines;
+using Backend.Veteriner.Domain.LabResults;
 using FluentValidation;
 
 namespace Backend.Veteriner.Application.LabResults.Commands.Create;
@@ -27,5 +29,11 @@ public sealed class CreateLabResultCommandValidator : AbstractValidator<CreateLa
         RuleFor(x => x.Notes)
             .MaximumLength(4000)
             .When(x => !string.IsNullOrEmpty(x.Notes));
+        RuleFor(x => x.Lines)
+            .Must(lines => lines!.Count <= LabResultLine.MaxPerResult)
+            .WithMessage($"Bir lab sonucunda en fazla {LabResultLine.MaxPerResult} değer satırı olabilir.")
+            .When(x => x.Lines is not null);
+        RuleForEach(x => x.Lines).NotNull().SetValidator(new LabResultLineRequestValidator())
+            .When(x => x.Lines is not null);
     }
 }
