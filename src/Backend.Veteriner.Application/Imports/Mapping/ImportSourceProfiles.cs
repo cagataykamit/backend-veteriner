@@ -38,9 +38,8 @@ public static class ImportSourceProfiles
             "Vetinity şablonu ya da başka bir programın dosyası. Yalnız genel eş anlamlı başlıklar kullanılır.",
             []),
         new(ImportSourceProfile.Kolayvet, "Kolayvet",
-            "Kolayvet sitesi hasta ve müşteri verisinin Excel ya da PDF olarak dışa alınabildiğini yazıyor; sütun adları kamuya açık değil "
-            + "(kolayvet.com/ozellikler/ozellikler/gelismis-ice-disa-aktarma). Hazır eşleme yok, genel eş anlamlı başlıklar kullanılır. "
-            + "Gerçek dosya görülünce eşleme eklenecek.",
+            "Kolayvet'ten Excel ya da CSV olarak dışa aktardığınız müşteri ve hasta listesini yükleyin. Sütunlar başlık adlarından tanınır; "
+            + "tanınmayan sütunu eşleme adımında kendiniz seçersiniz.",
             []),
         new(ImportSourceProfile.EVet, "E-vet",
             "E-vet'in Genel > Yedek Al Excel dosyası (müşteri, hasta, randevu, muayene) doğrudan okunur. Rapor > Genel > Hasta Listesi sahip "
