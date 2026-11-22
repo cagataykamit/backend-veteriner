@@ -24,6 +24,7 @@ public sealed class AssignTenantMemberClinicCommandHandler
     : IRequestHandler<AssignTenantMemberClinicCommand, Result<AssignTenantMemberClinicResultDto>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly TenantMemberManagementAccess _memberAccess;
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IUserTenantRepository _userTenantRepo;
     private readonly IReadRepository<Clinic> _clinicsRead;
@@ -34,6 +35,7 @@ public sealed class AssignTenantMemberClinicCommandHandler
 
     public AssignTenantMemberClinicCommandHandler(
         ITenantContext tenantContext,
+        TenantMemberManagementAccess memberAccess,
         ICurrentUserPermissionChecker permissions,
         IUserTenantRepository userTenantRepo,
         IReadRepository<Clinic> clinicsRead,
@@ -43,6 +45,7 @@ public sealed class AssignTenantMemberClinicCommandHandler
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
+        _memberAccess = memberAccess;
         _permissions = permissions;
         _userTenantRepo = userTenantRepo;
         _clinicsRead = clinicsRead;
@@ -99,6 +102,12 @@ public sealed class AssignTenantMemberClinicCommandHandler
                 "Clinics.Inactive",
                 "Seçilen klinik pasif; atama yapılamaz.");
         }
+
+        var access = await _memberAccess.EnsureMemberAsync(request.MemberId, ct);
+        if (access.IsSuccess)
+            access = await _memberAccess.EnsureClinicAsync(request.ClinicId, ct);
+        if (!access.IsSuccess)
+            return Result<AssignTenantMemberClinicResultDto>.Failure(access.Error);
 
         if (await _userClinics.ExistsAsync(request.MemberId, request.ClinicId, ct))
         {

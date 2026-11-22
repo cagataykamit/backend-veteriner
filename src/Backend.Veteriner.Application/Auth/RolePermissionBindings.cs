@@ -18,11 +18,11 @@ namespace Backend.Veteriner.Application.Auth;
 ///   <item><c>ClinicAdmin</c>: klinik operasyon yöneticisi. Tüm klinik modüllerinin Read/Create/Update,
 ///   randevu lifecycle, klinik okuma + güncelleme (klinik profili/working hours), reminder yönetimi.
 ///   <b>Verilmez:</b> <c>Clinics.Create</c> (yeni klinik açma yalnız tenant Admin/Owner),
-///   <c>Tenants.*</c> / <c>Subscriptions.Manage</c> / <c>Roles.*</c> / <c>Permissions.*</c> / <c>Users.*</c>
+///   <c>Tenants.InviteCreate</c> dışındaki <c>Tenants.*</c> (davet ve üye yönetimi kendi kliniğiyle sınırlı, <c>TenantMemberManagementAccess</c>) / <c>Subscriptions.Manage</c> / <c>Roles.*</c> / <c>Permissions.*</c> / <c>Users.*</c>
 ///   / <c>Outbox.*</c> / <c>Admin.Diagnostics</c>.</item>
 ///   <item><c>Veteriner</c>: tıbbi operasyon rolü. Klinik kayıtlarının (muayene, aşı, tedavi, reçete, lab,
 ///   yatış, vital ölçümü) Read/Create/Update; randevu Read/Create/Complete/Reschedule (Cancel verilmez); pet okuma + güncelleme
-///   (kilo/medikal not). <b>Verilmez:</b> müşteri C/U, ödeme C/U, klinik/tenant/abonelik ve sistem yetkileri,
+///   (kilo/medikal not); müşteri ve hasta açma (Create). <b>Verilmez:</b> müşteri güncelleme, ödeme C/U, klinik/tenant/abonelik ve sistem yetkileri,
     ///   düzeltme izinleri (<c>*.Correct</c>; yönetici düzeyi: Admin, Owner, ClinicAdmin).</item>
 ///   <item><c>Sekreter</c>: resepsiyon/operasyon rolü. Müşteri/pet R/C/U; randevu R/C/Cancel/Reschedule
 ///   (Complete verilmez); ödeme R/C/U; tıbbi modüller sadece Read. <b>Verilmez:</b> randevu Complete,
@@ -386,12 +386,16 @@ public static class RolePermissionBindings
 
             // Klinik operasyon paneli: dashboard + çekirdek modüller; klinik profilini
             // güncelleme yetkisi ürün gereği ClinicAdmin'de tutulur (working hours / break time / vb.).
-            // Tenants.* / Subscriptions.Manage / Users.Roles.Permissions / Outbox / Clinics.Create verilmez (Create: Admin/Owner).
+            // Tenants.InviteCreate (2026-11-22): kendi kliniğine personel daveti ve üye yönetimi; işletme yöneticisi rolü, kurum ayarları ve
+            // işletme yöneticisinin üyeliği hariç (kural TenantMemberManagementAccess).
+            // Diğer Tenants.* / Subscriptions.Manage / Users.Roles.Permissions / Outbox / Clinics.Create verilmez (Create: Admin/Owner).
             // Species/Breeds Create/Update tür-ırk kataloğu yönetimi için ClinicAdmin'de verilir (Faz 11B-3).
             // Subscriptions.Read ek bilgi amacıyla verilir.
             ["ClinicAdmin"] =
             [
                 PermissionCatalog.Dashboard.Read,
+
+                PermissionCatalog.Tenants.InviteCreate,
 
                 PermissionCatalog.Appointments.Read,
                 PermissionCatalog.Appointments.Create,
@@ -543,15 +547,17 @@ public static class RolePermissionBindings
             ],
 
             // Tıbbi operasyon: klinik kayıtlarını (muayene/aşı/tedavi/reçete/lab/yatış) yönetir.
-            // Randevu Cancel verilmez (resepsiyon/clinic admin işi). Müşteri C/U verilmez (sekreter işi).
+            // Randevu Cancel verilmez (resepsiyon/clinic admin işi). Müşteri ve hasta açabilir (Create, 2026-11-22); müşteri Update verilmez.
             // Pets.Update verilir (kilo/medikal not güncellemesi). Payments sadece Read.
             ["Veteriner"] =
             [
                 PermissionCatalog.Dashboard.Read,
 
                 PermissionCatalog.Clients.Read,
+                PermissionCatalog.Clients.Create,
 
                 PermissionCatalog.Pets.Read,
+                PermissionCatalog.Pets.Create,
                 PermissionCatalog.Pets.Update,
 
                 PermissionCatalog.Appointments.Read,

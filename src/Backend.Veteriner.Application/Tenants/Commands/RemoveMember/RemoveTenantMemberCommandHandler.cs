@@ -25,6 +25,7 @@ public sealed class RemoveTenantMemberCommandHandler
     private static readonly JsonSerializerOptions AuditJson = new(JsonSerializerDefaults.Web);
 
     private readonly ITenantContext _tenantContext;
+    private readonly TenantMemberManagementAccess _memberAccess;
     private readonly IClientContext _clientContext;
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IUserTenantRepository _userTenantRepo;
@@ -39,6 +40,7 @@ public sealed class RemoveTenantMemberCommandHandler
 
     public RemoveTenantMemberCommandHandler(
         ITenantContext tenantContext,
+        TenantMemberManagementAccess memberAccess,
         IClientContext clientContext,
         ICurrentUserPermissionChecker permissions,
         IUserTenantRepository userTenantRepo,
@@ -52,6 +54,7 @@ public sealed class RemoveTenantMemberCommandHandler
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
+        _memberAccess = memberAccess;
         _clientContext = clientContext;
         _permissions = permissions;
         _userTenantRepo = userTenantRepo;
@@ -101,6 +104,10 @@ public sealed class RemoveTenantMemberCommandHandler
                 "TenantMembers.NotFound",
                 "Üye bu kiracıda bulunamadı.");
         }
+
+        var access = await _memberAccess.EnsureMemberAsync(request.MemberId, ct);
+        if (!access.IsSuccess)
+            return Result<RemoveTenantMemberResultDto>.Failure(access.Error);
 
         var totalMembers = await _userTenantsRead.CountAsync(
             new UserTenantsByTenantCountSpec(request.TenantId), ct);

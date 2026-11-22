@@ -6,6 +6,7 @@ using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Outbox;
+using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
@@ -44,6 +45,7 @@ public sealed class TenantInviteEmailIntegrationTests : IClassFixture<CustomWebA
             var owner = new User(ownerEmail, hasher.Hash("123456"), now);
             db.AddRange(tenant, clinic, owner);
             db.UserTenants.Add(new UserTenant(owner.Id, tenant.Id, now));
+            db.UserOperationClaims.Add(new UserOperationClaim(owner.Id, (await db.OperationClaims.SingleAsync(c => c.Name == "Admin")).Id));
             db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Pro, now, 14));
             await db.SaveChangesAsync();
             (tenantId, clinicId) = (tenant.Id, clinic.Id);

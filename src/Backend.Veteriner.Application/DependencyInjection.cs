@@ -61,6 +61,7 @@ public static class DependencyInjection
         services.AddScoped<TenantSubscriptionSeatEvaluator>();
         services.AddScoped<TenantPlanFeatureEvaluator>();
         services.AddScoped<TenantInviteAcceptanceService>();
+        services.AddScoped<TenantMemberManagementAccess>();
         services.AddScoped<ISubscriptionCheckoutActivationService, SubscriptionCheckoutActivationService>();
         services.AddScoped<ICheckoutPaymentReconciler, CheckoutPaymentReconciler>();
         services.AddScoped<IDuplicatePaymentRefunder, DuplicatePaymentRefunder>();

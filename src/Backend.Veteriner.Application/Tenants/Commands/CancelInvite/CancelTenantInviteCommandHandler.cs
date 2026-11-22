@@ -16,6 +16,7 @@ public sealed class CancelTenantInviteCommandHandler
     : IRequestHandler<CancelTenantInviteCommand, Result<CancelTenantInviteResultDto>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly TenantMemberManagementAccess _memberAccess;
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IReadRepository<TenantInvite> _invitesRead;
     private readonly IRepository<TenantInvite> _invitesWrite;
@@ -23,12 +24,14 @@ public sealed class CancelTenantInviteCommandHandler
 
     public CancelTenantInviteCommandHandler(
         ITenantContext tenantContext,
+        TenantMemberManagementAccess memberAccess,
         ICurrentUserPermissionChecker permissions,
         IReadRepository<TenantInvite> invitesRead,
         IRepository<TenantInvite> invitesWrite,
         IUnitOfWork uow)
     {
         _tenantContext = tenantContext;
+        _memberAccess = memberAccess;
         _permissions = permissions;
         _invitesRead = invitesRead;
         _invitesWrite = invitesWrite;
@@ -67,6 +70,10 @@ public sealed class CancelTenantInviteCommandHandler
                 "Invites.NotFound",
                 "Davet bulunamadı.");
         }
+
+        var access = await _memberAccess.EnsureClinicAsync(invite.ClinicId, ct);
+        if (!access.IsSuccess)
+            return Result<CancelTenantInviteResultDto>.Failure(access.Error);
 
         if (invite.Status == TenantInviteStatus.Revoked)
         {

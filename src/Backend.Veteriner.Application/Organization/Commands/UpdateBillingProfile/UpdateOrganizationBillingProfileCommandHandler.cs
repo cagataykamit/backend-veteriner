@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Organization.Contracts.Dtos;
 using Backend.Veteriner.Application.Organization.Specs;
+using Backend.Veteriner.Application.Tenants;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Mediator;
@@ -12,6 +13,7 @@ public sealed class UpdateOrganizationBillingProfileCommandHandler
     : IRequestHandler<UpdateOrganizationBillingProfileCommand, Result<OrganizationBillingProfileDto>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly TenantMemberManagementAccess _memberAccess;
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IReadRepository<TenantBillingProfile> _profilesRead;
     private readonly IRepository<TenantBillingProfile> _profilesWrite;
@@ -19,12 +21,14 @@ public sealed class UpdateOrganizationBillingProfileCommandHandler
 
     public UpdateOrganizationBillingProfileCommandHandler(
         ITenantContext tenantContext,
+        TenantMemberManagementAccess memberAccess,
         ICurrentUserPermissionChecker permissions,
         IReadRepository<TenantBillingProfile> profilesRead,
         IRepository<TenantBillingProfile> profilesWrite,
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
+        _memberAccess = memberAccess;
         _permissions = permissions;
         _profilesRead = profilesRead;
         _profilesWrite = profilesWrite;
@@ -48,6 +52,10 @@ public sealed class UpdateOrganizationBillingProfileCommandHandler
                 "Tenants.ContextMissing",
                 "Kiracı bağlamı yok. JWT tenant_id gerekir.");
         }
+
+        var access = await _memberAccess.EnsureTenantSettingsAsync(ct);
+        if (!access.IsSuccess)
+            return Result<OrganizationBillingProfileDto>.Failure(access.Error);
 
         var row = await _profilesRead.FirstOrDefaultAsync(new TenantBillingProfileByTenantSpec(tenantId), ct);
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;

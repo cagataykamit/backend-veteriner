@@ -22,6 +22,7 @@ public sealed class ResendTenantInviteCommandHandler
     : IRequestHandler<ResendTenantInviteCommand, Result<ResendTenantInviteResultDto>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly TenantMemberManagementAccess _memberAccess;
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IReadRepository<TenantInvite> _invitesRead;
     private readonly IRepository<TenantInvite> _invitesWrite;
@@ -34,6 +35,7 @@ public sealed class ResendTenantInviteCommandHandler
 
     public ResendTenantInviteCommandHandler(
         ITenantContext tenantContext,
+        TenantMemberManagementAccess memberAccess,
         ICurrentUserPermissionChecker permissions,
         IReadRepository<TenantInvite> invitesRead,
         IRepository<TenantInvite> invitesWrite,
@@ -45,6 +47,7 @@ public sealed class ResendTenantInviteCommandHandler
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
+        _memberAccess = memberAccess;
         _permissions = permissions;
         _invitesRead = invitesRead;
         _invitesWrite = invitesWrite;
@@ -95,6 +98,10 @@ public sealed class ResendTenantInviteCommandHandler
                 "Invites.InvalidState",
                 "Yalnızca bekleyen davet yeniden gönderilebilir; kabul edilmiş veya iptal edilmiş davet yeniden üretilemez.");
         }
+
+        var access = await _memberAccess.EnsureClinicAsync(invite.ClinicId, ct);
+        if (!access.IsSuccess)
+            return Result<ResendTenantInviteResultDto>.Failure(access.Error);
 
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         var expires = request.ExpiresAtUtc is { } ex

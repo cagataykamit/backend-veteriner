@@ -21,6 +21,7 @@ public sealed class CreateTenantInviteCommandHandler
     : IRequestHandler<CreateTenantInviteCommand, Result<CreateTenantInviteResultDto>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly TenantMemberManagementAccess _memberAccess;
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly TenantSubscriptionSeatEvaluator _seatEvaluator;
     private readonly IReadRepository<User> _usersRead;
@@ -37,6 +38,7 @@ public sealed class CreateTenantInviteCommandHandler
 
     public CreateTenantInviteCommandHandler(
         ITenantContext tenantContext,
+        TenantMemberManagementAccess memberAccess,
         ICurrentUserPermissionChecker permissions,
         TenantSubscriptionSeatEvaluator seatEvaluator,
         IReadRepository<User> usersRead,
@@ -52,6 +54,7 @@ public sealed class CreateTenantInviteCommandHandler
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
+        _memberAccess = memberAccess;
         _permissions = permissions;
         _seatEvaluator = seatEvaluator;
         _usersRead = usersRead;
@@ -121,6 +124,13 @@ public sealed class CreateTenantInviteCommandHandler
                 "Invites.OperationClaimNotAssignable",
                 "Bu operation claim davet ile atanamaz; yalnızca atanabilir rol listesindekiler seçilebilir.");
         }
+
+        // Klinik yöneticisi yalnız kendi kliniğine ve işletme yöneticisi dışındaki rollerle davet eder (TenantMemberManagementAccess).
+        var access = await _memberAccess.EnsureClinicAsync(request.ClinicId, ct);
+        if (access.IsSuccess)
+            access = await _memberAccess.EnsureRoleAsync(claim.Name, ct);
+        if (!access.IsSuccess)
+            return Result<CreateTenantInviteResultDto>.Failure(access.Error);
 
         var existingUser = await _usersRead.FirstOrDefaultAsync(new UserByEmailNormalizedSpec(emailNorm), ct);
         if (existingUser is not null)

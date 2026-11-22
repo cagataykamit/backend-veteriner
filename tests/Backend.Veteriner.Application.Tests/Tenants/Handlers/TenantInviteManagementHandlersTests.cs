@@ -7,6 +7,7 @@ using Backend.Veteriner.Application.Tenants.Commands.CancelInvite;
 using Backend.Veteriner.Application.Tenants.Commands.ResendInvite;
 using Backend.Veteriner.Application.Tenants.Queries.GetInviteById;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Tenants;
@@ -42,10 +43,10 @@ public sealed class TenantInviteManagementHandlersTests
         => new(_tenantContext.Object, _permissions.Object, _invitesRead.Object, _claimsRead.Object, _clinicsRead.Object, _userTenants.Object, TimeProvider.System);
 
     private CancelTenantInviteCommandHandler CreateCancelHandler()
-        => new(_tenantContext.Object, _permissions.Object, _invitesRead.Object, _invitesWrite.Object, _uow.Object);
+        => new(_tenantContext.Object, TenantMemberManagementAccessStub.TenantWide(), _permissions.Object, _invitesRead.Object, _invitesWrite.Object, _uow.Object);
 
     private ResendTenantInviteCommandHandler CreateResendHandler()
-        => new(_tenantContext.Object, _permissions.Object, _invitesRead.Object, _invitesWrite.Object, _tokenHash.Object, _clinicsRead.Object, _email.Object,
+        => new(_tenantContext.Object, TenantMemberManagementAccessStub.TenantWide(), _permissions.Object, _invitesRead.Object, _invitesWrite.Object, _tokenHash.Object, _clinicsRead.Object, _email.Object,
             Options.Create(new AppOptions { FrontendBaseUrl = "https://panel.example.test/" }), _uow.Object, TimeProvider.System);
 
     private static TenantInvite BuildPending(Guid tenantId, Guid clinicId, Guid claimId, DateTime? expiresAtUtc = null, Guid? id = null)

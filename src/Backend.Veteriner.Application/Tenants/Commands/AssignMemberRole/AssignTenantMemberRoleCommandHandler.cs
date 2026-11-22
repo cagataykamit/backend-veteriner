@@ -25,6 +25,7 @@ public sealed class AssignTenantMemberRoleCommandHandler
     : IRequestHandler<AssignTenantMemberRoleCommand, Result<AssignTenantMemberRoleResultDto>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly TenantMemberManagementAccess _memberAccess;
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IUserTenantRepository _userTenantRepo;
     private readonly IReadRepository<OperationClaim> _claimsRead;
@@ -34,6 +35,7 @@ public sealed class AssignTenantMemberRoleCommandHandler
 
     public AssignTenantMemberRoleCommandHandler(
         ITenantContext tenantContext,
+        TenantMemberManagementAccess memberAccess,
         ICurrentUserPermissionChecker permissions,
         IUserTenantRepository userTenantRepo,
         IReadRepository<OperationClaim> claimsRead,
@@ -42,6 +44,7 @@ public sealed class AssignTenantMemberRoleCommandHandler
         IUnitOfWork uow)
     {
         _tenantContext = tenantContext;
+        _memberAccess = memberAccess;
         _permissions = permissions;
         _userTenantRepo = userTenantRepo;
         _claimsRead = claimsRead;
@@ -94,6 +97,12 @@ public sealed class AssignTenantMemberRoleCommandHandler
                 "Invites.OperationClaimNotAssignable",
                 "Bu operation claim tenant panelinden atanamaz; yalnızca atanabilir rol listesindekiler seçilebilir.");
         }
+
+        var access = await _memberAccess.EnsureMemberAsync(request.MemberId, ct);
+        if (access.IsSuccess)
+            access = await _memberAccess.EnsureRoleAsync(claim.Name, ct);
+        if (!access.IsSuccess)
+            return Result<AssignTenantMemberRoleResultDto>.Failure(access.Error);
 
         if (await _userOperationClaims.ExistsAsync(request.MemberId, request.OperationClaimId, ct))
         {
