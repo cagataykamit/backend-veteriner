@@ -73,9 +73,10 @@ public static class WebApplicationExtensions
         app.UseRouting();
 
         app.UseCors("AllowFrontend");
-        app.UseAppRateLimiting(app.Configuration);
 
         app.UseAuthentication();
+        // Hız sınırı kimlik doğrulamadan sonra: giriş yapmış istek kullanıcıya göre bölünür (RateLimitingOptions).
+        app.UseAppRateLimiting(app.Configuration);
         app.UseMiddleware<TenantContextMiddleware>();
         app.UseMiddleware<ClinicContextMiddleware>();
         app.UseAuthorization();
