@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Auth;
+using Backend.Veteriner.Application.Auth.Contracts.Dtos;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
 using Backend.Veteriner.Application.Tenants.Queries.GetMembers;
@@ -15,9 +16,47 @@ public sealed class GetTenantMembersQueryHandlerTests
     private readonly Mock<ITenantContext> _tenantContext = new();
     private readonly Mock<ICurrentUserPermissionChecker> _permissions = new();
     private readonly Mock<IReadRepository<UserTenant>> _userTenants = new();
+    private readonly Mock<IUserOperationClaimRepository> _userOperationClaims = new();
+    private readonly Mock<IUserClinicRepository> _userClinics = new();
+
+    public GetTenantMembersQueryHandlerTests()
+    {
+        _userOperationClaims.Setup(x => x.GetDetailsByUserIdsAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _userClinics.Setup(x => x.ListActiveClinicNamesByUserIdsAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+    }
 
     private GetTenantMembersQueryHandler CreateHandler()
-        => new(_tenantContext.Object, _permissions.Object, _userTenants.Object);
+        => new(_tenantContext.Object, _permissions.Object, _userTenants.Object, _userOperationClaims.Object, _userClinics.Object);
+
+    [Fact]
+    public async Task Handle_Should_Map_DisplayName_AssignableRoles_And_Clinics()
+    {
+        var tid = Guid.NewGuid();
+        var uid = Guid.NewGuid();
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.InviteCreate)).Returns(true);
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
+        _userTenants.Setup(x => x.CountAsync(It.IsAny<TenantMembersCountSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+        _userTenants.Setup(x => x.ListAsync(It.IsAny<TenantMembersPagedSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<TenantMemberListProjectionRow> { new(uid, "dr.test@x.com", true, DateTime.UtcNow, "Ece Arslan") });
+        _userOperationClaims.Setup(x => x.GetDetailsByUserIdsAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new UserOperationClaimDetailDto(Guid.NewGuid(), uid, "dr.test@x.com", Guid.NewGuid(), "Veteriner"),
+                new UserOperationClaimDetailDto(Guid.NewGuid(), uid, "dr.test@x.com", Guid.NewGuid(), "Internal.Technical"),
+            ]);
+        _userClinics.Setup(x => x.ListActiveClinicNamesByUserIdsAsync(It.IsAny<IReadOnlyCollection<Guid>>(), tid, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new UserClinicNameRow(uid, "Merkez Pati")]);
+
+        var result = await CreateHandler().Handle(new GetTenantMembersQuery(tid, new PageRequest()), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var item = result.Value!.Items.Should().ContainSingle().Subject;
+        item.Name.Should().Be("Ece Arslan");
+        item.Roles.Should().Equal("Veteriner");
+        item.Clinics.Should().Equal("Merkez Pati");
+    }
 
     [Fact]
     public async Task Handle_Should_ReturnFailure_When_PermissionDenied()

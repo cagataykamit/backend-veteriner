@@ -5,4 +5,5 @@ public sealed record TenantMemberListProjectionRow(
     Guid UserId,
     string Email,
     bool EmailConfirmed,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    string? DisplayName = null);

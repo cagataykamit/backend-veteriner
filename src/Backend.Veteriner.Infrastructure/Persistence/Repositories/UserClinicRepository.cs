@@ -47,6 +47,25 @@ public sealed class UserClinicRepository : IUserClinicRepository
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<UserClinicNameRow>> ListActiveClinicNamesByUserIdsAsync(
+        IReadOnlyCollection<Guid> userIds,
+        Guid tenantId,
+        CancellationToken ct)
+    {
+        if (userIds.Count == 0)
+            return [];
+
+        return await (
+            from uc in _db.UserClinics.AsNoTracking()
+            join c in _db.Clinics.AsNoTracking() on uc.ClinicId equals c.Id
+            where userIds.Contains(uc.UserId)
+                  && c.TenantId == tenantId
+                  && c.IsActive
+            orderby c.Name, c.Id
+            select new UserClinicNameRow(uc.UserId, c.Name)
+        ).ToListAsync(ct);
+    }
+
     public Task AddAsync(UserClinic entity, CancellationToken ct)
     {
         // SaveChanges burada yok; commit handler/UoW seviyesinde yapılır.

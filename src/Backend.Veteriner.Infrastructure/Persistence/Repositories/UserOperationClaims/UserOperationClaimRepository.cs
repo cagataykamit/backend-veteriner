@@ -73,6 +73,29 @@ public sealed class UserOperationClaimRepository : IUserOperationClaimRepository
         ).ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<UserOperationClaimDetailDto>> GetDetailsByUserIdsAsync(
+        IReadOnlyCollection<Guid> userIds,
+        CancellationToken ct)
+    {
+        if (userIds.Count == 0)
+            return [];
+
+        return await (
+            from uoc in _db.UserOperationClaims.AsNoTracking()
+            join u in _db.Users.AsNoTracking() on uoc.UserId equals u.Id
+            join oc in _db.OperationClaims.AsNoTracking() on uoc.OperationClaimId equals oc.Id
+            where userIds.Contains(uoc.UserId)
+            orderby oc.Name
+            select new UserOperationClaimDetailDto(
+                uoc.Id,
+                uoc.UserId,
+                u.Email,
+                uoc.OperationClaimId,
+                oc.Name
+            )
+        ).ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<string>> GetOperationClaimNamesByUserIdAsync(Guid userId, CancellationToken ct)
     {
         return await (

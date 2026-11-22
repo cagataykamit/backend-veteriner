@@ -20,6 +20,9 @@ public interface IUserOperationClaimRepository
 
     Task<IReadOnlyList<UserOperationClaimDetailDto>> GetDetailsByUserIdAsync(Guid userId, CancellationToken ct);
 
+    /// <summary>Birden çok kullanıcının rol ayrıntıları tek sorguda (üye listesi).</summary>
+    Task<IReadOnlyList<UserOperationClaimDetailDto>> GetDetailsByUserIdsAsync(IReadOnlyCollection<Guid> userIds, CancellationToken ct);
+
     /// <summary>Kullanıcının operation claim adları (rol kontrolü; Users join yok).</summary>
     Task<IReadOnlyList<string>> GetOperationClaimNamesByUserIdAsync(Guid userId, CancellationToken ct);
 }

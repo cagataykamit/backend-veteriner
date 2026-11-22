@@ -31,6 +31,7 @@ public sealed class TenantMembersPagedSpec : Specification<UserTenant, TenantMem
             ut.User!.Id,
             ut.User.Email,
             ut.User.EmailConfirmed,
-            ut.User.CreatedAtUtc));
+            ut.User.CreatedAtUtc,
+            ut.User.DisplayName));
     }
 }
