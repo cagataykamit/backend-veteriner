@@ -5,8 +5,8 @@ using Backend.Veteriner.Application.Notifications;
 using Backend.Veteriner.Application.Projections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Serilog;
 
 namespace Backend.Veteriner.Infrastructure.Outbox;
 
@@ -29,14 +29,20 @@ public sealed class OutboxProcessor : BackgroundService
     private readonly IServiceProvider _sp;
     private readonly OutboxOptions _opt;
     private readonly TimeProvider _timeProvider;
+    private readonly ILogger<OutboxProcessor> _logger;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public OutboxProcessor(IServiceProvider sp, IOptions<OutboxOptions> opt, TimeProvider timeProvider)
+    public OutboxProcessor(
+        IServiceProvider sp,
+        IOptions<OutboxOptions> opt,
+        TimeProvider timeProvider,
+        ILogger<OutboxProcessor> logger)
     {
         _sp = sp;
         _opt = opt.Value;
         _timeProvider = timeProvider;
+        _logger = logger;
 
         var workerId = $"outbox:{Environment.MachineName}:{Environment.ProcessId}:{Guid.NewGuid():N}";
         WorkerId = workerId.Length <= MaxWorkerIdLength ? workerId : workerId[..MaxWorkerIdLength];
@@ -49,7 +55,7 @@ public sealed class OutboxProcessor : BackgroundService
     {
         if (!_opt.Enabled)
         {
-            Log.Information("OutboxProcessor disabled via Outbox:Enabled=false; background outbox polling skipped.");
+            _logger.LogInformation("OutboxProcessor disabled via Outbox:Enabled=false; background outbox polling skipped.");
             return;
         }
 
@@ -68,7 +74,7 @@ public sealed class OutboxProcessor : BackgroundService
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Outbox loop error");
+                _logger.LogError(ex, "Outbox loop error");
             }
         }
     }
@@ -106,9 +112,13 @@ public sealed class OutboxProcessor : BackgroundService
 
             // Gönderim yapıldı: kapanışta iptal edilip mesajın yeniden gönderilmemesi için sonuç iptalsiz yazılır.
             if (await claims.MarkProcessedAsync(msg.Id, msg.ClaimToken, WorkerId, CancellationToken.None))
+            {
                 processedCount++;
+                // Başarılı gönderimin günlükteki tek izi; alıcı adresi kişisel veri olduğundan yazılmaz.
+                _logger.LogInformation("Outbox message sent. Type={Type} Id={Id} Retry={Retry}", msg.Type, msg.Id, msg.RetryCount);
+            }
             else
-                Log.Warning("Outbox completion rejected (claim lost). Type={Type} Id={Id}", msg.Type, msg.Id);
+                _logger.LogWarning("Outbox completion rejected (claim lost). Type={Type} Id={Id}", msg.Type, msg.Id);
         }
 
         return processedCount;
@@ -120,9 +130,9 @@ public sealed class OutboxProcessor : BackgroundService
         if (retryCount >= _opt.MaxRetryCount)
         {
             if (await claims.MarkDeadLetterAsync(msg.Id, msg.ClaimToken, WorkerId, ex.Message, CancellationToken.None))
-                Log.Error(ex, "Outbox dead-letter. Type={Type} Id={Id} Retry={Retry}", msg.Type, msg.Id, retryCount);
+                _logger.LogError(ex, "Outbox dead-letter. Type={Type} Id={Id} Retry={Retry}", msg.Type, msg.Id, retryCount);
             else
-                Log.Warning("Outbox dead-letter rejected (claim lost). Type={Type} Id={Id}", msg.Type, msg.Id);
+                _logger.LogWarning("Outbox dead-letter rejected (claim lost). Type={Type} Id={Id}", msg.Type, msg.Id);
             return;
         }
 
@@ -130,13 +140,13 @@ public sealed class OutboxProcessor : BackgroundService
         var nextAttemptAtUtc = _timeProvider.GetUtcNow().UtcDateTime.Add(backoff);
         if (await claims.MarkRetryAsync(msg.Id, msg.ClaimToken, WorkerId, retryCount, nextAttemptAtUtc, ex.Message, CancellationToken.None))
         {
-            Log.Warning(ex,
+            _logger.LogWarning(ex,
                 "Outbox retry in {DelaySeconds}s. Type={Type} Id={Id} Retry={Retry}",
                 (int)backoff.TotalSeconds, msg.Type, msg.Id, retryCount);
         }
         else
         {
-            Log.Warning("Outbox retry rejected (claim lost). Type={Type} Id={Id}", msg.Type, msg.Id);
+            _logger.LogWarning("Outbox retry rejected (claim lost). Type={Type} Id={Id}", msg.Type, msg.Id);
         }
     }
 

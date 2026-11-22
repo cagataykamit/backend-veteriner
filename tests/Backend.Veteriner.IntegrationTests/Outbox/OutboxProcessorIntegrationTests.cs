@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Text.Json;
 using Backend.Veteriner.Application.Appointments.IntegrationEvents;
@@ -16,6 +17,8 @@ using Backend.IntegrationTests.Infrastructure;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace Backend.IntegrationTests.Outbox;
@@ -93,6 +96,27 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
         row.DeadLetterAtUtc.Should().BeNull();
         row.RetryCount.Should().Be(0);
         row.ClaimToken.Should().BeNull("projeksiyon olayı generic işlemci tarafından claim edilmemeli");
+    }
+
+    [Fact]
+    public async Task ProcessBatch_Should_LogSentEmail_WithoutRecipient()
+    {
+        await ClearOutboxAsync();
+        var sentId = await AddEmailAsync(NewSubject(), BaseTime);
+        var failingSubject = NewSubject();
+        Sender.OnSend(failingSubject, () => throw new InvalidOperationException("smtp down"));
+        var failedId = await AddEmailAsync(failingSubject, BaseTime.AddSeconds(1));
+        var logger = new CapturingLogger<OutboxProcessor>();
+
+        var processed = await NewProcessor(logger: logger).ProcessBatchAsync(CancellationToken.None);
+
+        processed.Should().Be(1);
+        var sent = logger.Entries.Where(e => e.Message.StartsWith("Outbox message sent.")).ToList();
+        sent.Should().ContainSingle("yalnız başarılı gönderim 'sent' olarak günlüğe yazılır");
+        sent[0].Level.Should().Be(LogLevel.Information);
+        sent[0].Message.Should().Contain($"Type={OutboxMessageTypes.Email}").And.Contain(sentId.ToString());
+        sent[0].Message.Should().NotContain(failedId.ToString());
+        logger.Entries.Should().NotContain(e => e.Message.Contains("noop@example.com"), "alıcı adresi günlüğe yazılmaz");
     }
 
     [Fact]
@@ -243,7 +267,8 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
         var processor = new OutboxProcessor(
             _factory.Services,
             Options.Create(new OutboxOptions { Enabled = true, LoopIntervalSeconds = 1 }),
-            TimeProvider.System);
+            TimeProvider.System,
+            NullLogger<OutboxProcessor>.Instance);
 
         await processor.StartAsync(CancellationToken.None);
         try
@@ -337,11 +362,12 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
 
     private static string NewSubject() => $"proc-{Guid.NewGuid():N}";
 
-    private OutboxProcessor NewProcessor(int batchSize = 50, int maxRetryCount = 10)
+    private OutboxProcessor NewProcessor(int batchSize = 50, int maxRetryCount = 10, ILogger<OutboxProcessor>? logger = null)
         => new(
             _factory.Services,
             Options.Create(new OutboxOptions { BatchSize = batchSize, MaxRetryCount = maxRetryCount }),
-            TimeProvider.System);
+            TimeProvider.System,
+            logger ?? NullLogger<OutboxProcessor>.Instance);
 
     private Task<Guid> AddEmailAsync(string subject, DateTime createdAtUtc)
         => AddMessageAsync(
@@ -374,5 +400,17 @@ public sealed class OutboxProcessorIntegrationTests : IClassFixture<OutboxProces
         await using var scope = _factory.Services.CreateSystemScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await db.OutboxMessages.ExecuteDeleteAsync();
+    }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public ConcurrentQueue<(LogLevel Level, string Message)> Entries { get; } = new();
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            => Entries.Enqueue((logLevel, formatter(state, exception)));
     }
 }
