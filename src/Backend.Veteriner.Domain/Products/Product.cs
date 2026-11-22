@@ -221,6 +221,16 @@ public sealed class Product : AggregateRoot, ITenantOwned
         UpdatedAtUtc = utcNow;
     }
 
+    /// <summary>Yalnız adı değiştirir (kayıtlı adın yazım onarımı, DbMigrator <c>fix-product-names</c>); diğer alanlar aynen kalır.</summary>
+    public void Rename(string name, DateTime utcNow)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Ürün adı boş olamaz.", nameof(name));
+
+        Name = name.Trim();
+        UpdatedAtUtc = utcNow;
+    }
+
     public void Activate(DateTime utcNow)
     {
         IsActive = true;
