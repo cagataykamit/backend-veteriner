@@ -118,7 +118,10 @@ public sealed class GetPetOpenItemsQueryHandler : IRequestHandler<GetPetOpenItem
                 if (rows.Count == 0)
                     return null;
 
-                var items = rows.Select(v => new PetOpenItemsVaccinationDto(v.Id, v.VaccineName, v.DueAtUtc!.Value, v.ClinicId)).ToList();
+                var items = rows
+                    .Select(v => new PetOpenItemsVaccinationDto(
+                        v.Id, v.VaccineName, v.DueAtUtc!.Value, v.ClinicId, v.Status == VaccinationStatus.Applied, v.VaccineDefinitionId))
+                    .ToList();
                 return new PetOpenItemsVaccinationsDto(
                     items.Where(v => VaccinationDueRule.IsOverdueAt(v.DueAtUtc, overdueWindow)).ToList(),
                     items.Where(v => !VaccinationDueRule.IsOverdueAt(v.DueAtUtc, overdueWindow)).ToList());
