@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Backend.Veteriner.Domain.AppointmentRequests;
+using Backend.Veteriner.Domain.Appointments;
 
 namespace Backend.Veteriner.Application.AppointmentRequests;
 
@@ -86,6 +87,9 @@ public sealed record AppointmentRequestChannelSummaryDto(
     int Total,
     int Approved);
 
+/// <summary>
+/// Durum geçişi (APPT-024): <see cref="FromStatus"/> boşsa talep oluşturuldu. <see cref="ActorName"/> yalnız personel satırında dolar.
+/// </summary>
 public sealed record AppointmentRequestHistoryDto(
     AppointmentRequestStatus? FromStatus,
     AppointmentRequestStatus ToStatus,
@@ -113,7 +117,14 @@ public sealed record AppointmentRequestDetailDto(
     IReadOnlyList<AppointmentRequestHistoryDto> History,
     IReadOnlyList<ClientMatchDto> ClientMatches,
     bool RequestedSlotFree,
-    IReadOnlyList<Guid> FreeVeterinarianUserIds);
+    IReadOnlyList<Guid> FreeVeterinarianUserIds,
+    AppointmentRequestAppointmentDto? Appointment);
+
+/// <summary>
+/// Onaylı talepten oluşan randevunun güncel hali (APPT-024). <see cref="AppointmentRequestDetailDto.ApprovedStartUtc"/> onay anının
+/// saatidir; randevu sonradan taşınmış, iptal edilmiş ya da tamamlanmış olabilir.
+/// </summary>
+public sealed record AppointmentRequestAppointmentDto(Guid Id, DateTime ScheduledAtUtc, int DurationMinutes, AppointmentStatus Status);
 
 /// <summary>Onay/red ekranında gönderilecek e-postanın düzenlenmiş hali; boşsa şablon kullanılır.</summary>
 public sealed record AppointmentRequestEmailOverride(string Subject, string Body);

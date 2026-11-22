@@ -291,6 +291,68 @@ public sealed partial class OwnerPortalIntegrationTests
     }
 
     [Fact]
+    public async Task Request_Detail_Should_Show_Audit_Trail_And_Current_Appointment()
+    {
+        var b = await SetupBookingAsync();
+        var slots = await PublicSlotsAsync(b);
+        var email = UniqueEmail();
+        var (clientId, petId) = await SeedClientWithPetAsync(b.Staff.TenantId, email.ToLowerInvariant());
+
+        var first = await CreateLinkRequestAsync(b, slots[0], email);
+        var pending = await GetRequestAsync(b.Staff, first);
+        pending.GetProperty("appointment").ValueKind.Should().Be(JsonValueKind.Null);
+        var created = pending.GetProperty("history").EnumerateArray().Single();
+        created.GetProperty("fromStatus").ValueKind.Should().Be(JsonValueKind.Null);
+        created.GetProperty("toStatus").GetInt32().Should().Be((int)AppointmentRequestStatus.Pending);
+        created.GetProperty("actorKind").GetInt32().Should().Be((int)AppointmentRequestActorKind.Owner);
+        created.GetProperty("actorUserId").ValueKind.Should().Be(JsonValueKind.Null);
+        created.GetProperty("actorName").ValueKind.Should().Be(JsonValueKind.Null);
+
+        var approve = await SendAsync(HttpMethod.Post, $"/api/v1/appointment-requests/{first}/approve", b.Staff.Token, new { clientId, petId });
+        approve.StatusCode.Should().Be(HttpStatusCode.OK, await approve.Content.ReadAsStringAsync());
+        var approved = await approve.Content.ReadFromJsonAsync<JsonElement>();
+        var decision = approved.GetProperty("history").EnumerateArray().Last();
+        decision.GetProperty("fromStatus").GetInt32().Should().Be((int)AppointmentRequestStatus.Pending);
+        decision.GetProperty("toStatus").GetInt32().Should().Be((int)AppointmentRequestStatus.Approved);
+        decision.GetProperty("actorKind").GetInt32().Should().Be((int)AppointmentRequestActorKind.Staff);
+        decision.GetProperty("actorUserId").GetGuid().Should().NotBeEmpty();
+        decision.GetProperty("actorName").GetString().Should().NotBeNullOrWhiteSpace("personel kararı adla görünür");
+        decision.GetProperty("note").ValueKind.Should().Be(JsonValueKind.Null, "istenen saatle onay");
+
+        var appointmentId = approved.GetProperty("summary").GetProperty("appointmentId").GetGuid();
+        var appointment = approved.GetProperty("appointment");
+        appointment.GetProperty("id").GetGuid().Should().Be(appointmentId);
+        appointment.GetProperty("scheduledAtUtc").GetDateTime().ToUniversalTime().Should().Be(slots[0]);
+        appointment.GetProperty("durationMinutes").GetInt32().Should().BePositive();
+        appointment.GetProperty("status").GetInt32().Should().Be((int)AppointmentStatus.Scheduled);
+
+        // Randevu sonradan iptal edilir: talep geçmişi değişmez, detay randevunun güncel durumunu gösterir.
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var row = await db.Appointments.SingleAsync(a => a.Id == appointmentId);
+            row.Cancel("Sahibi aradı").IsSuccess.Should().BeTrue();
+            await db.SaveChangesAsync();
+        }
+
+        var afterCancel = await GetRequestAsync(b.Staff, first);
+        afterCancel.GetProperty("summary").GetProperty("status").GetInt32().Should().Be((int)AppointmentRequestStatus.Approved);
+        afterCancel.GetProperty("history").GetArrayLength().Should().Be(2);
+        afterCancel.GetProperty("appointment").GetProperty("status").GetInt32().Should().Be((int)AppointmentStatus.Cancelled);
+
+        // Red: gerekçe geçmişin notudur, randevu yoktur.
+        var second = await CreateLinkRequestAsync(b, slots[1], email);
+        var reject = await SendAsync(HttpMethod.Post, $"/api/v1/appointment-requests/{second}/reject", b.Staff.Token, new { reason = "Hekim izinli" });
+        reject.StatusCode.Should().Be(HttpStatusCode.OK, await reject.Content.ReadAsStringAsync());
+        var rejected = await reject.Content.ReadFromJsonAsync<JsonElement>();
+        rejected.GetProperty("appointment").ValueKind.Should().Be(JsonValueKind.Null);
+        var rejection = rejected.GetProperty("history").EnumerateArray().Last();
+        rejection.GetProperty("toStatus").GetInt32().Should().Be((int)AppointmentRequestStatus.Rejected);
+        rejection.GetProperty("actorKind").GetInt32().Should().Be((int)AppointmentRequestActorKind.Staff);
+        rejection.GetProperty("note").GetString().Should().Be("Hekim izinli");
+    }
+
+    [Fact]
     public async Task Expiry_Job_Should_Close_Past_Pending_Requests_With_System_History()
     {
         var b = await SetupBookingAsync();

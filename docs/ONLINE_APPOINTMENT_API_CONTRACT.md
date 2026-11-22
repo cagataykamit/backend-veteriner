@@ -346,3 +346,39 @@ bir yükleme alanı yoktur. Paket kilidi yoktur.
 - **Kontrast portalın kuralıdır:** renk beyaz yazılı zemin (adım numarası, gönder düğmesi), seçili saat ve odak halkası olur. Kart,
   sayfa zemini ve yumuşak vurgu yüzeylerinin hepsinde 4.5:1 tutmayan renk uygulanmaz, Vetinity renkleri kalır
   (frontend `projects/portal/src/app/features/booking/portal-booking-brand.ts`).
+
+## 17. Ek (2026-11-22): talep geçmişi ve denetim izi (APPT-024)
+
+Talebin kim tarafından, ne zaman, hangi durumdan hangisine ve hangi gerekçeyle geçtiği detayda okunur; onaylı talepte oluşan randevunun
+güncel hali de döner. Uç, izin ve migration değişmez (§4 `GET /{id}`; onay/red yanıtı aynı detaydır).
+
+- **Kaynak talebin kendi durum geçmişidir** (`AppointmentRequestStatusChanges`, §10 migration'ından beri her talepte). Satır yalnız domain
+  geçişlerinde eklenir (oluşturma, onay, red, sahibin vazgeçmesi, süre dolması); durum başka yoldan değişmez. Append-only: düzenlenmez,
+  silinmez. Geriye dönük doldurma gerekmez.
+- **RECORD-002 kaydetme yakalayıcısı kullanılmaz:** o yakalayıcı klinik kayıtların alan farkını yazar ve kullanıcısız değişikliği kaydetmez;
+  talep geçişlerinin bir kısmını sahip ya da sistem yapar. `AuditLogs` (güvenlik denetimi; `AppointmentRequest.Approve`, `.Reject`,
+  `.Create.Portal`, `.Cancel.Portal`) ayrı kalır ve bu ekrana kaynak değildir.
+- Yaşam döngüsü `Pending` → tek kapanış durumudur; bir talepte en çok iki satır olur. Liste eskiden yeniye (`atUtc`), sayfalama yoktur.
+
+| Alan | Anlam |
+|---|---|
+| `fromStatus` | Önceki durum; `null` = talep oluşturuldu. |
+| `toStatus` | Yeni durum. |
+| `actorKind` | `0 Owner` (talep, vazgeçme), `1 Staff` (onay, red), `2 System` (süre doldu, §9). |
+| `actorUserId` | Yalnız `Staff` satırında dolu. |
+| `actorName` | Personelin görünen adı (yoksa e-postası); kullanıcı silinmişse `null`. `Owner` ve `System` satırında `null`: istemci sahip için `summary.contactName` gösterir. |
+| `note` | `Rejected`: red gerekçesi (sahibe giden metin). İstenenden farklı saatle `Approved`: `"Farklı saatle onaylandı"`. Diğerlerinde `null`. |
+| `atUtc` | Geçiş anı. |
+
+**Oluşan randevu `[YENİ]`:** detayda `appointment` alanı. Onaylı talepte randevunun **güncel** hali, diğerlerinde `null`:
+
+```json
+"appointment": { "id": "…", "scheduledAtUtc": "…", "durationMinutes": 30, "status": 0 }
+```
+
+- `status` randevu durumudur: `0 Scheduled`, `1 Completed`, `2 Cancelled`, `3 NoShow`.
+- `approvedStartUtc` onay anının saatidir; randevu sonradan taşınırsa `appointment.scheduledAtUtc` farklı olur. Randevunun kendi
+  değişiklikleri randevu ekranındadır (panel `/panel/appointments/{id}`); talep geçmişine eklenmez.
+- `summary.appointmentId` aynı kalır (liste satırında da dolu).
+
+Kapsam dışı: portal "taleplerim" ekranında geçmiş, e-posta gönderim olayları, randevu ekranından talebe geri bağlantı.
