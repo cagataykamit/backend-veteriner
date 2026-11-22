@@ -85,7 +85,7 @@ public sealed class ClinicsController : ControllerBase
             id);
     }
 
-    /// <summary>Klinik haftalık çalışma saatleri. Kayıt yoksa varsayılan program döner.</summary>
+    /// <summary>Klinik haftalık çalışma saatleri <c>{ isConfigured, items }</c>. Kayıt yoksa <c>isConfigured=false</c> ve varsayılan program döner.</summary>
     /// <remarks>
     /// Read yetkisi composite "any-of": <c>Clinics.Read</c>, <c>Clinics.Update</c>,
     /// <c>Appointments.Create</c> veya <c>Appointments.Reschedule</c> permission'larından en az biri.
@@ -94,7 +94,7 @@ public sealed class ClinicsController : ControllerBase
     /// </remarks>
     [HttpGet("{id:guid}/working-hours")]
     [Authorize(Policy = AuthorizationPolicyNames.ClinicsSchedulingRead)]
-    [ProducesResponseType(typeof(IReadOnlyList<ClinicWorkingHourDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ClinicWorkingHoursDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]

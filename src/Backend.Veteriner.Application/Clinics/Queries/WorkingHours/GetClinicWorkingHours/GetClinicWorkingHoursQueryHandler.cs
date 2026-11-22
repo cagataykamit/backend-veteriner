@@ -9,7 +9,7 @@ using Mediator;
 namespace Backend.Veteriner.Application.Clinics.Queries.WorkingHours.GetClinicWorkingHours;
 
 public sealed class GetClinicWorkingHoursQueryHandler
-    : IRequestHandler<GetClinicWorkingHoursQuery, Result<IReadOnlyList<ClinicWorkingHourDto>>>
+    : IRequestHandler<GetClinicWorkingHoursQuery, Result<ClinicWorkingHoursDto>>
 {
     private readonly ITenantContext _tenantContext;
     private readonly IClientContext _clientContext;
@@ -34,20 +34,20 @@ public sealed class GetClinicWorkingHoursQueryHandler
         _hoursRead = hoursRead;
     }
 
-    public async ValueTask<Result<IReadOnlyList<ClinicWorkingHourDto>>> Handle(
+    public async ValueTask<Result<ClinicWorkingHoursDto>> Handle(
         GetClinicWorkingHoursQuery request,
         CancellationToken ct)
     {
         if (_tenantContext.TenantId is not { } tenantId)
         {
-            return Result<IReadOnlyList<ClinicWorkingHourDto>>.Failure(
+            return Result<ClinicWorkingHoursDto>.Failure(
                 "Tenants.ContextMissing",
                 "Kiracı bağlamı yok. JWT tenant_id veya sorgu tenantId gerekir.");
         }
 
         if (_clientContext.UserId is not { } userId)
         {
-            return Result<IReadOnlyList<ClinicWorkingHourDto>>.Failure(
+            return Result<ClinicWorkingHoursDto>.Failure(
                 "Auth.Unauthorized.UserContextMissing",
                 "Kullanıcı bağlamı yok.");
         }
@@ -55,7 +55,7 @@ public sealed class GetClinicWorkingHoursQueryHandler
         var clinic = await _clinics.FirstOrDefaultAsync(new ClinicByIdSpec(tenantId, request.ClinicId), ct);
         if (clinic is null)
         {
-            return Result<IReadOnlyList<ClinicWorkingHourDto>>.Failure(
+            return Result<ClinicWorkingHoursDto>.Failure(
                 "Clinics.NotFound",
                 "Klinik bulunamadı.");
         }
@@ -64,7 +64,7 @@ public sealed class GetClinicWorkingHoursQueryHandler
         {
             if (!await _userClinics.ExistsAsync(userId, clinic.Id, ct))
             {
-                return Result<IReadOnlyList<ClinicWorkingHourDto>>.Failure(
+                return Result<ClinicWorkingHoursDto>.Failure(
                     "Clinics.AccessDenied",
                     "Bu klinik için atanmış üyeliğiniz yok.");
             }
@@ -72,7 +72,7 @@ public sealed class GetClinicWorkingHoursQueryHandler
 
         var rows = await _hoursRead.ListAsync(new ClinicWorkingHoursByClinicSpec(tenantId, request.ClinicId), ct);
         if (rows.Count == 0)
-            return Result<IReadOnlyList<ClinicWorkingHourDto>>.Success(ClinicWorkingHoursDefaults.BuildWeek());
+            return Result<ClinicWorkingHoursDto>.Success(new ClinicWorkingHoursDto(false, ClinicWorkingHoursDefaults.BuildWeek()));
 
         var dtos = rows
             .Select(r => new ClinicWorkingHourDto(
@@ -84,6 +84,6 @@ public sealed class GetClinicWorkingHoursQueryHandler
                 r.BreakEndsAt))
             .ToList();
 
-        return Result<IReadOnlyList<ClinicWorkingHourDto>>.Success(dtos);
+        return Result<ClinicWorkingHoursDto>.Success(new ClinicWorkingHoursDto(true, dtos));
     }
 }
