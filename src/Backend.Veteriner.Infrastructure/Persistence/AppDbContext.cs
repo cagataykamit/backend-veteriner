@@ -132,6 +132,7 @@ public class AppDbContext : TenantIsolatedDbContext
     public DbSet<PetColor> PetColors => Set<PetColor>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<AppointmentReason> AppointmentReasons => Set<AppointmentReason>();
+    public DbSet<AppointmentResource> AppointmentResources => Set<AppointmentResource>();
     public DbSet<AppointmentOwnerLink> AppointmentOwnerLinks => Set<AppointmentOwnerLink>();
     public DbSet<WaitlistEntry> WaitlistEntries => Set<WaitlistEntry>();
     public DbSet<WaitlistOffer> WaitlistOffers => Set<WaitlistOffer>();

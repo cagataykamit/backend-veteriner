@@ -621,6 +621,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("int")
                         .HasDefaultValue(30);
 
+                    b.Property<Guid?>("EquipmentResourceId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid?>("ImportBatchId")
                         .HasColumnType("uniqueidentifier");
 
@@ -643,6 +646,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<Guid?>("ReasonId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("RoomResourceId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("ScheduledAtUtc")
                         .HasColumnType("datetime2");
 
@@ -657,10 +663,14 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("EquipmentResourceId");
+
                     b.HasIndex("ImportBatchId")
                         .HasFilter("[ImportBatchId] IS NOT NULL");
 
                     b.HasIndex("ReasonId");
+
+                    b.HasIndex("RoomResourceId");
 
                     b.HasIndex("TenantId");
 
@@ -675,6 +685,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasIndex("TenantId", "ClinicId", "PetId");
 
                     SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("TenantId", "ClinicId", "PetId"), new[] { "ScheduledAtUtc" });
+
+                    b.HasIndex("TenantId", "EquipmentResourceId", "ScheduledAtUtc")
+                        .HasFilter("[EquipmentResourceId] IS NOT NULL");
+
+                    b.HasIndex("TenantId", "RoomResourceId", "ScheduledAtUtc")
+                        .HasFilter("[RoomResourceId] IS NOT NULL");
 
                     b.HasIndex("TenantId", "VeterinarianUserId", "ScheduledAtUtc");
 
@@ -782,6 +798,54 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasFilter("[IsActive] = 1");
 
                     b.ToTable("AppointmentReasons", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Appointments.AppointmentResource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Capacity")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ClinicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("TenantId", "ClinicId");
+
+                    b.HasIndex("TenantId", "ClinicId", "Name")
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1");
+
+                    b.ToTable("AppointmentResources", (string)null);
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Auth.OperationClaim", b =>
@@ -8705,6 +8769,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Appointments.Appointment", b =>
                 {
+                    b.HasOne("Backend.Veteriner.Domain.Appointments.AppointmentResource", null)
+                        .WithMany()
+                        .HasForeignKey("EquipmentResourceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Backend.Veteriner.Domain.Imports.ImportBatch", null)
                         .WithMany()
                         .HasForeignKey("ImportBatchId")
@@ -8713,6 +8782,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.HasOne("Backend.Veteriner.Domain.Appointments.AppointmentReason", null)
                         .WithMany()
                         .HasForeignKey("ReasonId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Backend.Veteriner.Domain.Appointments.AppointmentResource", null)
+                        .WithMany()
+                        .HasForeignKey("RoomResourceId")
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
@@ -8764,6 +8838,15 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         });
 
                     b.Navigation("Veterinarians");
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.Appointments.AppointmentResource", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Auth.OperationClaimPermission", b =>
