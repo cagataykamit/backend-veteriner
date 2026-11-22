@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Appointments.Contracts.Dtos;
 using Backend.Veteriner.Application.Appointments.Queries.GetCalendar;
 using Backend.Veteriner.Application.Appointments.ReadModels;
+using Backend.Veteriner.Application.Appointments.Resources;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
@@ -27,6 +28,7 @@ public sealed class GetAppointmentsCalendarQueryHandlerTests
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
     private readonly Mock<IReadRepository<AppointmentReason>> _reasons = new();
+    private readonly Mock<IReadRepository<AppointmentResource>> _resources = new();
     private readonly Mock<IAppointmentReadModelReader> _readModelReader = new();
     private readonly Mock<IClinicReadScopeResolver> _scopeResolver = ClinicReadScopeResolverMock.Default();
     private static readonly Guid VetId = Guid.NewGuid();
@@ -45,6 +47,7 @@ public sealed class GetAppointmentsCalendarQueryHandlerTests
             Options.Create(new QueryReadModelsOptions { AppointmentsEnabled = appointmentsQueryEnabled }),
             VeterinarianReaderMock.Create(new Dictionary<Guid, string?> { [VetId] = "Dr. Ayşe" }).Object,
             _reasons.Object,
+            _resources.Object,
             TimeProvider.System);
 
     [Fact]
@@ -316,6 +319,38 @@ public sealed class GetAppointmentsCalendarQueryHandlerTests
         result.Value![0].VeterinarianName.Should().Be("Dr. Ayşe");
         result.Value[0].ReasonName.Should().Be("Kontrol");
         result.Value[0].Notes.Should().Be("Kontrol notu");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Complete_Room_And_Equipment_With_Names_On_ReadModel_Path()
+    {
+        var tenantId = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        var appointmentId = Guid.NewGuid();
+        var room = AppointmentResource.Create(tenantId, clinicId, "Ameliyathane", AppointmentResourceType.Room, 1, 0, DateTime.UtcNow);
+        var device = AppointmentResource.Create(tenantId, clinicId, "Ultrason", AppointmentResourceType.Equipment, 1, 0, DateTime.UtcNow);
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tenantId);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(clinicId);
+        _readModelReader.Setup(r => r.GetCalendarAsync(It.IsAny<AppointmentCalendarReadRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[]
+            {
+                new AppointmentCalendarItemDto(appointmentId, clinicId, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow, 30, DateTime.UtcNow.AddMinutes(30),
+                    AppointmentStatus.Scheduled, AppointmentType.Checkup, "Pamuk", "Ali Veli"),
+            });
+        _appointments.Setup(r => r.ListAsync(It.IsAny<AppointmentCalendarDetailsByIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<AppointmentCalendarDetailsRow> { new(appointmentId, null, null, null, room.Id, device.Id) });
+        _resources.Setup(r => r.ListAsync(It.IsAny<AppointmentResourcesByIdsSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<AppointmentResource> { room, device });
+
+        var result = await CreateHandler(appointmentsQueryEnabled: true).Handle(
+            new GetAppointmentsCalendarQuery(DateTime.UtcNow, DateTime.UtcNow.AddDays(1)),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value![0].RoomResourceId.Should().Be(room.Id);
+        result.Value[0].RoomResourceName.Should().Be("Ameliyathane");
+        result.Value[0].EquipmentResourceId.Should().Be(device.Id);
+        result.Value[0].EquipmentResourceName.Should().Be("Ultrason");
     }
 
     [Fact]

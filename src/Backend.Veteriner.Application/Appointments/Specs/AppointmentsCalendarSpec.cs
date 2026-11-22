@@ -13,7 +13,9 @@ public sealed record AppointmentCalendarRow(
     AppointmentType AppointmentType,
     Guid? VeterinarianUserId,
     Guid? ReasonId = null,
-    string? Notes = null);
+    string? Notes = null,
+    Guid? RoomResourceId = null,
+    Guid? EquipmentResourceId = null);
 
 public sealed class AppointmentsCalendarSpec : Specification<Appointment, AppointmentCalendarRow>
 {
@@ -45,12 +47,14 @@ public sealed class AppointmentsCalendarSpec : Specification<Appointment, Appoin
             a.AppointmentType,
             a.VeterinarianUserId,
             a.ReasonId,
-            a.Notes));
+            a.Notes,
+            a.RoomResourceId,
+            a.EquipmentResourceId));
     }
 }
 
 /// <summary>
-/// Randevuların hekimi, nedeni ve notu: okuma modeli yolu bunları taşımaz; takvim aynı istekte komut veritabanından tamamlar.
+/// Randevuların hekimi, nedeni, notu, odası ve cihazı: okuma modeli yolu bunları taşımaz; takvim aynı istekte komut veritabanından tamamlar.
 /// </summary>
 public sealed class AppointmentCalendarDetailsByIdsSpec : Specification<Appointment, AppointmentCalendarDetailsRow>
 {
@@ -59,11 +63,17 @@ public sealed class AppointmentCalendarDetailsByIdsSpec : Specification<Appointm
         var ids = appointmentIds.ToArray();
         Query.AsNoTracking();
         Query.Where(a => a.TenantId == tenantId && ids.Contains(a.Id));
-        Query.Select(a => new AppointmentCalendarDetailsRow(a.Id, a.VeterinarianUserId, a.ReasonId, a.Notes));
+        Query.Select(a => new AppointmentCalendarDetailsRow(a.Id, a.VeterinarianUserId, a.ReasonId, a.Notes, a.RoomResourceId, a.EquipmentResourceId));
     }
 }
 
-public sealed record AppointmentCalendarDetailsRow(Guid AppointmentId, Guid? VeterinarianUserId, Guid? ReasonId, string? Notes);
+public sealed record AppointmentCalendarDetailsRow(
+    Guid AppointmentId,
+    Guid? VeterinarianUserId,
+    Guid? ReasonId,
+    string? Notes,
+    Guid? RoomResourceId = null,
+    Guid? EquipmentResourceId = null);
 
 /// <summary>Takvimdeki randevu nedenlerinin adı (pasif neden de adıyla görünür).</summary>
 public sealed class AppointmentReasonNamesByIdsSpec : Specification<AppointmentReason, AppointmentReasonNameRow>

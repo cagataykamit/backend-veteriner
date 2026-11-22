@@ -450,6 +450,7 @@ public sealed class AppointmentListCalendarQueryParityIntegrationTests
             Options.Create(new QueryReadModelsOptions { AppointmentsEnabled = appointmentsEnabled }),
             sp.GetRequiredService<IClinicVeterinarianReader>(),
             sp.GetRequiredService<IReadRepository<AppointmentReason>>(),
+            sp.GetRequiredService<IReadRepository<AppointmentResource>>(),
             TimeProvider.System);
 
         return await handler.Handle(query, CancellationToken.None);
