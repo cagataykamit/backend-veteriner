@@ -28,6 +28,9 @@ public sealed class PublicOwnerSignupBody
 
     /// <summary>VKN (10 hane) ya da TCKN (11 hane); zorunluluğu <c>GET /public/owner-signup/settings</c> söyler. Aynı numarayla ikinci deneme 409.</summary>
     public string? TaxIdentityNumber { get; set; }
+
+    /// <summary>Kayıt olan yöneticinin ad-soyadı (hekim listeleri, kesinleştiren, Bugün satırı). Verilmezse e-postanın baş kısmı görünür.</summary>
+    public string? FullName { get; set; }
 }
 
 /// <summary>Deneme kaydı e-posta kodu isteği (TRIAL_SIGNUP_ABUSE_API_CONTRACT.md §2).</summary>

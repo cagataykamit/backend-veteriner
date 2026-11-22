@@ -112,6 +112,7 @@ public sealed class SignupAndAcceptTenantInviteCommandHandler
             return Result<TenantInviteAcceptResultDto>.Failure(legalCheck.Error);
 
         var user = new User(invite.Email, _hasher.Hash(request.Password), utcNow);
+        user.SetDisplayName(request.FullName, utcNow);
         await _usersWrite.AddAsync(user, ct);
 
         var accepted = await _acceptance.AcceptAsync(invite, user, ct);

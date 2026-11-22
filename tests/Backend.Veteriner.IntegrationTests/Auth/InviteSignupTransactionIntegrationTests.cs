@@ -81,4 +81,35 @@ public sealed class InviteSignupTransactionIntegrationTests : IClassFixture<Cust
             new { password = "Abc12345!", acceptedLegalDocuments = AllCurrentDocuments() });
         (await IntegrationTestProblemDetails.ReadCodeAsync(retry)).Should().Be("Invites.ClinicInvalid");
     }
+
+    /// <summary>Davetle katılımda ad-soyad (tam test 2026-11-22): hekim listelerinde e-postanın baş kısmı yerine görünür.</summary>
+    [Fact]
+    public async Task SignupAndAccept_Should_Store_FullName_As_DisplayName()
+    {
+        var rawToken = $"name-invite-{Guid.NewGuid():N}";
+        var email = $"name-invitee-{Guid.NewGuid():N}@example.com";
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var tokenHash = scope.ServiceProvider.GetRequiredService<ITokenHashService>();
+            var now = DateTime.UtcNow;
+            var tenant = new Tenant($"Ad Kiracı {Guid.NewGuid():N}"[..24], now);
+            var clinic = new Clinic(tenant.Id, "Ad Klinik", "İzmir");
+            db.AddRange(tenant, clinic);
+            db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Premium, now, 14));
+            var claim = await db.OperationClaims.SingleAsync(c => c.Name == "Veteriner");
+            db.TenantInvites.Add(TenantInvite.CreatePending(
+                tenant.Id, clinic.Id, email, tokenHash.ComputeSha256(rawToken), claim.Id, now.AddDays(3), now));
+            await db.SaveChangesAsync();
+        }
+
+        var response = await _client.PostAsJsonAsync($"/api/v1/public/invites/{rawToken}/signup-and-accept",
+            new { password = "Abc12345!", fullName = "  Ayşe Yılmaz ", acceptedLegalDocuments = AllCurrentDocuments() });
+
+        response.IsSuccessStatusCode.Should().BeTrue();
+        await using var verify = _factory.Services.CreateSystemScope();
+        var normalized = email.ToLowerInvariant();
+        (await verify.ServiceProvider.GetRequiredService<AppDbContext>().Users.AsNoTracking().SingleAsync(u => u.Email == normalized))
+            .DisplayName.Should().Be("Ayşe Yılmaz");
+    }
 }
