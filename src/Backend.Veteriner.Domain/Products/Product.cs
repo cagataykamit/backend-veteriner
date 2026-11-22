@@ -57,6 +57,12 @@ public sealed class Product : AggregateRoot, ITenantOwned
     /// <summary>Birim alış fiyatı (TL), yalnız bilgi: stok değeri, maliyet raporu ve ücret hesabı bu alanı okumaz.</summary>
     public decimal? PurchasePrice { get; private set; }
 
+    /// <summary>
+    /// İsteğe bağlı ilaç rehberi bağı (REF-001 Dilim 2, ADR-049 K4): etken madde ve hedef tür bu kayıttan okunur, karta
+    /// kopyalanmaz. Bağsız ürün (hizmet, mama, ithal ürün) olduğu gibi çalışır.
+    /// </summary>
+    public Guid? LicensedProductId { get; private set; }
+
     /// <summary>Hizmet dışındaki ürünler stok takiplidir; stok düşen/giren her yüzey bu kuralı kullanır.</summary>
     public bool IsStockTracked => Kind != ProductKind.Service;
 
@@ -128,6 +134,16 @@ public sealed class Product : AggregateRoot, ITenantOwned
         IsActive = true;
         CreatedAtUtc = utcNow;
         UpdatedAtUtc = null;
+    }
+
+    /// <summary>Rehber bağını kurar ya da (<c>null</c>) kaldırır; kaydın varlığı çağıranın denetimidir.</summary>
+    public void LinkLicensedProduct(Guid? licensedProductId, DateTime utcNow)
+    {
+        if (licensedProductId == Guid.Empty)
+            throw new ArgumentException("Ruhsatlı ürün kimliği geçersiz.", nameof(licensedProductId));
+
+        LicensedProductId = licensedProductId;
+        UpdatedAtUtc = utcNow;
     }
 
     private static string? NormalizeOptional(string? value)
