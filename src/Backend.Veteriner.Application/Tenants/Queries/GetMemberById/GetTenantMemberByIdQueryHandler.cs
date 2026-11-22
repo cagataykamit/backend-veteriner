@@ -1,6 +1,6 @@
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
-using Backend.Veteriner.Application.Tenants.Common;
+using Backend.Veteriner.Application.Users.Common;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Domain.Shared;
@@ -95,7 +95,7 @@ public sealed class GetTenantMemberByIdQueryHandler
         return Result<TenantMemberDetailDto>.Success(new TenantMemberDetailDto(
             user.Id,
             user.Email,
-            TenantMemberDisplayName.DeriveFromEmail(user.Email),
+            UserDisplayName.Resolve(user.DisplayName, user.Email),
             user.EmailConfirmed,
             membership.CreatedAtUtc,
             roles,

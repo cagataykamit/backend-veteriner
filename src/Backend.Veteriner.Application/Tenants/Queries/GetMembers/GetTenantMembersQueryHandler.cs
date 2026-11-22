@@ -1,9 +1,9 @@
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Models;
-using Backend.Veteriner.Application.Tenants.Common;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Users.Common;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Mediator;
@@ -16,15 +16,21 @@ public sealed class GetTenantMembersQueryHandler
     private readonly ITenantContext _tenantContext;
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IReadRepository<UserTenant> _userTenants;
+    private readonly IUserOperationClaimRepository _userOperationClaims;
+    private readonly IUserClinicRepository _userClinics;
 
     public GetTenantMembersQueryHandler(
         ITenantContext tenantContext,
         ICurrentUserPermissionChecker permissions,
-        IReadRepository<UserTenant> userTenants)
+        IReadRepository<UserTenant> userTenants,
+        IUserOperationClaimRepository userOperationClaims,
+        IUserClinicRepository userClinics)
     {
         _tenantContext = tenantContext;
         _permissions = permissions;
         _userTenants = userTenants;
+        _userOperationClaims = userOperationClaims;
+        _userClinics = userClinics;
     }
 
     public async ValueTask<Result<PagedResult<TenantMemberListItemDto>>> Handle(
@@ -61,13 +67,24 @@ public sealed class GetTenantMembersQueryHandler
         var rows = await _userTenants.ListAsync(
             new TenantMembersPagedSpec(request.TenantId, searchLower, page, pageSize), ct);
 
+        var userIds = rows.Select(r => r.UserId).ToArray();
+        var rolesByUser = (await _userOperationClaims.GetDetailsByUserIdsAsync(userIds, ct))
+            .Where(d => InviteAssignableOperationClaimsCatalog.IsAssignableName(d.OperationClaimName))
+            .GroupBy(d => d.UserId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<string>)g.Select(d => d.OperationClaimName).ToList());
+        var clinicsByUser = (await _userClinics.ListActiveClinicNamesByUserIdsAsync(userIds, request.TenantId, ct))
+            .GroupBy(c => c.UserId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<string>)g.Select(c => c.ClinicName).ToList());
+
         var items = rows
             .Select(r => new TenantMemberListItemDto(
                 r.UserId,
                 r.Email,
-                TenantMemberDisplayName.DeriveFromEmail(r.Email),
+                UserDisplayName.Resolve(r.DisplayName, r.Email),
                 r.EmailConfirmed,
-                r.CreatedAtUtc))
+                r.CreatedAtUtc,
+                rolesByUser.GetValueOrDefault(r.UserId) ?? [],
+                clinicsByUser.GetValueOrDefault(r.UserId) ?? []))
             .ToList();
 
         return Result<PagedResult<TenantMemberListItemDto>>.Success(

@@ -164,11 +164,12 @@ public sealed class PetReadModelReader : IPetReadModelReader, IPetReadModelLooku
             x.PetId,
             x.TenantId,
             x.ClientId,
+            x.ClientFullName,
             x.Name,
             x.SpeciesId,
             x.SpeciesName,
             x.ColorId,
             x.ColorName,
             x.Breed,
-            x.Weight ?? 0);
+            x.Weight);
 }

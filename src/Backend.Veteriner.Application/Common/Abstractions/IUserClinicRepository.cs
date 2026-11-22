@@ -1,5 +1,7 @@
 namespace Backend.Veteriner.Application.Common.Abstractions;
 
+public sealed record UserClinicNameRow(Guid UserId, string ClinicName);
+
 /// <summary>
 /// Kullanıcı–klinik atama erişimi (/me/clinics, select-clinic, tenant paneli klinik üyelik yönetimi).
 /// Yazım metotları <see cref="IUserOperationClaimRepository"/> ile aynı çizgidedir: SaveChanges çağırmaz,
@@ -14,6 +16,9 @@ public interface IUserClinicRepository
 
     /// <summary>Tenant içinde kullanıcının yetkili olduğu klinikler (isim sırası).</summary>
     Task<IReadOnlyList<Backend.Veteriner.Domain.Clinics.Clinic>> ListAccessibleClinicsAsync(Guid userId, Guid tenantId, bool? isActive, CancellationToken ct);
+
+    /// <summary>Birden çok kullanıcının tenant içindeki aktif klinik adları (üye listesi; isim sırası).</summary>
+    Task<IReadOnlyList<UserClinicNameRow>> ListActiveClinicNamesByUserIdsAsync(IReadOnlyCollection<Guid> userIds, Guid tenantId, CancellationToken ct);
 
     /// <summary>Yeni <see cref="Backend.Veteriner.Domain.Clinics.UserClinic"/> satırı ekler (tenant/klinik doğrulaması handler'da yapılır). SaveChanges çağırmaz.</summary>
     Task AddAsync(Backend.Veteriner.Domain.Clinics.UserClinic entity, CancellationToken ct);

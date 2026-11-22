@@ -65,7 +65,7 @@ public sealed class GetPetsListQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_MapListItems_And_UseZero_When_WeightNull()
+    public async Task Handle_Should_MapListItems_With_ClientName_And_KeepNullWeight()
     {
         var tid = Guid.NewGuid();
         var cid = Guid.NewGuid();
@@ -83,6 +83,8 @@ public sealed class GetPetsListQueryHandlerTests
             .ReturnsAsync(2);
         _pets.Setup(r => r.ListAsync(It.IsAny<PetsByTenantPagedSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<PetListProjectionRow> { rowNoWeight, rowWeighted });
+        _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantIdsNameSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ClientNameRow> { new(cid, "Ayşe Yılmaz") });
 
         var result = await CreateHandler().Handle(
             new GetPetsListQuery(new PageRequest { Page = 1, PageSize = 20 }),
@@ -91,7 +93,8 @@ public sealed class GetPetsListQueryHandlerTests
         result.IsSuccess.Should().BeTrue();
         var items = result.Value!.Items;
         items.Should().HaveCount(2);
-        items[0].Weight.Should().Be(0);
+        items.Should().AllSatisfy(i => i.ClientName.Should().Be("Ayşe Yılmaz"));
+        items[0].Weight.Should().BeNull();
         items[1].Weight.Should().Be(3.25m);
         items[0].SpeciesName.Should().Be("Kedi");
     }
