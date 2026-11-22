@@ -112,6 +112,8 @@ public sealed class RescheduleAppointmentCommandHandler : IRequestHandler<Resche
             appointment.PetId,
             appointment.VeterinarianUserId,
             appointment.VeterinarianUserId,
+            appointment.Resources,
+            appointment.Resources,
             scheduledUtc,
             endUtc,
             appointment.Id,

@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Shared;
@@ -15,4 +16,10 @@ public sealed record UpdateAppointmentCommand(
     string? Notes = null,
     int? DurationMinutes = null,
     Guid? ReasonId = null,
-    Guid? VeterinarianUserId = null) : IRequest<Result>, ITransactionalRequest;
+    Guid? VeterinarianUserId = null,
+    Guid? RoomResourceId = null,
+    Guid? EquipmentResourceId = null) : IRequest<Result>, ITransactionalRequest
+{
+    [JsonIgnore]
+    public AppointmentResourceIds Resources => new(RoomResourceId, EquipmentResourceId);
+}

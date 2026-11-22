@@ -130,7 +130,9 @@ public sealed class GetAppointmentByIdQueryHandler
             a.Notes,
             a.ReasonId,
             a.VeterinarianUserId,
-            a.OwnerConfirmedAtUtc);
+            a.OwnerConfirmedAtUtc,
+            a.RoomResourceId,
+            a.EquipmentResourceId);
         return Result<AppointmentDetailDto>.Success(dto);
     }
 }

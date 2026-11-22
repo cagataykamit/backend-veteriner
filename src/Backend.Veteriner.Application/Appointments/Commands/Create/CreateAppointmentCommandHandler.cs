@@ -169,6 +169,7 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
                 request.VeterinarianUserId,
                 scheduledUtc,
                 durationMinutes,
+                request.Resources,
                 ct);
             if (!bookable.IsSuccess)
                 return Result<Guid>.Failure(bookable.Error);
@@ -184,7 +185,8 @@ public sealed class CreateAppointmentCommandHandler : IRequestHandler<CreateAppo
             request.Status,
             request.Notes,
             request.ReasonId,
-            request.VeterinarianUserId);
+            request.VeterinarianUserId,
+            request.Resources);
 
         await _appointmentsWrite.AddAsync(appointment, ct);
         await _assignment.NotifyIfAssignedAsync(appointment, null, ct);

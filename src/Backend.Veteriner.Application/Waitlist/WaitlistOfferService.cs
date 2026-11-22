@@ -198,7 +198,7 @@ public sealed class WaitlistOfferService
         var settings = await _settings.FirstOrDefaultAsync(new ClinicAppointmentSettingsByClinicSpec(entry.TenantId, entry.ClinicId), ct);
         var bookable = await AppointmentSlotRules.EnsureBookableAsync(
             _appointments, _workingHours, _assignment, settings, entry.TenantId, entry.ClinicId, entry.PetId,
-            offer.VeterinarianUserId, offer.SlotStartUtc, offer.DurationMinutes, ct);
+            offer.VeterinarianUserId, offer.SlotStartUtc, offer.DurationMinutes, default, ct);
         if (!bookable.IsSuccess)
             return Result<WaitlistOffer>.Failure(bookable.Error);
 

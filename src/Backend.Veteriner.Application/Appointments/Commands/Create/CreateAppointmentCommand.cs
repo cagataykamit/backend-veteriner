@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Shared;
@@ -15,8 +16,13 @@ public sealed record CreateAppointmentCommand(
     string? Notes = null,
     int? DurationMinutes = null,
     Guid? ReasonId = null,
-    Guid? VeterinarianUserId = null)
+    Guid? VeterinarianUserId = null,
+    Guid? RoomResourceId = null,
+    Guid? EquipmentResourceId = null)
     : IRequest<Result<Guid>>, IActivationSignalRequest, ITransactionalRequest
 {
+    [JsonIgnore]
+    public AppointmentResourceIds Resources => new(RoomResourceId, EquipmentResourceId);
+
     public ActivationSignalKind ActivationSignal => ActivationSignalKind.AppointmentCreated;
 }

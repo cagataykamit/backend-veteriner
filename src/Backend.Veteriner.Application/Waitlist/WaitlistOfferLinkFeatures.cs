@@ -208,7 +208,7 @@ public sealed class AcceptWaitlistOfferByLinkCommandHandler : IRequestHandler<Ac
             await _assignment.LockScheduleAsync(offer.TenantId, ct);
             bookable = await AppointmentSlotRules.EnsureBookableAsync(
                 _appointmentsRead, _workingHours, _assignment, settings, offer.TenantId, offer.ClinicId, s.Pet.Id,
-                offer.VeterinarianUserId, offer.SlotStartUtc, offer.DurationMinutes, ct);
+                offer.VeterinarianUserId, offer.SlotStartUtc, offer.DurationMinutes, default, ct);
         }
 
         if (!bookable.IsSuccess)

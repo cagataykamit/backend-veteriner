@@ -402,7 +402,8 @@ public static class DevSampleDataSeeder
                         new EfRepository<UserNotification>(db),
                         TimeProvider.System),
                     clientContext,
-                    new NoTransactionLock()),
+                    new NoTransactionLock(),
+                    new EfReadRepository<AppointmentResource>(db)),
                 TimeProvider.System);
 
             CreateCharge = new CreateChargeCommandHandler(

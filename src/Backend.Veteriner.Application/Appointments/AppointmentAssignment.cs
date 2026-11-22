@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Appointments.Reasons;
+using Backend.Veteriner.Application.Appointments.Resources;
 using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -12,7 +13,7 @@ namespace Backend.Veteriner.Application.Appointments;
 /// Randevunun nedeni ve hekimi (ADR-042 K2/K3) — tek yer: klinik içi oluşturma/güncelleme ve talep onayı kullanır.
 /// Neden kliniğin aktif nedeni, hekim kliniğin aktif hekimi olmalı; mevcut randevuda zaten bağlı olan (sonradan pasifleşen)
 /// neden/hekim korunabilir. Hekimin planlı randevuları çakışamaz. Randevu bir hekime atanınca hekime bildirim gider (UX-008
-/// "kişiye atanan iş").
+/// "kişiye atanan iş"). Oda ve cihaz (ADR-053) kliniğin kaynağı ve doğru türde olmalı; kapasite aşılamaz.
 /// </summary>
 public sealed class AppointmentAssignment
 {
@@ -22,6 +23,7 @@ public sealed class AppointmentAssignment
     private readonly IUserNotificationPublisher _notifications;
     private readonly IClientContext _clientContext;
     private readonly ITransactionLock _locks;
+    private readonly IReadRepository<AppointmentResource> _resources;
 
     public AppointmentAssignment(
         IReadRepository<AppointmentReason> reasons,
@@ -29,7 +31,8 @@ public sealed class AppointmentAssignment
         IClinicVeterinarianReader veterinarians,
         IUserNotificationPublisher notifications,
         IClientContext clientContext,
-        ITransactionLock locks)
+        ITransactionLock locks,
+        IReadRepository<AppointmentResource> resources)
     {
         _reasons = reasons;
         _appointments = appointments;
@@ -37,6 +40,7 @@ public sealed class AppointmentAssignment
         _notifications = notifications;
         _clientContext = clientContext;
         _locks = locks;
+        _resources = resources;
     }
 
     /// <summary>
@@ -115,5 +119,52 @@ public sealed class AppointmentAssignment
                 "Appointments.VeterinarianTimeConflict",
                 "Bu zaman aralığında hekimin başka bir planlı randevusu var.")
             : Result.Success();
+    }
+
+    /// <summary>
+    /// Oda ve cihaz (ADR-053 K3/K4): kaynak bu kliniğin, alanın türünde ve aktif olmalı (mevcut randevuda zaten bağlı pasif kaynak
+    /// korunabilir); aralıktaki kullanım kapasiteyi aşamaz (<see cref="AppointmentResource.HasRoomFor"/>). Klinik üst üste binme
+    /// ayarı bu kuralı etkilemez.
+    /// </summary>
+    /// <param name="keep">Mevcut randevunun kaynakları; pasif olsa da korunabilir.</param>
+    public async Task<Result> EnsureResourcesAsync(
+        Guid tenantId,
+        Guid clinicId,
+        AppointmentResourceIds resources,
+        AppointmentResourceIds keep,
+        DateTime startUtc,
+        DateTime endUtc,
+        Guid? excludeAppointmentId,
+        CancellationToken ct)
+    {
+        foreach (var (id, type) in resources.Assigned())
+        {
+            var resource = await _resources.FirstOrDefaultAsync(new AppointmentResourceByIdSpec(tenantId, clinicId, id), ct);
+            if (resource is null)
+                return Result.Failure("AppointmentResources.NotFound", "Oda ya da cihaz bu klinikte bulunamadı.");
+
+            if (resource.Type != type)
+            {
+                return Result.Failure(
+                    "Appointments.Validation",
+                    type == AppointmentResourceType.Room ? "Oda alanında oda seçilmelidir." : "Cihaz alanında cihaz seçilmelidir.");
+            }
+
+            if (!resource.IsActive && !keep.Assigned().Any(k => k.Id == id))
+                return Result.Failure("Appointments.Validation", $"\"{resource.Name}\" pasif; yeni randevuda seçilemez.");
+
+            var busy = await _appointments.ListAsync(
+                new AppointmentIntervalsUsingResourceSpec(tenantId, id, startUtc, endUtc, excludeAppointmentId), ct);
+            if (!resource.HasRoomFor(busy.Select(b => (b.StartUtc, b.EndUtc)), startUtc, endUtc))
+            {
+                return Result.Failure(
+                    "Appointments.ResourceTimeConflict",
+                    resource.Capacity == 1
+                        ? $"Bu zaman aralığında \"{resource.Name}\" başka bir randevuda."
+                        : $"Bu zaman aralığında \"{resource.Name}\" dolu (aynı anda en çok {resource.Capacity} randevu).");
+            }
+        }
+
+        return Result.Success();
     }
 }
