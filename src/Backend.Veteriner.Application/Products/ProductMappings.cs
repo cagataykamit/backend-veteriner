@@ -25,5 +25,6 @@ internal static class ProductMappings
             p.Packaging,
             p.Manufacturer,
             p.VatRate,
-            p.PurchasePrice);
+            p.PurchasePrice,
+            p.LicensedProductId);
 }

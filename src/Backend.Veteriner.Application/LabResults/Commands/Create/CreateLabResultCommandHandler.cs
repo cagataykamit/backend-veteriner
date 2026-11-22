@@ -144,7 +144,8 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
         if (!visit.IsSuccess)
             return Result<Guid>.Failure(visit.Error);
 
-        var resultCheck = LabResult.ValidateResult(resultUtc, request.ResultText, request.Interpretation);
+        var lines = request.Lines?.Select(l => l.ToDraft()).ToList();
+        var resultCheck = LabResult.ValidateResult(resultUtc, request.ResultText, request.Interpretation, lines);
         if (!resultCheck.IsSuccess)
             return Result<Guid>.Failure(resultCheck.Error);
 
@@ -160,7 +161,8 @@ public sealed class CreateLabResultCommandHandler : IRequestHandler<CreateLabRes
             request.ResultText,
             request.Interpretation,
             request.Notes,
-            utcNow);
+            utcNow,
+            lines);
 
         // Tanısal kayıt kesinleşmiş muayeneye serbest eklenir; rozet taşır (ADR-043 AK-4, ADR-013 Ek 2).
         if (exam is { IsFinalized: true })

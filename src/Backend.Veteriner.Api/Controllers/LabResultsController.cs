@@ -18,6 +18,7 @@ using Backend.Veteriner.Application.LabResults.Commands.Update;
 using Backend.Veteriner.Application.LabResults.Contracts.Dtos;
 using Backend.Veteriner.Application.LabResults.Queries.GetById;
 using Backend.Veteriner.Application.LabResults.Queries.GetList;
+using Backend.Veteriner.Application.LabResults.Queries.GetParameterHistory;
 using Backend.Veteriner.Domain.Files;
 using Backend.Veteriner.Domain.LabResults;
 using Backend.Veteriner.Domain.Shared;
@@ -94,7 +95,8 @@ public sealed class LabResultsController : ControllerBase
             body.Interpretation,
             body.Notes,
             body.RowVersion,
-            body.VisitId);
+            body.VisitId,
+            body.Lines);
 
         var result = await _mediator.Send(cmd, ct);
         return result.ToActionResult(this);
@@ -181,6 +183,28 @@ public sealed class LabResultsController : ControllerBase
                 dateToUtc,
                 status),
             ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Hastada bir parametrenin değerleri, yeniden eskiye (REF-001 Dilim 3); bkz. docs/LAB_RESULT_LINES_API_CONTRACT.md.
+    /// Liste ucu gibi klinik kapsamı ister (<c>clinicId</c> ya da aktif klinik).
+    /// </summary>
+    [HttpGet("parameter-history")]
+    [Authorize(Policy = PermissionCatalog.LabResults.Read)]
+    [ProducesResponseType(typeof(IReadOnlyList<LabParameterHistoryPointDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetParameterHistory(
+        [FromQuery] Guid petId,
+        [FromQuery] string? parameter,
+        [FromQuery] Guid? clinicId = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        var result = await _mediator.Send(new GetLabParameterHistoryQuery(petId, parameter ?? string.Empty, clinicId), ct);
         return result.ToActionResult(this);
     }
 

@@ -1,3 +1,5 @@
+using Backend.Veteriner.Domain.Shared;
+
 namespace Backend.Veteriner.Application.Common;
 
 /// <summary>Listeleme endpointleri için metin araması: normalizasyon ve SQL LIKE güvenli deseni.</summary>
@@ -22,5 +24,22 @@ public static class ListQueryTextSearch
             .Replace("%", "[%]", StringComparison.Ordinal)
             .Replace("_", "[_]", StringComparison.Ordinal);
         return $"%{escaped}%";
+    }
+
+    /// <summary>
+    /// Türkçe anahtarlı arama: metin <see cref="TurkishTextKey.Normalize"/> ile anahtarlanır, boşlukla en çok
+    /// <paramref name="maxTokens"/> parçaya bölünür; her parça için LIKE deseni döner (sıra bağımsız eşleşme için).
+    /// </summary>
+    public static IReadOnlyList<string> BuildKeyTokenPatterns(string? search, int maxTokens)
+    {
+        var normalized = Normalize(search);
+        if (normalized is null)
+            return [];
+
+        return TurkishTextKey.Normalize(normalized)
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Take(maxTokens)
+            .Select(BuildContainsLikePattern)
+            .ToList();
     }
 }

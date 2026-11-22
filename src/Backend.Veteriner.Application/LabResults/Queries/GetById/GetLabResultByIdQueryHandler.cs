@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.LabResults.Contracts.Dtos;
+using Backend.Veteriner.Application.LabResults.Lines;
 using Backend.Veteriner.Application.LabResults.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Clients;
@@ -113,8 +114,30 @@ public sealed class GetLabResultByIdQueryHandler
             row.CancelledByUserId,
             row.CancelReason,
             ExaminationRowVersion.Encode(row.RowVersion),
-            row.AddedAfterFinalization);
+            row.AddedAfterFinalization,
+            await BuildLinesAsync(tenantId, row, ct));
 
         return Result<LabResultDetailDto>.Success(dto);
+    }
+
+    /// <summary>Satırlar ve aynı klinikte aynı hastanın bir önceki karşılaştırılabilir değeri (REF-001 Dilim 3).</summary>
+    private async Task<IReadOnlyList<LabResultLineDto>> BuildLinesAsync(Guid tenantId, LabResult row, CancellationToken ct)
+    {
+        if (row.Lines.Count == 0)
+            return [];
+
+        IReadOnlyList<LabResult> prior = row.ResultDateUtc is { } resultDate
+            ? await _labResults.ListAsync(
+                new LabResultsWithParameterLinesSpec(
+                    tenantId,
+                    row.PetId,
+                    row.ClinicId,
+                    null,
+                    row.Lines.Select(l => l.ParameterKey).ToList(),
+                    (resultDate, row.CreatedAtUtc)),
+                ct)
+            : [];
+
+        return LabResultLineComparison.Build(row.Lines, prior);
     }
 }

@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.LabResults.Commands.Create;
+using Backend.Veteriner.Application.LabResults.Contracts.Dtos;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Visits.Specs;
@@ -361,6 +362,54 @@ public sealed class CreateLabResultCommandHandlerTests
         added!.ExaminationId.Should().Be(examId);
         _labResultsWrite.Verify(r => r.AddAsync(It.IsAny<LabResult>(), It.IsAny<CancellationToken>()), Times.Once);
         _labResultsWrite.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Persist_Value_Lines_As_Result_Without_Text()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        SetupTenantClinicPetSafe(tid, cid, petId);
+
+        LabResult? added = null;
+        _labResultsWrite.Setup(r => r.AddAsync(It.IsAny<LabResult>(), It.IsAny<CancellationToken>()))
+            .Callback<LabResult, CancellationToken>((p, _) => added = p)
+            .ReturnsAsync((LabResult p, CancellationToken _) => p);
+
+        var cmd = Cmd(cid, petId) with
+        {
+            ResultText = null,
+            Lines = [new LabResultLineRequest("ALT", 120m, "U/L", 10m, 100m)],
+        };
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        added!.Status.Should().Be(LabResultStatus.Resulted);
+        added.Lines.Should().ContainSingle(l => l.ParameterName == "ALT" && l.Flag == LabValueFlag.High);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Reject_Duplicate_Parameter_Lines()
+    {
+        var tid = Guid.NewGuid();
+        var cid = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clinicContext.SetupGet(c => c.ClinicId).Returns(cid);
+        SetupTenantClinicPetSafe(tid, cid, petId);
+
+        var cmd = Cmd(cid, petId) with
+        {
+            Lines = [new LabResultLineRequest("ALT", 1m), new LabResultLineRequest("alt", 2m)],
+        };
+        var result = await CreateHandler().Handle(cmd, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("LabResults.Validation");
+        _labResultsWrite.Verify(r => r.AddAsync(It.IsAny<LabResult>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

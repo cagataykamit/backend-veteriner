@@ -177,6 +177,7 @@ public static class RolePermissionBindings
                 PermissionCatalog.ProductCategories.Deactivate,
 
                 PermissionCatalog.ClinicalTerms.Read,
+                PermissionCatalog.DrugGuide.Read,
                 PermissionCatalog.ClinicalTerms.Create,
                 PermissionCatalog.ClinicalTerms.Update,
                 PermissionCatalog.ClinicalTerms.Deactivate,
@@ -343,6 +344,7 @@ public static class RolePermissionBindings
                 PermissionCatalog.ProductCategories.Deactivate,
 
                 PermissionCatalog.ClinicalTerms.Read,
+                PermissionCatalog.DrugGuide.Read,
                 PermissionCatalog.ClinicalTerms.Create,
                 PermissionCatalog.ClinicalTerms.Update,
                 PermissionCatalog.ClinicalTerms.Deactivate,
@@ -502,6 +504,7 @@ public static class RolePermissionBindings
                 PermissionCatalog.ProductCategories.Deactivate,
 
                 PermissionCatalog.ClinicalTerms.Read,
+                PermissionCatalog.DrugGuide.Read,
                 PermissionCatalog.ClinicalTerms.Create,
                 PermissionCatalog.ClinicalTerms.Update,
                 PermissionCatalog.ClinicalTerms.Deactivate,
@@ -620,6 +623,7 @@ public static class RolePermissionBindings
                 PermissionCatalog.Breeds.Read,
 
                 PermissionCatalog.ClinicalTerms.Read,
+                PermissionCatalog.DrugGuide.Read,
                 PermissionCatalog.ClinicalTerms.Create,
                 PermissionCatalog.ClinicalTerms.Update,
 
@@ -706,6 +710,7 @@ public static class RolePermissionBindings
                 PermissionCatalog.StockMovements.Create,
 
                 PermissionCatalog.ClinicalTerms.Read,
+                PermissionCatalog.DrugGuide.Read,
                 PermissionCatalog.ClinicalSnippets.Read,
                 PermissionCatalog.ExaminationTemplates.Read,
 

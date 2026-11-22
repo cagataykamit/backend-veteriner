@@ -3456,6 +3456,127 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("DemoRequests", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.DrugGuide.ActiveIngredient", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NormalizedName")
+                        .IsUnique();
+
+                    b.ToTable("ActiveIngredients", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.DrugGuide.LicensedProduct", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsListedInSource")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LicenseHolder")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("LicenseNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("NormalizedLicenseHolder")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("SourceSyncedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SpcUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NormalizedLicenseHolder");
+
+                    b.HasIndex("NormalizedName");
+
+                    b.ToTable("LicensedProducts", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.DrugGuide.LicensedProductIngredient", b =>
+                {
+                    b.Property<Guid>("LicensedProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ActiveIngredientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("LicensedProductId", "ActiveIngredientId");
+
+                    b.HasIndex("ActiveIngredientId");
+
+                    b.ToTable("LicensedProductIngredients", (string)null);
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.DrugGuide.LicensedProductTargetSpecies", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("LicensedProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("SpeciesId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LicensedProductId");
+
+                    b.HasIndex("SpeciesId");
+
+                    b.ToTable("LicensedProductTargetSpecies", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.EDocuments.ClinicEDocumentSettings", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5093,6 +5214,50 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("LabResults", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.LabResults.LabResultLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("LabResultId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ParameterKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ParameterName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<decimal?>("ReferenceHigh")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal?>("ReferenceLow")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<decimal>("Value")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LabResultId", "ParameterKey");
+
+                    b.ToTable("LabResultLines", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Legal.LegalAcceptance", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6098,6 +6263,9 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("int")
                         .HasDefaultValue(0);
 
+                    b.Property<Guid?>("LicensedProductId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Manufacturer")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -6150,6 +6318,8 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .HasColumnType("decimal(5,2)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("LicensedProductId");
 
                     b.HasIndex("ProductCategoryId");
 
@@ -9079,6 +9249,37 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.DrugGuide.LicensedProductIngredient", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.DrugGuide.ActiveIngredient", "Ingredient")
+                        .WithMany()
+                        .HasForeignKey("ActiveIngredientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.DrugGuide.LicensedProduct", null)
+                        .WithMany("Ingredients")
+                        .HasForeignKey("LicensedProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Ingredient");
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.DrugGuide.LicensedProductTargetSpecies", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.DrugGuide.LicensedProduct", null)
+                        .WithMany("TargetSpecies")
+                        .HasForeignKey("LicensedProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Veteriner.Domain.Catalog.Species", null)
+                        .WithMany()
+                        .HasForeignKey("SpeciesId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.EDocuments.ClinicEDocumentSettings", b =>
                 {
                     b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
@@ -9233,6 +9434,15 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ImportBatchId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.LabResults.LabResultLine", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.LabResults.LabResult", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("LabResultId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
@@ -9396,6 +9606,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
             modelBuilder.Entity("Backend.Veteriner.Domain.Products.Product", b =>
                 {
+                    b.HasOne("Backend.Veteriner.Domain.DrugGuide.LicensedProduct", null)
+                        .WithMany()
+                        .HasForeignKey("LicensedProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Backend.Veteriner.Domain.Products.ProductCategory", "Category")
                         .WithMany("Products")
                         .HasForeignKey("ProductCategoryId")
@@ -9741,7 +9956,19 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Navigation("Lines");
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.DrugGuide.LicensedProduct", b =>
+                {
+                    b.Navigation("Ingredients");
+
+                    b.Navigation("TargetSpecies");
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.EDocuments.EDocument", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.LabResults.LabResult", b =>
                 {
                     b.Navigation("Lines");
                 });

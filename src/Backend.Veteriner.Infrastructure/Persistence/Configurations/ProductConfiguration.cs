@@ -1,3 +1,4 @@
+using Backend.Veteriner.Domain.DrugGuide;
 using Backend.Veteriner.Domain.Products;
 using Backend.Veteriner.Domain.Shared;
 using Microsoft.EntityFrameworkCore;
@@ -59,6 +60,12 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         b.HasOne(x => x.Category)
             .WithMany(c => c.Products)
             .HasForeignKey(x => x.ProductCategoryId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // İlaç rehberi bağı (REF-001 Dilim 2); global katalog kaydı silinmez, kaynaktan düşerse işaretlenir.
+        b.HasOne<LicensedProduct>()
+            .WithMany()
+            .HasForeignKey(x => x.LicensedProductId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

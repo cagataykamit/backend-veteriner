@@ -182,7 +182,8 @@ public sealed class UpdateLabResultCommandHandler
             request.ResultText,
             request.Interpretation,
             request.Notes,
-            utcNow);
+            utcNow,
+            request.Lines?.Select(l => l.ToDraft()).ToList());
 
         if (!update.IsSuccess)
             return Result<LabResultWriteResultDto>.Failure(update.Error);

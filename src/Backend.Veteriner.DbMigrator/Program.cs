@@ -89,6 +89,13 @@ try
                 logger.LogInformation("Dev sample data seed finished (ready: {Ready}).", summary is not null);
                 break;
             }
+        case "seed-dev-drug-guide":
+            {
+                var added = await DevDrugGuideSeeder.SeedAsync(
+                    db, sp.GetRequiredService<IHostEnvironment>(), TimeProvider.System, logger, CancellationToken.None);
+                logger.LogInformation("Dev drug guide seed finished (added: {Added}).", added);
+                break;
+            }
         case "create-platform-admin":
             {
                 var email = ReadOption(args, "--email") ?? Environment.GetEnvironmentVariable("VETINITY_FIRST_ADMIN_EMAIL");
@@ -455,6 +462,8 @@ static void PrintHelp()
           seed-dev-staff — YALNIZCA Development: rol başına test kullanıcısı (hekim, sekreter, klinik yöneticisi, işletme
                            yöneticisi; idempotent; kimlik bilgileri DevTestStaffSeeder.cs). Eski adı seed-dev-veterinarian da çalışır
           seed-dev-sample-data  — YALNIZCA Development: örnek randevu/ücret/ödeme (idempotent; DevSampleDataSeeder.cs; kimlik bilgisi yok)
+          seed-dev-drug-guide   — YALNIZCA Development: elle yazılmış birkaç ÖRNEK ruhsatlı ürün (idempotent; DevDrugGuideSeeder.cs;
+                           Bakanlık verisi değildir, izin gelmeden toplu alım yok — ADR-049)
           loadtest-seed  — yük testi sentetik veri (yalnızca VetinityCommandDb_LoadTest command DB; profil: small)
           rebuild-appointment-projections — Command DB randevularından Query read-model yeniden oluştur
                                             (--batch-size 1000 opsiyonel)

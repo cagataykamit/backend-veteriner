@@ -51,17 +51,7 @@ public static class ClinicalTermSearch
     public const int MaxTokenCount = 5;
 
     public static IReadOnlyList<string> BuildTokenPatterns(string? search)
-    {
-        var normalized = ListQueryTextSearch.Normalize(search);
-        if (normalized is null)
-            return [];
-
-        return TurkishTextKey.Normalize(normalized)
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-            .Take(MaxTokenCount)
-            .Select(ListQueryTextSearch.BuildContainsLikePattern)
-            .ToList();
-    }
+        => ListQueryTextSearch.BuildKeyTokenPatterns(search, MaxTokenCount);
 
     internal static void Apply(
         ISpecificationBuilder<ClinicalTerm> query,
