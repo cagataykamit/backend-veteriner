@@ -24,7 +24,7 @@ public sealed class LabResult : AggregateRoot, IClinicScoped, ITenantOwned
     public DateTime RequestedAtUtc { get; private set; }
     public Guid? RequestedByUserId { get; private set; }
 
-    /// <summary>Yalnız <see cref="LabResultStatus.Requested"/> durumunda boştur; <see cref="ResultText"/> ile birlikte dolar.</summary>
+    /// <summary>Yalnız <see cref="LabResultStatus.Requested"/> durumunda boştur; sonuç (metin ya da değer satırı) ile birlikte dolar.</summary>
     public DateTime? ResultDateUtc { get; private set; }
     public string TestName { get; private set; } = default!;
     public string? ResultText { get; private set; }
@@ -48,6 +48,11 @@ public sealed class LabResult : AggregateRoot, IClinicScoped, ITenantOwned
     /// <summary>Yeni kayıtlarda true; yorum gerekmiyor sayılan eski (migration ile gelen) kayıtlarda false.</summary>
     public bool InterpretationRequired { get; private set; }
 
+    private readonly List<LabResultLine> _lines = new();
+
+    /// <summary>İsteğe bağlı yapılandırılmış değer satırları (REF-001 Dilim 3); serbest metin sonuç yanında kalır.</summary>
+    public IReadOnlyList<LabResultLine> Lines => _lines;
+
     /// <summary>
     /// Sonuç var, yorum gerekiyor ama hekim yorumu yok (tek kural): sorgularda bu ifade, bellekte
     /// <see cref="AwaitingInterpretation"/> kullanılır.
@@ -62,7 +67,10 @@ public sealed class LabResult : AggregateRoot, IClinicScoped, ITenantOwned
 
     private LabResult() { }
 
-    /// <summary>Sonuç alanları verilmezse kayıt <see cref="LabResultStatus.Requested"/>, verilirse <see cref="LabResultStatus.Resulted"/> olur.</summary>
+    /// <summary>
+    /// Sonuç (metin ya da değer satırı) verilmezse kayıt <see cref="LabResultStatus.Requested"/>, verilirse
+    /// <see cref="LabResultStatus.Resulted"/> olur.
+    /// </summary>
     public LabResult(
         Guid tenantId,
         Guid clinicId,
@@ -75,7 +83,8 @@ public sealed class LabResult : AggregateRoot, IClinicScoped, ITenantOwned
         string? resultText,
         string? interpretation,
         string? notes,
-        DateTime utcNow)
+        DateTime utcNow,
+        IReadOnlyList<LabResultLineDraft>? lines = null)
     {
         if (tenantId == Guid.Empty)
             throw new ArgumentException("TenantId is invalid.", nameof(tenantId));
@@ -86,11 +95,12 @@ public sealed class LabResult : AggregateRoot, IClinicScoped, ITenantOwned
         if (string.IsNullOrWhiteSpace(testName))
             throw new ArgumentException("TestName is required.", nameof(testName));
 
-        var resultCheck = ValidateResult(resultDateUtc, resultText, interpretation);
+        lines ??= [];
+        var resultCheck = ValidateResult(resultDateUtc, resultText, interpretation, lines);
         if (!resultCheck.IsSuccess)
             throw new ArgumentException(resultCheck.Error.Message, nameof(resultText));
 
-        var hasResult = !string.IsNullOrWhiteSpace(resultText);
+        var hasResult = HasResult(resultText, lines.Count);
 
         TenantId = tenantId;
         ClinicId = clinicId;
@@ -103,16 +113,18 @@ public sealed class LabResult : AggregateRoot, IClinicScoped, ITenantOwned
         RequestedAtUtc = ResultDateUtc ?? utcNow;
         RequestedByUserId = requestedByUserId;
         TestName = testName.Trim();
-        ResultText = hasResult ? resultText!.Trim() : null;
+        ResultText = Trimmed(resultText);
         Interpretation = Trimmed(interpretation);
         Notes = Trimmed(notes);
         CreatedAtUtc = utcNow;
         UpdatedAtUtc = null;
+        SetLines(lines);
     }
 
     /// <summary>
     /// Tam güncelleme. <see cref="LabResultStatus.Requested"/> kayda sonuç yazılırsa kayıt sonuçlanır;
-    /// sonuçlanmış kayıttan sonuç silinemez. İptal edilmiş kayıt değişmez.
+    /// sonuçlanmış kayıttan sonuç silinemez. İptal edilmiş kayıt değişmez. <paramref name="lines"/> null ise değer
+    /// satırlarına dokunulmaz, boş liste hepsini siler, dolu liste satırları bu liste yapar.
     /// </summary>
     public Result UpdateDetails(
         Guid clinicId,
@@ -124,7 +136,8 @@ public sealed class LabResult : AggregateRoot, IClinicScoped, ITenantOwned
         string? resultText,
         string? interpretation,
         string? notes,
-        DateTime utcNow)
+        DateTime utcNow,
+        IReadOnlyList<LabResultLineDraft>? lines = null)
     {
         if (Status == LabResultStatus.Cancelled)
             return AlreadyCancelled();
@@ -138,16 +151,18 @@ public sealed class LabResult : AggregateRoot, IClinicScoped, ITenantOwned
         if (!subject.IsSuccess)
             return subject;
 
-        var resultCheck = ValidateResult(resultDateUtc, resultText, interpretation);
+        var resultCheck = lines is null
+            ? ValidateResult(resultDateUtc, resultText, interpretation, _lines.Count)
+            : ValidateResult(resultDateUtc, resultText, interpretation, lines);
         if (!resultCheck.IsSuccess)
             return resultCheck;
 
-        var hasResult = !string.IsNullOrWhiteSpace(resultText);
+        var hasResult = HasResult(resultText, lines?.Count ?? _lines.Count);
         if (Status == LabResultStatus.Resulted && !hasResult)
         {
             return Result.Failure(
                 "LabResults.Validation",
-                "Sonuçlanmış kaydın sonucu silinemez; yanlış kayıt iptal edilmelidir.");
+                "Sonuçlanmış kaydın sonucu (metin ve değer satırları) silinemez; yanlış kayıt iptal edilmelidir.");
         }
 
         ClinicId = clinicId;
@@ -158,10 +173,12 @@ public sealed class LabResult : AggregateRoot, IClinicScoped, ITenantOwned
             Status = LabResultStatus.Resulted;
         ResultDateUtc = hasResult ? NormalizeUtc(resultDateUtc!.Value) : null;
         TestName = testName.Trim();
-        ResultText = hasResult ? resultText!.Trim() : null;
+        ResultText = Trimmed(resultText);
         Interpretation = Trimmed(interpretation);
         Notes = Trimmed(notes);
         UpdatedAtUtc = utcNow;
+        if (lines is not null)
+            SetLines(lines);
         return Result.Success();
     }
 
@@ -206,16 +223,58 @@ public sealed class LabResult : AggregateRoot, IClinicScoped, ITenantOwned
         RowVersion = expectedRowVersion;
     }
 
-    /// <summary>Sonuç metni ile tarihi birlikte verilir/verilmez; sonuç yokken yorum yazılamaz.</summary>
-    public static Result ValidateResult(DateTime? resultDateUtc, string? resultText, string? interpretation)
+    /// <summary>
+    /// Sonuç (metin ya da en az bir değer satırı) ile tarihi birlikte verilir/verilmez; sonuç yokken yorum yazılamaz.
+    /// Satırlar tek tek ve birlikte (sayı sınırı, aynı parametre iki kez) doğrulanır.
+    /// </summary>
+    public static Result ValidateResult(
+        DateTime? resultDateUtc,
+        string? resultText,
+        string? interpretation,
+        IReadOnlyList<LabResultLineDraft>? lines = null)
     {
-        var hasText = !string.IsNullOrWhiteSpace(resultText);
-        if (hasText != resultDateUtc.HasValue)
-            return Result.Failure("LabResults.Validation", "Sonuç metni ve sonuç tarihi birlikte verilmelidir.");
-        if (!hasText && !string.IsNullOrWhiteSpace(interpretation))
+        lines ??= [];
+        if (lines.Count > LabResultLine.MaxPerResult)
+        {
+            return Result.Failure(
+                "LabResults.Validation",
+                $"Bir lab sonucunda en fazla {LabResultLine.MaxPerResult} değer satırı olabilir.");
+        }
+
+        foreach (var line in lines)
+        {
+            var valid = LabResultLine.Validate(line);
+            if (!valid.IsSuccess)
+                return valid;
+        }
+
+        var keys = lines.Select(l => TurkishTextKey.Normalize(l.ParameterName)).ToList();
+        if (keys.Distinct(StringComparer.Ordinal).Count() != keys.Count)
+            return Result.Failure("LabResults.Validation", "Aynı parametre bir sonuçta birden fazla kez yazılamaz.");
+
+        return ValidateResult(resultDateUtc, resultText, interpretation, lines.Count);
+    }
+
+    private static Result ValidateResult(DateTime? resultDateUtc, string? resultText, string? interpretation, int lineCount)
+    {
+        var hasResult = HasResult(resultText, lineCount);
+        if (hasResult != resultDateUtc.HasValue)
+            return Result.Failure("LabResults.Validation", "Sonuç (metin ya da değer satırı) ve sonuç tarihi birlikte verilmelidir.");
+        if (!hasResult && !string.IsNullOrWhiteSpace(interpretation))
             return Result.Failure("LabResults.Validation", "Sonuç girilmeden yorum yazılamaz.");
 
         return Result.Success();
+    }
+
+    private static bool HasResult(string? resultText, int lineCount)
+        => !string.IsNullOrWhiteSpace(resultText) || lineCount > 0;
+
+    /// <summary>Satırları verilen liste yapar (sıra dizideki sıradır); doğrulama önceden yapılmış olmalıdır.</summary>
+    private void SetLines(IReadOnlyList<LabResultLineDraft> lines)
+    {
+        _lines.Clear();
+        for (var i = 0; i < lines.Count; i++)
+            _lines.Add(new LabResultLine(Id, i + 1, lines[i]));
     }
 
     private static Result AlreadyCancelled()

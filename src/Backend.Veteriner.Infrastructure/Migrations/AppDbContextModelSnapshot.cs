@@ -5093,6 +5093,50 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.ToTable("LabResults", (string)null);
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.LabResults.LabResultLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("LabResultId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ParameterKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ParameterName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<decimal?>("ReferenceHigh")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal?>("ReferenceLow")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<decimal>("Value")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LabResultId", "ParameterKey");
+
+                    b.ToTable("LabResultLines", (string)null);
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.Legal.LegalAcceptance", b =>
                 {
                     b.Property<Guid>("Id")
@@ -9236,6 +9280,15 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Backend.Veteriner.Domain.LabResults.LabResultLine", b =>
+                {
+                    b.HasOne("Backend.Veteriner.Domain.LabResults.LabResult", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("LabResultId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Backend.Veteriner.Domain.OwnerExplanations.OwnerExplanation", b =>
                 {
                     b.HasOne("Backend.Veteriner.Domain.Clinics.Clinic", null)
@@ -9742,6 +9795,11 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("Backend.Veteriner.Domain.EDocuments.EDocument", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("Backend.Veteriner.Domain.LabResults.LabResult", b =>
                 {
                     b.Navigation("Lines");
                 });

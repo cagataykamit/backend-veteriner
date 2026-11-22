@@ -41,6 +41,13 @@ public sealed class LabResultConfiguration : IEntityTypeConfiguration<LabResult>
 
         b.Ignore(x => x.AwaitingInterpretation);
 
+        // Değer satırları (REF-001 Dilim 3): kaydın parçasıdır, kayıtla silinir.
+        b.HasMany(x => x.Lines)
+            .WithOne()
+            .HasForeignKey(l => l.LabResultId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.RequestedAtUtc });
         b.HasIndex(x => new { x.TenantId, x.Status });
