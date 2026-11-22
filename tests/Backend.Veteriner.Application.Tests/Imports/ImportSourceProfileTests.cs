@@ -1,7 +1,9 @@
 using Backend.Veteriner.Application.Imports;
+using Backend.Veteriner.Application.Imports.Commands.Create;
 using Backend.Veteriner.Application.Imports.Contracts.Dtos;
 using Backend.Veteriner.Application.Imports.Mapping;
 using Backend.Veteriner.Application.Imports.Queries.GetSourceProfiles;
+using Backend.Veteriner.Application.Imports.Reading;
 using Backend.Veteriner.Domain.Imports;
 using AwesomeAssertions;
 
@@ -40,6 +42,28 @@ public sealed class ImportSourceProfileTests
     public void Profiles_Should_Cover_Generic_Kolayvet_And_EVet_Once()
         => ImportSourceProfiles.All.Select(p => p.Code).Should()
             .Equal(ImportSourceProfile.Generic, ImportSourceProfile.Kolayvet, ImportSourceProfile.EVet);
+
+    /// <summary>2026-11-22 kullanıcı kararı: Kolayvet seçeneği gizli (aktarma yapılmadı); tanım var olan partiler için kalır.</summary>
+    [Fact]
+    public void Kolayvet_Should_Be_Hidden_From_Wizard_But_Kept_For_Existing_Batches()
+    {
+        ImportSourceProfiles.Offered.Select(p => p.Code).Should().Equal(ImportSourceProfile.Generic, ImportSourceProfile.EVet);
+        ImportSourceProfiles.IsOffered(ImportSourceProfile.Kolayvet).Should().BeFalse();
+        ImportSourceProfiles.Get(ImportSourceProfile.Kolayvet).DisplayName.Should().Be("Kolayvet");
+        ((int)ImportSourceProfile.Kolayvet).Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData("Kolayvet", false)]
+    [InlineData("EVet", true)]
+    [InlineData(null, true)]
+    public void Create_Validator_Should_Reject_Hidden_Profile(string? sourceProfile, bool valid)
+    {
+        var validator = new CreateImportBatchCommandValidator();
+        var errors = validator.Validate(CreateCommand(sourceProfile)).Errors.Where(e => e.PropertyName == nameof(CreateImportBatchCommand.SourceProfile));
+
+        errors.Any().Should().Be(!valid);
+    }
 
     [Fact]
     public void Kolayvet_Should_Have_No_Mapping_Without_Source()
@@ -138,5 +162,9 @@ public sealed class ImportSourceProfileTests
         evet.Verified.Should().BeTrue();
         evet.Mappings.Should().Contain(new ImportProfileMappingDto("pets", "Hasta Irkı", "Irk", evet.Mappings.First(m => m.Header == "Hasta Irkı").Source, true));
         evet.Mappings.Select(m => m.Table).Distinct().Should().BeEquivalentTo("customers", "pets");
+        result.Value.Select(p => p.Code).Should().NotContain(ImportSourceProfile.Kolayvet, "Kolayvet şimdilik sunulmaz");
     }
+
+    private static CreateImportBatchCommand CreateCommand(string? sourceProfile)
+        => new(Guid.NewGuid(), null, null, new ImportFileSet(null, null, null, null), null, null, sourceProfile);
 }

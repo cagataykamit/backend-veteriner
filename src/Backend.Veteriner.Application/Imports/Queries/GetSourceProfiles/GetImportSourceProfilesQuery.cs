@@ -25,7 +25,7 @@ public sealed class GetImportSourceProfilesQueryHandler
 {
     public ValueTask<Result<IReadOnlyList<ImportSourceProfileDto>>> Handle(GetImportSourceProfilesQuery request, CancellationToken ct)
     {
-        IReadOnlyList<ImportSourceProfileDto> profiles = ImportSourceProfiles.All
+        IReadOnlyList<ImportSourceProfileDto> profiles = ImportSourceProfiles.Offered
             .Select(p => new ImportSourceProfileDto(
                 p.Code,
                 p.DisplayName,

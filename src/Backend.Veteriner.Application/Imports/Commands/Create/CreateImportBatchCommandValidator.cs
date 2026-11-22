@@ -18,7 +18,7 @@ public sealed class CreateImportBatchCommandValidator : AbstractValidator<Create
             .Must(d => CsvTableReader.TryParseDelimiter(d, out _))
             .WithMessage("delimiter ';', ',' veya sekme (tab) olmalıdır.");
         RuleFor(x => x.SourceProfile)
-            .Must(p => ImportSourceProfiles.TryParse(p, out _))
-            .WithMessage("sourceProfile Generic, Kolayvet veya EVet olmalıdır.");
+            .Must(p => ImportSourceProfiles.TryParse(p, out var profile) && ImportSourceProfiles.IsOffered(profile))
+            .WithMessage("sourceProfile Generic veya EVet olmalıdır (Kolayvet'ten aktarma şimdilik kapalı).");
     }
 }

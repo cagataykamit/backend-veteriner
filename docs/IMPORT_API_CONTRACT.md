@@ -98,7 +98,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 - K13'te yeni migration **yoktur** (`Validating` durumu, kira sütunları ve tek-aktif-iş indeksi B1'den beri vardır).
 
 **Frontend için değişenler (TIER-021 — kaynak program profilleri; geriye uyumlu ekleme):**
-- Yükleme öncesi "Hangi programdan geliyorsunuz?" seçenekleri `GET /imports/source-profiles` ile okunur (bölüm 7.15; `Imports.Read`, her pakette). Liste: `Generic` (Genel Excel / CSV), `Kolayvet`, `EVet`. Seçenek adları ve not metni sunucudan gelir; istemci kopyalamaz.
+- Yükleme öncesi "Hangi programdan geliyorsunuz?" seçenekleri `GET /imports/source-profiles` ile okunur (bölüm 7.15; `Imports.Read`, her pakette). Liste: `Generic` (Genel Excel / CSV), `EVet`. `Kolayvet` şimdilik listede yok ve yeni aktarmada reddedilir (2026-11-22 kullanıcı kararı; aktarma yapılmadı, örnek dosya gelince geri eklenir; var olan partiler adını korur). Seçenek adları ve not metni sunucudan gelir; istemci kopyalamaz.
 - Seçilen profil `POST /imports/batches` gövdesinde `sourceProfile` alanıyla gönderilir (isteğe bağlı; yoksa `Generic`). Geçersiz değer `400 Validation.FluentValidation`. Aynı `requestId` ile farklı `sourceProfile` gelirse `409 Imports.RequestIdConflict`.
 - Parti nesnesine (ayrıntı, liste, yükleme ve eşleme yanıtı) `sourceProfile` eklendi. Profil yüklemeden sonra değişmez; başka profil için dosya yeniden yüklenir (taslak silinebilir).
 - `tables[].columns[].confidence` yeni değer alabilir: **`Profile`** (seçilen programın hazır eşlemesi). Sıra: `Exact` → `Profile` → `Alias`. Profil eşlemelerinin hepsi şu an **doğrulanmamıştır** (`verified = false`); ekran bunu kullanıcıya söylemeli ve eşlemeyi her zaman düzeltilebilir bırakmalıdır.
@@ -429,7 +429,7 @@ Hata zarfı için bölüm 8. `{id}` = parti kimliği.
 | `clinicId` | Aşı varsa evet | Bölüm 4.3. |
 | `name` | Hayır | Listede görünen etiket (≤ 100); kişisel veri içermemeli. |
 | `encoding`, `delimiter` | Hayır | CSV zorlaması. |
-| `sourceProfile` | Hayır | Kaynak program: `Generic` (varsayılan), `Kolayvet`, `EVet` (bölüm 4.5; TIER-021). Partide saklanır, sütun önerisini seçer. |
+| `sourceProfile` | Hayır | Kaynak program: `Generic` (varsayılan), `EVet` (`Kolayvet` şimdilik 400) (bölüm 4.5; TIER-021). Partide saklanır, sütun önerisini seçer. |
 
 İşlem: dosya boyut/biçim denetimi, **içerik özeti (SHA-256)** hesabı, başlıkların okunması, kanonik başlıklarla otomatik eşleme önerisi. Satırlar bu aşamada saklanır (`Uploaded`) ama doğrulanmamıştır.
 
@@ -738,7 +738,6 @@ Uygulama (arka plan): müşteri → hasta → aşı sırası; **sahip bazlı** i
 ```json
 [
   { "code": "Generic", "displayName": "Genel Excel / CSV", "note": "…", "verified": false, "mappings": [] },
-  { "code": "Kolayvet", "displayName": "Kolayvet", "note": "…", "verified": false, "mappings": [] },
   { "code": "EVet", "displayName": "E-vet", "note": "…", "verified": false,
     "mappings": [ { "table": "pets", "header": "Hasta Irkı", "field": "Irk", "source": "Rakip incelemesi: …", "verified": false } ] }
 ]
