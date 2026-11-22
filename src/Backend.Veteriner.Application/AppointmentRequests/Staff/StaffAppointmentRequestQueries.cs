@@ -1,6 +1,7 @@
 using Ardalis.Specification;
 using Backend.Veteriner.Application.Appointments.Availability;
 using Backend.Veteriner.Application.Appointments.Reasons;
+using Backend.Veteriner.Application.Appointments.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
@@ -29,7 +30,9 @@ public sealed record GetAppointmentRequestsQuery(
     int PageSize)
     : IRequest<Result<PagedResult<AppointmentRequestListItemDto>>>;
 
-/// <summary>Talep detayı: geçmiş, müşteri eşleştirme önerileri ve istenen saatte boş uygun hekimler.</summary>
+/// <summary>
+/// Talep detayı: geçmiş (APPT-024), oluşan randevunun güncel hali, müşteri eşleştirme önerileri ve istenen saatte boş uygun hekimler.
+/// </summary>
 public sealed record GetAppointmentRequestQuery(Guid Id) : IRequest<Result<AppointmentRequestDetailDto>>;
 
 public sealed class GetAppointmentRequestsQueryValidator : AbstractValidator<GetAppointmentRequestsQuery>
@@ -88,6 +91,7 @@ public sealed class GetAppointmentRequestQueryHandler : IRequestHandler<GetAppoi
     private readonly StaffAppointmentRequestAccess _access;
     private readonly StaffAppointmentRequestMapper _mapper;
     private readonly IReadRepository<AppointmentReason> _reasons;
+    private readonly IReadRepository<Appointment> _appointments;
     private readonly IReadRepository<Client> _clients;
     private readonly IReadRepository<Pet> _pets;
     private readonly IClinicVeterinarianReader _veterinarians;
@@ -98,6 +102,7 @@ public sealed class GetAppointmentRequestQueryHandler : IRequestHandler<GetAppoi
         StaffAppointmentRequestAccess access,
         StaffAppointmentRequestMapper mapper,
         IReadRepository<AppointmentReason> reasons,
+        IReadRepository<Appointment> appointments,
         IReadRepository<Client> clients,
         IReadRepository<Pet> pets,
         IClinicVeterinarianReader veterinarians,
@@ -107,6 +112,7 @@ public sealed class GetAppointmentRequestQueryHandler : IRequestHandler<GetAppoi
         _access = access;
         _mapper = mapper;
         _reasons = reasons;
+        _appointments = appointments;
         _clients = clients;
         _pets = pets;
         _veterinarians = veterinarians;
@@ -132,6 +138,11 @@ public sealed class GetAppointmentRequestQueryHandler : IRequestHandler<GetAppoi
             .ToList();
 
         var matches = r.ClientId is null ? await FindClientMatchesAsync(r, ct) : [];
+
+        // Oluşan randevunun güncel hali (APPT-024): onaydan sonra taşınmış ya da iptal edilmiş olabilir.
+        var appointment = r.AppointmentId is { } appointmentId
+            ? await _appointments.FirstOrDefaultAsync(new AppointmentByIdSpec(r.TenantId, appointmentId), ct)
+            : null;
 
         var freeSlot = false;
         IReadOnlyList<Guid> freeVets = [];
@@ -164,7 +175,10 @@ public sealed class GetAppointmentRequestQueryHandler : IRequestHandler<GetAppoi
             history,
             matches,
             freeSlot,
-            freeVets));
+            freeVets,
+            appointment is null
+                ? null
+                : new AppointmentRequestAppointmentDto(appointment.Id, appointment.ScheduledAtUtc, appointment.DurationMinutes, appointment.Status)));
     }
 
     private async Task<IReadOnlyList<ClientMatchDto>> FindClientMatchesAsync(AppointmentRequest r, CancellationToken ct)
