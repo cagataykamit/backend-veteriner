@@ -70,7 +70,7 @@ public static class ClinicKvkkFormTemplateDefaults
         + "Uyulacak Usul ve Esaslar Hakkında Tebliğ uyarınca, kişisel verileriniz hakkında sizi bilgilendiririz. Bu metin bir rıza beyanı "
         + "değildir; bilgilendirme amacıyla verilir.\n\n"
         + "1. Veri sorumlusunun kimliği\n"
-        + "Veri sorumlusu {{clinicName}}'dır" + ControllerContact(clinic) + ".\n\n"
+        + "Veri sorumlusu: {{clinicName}}" + ControllerContact(clinic) + ".\n\n"
         + "2. İşlenen kişisel veriler\n"
         + "- Kimlik: ad, soyad; yalnız fatura/e-belge için gerektiğinde T.C. kimlik numarası, kurumsal alıcıda vergi kimlik numarası, "
         + "vergi dairesi ve unvan.\n"
