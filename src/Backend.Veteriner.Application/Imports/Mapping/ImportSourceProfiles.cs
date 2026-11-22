@@ -38,9 +38,8 @@ public static class ImportSourceProfiles
             "Vetinity şablonu ya da başka bir programın dosyası. Yalnız genel eş anlamlı başlıklar kullanılır.",
             []),
         new(ImportSourceProfile.Kolayvet, "Kolayvet",
-            "Kolayvet sitesi hasta ve müşteri verisinin Excel ya da PDF olarak dışa alınabildiğini yazıyor; sütun adları kamuya açık değil "
-            + "(kolayvet.com/ozellikler/ozellikler/gelismis-ice-disa-aktarma). Hazır eşleme yok, genel eş anlamlı başlıklar kullanılır. "
-            + "Gerçek dosya görülünce eşleme eklenecek.",
+            "Kolayvet'ten Excel ya da CSV olarak dışa aktardığınız müşteri ve hasta listesini yükleyin. Sütunlar başlık adlarından tanınır; "
+            + "tanınmayan sütunu eşleme adımında kendiniz seçersiniz.",
             []),
         new(ImportSourceProfile.EVet, "E-vet",
             "E-vet'in Genel > Yedek Al Excel dosyası (müşteri, hasta, randevu, muayene) doğrudan okunur. Rapor > Genel > Hasta Listesi sahip "
@@ -73,6 +72,18 @@ public static class ImportSourceProfiles
                 new(ImportTable.Pets, "Durum", "Durum", EVetBackup, Verified: true),
             ]),
     ];
+
+    /// <summary>
+    /// Sihirbazda sunulmayan ve yeni aktarmada kabul edilmeyen profiller (2026-11-22 kullanıcı kararı: Kolayvet'ten aktarma yapılmadı, örnek
+    /// dosya gelince buradan çıkarılır). Tanım <see cref="All"/> içinde kalır: var olan partiler ve talepler adını ve eşlemesini okur.
+    /// </summary>
+    private static readonly HashSet<ImportSourceProfile> Hidden = [ImportSourceProfile.Kolayvet];
+
+    /// <summary>"Hangi programdan geliyorsunuz?" seçenekleri: gizlenenler hariç.</summary>
+    public static IEnumerable<ImportSourceProfileDefinition> Offered => All.Where(p => IsOffered(p.Code));
+
+    /// <summary>Profil yeni aktarmada seçilebilir mi.</summary>
+    public static bool IsOffered(ImportSourceProfile code) => !Hidden.Contains(code);
 
     public static ImportSourceProfileDefinition Get(ImportSourceProfile code) => All.First(p => p.Code == code);
 

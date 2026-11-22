@@ -156,6 +156,15 @@ public sealed class GetVaccinationsListQueryHandler
             MarkStep("petsNotReceivingCareLookup");
         }
 
+        // Gecikmiş liste uygulanmış aşının karşılanmamış sonraki tarihini de içerir (VaccinationDueRule).
+        IReadOnlyCollection<Guid>? fulfilledNextDueIds = null;
+        if (request.OnlyOverdue)
+        {
+            fulfilledNextDueIds = await _vaccinations.FulfilledNextDueIdsAsync(
+                tenantId, effectiveClinicId, accessibleClinicIds, VaccinationDueRule.OverdueWindow(listAsOfUtc), ct);
+            MarkStep("fulfilledNextDueLookup");
+        }
+
         var total = await _vaccinations.CountAsync(
             new VaccinationsFilteredCountSpec(
                 tenantId,
@@ -176,7 +185,8 @@ public sealed class GetVaccinationsListQueryHandler
                 clientPetIds,
                 request.DateFromUtc,
                 request.DateToUtc,
-                request.HbsStatus),
+                request.HbsStatus,
+                fulfilledNextDueIds),
             ct);
         MarkStep("vaccinationsCount");
 
@@ -203,7 +213,8 @@ public sealed class GetVaccinationsListQueryHandler
                 request.DateFromUtc,
                 request.DateToUtc,
                 sort,
-                request.HbsStatus),
+                request.HbsStatus,
+                fulfilledNextDueIds),
             ct);
         MarkStep("vaccinationsPage");
 

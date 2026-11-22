@@ -65,7 +65,8 @@ public sealed class PublicController : ControllerBase
             body.DiscountCode,
             body.StartWithExampleClinic,
             body.EmailVerificationToken,
-            body.TaxIdentityNumber);
+            body.TaxIdentityNumber,
+            body.FullName);
 
         var result = await _mediator.Send(command, ct);
         return result.ToActionResult(this);
@@ -229,7 +230,7 @@ public sealed class PublicController : ControllerBase
                 .ToActionResult(this);
         }
 
-        var result = await _mediator.Send(new SignupAndAcceptTenantInviteCommand(token, body.Password, body.AcceptedLegalDocuments), ct);
+        var result = await _mediator.Send(new SignupAndAcceptTenantInviteCommand(token, body.Password, body.AcceptedLegalDocuments, body.FullName), ct);
         return result.ToActionResult(this);
     }
 }

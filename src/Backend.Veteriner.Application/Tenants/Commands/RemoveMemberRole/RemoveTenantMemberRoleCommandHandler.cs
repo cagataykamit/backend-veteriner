@@ -25,6 +25,7 @@ public sealed class RemoveTenantMemberRoleCommandHandler
     : IRequestHandler<RemoveTenantMemberRoleCommand, Result<RemoveTenantMemberRoleResultDto>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly TenantMemberManagementAccess _memberAccess;
     private readonly IClientContext _clientContext;
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IUserTenantRepository _userTenantRepo;
@@ -35,6 +36,7 @@ public sealed class RemoveTenantMemberRoleCommandHandler
 
     public RemoveTenantMemberRoleCommandHandler(
         ITenantContext tenantContext,
+        TenantMemberManagementAccess memberAccess,
         IClientContext clientContext,
         ICurrentUserPermissionChecker permissions,
         IUserTenantRepository userTenantRepo,
@@ -44,6 +46,7 @@ public sealed class RemoveTenantMemberRoleCommandHandler
         IUnitOfWork uow)
     {
         _tenantContext = tenantContext;
+        _memberAccess = memberAccess;
         _clientContext = clientContext;
         _permissions = permissions;
         _userTenantRepo = userTenantRepo;
@@ -104,6 +107,12 @@ public sealed class RemoveTenantMemberRoleCommandHandler
                 "Invites.OperationClaimNotAssignable",
                 "Bu operation claim tenant panelinden yönetilemez; teknik/internal roller yalnız global admin yüzeyinden yönetilir.");
         }
+
+        var access = await _memberAccess.EnsureMemberAsync(request.MemberId, ct);
+        if (access.IsSuccess)
+            access = await _memberAccess.EnsureRoleAsync(claim.Name, ct);
+        if (!access.IsSuccess)
+            return Result<RemoveTenantMemberRoleResultDto>.Failure(access.Error);
 
         if (!await _userOperationClaims.ExistsAsync(request.MemberId, request.OperationClaimId, ct))
         {

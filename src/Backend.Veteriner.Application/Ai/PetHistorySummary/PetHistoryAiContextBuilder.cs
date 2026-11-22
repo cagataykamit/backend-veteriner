@@ -211,18 +211,22 @@ public sealed class PetHistoryAiContextBuilder
             var applied = await _vaccinations.ListAsync(new AppliedVaccinationsForPetAiSpec(tenantId, clinicId, petId, TakePerType, clinicIds), ct);
             var scheduled = await _vaccinations.ListAsync(new ScheduledVaccinationsForPetAiSpec(tenantId, clinicId, petId, ScheduledVaccinationsTake, clinicIds), ct);
             var overdueWindow = VaccinationDueRule.OverdueWindow(today);
+            // Uygulanmış aşının karşılanmamış sonraki tarihi de gecikmiş olabilir (VaccinationDueRule).
+            var fulfilled = (await _vaccinations.FulfilledNextDueIdsAsync(
+                tenantId, clinicId, clinicIds, overdueWindow.FromUtc, overdueWindow.BeforeUtc, ct, petIds: [petId]));
             var index = 0;
             foreach (var v in applied.Concat(scheduled))
             {
                 var at = v.AppliedAtUtc ?? v.DueAtUtc ?? v.CreatedAtUtc;
                 var isScheduled = v.Status == VaccinationStatus.Scheduled;
+                var isOpenDue = VaccinationDueRule.IsOpenDue(v.Id, v.Status, v.AppliedAtUtc, v.DueAtUtc, fulfilled);
                 entries.Add(new Entry($"A{++index}", PetRecordKind.Vaccination, v.Id, at, Compact(new JsonObject
                 {
                     ["vaccine"] = Text(v.VaccineName),
                     ["status"] = isScheduled ? "Scheduled" : "Applied",
                     ["appliedDate"] = Date(v.AppliedAtUtc),
                     ["dueDate"] = Date(v.DueAtUtc),
-                    ["overdue"] = isScheduled && pet.Status == PetStatus.Active && v.DueAtUtc is { } due && VaccinationDueRule.IsOverdueAt(due, overdueWindow) ? true : null,
+                    ["overdue"] = isOpenDue && pet.Status == PetStatus.Active && v.DueAtUtc is { } due && VaccinationDueRule.IsOverdueAt(due, overdueWindow) ? true : null,
                     ["notes"] = Text(v.Notes),
                 })));
             }

@@ -35,10 +35,6 @@ public static partial class RateLimitingExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var globalPermitLimit = RateLimitingOptions
-            .FromConfiguration(configuration)
-            .GetEffectiveGlobalPermitLimit();
-
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -85,12 +81,18 @@ public static partial class RateLimitingExtensions
                 if (IsPublicSiteImageRequest(ctx.Request.Path))
                     return RateLimitPartition.GetNoLimiter(PublicSiteImagePolicy);
 
-                var key = GetClientIp(ctx);
+                // Giriş yapmış istek kullanıcıya, girişsiz istek IP'ye göre bölünür (aynı klinik IP'sindeki personel birbirini kilitlemez).
+                // Sınırlar istek anında yapılandırmadan okunur (dış API politikasıyla aynı desen).
+                var limits = RateLimitingOptions.FromConfiguration(ctx.RequestServices.GetRequiredService<IConfiguration>());
+                var userKey = GetUserKey(ctx);
+                var (key, permitLimit) = userKey is null
+                    ? ($"ip:{GetClientIp(ctx)}", limits.GetEffectiveGlobalPermitLimit())
+                    : (userKey, limits.GetEffectiveUserPermitLimit());
                 return RateLimitPartition.GetSlidingWindowLimiter(
                     key,
                     _ => new SlidingWindowRateLimiterOptions
                     {
-                        PermitLimit = globalPermitLimit,
+                        PermitLimit = permitLimit,
                         Window = TimeSpan.FromMinutes(1),
                         SegmentsPerWindow = 6,
                         QueueLimit = 0,
@@ -387,7 +389,7 @@ public static partial class RateLimitingExtensions
                     });
             });
 
-            // -- DIŞ API (TIER-009): hız sınırı kimlik doğrulamadan önce çalışır; anahtar ön eki başlıktan okunur (gizli kısım bölüm
+            // -- DIŞ API (TIER-009): anahtar başına sınır; anahtar ön eki başlıktan okunur (gizli kısım bölüm
             //    anahtarına girmez). Biçimsiz ya da eksik anahtar IP bölümüne düşer. Genel IP tavanı ayrıca geçerlidir.
             options.AddPolicy(ExternalApiPolicy, httpContext =>
             {
@@ -442,6 +444,16 @@ public static partial class RateLimitingExtensions
 
     [GeneratedRegex("^/api/v[^/]+/public/sites/[^/]+/images/[^/]+$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex PublicSiteImagePath();
+
+    /// <summary>Doğrulanmış oturumun kullanıcı bölümü (<c>user:{sub}</c>); oturum yoksa <c>null</c>. Kimlik doğrulama sınırlayıcıdan önce çalışır.</summary>
+    private static string? GetUserKey(HttpContext ctx)
+    {
+        if (ctx.User.Identity?.IsAuthenticated != true)
+            return null;
+
+        var sub = ctx.User.FindFirst("sub")?.Value ?? ctx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return string.IsNullOrWhiteSpace(sub) ? null : $"user:{sub}";
+    }
 
     private static string GetClientIp(HttpContext ctx)
         => ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";

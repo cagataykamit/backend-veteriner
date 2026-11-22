@@ -22,17 +22,20 @@ public sealed class UpdateTenantSettingsCommandHandler
     : IRequestHandler<UpdateTenantSettingsCommand, Result<TenantDetailDto>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly TenantMemberManagementAccess _memberAccess;
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IReadRepository<Tenant> _tenantsRead;
     private readonly IRepository<Tenant> _tenantsWrite;
 
     public UpdateTenantSettingsCommandHandler(
         ITenantContext tenantContext,
+        TenantMemberManagementAccess memberAccess,
         ICurrentUserPermissionChecker permissions,
         IReadRepository<Tenant> tenantsRead,
         IRepository<Tenant> tenantsWrite)
     {
         _tenantContext = tenantContext;
+        _memberAccess = memberAccess;
         _permissions = permissions;
         _tenantsRead = tenantsRead;
         _tenantsWrite = tenantsWrite;
@@ -60,6 +63,10 @@ public sealed class UpdateTenantSettingsCommandHandler
                 "Tenants.AccessDenied",
                 "Kurum ayarları yalnızca oturumdaki kiracı bağlamında güncellenebilir.");
         }
+
+        var access = await _memberAccess.EnsureTenantSettingsAsync(ct);
+        if (!access.IsSuccess)
+            return Result<TenantDetailDto>.Failure(access.Error);
 
         var tenant = await _tenantsRead.FirstOrDefaultAsync(new TenantByIdSpec(request.TenantId), ct);
         if (tenant is null)

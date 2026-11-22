@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Clinics.Access;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Application.Tests.TestHelpers;
+using Backend.Veteriner.Application.Vaccinations;
 using Backend.Veteriner.Application.Vaccinations.Calendar;
 using Backend.Veteriner.Application.Vaccinations.Queries.GetCalendar;
 using Backend.Veteriner.Application.Vaccinations.Specs;

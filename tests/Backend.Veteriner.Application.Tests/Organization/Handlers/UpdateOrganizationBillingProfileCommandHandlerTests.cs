@@ -2,6 +2,7 @@ using Ardalis.Specification;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Organization.Commands.UpdateBillingProfile;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Tenants;
 using AwesomeAssertions;
 using Moq;
@@ -16,7 +17,7 @@ public sealed class UpdateOrganizationBillingProfileCommandHandlerTests
     private readonly Mock<IRepository<TenantBillingProfile>> _profilesWrite = new();
 
     private UpdateOrganizationBillingProfileCommandHandler CreateHandler()
-        => new(_tenant.Object, _permissions.Object, _profilesRead.Object, _profilesWrite.Object, TimeProvider.System);
+        => new(_tenant.Object, TenantMemberManagementAccessStub.TenantWide(), _permissions.Object, _profilesRead.Object, _profilesWrite.Object, TimeProvider.System);
 
     private static UpdateOrganizationBillingProfileCommand ValidCommand(string? taxNumber = "1234567890")
         => new(

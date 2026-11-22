@@ -6,6 +6,7 @@ using Backend.Veteriner.Domain.Appointments;
 using Backend.Veteriner.Domain.Charges;
 using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Clinics;
+using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Payments;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Tenants;
@@ -206,6 +207,18 @@ public sealed partial class OwnerPortalIntegrationTests
         var (detail, _) = await GetOkAsync($"/api/portal/v1/links/{link}/pets/{f.ActivePetId}", token);
         detail.GetProperty("isNeutered").GetBoolean().Should().BeTrue();
         detail.TryGetProperty("colorName", out _).Should().BeTrue();
+        detail.GetProperty("weightKg").GetDecimal().Should().Be(4.2m, "kilo ölçülmüş muayene yoksa profil kilosu");
+        await using (var scope = _factory.Services.CreateSystemScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var tenantId = await db.Clinics.AsNoTracking().Where(c => c.Id == f.Staff.ClinicId).Select(c => c.TenantId).SingleAsync();
+            db.Examinations.Add(new Examination(
+                tenantId, f.Staff.ClinicId, f.ActivePetId, null, DateTime.UtcNow.AddDays(-1), "Kontrol", "Bulgu", null, null, DateTime.UtcNow, weightKg: 4.3m));
+            await db.SaveChangesAsync();
+        }
+
+        var (weighed, _) = await GetOkAsync($"/api/portal/v1/links/{link}/pets/{f.ActivePetId}", token);
+        weighed.GetProperty("weightKg").GetDecimal().Should().Be(4.3m, "son kilo ölçülmüş muayenenin kilosu (tam test 2026-11-22)");
 
         // Aşılar
         var (vacc, _) = await GetOkAsync($"/api/portal/v1/links/{link}/pets/{f.ActivePetId}/vaccinations", token);

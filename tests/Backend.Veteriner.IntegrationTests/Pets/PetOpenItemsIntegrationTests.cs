@@ -194,6 +194,51 @@ public sealed class PetOpenItemsIntegrationTests : IClassFixture<CustomWebApplic
             .Should().Be(2);
     }
 
+    /// <summary>
+    /// Tam test 2026-11-22 (P1): uygulanmış aşının sonraki tarihi Yapılacaklar, hasta özeti, pano ve "Geciken aşı takipleri" listesinde
+    /// gecikmiş sayılır; aynı aşı yeniden uygulanınca hepsinden düşer (VaccinationDueRule).
+    /// </summary>
+    [Fact]
+    public async Task Applied_NextDue_Should_Be_Overdue_Everywhere_Until_Same_Vaccine_Is_Applied_Again()
+    {
+        var env = await SeedAsync();
+        var now = DateTime.UtcNow;
+        Guid nextDueId = Guid.Empty, vaccineId = Guid.Empty;
+        await env.WithDbAsync(async (db, s) =>
+        {
+            var vaccine = VaccineDefinition.CreateTenant(s.TenantId, $"ND{Guid.NewGuid():N}"[..12], "FVRCP", DateTime.UtcNow);
+            db.VaccineDefinitions.Add(vaccine);
+            await db.SaveChangesAsync();
+            var applied = new Vaccination(
+                s.TenantId, s.PetId, s.ClinicId, null, vaccine.Id, vaccine.Name, VaccinationStatus.Applied, now.AddDays(-40), now.AddDays(-3), null, DateTime.UtcNow);
+            db.Vaccinations.Add(applied);
+            await db.SaveChangesAsync();
+            (nextDueId, vaccineId) = (applied.Id, vaccine.Id);
+        });
+
+        var overdue = Section(await env.GetJsonAsync($"/api/v1/pets/{env.PetId}/open-items"), "vaccinations", "Ok").GetProperty("overdue");
+        overdue.GetArrayLength().Should().Be(1);
+        overdue[0].GetProperty("id").GetGuid().Should().Be(nextDueId);
+        overdue[0].GetProperty("isNextDue").GetBoolean().Should().BeTrue();
+        overdue[0].GetProperty("vaccineDefinitionId").GetGuid().Should().Be(vaccineId);
+        var nextDue = Section(await env.GetJsonAsync($"/api/v1/pets/{env.PetId}/summary"), "vaccinations", "Ok").GetProperty("nextDue");
+        nextDue.GetProperty("id").GetGuid().Should().Be(nextDueId);
+        nextDue.GetProperty("isOverdue").GetBoolean().Should().BeTrue();
+        (await env.GetJsonAsync("/api/v1/dashboard/operational-alerts")).GetProperty("overdueVaccinationsCount").GetInt32().Should().Be(1);
+        (await env.GetTotalItemsAsync(env.OverdueVaccinationsUrl)).Should().Be(1);
+
+        await env.WithDbAsync(async (db, s) =>
+        {
+            db.Vaccinations.Add(new Vaccination(
+                s.TenantId, s.PetId, s.ClinicId, null, vaccineId, "FVRCP", VaccinationStatus.Applied, now.AddHours(-1), null, null, DateTime.UtcNow));
+            await db.SaveChangesAsync();
+        });
+
+        Section(await env.GetJsonAsync($"/api/v1/pets/{env.PetId}/open-items"), "vaccinations", "Empty");
+        (await env.GetJsonAsync("/api/v1/dashboard/operational-alerts")).GetProperty("overdueVaccinationsCount").GetInt32().Should().Be(0);
+        (await env.GetTotalItemsAsync(env.OverdueVaccinationsUrl)).Should().Be(0);
+    }
+
     // ---- Yardımcılar ----
 
     private static JsonElement Section(JsonElement body, string name, string expectedState)

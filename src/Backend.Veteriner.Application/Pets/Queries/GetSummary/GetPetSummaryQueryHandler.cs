@@ -108,8 +108,11 @@ public sealed class GetPetSummaryQueryHandler : IRequestHandler<GetPetSummaryQue
                 new LastAppliedVaccinationForPetSpec(tenantId, clinicId, request.PetId, accessibleClinicIds), ct);
             // Gecikmiş penceresinden (son 1 takvim ayı) eski vade hasta kartında gösterilmez (ADR-028).
             var overdueWindow = VaccinationDueRule.OverdueWindow(nowUtc);
+            // Sıradaki aşı uygulanmış aşının karşılanmamış sonraki tarihi de olabilir (VaccinationDueRule).
+            var fulfilled = await _vaccinations.FulfilledNextDueIdsAsync(
+                tenantId, clinicId, accessibleClinicIds, overdueWindow.FromUtc, null, ct, petIds: [request.PetId]);
             var due = await _vaccinations.FirstOrDefaultAsync(
-                new NextDueVaccinationForPetSpec(tenantId, clinicId, request.PetId, overdueWindow.FromUtc, accessibleClinicIds), ct);
+                new NextDueVaccinationForPetSpec(tenantId, clinicId, request.PetId, overdueWindow.FromUtc, accessibleClinicIds, fulfilled), ct);
             if (applied is null && due is null)
                 return null;
 

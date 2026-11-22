@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Ai.Drafts;
 using Backend.Veteriner.Application.Clients.Specs;
 using Backend.Veteriner.Application.Clinics.Access;
+using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations;
@@ -8,6 +9,7 @@ using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
 using Backend.Veteriner.Application.Examinations.Specs;
 using Backend.Veteriner.Application.Pets.Specs;
 using Backend.Veteriner.Domain.Clients;
+using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Examinations;
 using Backend.Veteriner.Domain.Pets;
 using Backend.Veteriner.Domain.Shared;
@@ -26,6 +28,7 @@ public sealed class GetExaminationByIdQueryHandler
     private readonly IReadRepository<Examination> _examinations;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
+    private readonly IReadRepository<Clinic> _clinics;
     private readonly IClinicVeterinarianReader _userNames;
     private readonly IAiProvenanceReader _aiProvenance;
 
@@ -38,9 +41,11 @@ public sealed class GetExaminationByIdQueryHandler
         IReadRepository<Examination> examinations,
         IReadRepository<Pet> pets,
         IReadRepository<Client> clients,
+        IReadRepository<Clinic> clinics,
         IClinicVeterinarianReader userNames,
         IAiProvenanceReader aiProvenance)
     {
+        _clinics = clinics;
         _aiProvenance = aiProvenance;
         _tenantContext = tenantContext;
         _clinicContext = clinicContext;
@@ -97,6 +102,8 @@ public sealed class GetExaminationByIdQueryHandler
             clientName = client?.FullName ?? string.Empty;
         }
 
+        var clinic = await _clinics.FirstOrDefaultAsync(new ClinicByIdSpec(tenantId, e.ClinicId), ct);
+
         string? finalizedByName = null;
         if (e.FinalizedByUserId is { } finalizedBy)
         {
@@ -133,7 +140,8 @@ public sealed class GetExaminationByIdQueryHandler
             e.FinalizedAtUtc,
             e.FinalizedByUserId,
             finalizedByName,
-            await _aiProvenance.ForRecordAsync(tenantId, e.Id, ct));
+            await _aiProvenance.ForRecordAsync(tenantId, e.Id, ct),
+            clinic?.Name ?? string.Empty);
         return Result<ExaminationDetailDto>.Success(dto);
     }
 }

@@ -12,15 +12,18 @@ public sealed class GetAssignableOperationClaimsForInviteQueryHandler
     : IRequestHandler<GetAssignableOperationClaimsForInviteQuery, Result<IReadOnlyList<AssignableOperationClaimForInviteDto>>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly TenantMemberManagementAccess _memberAccess;
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IReadRepository<OperationClaim> _claims;
 
     public GetAssignableOperationClaimsForInviteQueryHandler(
         ITenantContext tenantContext,
+        TenantMemberManagementAccess memberAccess,
         ICurrentUserPermissionChecker permissions,
         IReadRepository<OperationClaim> claims)
     {
         _tenantContext = tenantContext;
+        _memberAccess = memberAccess;
         _permissions = permissions;
         _claims = claims;
     }
@@ -54,10 +57,12 @@ public sealed class GetAssignableOperationClaimsForInviteQueryHandler
             c => c.Name,
             StringComparer.OrdinalIgnoreCase);
 
+        // Klinik yöneticisine işletme yöneticisi rolü listelenmez (TenantMemberManagementAccess).
+        var clinicScoped = await _memberAccess.IsClinicScopedAsync(ct);
         var ordered = new List<AssignableOperationClaimForInviteDto>();
         foreach (var name in allowed)
         {
-            if (byName.TryGetValue(name, out var claim))
+            if (byName.TryGetValue(name, out var claim) && TenantMemberManagementAccess.CanAssignRole(claim.Name, clinicScoped))
                 ordered.Add(new AssignableOperationClaimForInviteDto(claim.Id, claim.Name));
         }
 

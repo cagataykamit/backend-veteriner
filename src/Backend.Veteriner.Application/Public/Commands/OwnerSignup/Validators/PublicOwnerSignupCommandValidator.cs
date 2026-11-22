@@ -1,6 +1,7 @@
 using Backend.Veteriner.Application.Common.Validation;
 using Backend.Veteriner.Application.Public.TrialSignup;
 using Backend.Veteriner.Domain.Shared;
+using Backend.Veteriner.Domain.Users;
 using FluentValidation;
 
 namespace Backend.Veteriner.Application.Public.Commands.OwnerSignup.Validators;
@@ -37,6 +38,10 @@ public sealed class PublicOwnerSignupCommandValidator : AbstractValidator<Public
         RuleFor(x => x.Password)
             .NotEmpty()
             .StrongPasswordRules(includeMaxLength: true);
+
+        RuleFor(x => x.FullName)
+            .MaximumLength(User.MaxDisplayNameLength)
+            .WithMessage($"Ad-soyad en fazla {User.MaxDisplayNameLength} karakter olabilir.");
 
         RuleFor(x => x.EmailVerificationToken)
             .NotEmpty().WithMessage(TrialSignupErrors.VerificationRequired.Message)

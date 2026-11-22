@@ -2,14 +2,17 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Auth.Specs;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Tenants.Commands.CancelInvite;
 using Backend.Veteriner.Application.Tenants.Commands.ResendInvite;
 using Backend.Veteriner.Application.Tenants.Queries.GetInviteById;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Tenants;
 using AwesomeAssertions;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace Backend.Veteriner.Application.Tests.Tenants.Handlers;
@@ -34,15 +37,17 @@ public sealed class TenantInviteManagementHandlersTests
     private readonly Mock<IUserTenantRepository> _userTenants = new();
     private readonly Mock<ITokenHashService> _tokenHash = new();
     private readonly Mock<IUnitOfWork> _uow = new();
+    private readonly Mock<IEmailSender> _email = new();
 
     private GetTenantInviteByIdQueryHandler CreateDetailHandler()
         => new(_tenantContext.Object, _permissions.Object, _invitesRead.Object, _claimsRead.Object, _clinicsRead.Object, _userTenants.Object, TimeProvider.System);
 
     private CancelTenantInviteCommandHandler CreateCancelHandler()
-        => new(_tenantContext.Object, _permissions.Object, _invitesRead.Object, _invitesWrite.Object, _uow.Object);
+        => new(_tenantContext.Object, TenantMemberManagementAccessStub.TenantWide(), _permissions.Object, _invitesRead.Object, _invitesWrite.Object, _uow.Object);
 
     private ResendTenantInviteCommandHandler CreateResendHandler()
-        => new(_tenantContext.Object, _permissions.Object, _invitesRead.Object, _invitesWrite.Object, _tokenHash.Object, _uow.Object, TimeProvider.System);
+        => new(_tenantContext.Object, TenantMemberManagementAccessStub.TenantWide(), _permissions.Object, _invitesRead.Object, _invitesWrite.Object, _tokenHash.Object, _clinicsRead.Object, _email.Object,
+            Options.Create(new AppOptions { FrontendBaseUrl = "https://panel.example.test/" }), _uow.Object, TimeProvider.System);
 
     private static TenantInvite BuildPending(Guid tenantId, Guid clinicId, Guid claimId, DateTime? expiresAtUtc = null, Guid? id = null)
     {
@@ -278,6 +283,30 @@ public sealed class TenantInviteManagementHandlersTests
         invite.Status.Should().Be(TenantInviteStatus.Revoked);
         _invitesWrite.Verify(x => x.UpdateAsync(invite, It.IsAny<CancellationToken>()), Times.Once);
         _uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Resend_Should_Email_New_Join_Link_To_Invitee()
+    {
+        var tid = Guid.NewGuid();
+        var clinicId = Guid.NewGuid();
+        _permissions.Setup(x => x.HasPermission(PermissionCatalog.Tenants.InviteCreate)).Returns(true);
+        _tenantContext.SetupGet(x => x.TenantId).Returns(tid);
+        var invite = BuildPending(tid, clinicId, Guid.NewGuid());
+        _invitesRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<TenantInviteByTenantAndIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(invite);
+        _clinicsRead.Setup(x => x.FirstOrDefaultAsync(It.IsAny<ClinicByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Clinic(tid, "Merkez Pati", "Istanbul"));
+        _tokenHash.Setup(x => x.ComputeSha256(It.IsAny<string>())).Returns("new-hash");
+        string? body = null;
+        _email.Setup(x => x.SendAsync("a@b.com", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), false))
+            .Callback<string, string, string, CancellationToken, bool>((_, _, b, _, _) => body = b)
+            .Returns(Task.CompletedTask);
+
+        var result = await CreateResendHandler().Handle(new ResendTenantInviteCommand(tid, invite.Id, null), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        body.Should().Contain("Merkez Pati").And.Contain($"https://panel.example.test/join/{result.Value!.Token}");
     }
 
     [Fact]

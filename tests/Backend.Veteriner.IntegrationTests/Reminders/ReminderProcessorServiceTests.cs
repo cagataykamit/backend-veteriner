@@ -361,6 +361,45 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         email.Enqueued[0].Body.Should().Contain("sonraki uygulama tarihinin");
     }
 
+    /// <summary>
+    /// VaccinationDueRule: aynı aşı hayvana sonra uygulandıysa önceki dozun sonraki tarihi karşılanmıştır (hatırlatılmaz); aynı aşının aynı
+    /// penceredeki planlı kaydı varsa hatırlatma yalnız planlı kayıttan gider (aynı aşı iki kez gönderilmez).
+    /// </summary>
+    [Fact]
+    public async Task ProcessOnce_Should_Skip_Fulfilled_NextDue_And_Remind_Same_Vaccine_Once()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var client = new Client(tenant.Id, "Ali Veli", DateTime.UtcNow, "905555555555", "ali@example.com");
+        var speciesId = await GetAnySpeciesIdAsync(db);
+        var rabies = await GetRabiesVaccineDefinitionAsync(db);
+        var fulfilledPet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
+        var duplicatePet = new Pet(tenant.Id, client.Id, "Boncuk", speciesId);
+        var earlier = new Vaccination(
+            tenant.Id, fulfilledPet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Applied, now.AddDays(-30), now.AddDays(2), null, DateTime.UtcNow);
+        var later = new Vaccination(
+            tenant.Id, fulfilledPet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Applied, now.AddDays(-1), null, null, DateTime.UtcNow);
+        var nextDue = new Vaccination(
+            tenant.Id, duplicatePet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Applied, now.AddDays(-30), now.AddDays(2), null, DateTime.UtcNow);
+        var planned = new Vaccination(
+            tenant.Id, duplicatePet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(2).AddHours(1), null, DateTime.UtcNow);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(false, 24, true, 3, true, DateTime.UtcNow);
+
+        db.AddRange(tenant, clinic, client, fulfilledPet, duplicatePet, earlier, later, nextDue, planned, settings);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+        await db.SaveChangesAsync();
+
+        await CreateService(db, email).ProcessOnceAsync(CancellationToken.None);
+        await CreateService(db, email).ProcessOnceAsync(CancellationToken.None);
+
+        email.Enqueued.Should().ContainSingle();
+        (await db.ReminderDispatchLogs.SingleAsync()).SourceEntityId.Should().Be(planned.Id);
+    }
+
     [Fact]
     public async Task ProcessOnce_Should_NotEnqueue_VaccinationReminder_When_Applied_WithNullDueAt()
     {

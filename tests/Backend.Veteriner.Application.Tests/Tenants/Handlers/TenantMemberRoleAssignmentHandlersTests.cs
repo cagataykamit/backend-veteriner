@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Auth.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Commands.AssignMemberRole;
 using Backend.Veteriner.Application.Tenants.Commands.RemoveMemberRole;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Auth;
 using AwesomeAssertions;
 using Moq;
@@ -28,11 +29,11 @@ public sealed class TenantMemberRoleAssignmentHandlersTests
     private readonly Mock<IUnitOfWork> _uow = new();
 
     private AssignTenantMemberRoleCommandHandler CreateAssignHandler()
-        => new(_tenantContext.Object, _permissions.Object, _userTenantRepo.Object,
+        => new(_tenantContext.Object, TenantMemberManagementAccessStub.TenantWide(), _permissions.Object, _userTenantRepo.Object,
                _claimsRead.Object, _userOperationClaims.Object, _cache.Object, _uow.Object);
 
     private RemoveTenantMemberRoleCommandHandler CreateRemoveHandler()
-        => new(_tenantContext.Object, _clientContext.Object, _permissions.Object, _userTenantRepo.Object,
+        => new(_tenantContext.Object, TenantMemberManagementAccessStub.TenantWide(), _clientContext.Object, _permissions.Object, _userTenantRepo.Object,
                _claimsRead.Object, _userOperationClaims.Object, _cache.Object, _uow.Object);
 
     private static OperationClaim BuildClaim(Guid id, string name)

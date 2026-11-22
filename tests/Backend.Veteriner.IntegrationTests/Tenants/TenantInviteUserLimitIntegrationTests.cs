@@ -7,6 +7,7 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.LegalAcceptances;
 using Backend.Veteriner.Application.Tenants;
+using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Tenants;
@@ -50,6 +51,8 @@ public sealed class TenantInviteUserLimitIntegrationTests : IClassFixture<Custom
         db.Clinics.Add(clinic);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, plan, now, 14));
         var claim = await db.OperationClaims.SingleAsync(c => c.Name == "Veteriner");
+        // Daveti işletme yöneticisi (Admin) yapar; klinik kapsamlı kullanıcı yalnız atandığı kliniğe davet eder (TenantMemberManagementAccess).
+        var adminClaim = await db.OperationClaims.SingleAsync(c => c.Name == "Admin");
 
         var ownerEmail = string.Empty;
         for (var i = 0; i < memberCount; i++)
@@ -59,6 +62,8 @@ public sealed class TenantInviteUserLimitIntegrationTests : IClassFixture<Custom
             var user = new User(email, hasher.Hash("123456"), now);
             db.Users.Add(user);
             db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, now));
+            if (i == 0)
+                db.UserOperationClaims.Add(new UserOperationClaim(user.Id, adminClaim.Id));
         }
 
         await db.SaveChangesAsync();

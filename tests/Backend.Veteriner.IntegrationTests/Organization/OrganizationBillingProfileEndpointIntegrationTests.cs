@@ -7,7 +7,9 @@ using Backend.IntegrationTests.Infrastructure;
 using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Constants;
+using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Tenants;
+using Backend.Veteriner.Domain.Users;
 using Backend.Veteriner.Infrastructure.Persistence;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -252,15 +254,21 @@ public sealed class OrganizationBillingProfileEndpointIntegrationTests : IClassF
         var tenant = new Tenant($"Tenant-{Guid.NewGuid():N}"[..18], DateTime.UtcNow);
         db.Tenants.Add(tenant);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, DateTime.UtcNow, 14));
+        // Fatura profilini yalnız işletme yöneticisi (Admin) değiştirir (TenantMemberManagementAccess).
+        var user = new User($"it-{Guid.NewGuid():N}@example.com", "hash", DateTime.UtcNow);
+        db.Users.Add(user);
+        db.UserTenants.Add(new UserTenant(user.Id, tenant.Id, DateTime.UtcNow));
+        var admin = await db.OperationClaims.SingleAsync(c => c.Name == "Admin");
+        db.UserOperationClaims.Add(new UserOperationClaim(user.Id, admin.Id));
         await db.SaveChangesAsync();
 
-        var userId = Guid.NewGuid();
+        var userId = user.Id;
         var claims = permissions
             .Select(p => new Claim("permission", p))
             .Append(new Claim(VeterinerClaims.TenantId, tenant.Id.ToString("D")))
             .ToList();
 
-        var (accessToken, _, _) = jwt.Create(userId, $"it-{Guid.NewGuid():N}@example.com", Array.Empty<string>(), claims);
+        var (accessToken, _, _) = jwt.Create(userId, user.Email, Array.Empty<string>(), claims);
         return (tenant.Id, userId, accessToken);
     }
 

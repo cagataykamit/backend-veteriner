@@ -1,4 +1,3 @@
-using System.Globalization;
 using Backend.Veteriner.Application.Common.Time;
 
 namespace Backend.Veteriner.Application.Vaccinations.Calendar;
@@ -19,13 +18,12 @@ public enum VaccinationCalendarKind
 /// <summary>
 /// Takvim aşı katmanının kuralları (tek yer). Durum (renk) <see cref="CalendarItemStateRule"/>: uygulanan aşı tamamlanan, vadeli aşı
 /// vadesine göre bugün, gelecek ya da gecikmiş. Vadesi gecikmiş penceresinden (<see cref="VaccinationDueRule.OverdueWindow(DateTime)"/>,
-/// son 1 takvim ayı) eski vadeli satır gösterilmez (<see cref="IsShown"/>). Aşı randevu değildir: saat dilimini doldurmaz, çakışma ve boş
+/// son 1 takvim ayı) eski vadeli satır gösterilmez (<see cref="IsShown"/>); karşılanmış sonraki tarih
+/// (<see cref="VaccinationDueRule.IsNextDueFulfilled"/>) de gösterilmez. Aşı randevu değildir: saat dilimini doldurmaz, çakışma ve boş
 /// saat hesabına girmez, randevu hatırlatması üretmez.
 /// </summary>
 public static class VaccinationCalendarRules
 {
-    private static readonly CompareInfo TurkishCompare = CultureInfo.GetCultureInfo("tr-TR").CompareInfo;
-
     /// <summary>Satır takvimde görünür mü: uygulanan aşı her zaman; vadeli satır (planlı, sonraki tarih) vadesi pencereden eski değilse.</summary>
     public static bool IsShown(VaccinationCalendarKind kind, DateTime atUtc, VaccinationOverdueWindow overdueWindow)
         => kind == VaccinationCalendarKind.Applied || !VaccinationDueRule.IsBeforeOverdueWindow(atUtc, overdueWindow);
@@ -42,22 +40,4 @@ public static class VaccinationCalendarRules
 
     /// <summary>Kaydın takvimde göründüğü İstanbul günü.</summary>
     public static DateOnly LocalDate(DateTime utc) => OperationDayBounds.ToLocalDate(utc);
-
-    /// <summary>
-    /// Sonraki uygulama tarihi karşılandı mı: aynı hayvana aynı aşı (tanım kimliği; tanımsız eski kayıtta ad) bu uygulamadan sonra yeniden
-    /// uygulanmışsa vade kapanmıştır ve takvimde gösterilmez. Planlı kayıt bu kurala girmez; uygulanınca durumu değişir.
-    /// </summary>
-    public static bool IsNextDueFulfilled(VaccinationDose source, IEnumerable<VaccinationDose> appliedDoses)
-        => appliedDoses.Any(d => d.Id != source.Id
-                                 && d.PetId == source.PetId
-                                 && d.AppliedAtUtc > source.AppliedAtUtc
-                                 && SameVaccine(d, source));
-
-    private static bool SameVaccine(VaccinationDose a, VaccinationDose b)
-        => a.VaccineDefinitionId is { } x && b.VaccineDefinitionId is { } y
-            ? x == y
-            : TurkishCompare.Compare(a.VaccineName.Trim(), b.VaccineName.Trim(), CompareOptions.IgnoreCase) == 0;
 }
-
-/// <summary>Karşılanma kuralı için uygulanmış doz.</summary>
-public sealed record VaccinationDose(Guid Id, Guid PetId, Guid? VaccineDefinitionId, string VaccineName, DateTime AppliedAtUtc);

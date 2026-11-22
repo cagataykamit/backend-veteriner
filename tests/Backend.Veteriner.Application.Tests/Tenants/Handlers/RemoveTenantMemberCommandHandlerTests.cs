@@ -4,6 +4,7 @@ using Backend.Veteriner.Application.Auth.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Auditing;
 using Backend.Veteriner.Application.Tenants.Commands.RemoveMember;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Auth;
 using Backend.Veteriner.Domain.Clinics;
 using Backend.Veteriner.Domain.Tenants;
@@ -29,6 +30,7 @@ public sealed class RemoveTenantMemberCommandHandlerTests
     private RemoveTenantMemberCommandHandler CreateHandler()
         => new(
             _tenantContext.Object,
+            TenantMemberManagementAccessStub.TenantWide(),
             _clientContext.Object,
             _permissions.Object,
             _userTenantRepo.Object,

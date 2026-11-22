@@ -344,7 +344,6 @@ public sealed class RolePermissionBindingsMatrixTests
             PermissionCatalog.Users.Read,
             PermissionCatalog.Users.Write,
             PermissionCatalog.Tenants.Create,
-            PermissionCatalog.Tenants.InviteCreate,
             PermissionCatalog.Subscriptions.Manage,
             PermissionCatalog.Clinics.Create,
         };
@@ -352,6 +351,10 @@ public sealed class RolePermissionBindingsMatrixTests
         foreach (var role in roles)
             foreach (var code in systemCodes)
                 yield return new object[] { role, code };
+
+        // Davet ve üye yönetimi klinik yöneticisinde kendi kliniğiyle sınırlı (2026-11-22, TenantMemberManagementAccess).
+        yield return new object[] { "Veteriner", PermissionCatalog.Tenants.InviteCreate };
+        yield return new object[] { "Sekreter", PermissionCatalog.Tenants.InviteCreate };
     }
 
     [Theory]
@@ -393,10 +396,9 @@ public sealed class RolePermissionBindingsMatrixTests
     // ---------- Rol-spesifik kısıtlamalar (ürün matrisi) ----------
 
     [Fact]
-    public void Veteriner_Should_Not_Contain_Client_Or_Payment_Write_Permissions()
+    public void Veteriner_Should_Not_Contain_Client_Update_Or_Payment_Write_Permissions()
     {
         var vet = Perms("Veteriner");
-        vet.Should().NotContain(PermissionCatalog.Clients.Create, "Veteriner müşteri oluşturmaz (operasyon işi)");
         vet.Should().NotContain(PermissionCatalog.Clients.Update, "Veteriner müşteri güncellemez (operasyon işi)");
         vet.Should().NotContain(PermissionCatalog.Payments.Create, "Veteriner ödeme oluşturmaz");
         vet.Should().NotContain(PermissionCatalog.Payments.Update, "Veteriner ödeme güncellemez");
@@ -481,11 +483,11 @@ public sealed class RolePermissionBindingsMatrixTests
     }
 
     [Fact]
-    public void ClinicAdmin_Should_Not_Contain_Tenant_Or_Clinic_Create_Or_Subscriptions_Manage()
+    public void ClinicAdmin_Should_Invite_But_Not_Contain_Tenant_Or_Clinic_Create_Or_Subscriptions_Manage()
     {
         var ca = Perms("ClinicAdmin");
         ca.Should().NotContain(PermissionCatalog.Clinics.Create, "Yeni klinik açma yalnız tenant Admin/Owner");
-        ca.Should().NotContain(PermissionCatalog.Tenants.InviteCreate, "Üye davet tenant Admin/Owner işi");
+        ca.Should().Contain(PermissionCatalog.Tenants.InviteCreate, "Kendi kliniğine personel daveti (2026-11-22; sınır TenantMemberManagementAccess)");
         ca.Should().NotContain(PermissionCatalog.Tenants.Read);
         ca.Should().NotContain(PermissionCatalog.Tenants.Create);
         ca.Should().NotContain(PermissionCatalog.Subscriptions.Manage);

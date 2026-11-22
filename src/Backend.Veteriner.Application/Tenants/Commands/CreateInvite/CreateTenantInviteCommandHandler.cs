@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Auth.Specs;
 using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
+using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Tenants.Contracts.Dtos;
 using Backend.Veteriner.Application.Tenants.Specs;
 using Backend.Veteriner.Application.Users.Specs;
@@ -12,6 +13,7 @@ using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
 using Backend.Veteriner.Domain.Users;
 using Mediator;
+using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.Tenants.Commands.CreateInvite;
 
@@ -19,6 +21,7 @@ public sealed class CreateTenantInviteCommandHandler
     : IRequestHandler<CreateTenantInviteCommand, Result<CreateTenantInviteResultDto>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly TenantMemberManagementAccess _memberAccess;
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly TenantSubscriptionSeatEvaluator _seatEvaluator;
     private readonly IReadRepository<User> _usersRead;
@@ -28,11 +31,14 @@ public sealed class CreateTenantInviteCommandHandler
     private readonly IReadRepository<TenantInvite> _invitesRead;
     private readonly IRepository<TenantInvite> _invitesWrite;
     private readonly ITokenHashService _tokenHash;
+    private readonly IEmailSender _email;
+    private readonly AppOptions _appOptions;
     private readonly IUnitOfWork _uow;
     private readonly TimeProvider _timeProvider;
 
     public CreateTenantInviteCommandHandler(
         ITenantContext tenantContext,
+        TenantMemberManagementAccess memberAccess,
         ICurrentUserPermissionChecker permissions,
         TenantSubscriptionSeatEvaluator seatEvaluator,
         IReadRepository<User> usersRead,
@@ -42,10 +48,13 @@ public sealed class CreateTenantInviteCommandHandler
         IReadRepository<TenantInvite> invitesRead,
         IRepository<TenantInvite> invitesWrite,
         ITokenHashService tokenHash,
+        IEmailSender email,
+        IOptions<AppOptions> appOptions,
         IUnitOfWork uow,
         TimeProvider timeProvider)
     {
         _tenantContext = tenantContext;
+        _memberAccess = memberAccess;
         _permissions = permissions;
         _seatEvaluator = seatEvaluator;
         _usersRead = usersRead;
@@ -55,6 +64,8 @@ public sealed class CreateTenantInviteCommandHandler
         _invitesRead = invitesRead;
         _invitesWrite = invitesWrite;
         _tokenHash = tokenHash;
+        _email = email;
+        _appOptions = appOptions.Value;
         _uow = uow;
         _timeProvider = timeProvider;
     }
@@ -114,6 +125,13 @@ public sealed class CreateTenantInviteCommandHandler
                 "Bu operation claim davet ile atanamaz; yalnızca atanabilir rol listesindekiler seçilebilir.");
         }
 
+        // Klinik yöneticisi yalnız kendi kliniğine ve işletme yöneticisi dışındaki rollerle davet eder (TenantMemberManagementAccess).
+        var access = await _memberAccess.EnsureClinicAsync(request.ClinicId, ct);
+        if (access.IsSuccess)
+            access = await _memberAccess.EnsureRoleAsync(claim.Name, ct);
+        if (!access.IsSuccess)
+            return Result<CreateTenantInviteResultDto>.Failure(access.Error);
+
         var existingUser = await _usersRead.FirstOrDefaultAsync(new UserByEmailNormalizedSpec(emailNorm), ct);
         if (existingUser is not null)
         {
@@ -164,6 +182,10 @@ public sealed class CreateTenantInviteCommandHandler
             request.OperationClaimId,
             expires,
             utcNow);
+
+        // Davet e-postası (outbox) davet kaydıyla aynı kayıtta yazılır.
+        var message = TenantInviteEmails.Invite(clinic.Name, TenantInviteEmails.JoinLink(_appOptions, rawToken), invite.ExpiresAtUtc);
+        await _email.SendAsync(invite.Email, message.Subject, message.Body, ct);
 
         await _invitesWrite.AddAsync(invite, ct);
         await _uow.SaveChangesAsync(ct);

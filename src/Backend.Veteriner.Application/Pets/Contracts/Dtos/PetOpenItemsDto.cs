@@ -4,13 +4,16 @@ using Backend.Veteriner.Domain.Pets;
 
 namespace Backend.Veteriner.Application.Pets.Contracts.Dtos;
 
+/// <param name="IsNextDue">Uygulanmış aşının sonraki dozu (planlı kayıt değil); uygulama yeni aşı kaydıyla yapılır (<c>VaccineDefinitionId</c> ile).</param>
 public sealed record PetOpenItemsVaccinationDto(
     Guid Id,
     string VaccineName,
     DateTime DueAtUtc,
-    Guid ClinicId);
+    Guid ClinicId,
+    bool IsNextDue = false,
+    Guid? VaccineDefinitionId = null);
 
-/// <summary>Gecikmiş (vade &lt; bugünün İstanbul başı) ve yaklaşan (bugün dahil 30 takvim günü) planlı aşılar; ikisi de en erken vade önce (ADR-028).</summary>
+/// <summary>Gecikmiş (vade &lt; bugünün İstanbul başı) ve yaklaşan (bugün dahil 30 takvim günü) vadeli aşılar (planlı ya da karşılanmamış sonraki doz, VaccinationDueRule); ikisi de en erken vade önce (ADR-028).</summary>
 public sealed record PetOpenItemsVaccinationsDto(
     IReadOnlyList<PetOpenItemsVaccinationDto> Overdue,
     IReadOnlyList<PetOpenItemsVaccinationDto> Upcoming);

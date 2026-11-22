@@ -5,4 +5,4 @@ using Mediator;
 namespace Backend.Veteriner.Application.Clinics.Queries.WorkingHours.GetClinicWorkingHours;
 
 public sealed record GetClinicWorkingHoursQuery(Guid ClinicId)
-    : IRequest<Result<IReadOnlyList<ClinicWorkingHourDto>>>;
+    : IRequest<Result<ClinicWorkingHoursDto>>;

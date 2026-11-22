@@ -184,6 +184,7 @@ public sealed class PublicOwnerSignupCommandHandler
             return Result<PublicOwnerSignupResultDto>.Failure(emailVerification.Error);
 
         var user = new User(email, _hasher.Hash(request.Password), utcNow);
+        user.SetDisplayName(request.FullName, utcNow);
         MarkStep("hashAndCreateUser");
         var roleResult = user.AddRole("Admin", utcNow);
         if (!roleResult.IsSuccess)

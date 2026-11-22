@@ -39,7 +39,9 @@ değişmedi: `[{ userId, name? }]`. Takvim boş hekimin de sütununu bu listeden
 ## 4) İstemcinin kullandığı mevcut uçlar (değişmedi)
 
 - Çalışma saatleri: `GET /api/v1/clinics/{id}/working-hours` (taralı kapalı saat ve mola). Hekim bazında çalışma saati ve tarihe özel
-  kapalı gün modeli yok; ilk sürümde klinik saatleri yeter.
+  kapalı gün modeli yok; ilk sürümde klinik saatleri yeter. Yanıt (2026-11-22): `{ isConfigured, items: [{ dayOfWeek, isClosed, opensAt,
+  closesAt, breakStartsAt, breakEndsAt }] }`; kayıt yoksa `isConfigured=false` ve `items` varsayılan haftadır (panel bunu ilk kayıtta
+  yazdırır; klinik sitesi yayın şartı ve "İlk hafta" adımı kayıt ister). `PUT` yanıtı değişmedi (kaydedilen satırlar dizisi).
 - Slot aralığı: `GET /api/v1/clinics/{id}/appointment-settings` (`slotIntervalMinutes`; tıklanan hücre bu aralığa hizalı).
 - "Boş saat bul": `GET /api/v1/clinics/{clinicId}/online-booking/availability?reasonId&from&days` (personel, en çok 14 gün;
   `reasonId` boşsa 30 dk, tüm hekimler). Yanıttaki `freeVeterinarianUserIds` ilk boş hekimi önerir.
@@ -96,7 +98,9 @@ Kurallar (tek yer `VaccinationCalendarRules`):
   `Applied` geçmişi bu kurala girmez. Kural `VaccinationDueRule.OverdueWindow` + `VaccinationCalendarRules.IsShown`; randevu durumu
   (`CalendarItemStateRule.ForAppointment`) değişmez, randevuda alt sınır yoktur.
 - **Karşılanmış sonraki tarih:** aynı hayvana aynı aşı (aşı tanımı kimliği; tanımsız eski kayıtta ad, büyük/küçük harf duyarsız) bu
-  uygulamadan sonra yeniden uygulanmışsa `NextDue` satırı çıkmaz. Yeniden uygulama kullanıcının okuyabildiği tüm kliniklerden sayılır.
+  uygulamadan sonra yeniden uygulanmışsa `NextDue` satırı çıkmaz. Yeniden uygulama kiracının bütün kliniklerinden sayılır (2026-11-22; önce kullanıcının okuyabildiği klinikler). Kural
+  `VaccinationDueRule.IsNextDueFulfilled`; gecikmiş listesi, pano/Rapor Merkezi sayaçları, hasta özeti, "Yapılacaklar", portal, AI araması ve
+  aşı hatırlatması aynı tanımı kullanır.
   Planlı kayıt bu kurala girmez; uygulanınca durumu `Applied` olur.
 - **Vefat:** bakım dışı hayvanın (`Pet.ReceivesCare` değil) `Planned`/`NextDue` satırı çıkmaz; `Applied` geçmişi görünür.
 - **Randevu değildir:** saat dilimini doldurmaz, çakışma (`ClinicOverlapBlocks`) ve "Boş saat bul" (`AppointmentAvailabilityCalculator`)

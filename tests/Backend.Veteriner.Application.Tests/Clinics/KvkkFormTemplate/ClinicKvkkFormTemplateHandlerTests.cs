@@ -99,7 +99,7 @@ public sealed class ClinicKvkkFormTemplateHandlerTests
         var result = await CreateQueryHandler().Handle(new GetClinicKvkkFormTemplateQuery(_clinicId, Disclosure), CancellationToken.None);
 
         result.Value!.Text.Should()
-            .Contain("Veri sorumlusu {{clinicName}}'dır (Adres: Moda Cad. 1 Kadıköy; Telefon: 0212 111 22 33; E-posta: k@ornek.com).")
+            .Contain("Veri sorumlusu: {{clinicName}} (Adres: Moda Cad. 1 Kadıköy; Telefon: 0212 111 22 33; E-posta: k@ornek.com).")
             .And.Contain("talebinizi yazılı olarak Moda Cad. 1 Kadıköy adresine elden veya noter aracılığıyla ya da k@ornek.com adresine e-postayla iletebilirsiniz.")
             .And.NotContain("[");
         result.Value.MissingClinicDetails.Should().BeEmpty();
@@ -115,7 +115,7 @@ public sealed class ClinicKvkkFormTemplateHandlerTests
         var consent = await CreateQueryHandler().Handle(new GetClinicKvkkFormTemplateQuery(_clinicId, Consent), CancellationToken.None);
 
         disclosure.Value!.Text.Should()
-            .Contain("Veri sorumlusu {{clinicName}}'dır (Telefon: 0212 111 22 33).")
+            .Contain("Veri sorumlusu: {{clinicName}} (Telefon: 0212 111 22 33).")
             .And.Contain("talebinizi yazılı olarak veri sorumlusuna iletebilirsiniz.")
             .And.NotContain("Adres:").And.NotContain("E-posta:");
         disclosure.Value.MissingClinicDetails.Should().Equal("address", "email");
@@ -136,7 +136,7 @@ public sealed class ClinicKvkkFormTemplateHandlerTests
         result.Value.Text.Should().StartWith("{{clinicName}} — KİŞİSEL VERİLERİN İŞLENMESİNE İLİŞKİN AYDINLATMA METNİ");
         result.Value.Text.Should().Contain("{{date}}").And.Contain("{{clientName}}").And.NotContain("**")
             .And.NotContain("hukuk danışman").And.NotContain("[")
-            .And.Contain("Veri sorumlusu {{clinicName}}'dır.");
+            .And.Contain("Veri sorumlusu: {{clinicName}}.");
         result.Value.MissingClinicDetails.Should().Equal("address", "phone", "email");
         result.Value.Text.Length.Should().BeLessThan(ClinicKvkkFormTemplate.MaxTextLength);
         result.Value.Placeholders.Should().Equal("{{clinicName}}", "{{clientName}}", "{{date}}");

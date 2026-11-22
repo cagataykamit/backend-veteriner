@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Clinics.Specs;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Commands.AssignMemberClinic;
 using Backend.Veteriner.Application.Tenants.Commands.RemoveMemberClinic;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Clinics;
 using AwesomeAssertions;
 using Moq;
@@ -29,11 +30,11 @@ public sealed class TenantMemberClinicAssignmentHandlersTests
     private readonly Mock<IUnitOfWork> _uow = new();
 
     private AssignTenantMemberClinicCommandHandler CreateAssignHandler()
-        => new(_tenantContext.Object, _permissions.Object, _userTenantRepo.Object,
+        => new(_tenantContext.Object, TenantMemberManagementAccessStub.TenantWide(), _permissions.Object, _userTenantRepo.Object,
                _clinicsRead.Object, _userClinics.Object, _cache.Object, _uow.Object, TimeProvider.System);
 
     private RemoveTenantMemberClinicCommandHandler CreateRemoveHandler()
-        => new(_tenantContext.Object, _clientContext.Object, _permissions.Object, _userTenantRepo.Object,
+        => new(_tenantContext.Object, TenantMemberManagementAccessStub.TenantWide(), _clientContext.Object, _permissions.Object, _userTenantRepo.Object,
                _clinicsRead.Object, _userClinics.Object, _cache.Object, _uow.Object);
 
     private static Clinic BuildClinic(Guid id, Guid tenantId, string name = "Merkez Klinik", bool active = true)

@@ -26,6 +26,7 @@ public sealed class RemoveTenantMemberClinicCommandHandler
     : IRequestHandler<RemoveTenantMemberClinicCommand, Result<RemoveTenantMemberClinicResultDto>>
 {
     private readonly ITenantContext _tenantContext;
+    private readonly TenantMemberManagementAccess _memberAccess;
     private readonly IClientContext _clientContext;
     private readonly ICurrentUserPermissionChecker _permissions;
     private readonly IUserTenantRepository _userTenantRepo;
@@ -36,6 +37,7 @@ public sealed class RemoveTenantMemberClinicCommandHandler
 
     public RemoveTenantMemberClinicCommandHandler(
         ITenantContext tenantContext,
+        TenantMemberManagementAccess memberAccess,
         IClientContext clientContext,
         ICurrentUserPermissionChecker permissions,
         IUserTenantRepository userTenantRepo,
@@ -45,6 +47,7 @@ public sealed class RemoveTenantMemberClinicCommandHandler
         IUnitOfWork uow)
     {
         _tenantContext = tenantContext;
+        _memberAccess = memberAccess;
         _clientContext = clientContext;
         _permissions = permissions;
         _userTenantRepo = userTenantRepo;
@@ -101,6 +104,12 @@ public sealed class RemoveTenantMemberClinicCommandHandler
                 "Clinics.NotFound",
                 "Klinik bulunamadı veya kiracıya ait değil.");
         }
+
+        var access = await _memberAccess.EnsureMemberAsync(request.MemberId, ct);
+        if (access.IsSuccess)
+            access = await _memberAccess.EnsureClinicAsync(request.ClinicId, ct);
+        if (!access.IsSuccess)
+            return Result<RemoveTenantMemberClinicResultDto>.Failure(access.Error);
 
         if (!await _userClinics.ExistsAsync(request.MemberId, request.ClinicId, ct))
         {

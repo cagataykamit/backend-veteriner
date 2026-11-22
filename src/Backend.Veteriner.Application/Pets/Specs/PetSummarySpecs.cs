@@ -4,6 +4,7 @@ using Backend.Veteriner.Domain.Hospitalizations;
 using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Domain.Visits;
 using Backend.Veteriner.Application.Common.Specifications;
+using Backend.Veteriner.Application.Vaccinations;
 
 namespace Backend.Veteriner.Application.Pets.Specs;
 
@@ -47,7 +48,10 @@ public sealed class LastAppliedVaccinationForPetSpec : Specification<Vaccination
     }
 }
 
-/// <summary>Vadesi <paramref name="dueFromUtc"/> ve sonrası olan planlı aşılar içinde en erken vadeli (gecikmiş olabilir).</summary>
+/// <summary>
+/// Vadesi <paramref name="dueFromUtc"/> ve sonrası olan vadeli aşılar (planlı ya da karşılanmamış sonraki tarih,
+/// <see cref="VaccinationDueRule.IsOpenDue(IReadOnlyCollection{Guid})"/>) içinde en erken vadeli (gecikmiş olabilir).
+/// </summary>
 public sealed class NextDueVaccinationForPetSpec : Specification<Vaccination>
 {
     public NextDueVaccinationForPetSpec(
@@ -55,13 +59,14 @@ public sealed class NextDueVaccinationForPetSpec : Specification<Vaccination>
         Guid? clinicId,
         Guid petId,
         DateTime dueFromUtc,
-        IReadOnlyCollection<Guid>? accessibleClinicIds)
+        IReadOnlyCollection<Guid>? accessibleClinicIds,
+        IReadOnlyCollection<Guid>? fulfilledNextDueIds = null)
     {
         Query.Where(v => v.TenantId == tenantId
                          && v.PetId == petId
-                         && v.Status == VaccinationStatus.Scheduled
                          && v.DueAtUtc != null
                          && v.DueAtUtc >= dueFromUtc);
+        Query.Where(VaccinationDueRule.IsOpenDue(fulfilledNextDueIds));
         Query.ApplyClinicScope(clinicId, accessibleClinicIds);
         Query.OrderBy(v => v.DueAtUtc)
             .ThenBy(v => v.Id)

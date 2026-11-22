@@ -28,7 +28,8 @@ public sealed class VaccinationsFilteredCountSpec : Specification<Vaccination>
         IReadOnlyCollection<Guid>? clientPetIds = null,
         DateTime? dateFromUtc = null,
         DateTime? dateToUtc = null,
-        HbsEntryStatus? hbsStatus = null)
+        HbsEntryStatus? hbsStatus = null,
+        IReadOnlyCollection<Guid>? fulfilledNextDueIds = null)
     {
         if (hbsStatus is { } hbs)
             Query.Where(HbsTracking.VaccinationTrackedWithStatus(hbs));
@@ -40,7 +41,7 @@ public sealed class VaccinationsFilteredCountSpec : Specification<Vaccination>
             Query.Where(v => v.ExaminationId == examinationId.Value);
 
         if (onlyOverdue)
-            Query.Where(VaccinationDueRule.IsOverdue(VaccinationDueRule.OverdueWindow(listAsOfUtc ?? throw new ArgumentNullException(nameof(listAsOfUtc), "Gecikmiş filtresi liste anı (listAsOfUtc) ister."))));
+            Query.Where(VaccinationDueRule.IsOverdue(VaccinationDueRule.OverdueWindow(listAsOfUtc ?? throw new ArgumentNullException(nameof(listAsOfUtc), "Gecikmiş filtresi liste anı (listAsOfUtc) ister.")), fulfilledNextDueIds));
         else if (status.HasValue)
         {
             Query.Where(v => v.Status == status.Value);

@@ -3,6 +3,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Tenants.Commands.UpdateSettings;
 using Backend.Veteriner.Application.Tenants.Commands.UpdateSettings.Validators;
 using Backend.Veteriner.Application.Tenants.Specs;
+using Backend.Veteriner.Application.Tests.TestHelpers;
 using Backend.Veteriner.Domain.Tenants;
 using AwesomeAssertions;
 using Moq;
@@ -24,7 +25,7 @@ public sealed class UpdateTenantSettingsCommandHandlerTests
     private readonly Mock<IRepository<Tenant>> _write = new();
 
     private UpdateTenantSettingsCommandHandler CreateHandler()
-        => new(_tenantContext.Object, _permissions.Object, _read.Object, _write.Object);
+        => new(_tenantContext.Object, TenantMemberManagementAccessStub.TenantWide(), _permissions.Object, _read.Object, _write.Object);
 
     private static Tenant BuildTenant(Guid id, string name = "Acme Vet")
     {

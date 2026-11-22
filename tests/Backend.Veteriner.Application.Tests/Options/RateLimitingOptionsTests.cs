@@ -95,4 +95,17 @@ public sealed class RateLimitingOptionsTests
     {
         RateLimitingOptions.ResolveEffectiveGlobalPermitLimit(configured).Should().Be(expected);
     }
+
+    [Theory]
+    [InlineData(null, 600)]
+    [InlineData("900", 900)]
+    [InlineData("0", 600)]
+    public void FromConfiguration_UserPermitLimit_Should_Default_To_600(string? raw, int expected)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["RateLimiting:UserPermitLimit"] = raw })
+            .Build();
+
+        RateLimitingOptions.FromConfiguration(configuration).GetEffectiveUserPermitLimit().Should().Be(expected);
+    }
 }

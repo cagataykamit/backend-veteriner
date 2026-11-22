@@ -14,6 +14,7 @@ namespace Backend.Veteriner.Application.Public.Commands.OwnerSignup;
 /// </param>
 /// <param name="EmailVerificationToken">E-posta kodu doğrulamasından dönen jeton (TRIAL-001); kayıtla aynı işlemde kullanılır.</param>
 /// <param name="TaxIdentityNumber">VKN (10 hane) ya da TCKN (11 hane); bir numarayla tek deneme. Zorunluluğu <c>TrialSignup:RequireTaxIdentityNumber</c>.</param>
+/// <param name="FullName">Yöneticinin ad-soyadı (<c>User.DisplayName</c>); verilmezse görünen ad e-postadan türetilir.</param>
 /// <remarks>
 /// Kullanıcı, kiracı, abonelik, klinik, üyelikler, kabuller, tek deneme kaydı, fatura profili (vergi numarası) ve (istenirse) örnek
 /// klinik verisi tek veritabanı işleminde yazılır; hata durumunda hiçbiri kalmaz ve e-posta jetonu kullanılmamış kalır.
@@ -29,7 +30,8 @@ public sealed record PublicOwnerSignupCommand(
     string? DiscountCode = null,
     bool StartWithExampleClinic = false,
     string? EmailVerificationToken = null,
-    string? TaxIdentityNumber = null)
+    string? TaxIdentityNumber = null,
+    string? FullName = null)
     : IRequest<Result<PublicOwnerSignupResultDto>>, ITransactionalRollbackOnFailureRequest, IAuditableRequest
 {
     public string AuditAction => "Public.OwnerSignup";

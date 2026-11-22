@@ -55,8 +55,9 @@ public sealed class GetClinicWorkingHoursQueryHandlerTests
         var result = await CreateHandler().Handle(new GetClinicWorkingHoursQuery(cid), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        result.Value!.Count.Should().Be(7);
-        result.Value.Should().BeEquivalentTo(ClinicWorkingHoursDefaults.BuildWeek(), opts => opts.WithStrictOrdering());
+        result.Value!.IsConfigured.Should().BeFalse();
+        result.Value.Items.Count.Should().Be(7);
+        result.Value.Items.Should().BeEquivalentTo(ClinicWorkingHoursDefaults.BuildWeek(), opts => opts.WithStrictOrdering());
     }
 
     [Fact]
@@ -95,9 +96,10 @@ public sealed class GetClinicWorkingHoursQueryHandlerTests
         var result = await CreateHandler().Handle(new GetClinicWorkingHoursQuery(cid), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        result.Value!.Should().ContainSingle();
-        result.Value[0].DayOfWeek.Should().Be(DayOfWeek.Monday);
-        result.Value[0].OpensAt.Should().Be(new TimeOnly(10, 0));
+        result.Value!.IsConfigured.Should().BeTrue();
+        result.Value.Items.Should().ContainSingle();
+        result.Value.Items[0].DayOfWeek.Should().Be(DayOfWeek.Monday);
+        result.Value.Items[0].OpensAt.Should().Be(new TimeOnly(10, 0));
     }
 
     [Fact]
@@ -120,6 +122,6 @@ public sealed class GetClinicWorkingHoursQueryHandlerTests
         var result = await CreateHandler().Handle(new GetClinicWorkingHoursQuery(cid), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        result.Value!.Count.Should().Be(7);
+        result.Value!.Items.Count.Should().Be(7);
     }
 }

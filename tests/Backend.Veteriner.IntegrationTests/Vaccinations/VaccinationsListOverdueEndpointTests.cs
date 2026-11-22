@@ -28,7 +28,7 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
     public VaccinationsListOverdueEndpointTests(CustomWebApplicationFactory factory) => _factory = factory;
 
     [Fact]
-    public async Task GetList_OnlyOverdueTrue_WithStatusZero_ReturnsOnlyOverdueScheduled()
+    public async Task GetList_OnlyOverdueTrue_WithStatusZero_ReturnsOverdueScheduledAndOpenNextDue()
     {
         var ctx = await SeedOverdueScenarioAsync();
         var client = _factory.CreateClient();
@@ -39,11 +39,11 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
         var response = await client.GetAsync(url);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-        json.GetProperty("totalItems").GetInt32().Should().Be(1);
-        var items = json.GetProperty("items");
-        items.GetArrayLength().Should().Be(1);
-        items[0].GetProperty("id").GetGuid().Should().Be(ctx.OverdueScheduledId);
-        items[0].GetProperty("status").GetInt32().Should().Be((int)VaccinationStatus.Scheduled);
+        // Uygulanmış aşının karşılanmamış sonraki tarihi de gecikmiştir; aynı aşı sonra uygulandıysa (FulfilledPast) sayılmaz (VaccinationDueRule).
+        json.GetProperty("totalItems").GetInt32().Should().Be(2);
+        var items = json.GetProperty("items").EnumerateArray().ToList();
+        items.Select(e => e.GetProperty("id").GetGuid()).Should().BeEquivalentTo([ctx.OverdueScheduledId, ctx.AppliedPastDueId]);
+        items.Single(e => e.GetProperty("id").GetGuid() == ctx.AppliedPastDueId).GetProperty("status").GetInt32().Should().Be((int)VaccinationStatus.Applied);
     }
 
     [Fact]
@@ -79,8 +79,9 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
         var response = await client.GetAsync(url);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-        json.GetProperty("totalItems").GetInt32().Should().Be(1);
-        json.GetProperty("items")[0].GetProperty("id").GetGuid().Should().Be(ctx.OverdueScheduledId);
+        json.GetProperty("totalItems").GetInt32().Should().Be(2);
+        json.GetProperty("items").EnumerateArray().Select(e => e.GetProperty("id").GetGuid())
+            .Should().BeEquivalentTo([ctx.OverdueScheduledId, ctx.AppliedPastDueId]);
     }
 
     [Fact]
@@ -134,7 +135,7 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
             $"/api/v1/vaccinations?page=1&pageSize=50&status=0&clinicId={ctx.ClinicId:D}");
 
         overdue.GetProperty("items").EnumerateArray().Select(e => e.GetProperty("id").GetGuid())
-            .Should().Equal(ctx.OverdueScheduledId);
+            .Should().BeEquivalentTo([ctx.OverdueScheduledId, ctx.AppliedPastDueId]);
         scheduled.GetProperty("items").EnumerateArray().Select(e => e.GetProperty("id").GetGuid())
             .Should().Contain(ctx.TooOldScheduledId!.Value);
     }
@@ -220,6 +221,11 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
             null,
             DateTime.UtcNow);
 
+        // AppliedPastCase aynı aşının sonraki dozu olduğundan bu kaydın sonraki tarihi karşılanmıştır.
+        var fulfilledPast = new Vaccination(
+            tenant.Id, pet.Id, clinic.Id, null, catalogVaccine.Id, "FulfilledPastCase", VaccinationStatus.Applied,
+            now.AddDays(-60), now.AddDays(-7), null, DateTime.UtcNow);
+
         var cancelledPast = new Vaccination(
             tenant.Id,
             pet.Id,
@@ -233,7 +239,7 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
             null,
             DateTime.UtcNow);
 
-        db.AddRange(tenant, clinic, client, pet, overdue, future, nullDue, appliedPast, cancelledPast);
+        db.AddRange(tenant, clinic, client, pet, overdue, future, nullDue, appliedPast, fulfilledPast, cancelledPast);
 
         Guid? deceasedPetScheduledId = null;
         if (withDeceasedPetScheduled)

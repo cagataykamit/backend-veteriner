@@ -331,7 +331,7 @@ Detay örneği:
   "isNeutered": true, "colorName": "Siyah" }
 ```
 
-- `breedName`: katalog ırkı varsa onun adı, yoksa serbest metin ırk; ikisi de yoksa `null`. `gender`: `Male`/`Female`/`null`. `status`: `Active`/`Deceased`. `weightKg`: klinikteki son kayıtlı kilo (kg) veya `null`.
+- `breedName`: katalog ırkı varsa onun adı, yoksa serbest metin ırk; ikisi de yoksa `null`. `gender`: `Male`/`Female`/`null`. `status`: `Active`/`Deceased`. `weightKg`: listede hasta profilindeki kilo; ayrıntıda (`GET …/pets/{petId}`) son kilo ölçülmüş muayenenin kilosu, yoksa profil kilosu (kg; 2026-11-22) veya `null`.
 
 Detay: liste öğesi + `isNeutered` (bool), `colorName` (katalog rengi veya `null`). Karne/küpe ve özel protokol numarası, uyarı bayrakları/notu, klinik notu, vefat tarihi **dönmez**.
 
@@ -350,7 +350,7 @@ Detay: liste öğesi + `isNeutered` (bool), `colorName` (katalog rengi veya `nul
 ```
 
 - `history`: `Applied` kayıtlar (iptal edilen aşı dönmez); en yeni önce (uygulama tarihi, yoksa vade, yoksa oluşturma zamanı).
-- `upcoming`: `Scheduled` kayıtlar, vadeye göre artan (vadesiz planlı kayıt sonda, `dueAtUtc: null`, `isOverdue: false`). Vadesi son 1 takvim ayından eski planlı kayıt dönmez (2026-11-21).
+- `upcoming`: `Scheduled` kayıtlar ve uygulanmış aşının karşılanmamış sonraki tarihi (aynı aşı sonra uygulanmamış; `VaccinationDueRule`, 2026-11-22), vadeye göre artan (vadesiz planlı kayıt sonda, `dueAtUtc: null`, `isOverdue: false`). Vadesi son 1 takvim ayından eski planlı kayıt dönmez (2026-11-21).
 - `isOverdue`: **ADR-028 gün bazlı tanım, tek kural `VaccinationDueRule`**: vade son 1 takvim ayı içinde ve İstanbul gününün başından (UTC) önceyse gecikmiş; bugün vadesi olan aşı saati geçse de gecikmiş değildir.
 - Vefat eden hayvanda `upcoming` boş (ortak kurallar).
 
