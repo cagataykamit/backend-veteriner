@@ -506,6 +506,24 @@ public sealed class ImportFullMigrationValidationTests
         Codes(Row(output, ImportTable.Products, 3)).Should().Contain(ImportRules.DuplicateInFile.Code);
     }
 
+    [Fact]
+    public void Product_Name_Should_Be_Corrected_And_Suspicious_Word_Warned()
+    {
+        var output = Run(new()
+        {
+            [ImportTable.Products] = Table(ImportTable.Products, ["Flexı Classıc Açık Mavı"], ["Wıld Duck Kırmızı Tasması"]),
+        });
+
+        var corrected = Row(output, ImportTable.Products);
+        ((ImportNormalizedProduct)corrected.Normalized).Name.Should().Be("Flexi Classic Açık Mavi");
+        corrected.Issues.Should().BeEmpty();
+
+        var suspicious = Row(output, ImportTable.Products, 3);
+        ((ImportNormalizedProduct)suspicious.Normalized).Name.Should().Be("Wıld Duck Kırmızı Tasması");
+        suspicious.Issues.Should().ContainSingle(i => i.Code == ImportRules.ProductNameSpellingSuspect.Code && i.Value == "Wıld");
+        suspicious.Normalized.Action.Should().Be(ImportRowAction.Create);
+    }
+
     // ================================================================ Sayaçlar ve dosya düzeyi
 
     [Fact]

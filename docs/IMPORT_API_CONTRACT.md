@@ -27,6 +27,11 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 | Geri alma süresi 15 gün (2026-11-17) | `ImportBatch.RollbackWindow` 30 → 15 gün; parti nesnesine `rollbackWindowDays` (süre, gün). Satır ve parti saklaması da bu süreyi kullanır (aşağıdaki saklama satırı, bölüm 7.5, 9.1, 10.1) | **Uygulandı** (migration yok) |
 | Güncelleme aktarması (ADR-051, 2026-11-17) | Kaynak kimliği (`MusteriNo`, `HayvanNo`) kalıcı eşleme tablosunda; ikinci yedekte önce kaynak kimliğiyle eşleşme; klinik kayıtta uygulama anı mükerrer denetimi; bakiye farkı listesi ve commit seçimi `balanceDifferences`; önizlemede `overlap` özeti; geri almada fark hareketi (bölüm 14) | **Uygulandı** (migration `AddImportSourceLinks`) |
 | Satır ve parti saklama (ADR-051 eki, 2026-11-17) | Aktarılmış partinin satırları geri alma süresi dolunca silinir; kapanmış parti (`RolledBack`, `Discarded`, `Expired`) aynı süre sonra kaydıyla silinir; parçalı bakım; ayrı saklama sabiti kalktı (bölüm 10.1) | **Uygulandı** (migration yok) |
+| Ürün adı noktasız ı (2026-11-23) | Ürün `Ad` alanında büyük harfle yazılıp Türkçe küçültülmüş kelimeler ("Flexı", "Mavı") sözlükle düzeltilir; sözlükte olmayan şüpheli kelimeye uyarı `Imports.ProductNameSpellingSuspect`. Kayıtlı adlar için DbMigrator `fix-product-names` (bölüm 12.3) | **Uygulandı** (migration yok) |
+
+**Frontend için değişenler (ürün adı noktasız ı, 2026-11-23; geriye uyumlu, bölüm 12.3):**
+- Ürün satırının normalize adı düzeltilmiş addır (önizleme, satır listesi, oluşan ürün). Kaynak hücre değişmez.
+- Yeni satır kodu `Imports.ProductNameSpellingSuspect` (uyarı, satır aktarılır, ad olduğu gibi kalır); `value` şüpheli kelimelerdir (`, ` ile). Ekran varsayılan mesajı gösterebilir.
 
 **Frontend için değişenler (güncelleme aktarması, 2026-11-17; geriye uyumlu, bölüm 14):**
 - Önizlemeye `overlap` (güncelleme özeti) ve `balanceDifferences` (bakiye farkı listesi) eklendi. `overlap.isUpdate = true` iken sayfanın en üstünde "Bu dosya önceki aktarmayla büyük ölçüde örtüşüyor: X yeni müşteri, Y yeni hasta, Z yeni aşı… gelecek; geri kalanı zaten var" özeti gösterilir.
@@ -958,7 +963,7 @@ Süre tek sabittir: geri alma süresi `ImportBatch.RollbackWindow` (bölüm 9.1)
 
 | Kanonik başlık | Zorunlu | Kural |
 |---|---|---|
-| `Ad` | **Evet** | Ürün adı sınırı (`Product`); aşım `Imports.FieldTooLong`. |
+| `Ad` | **Evet** | Ürün adı sınırı (`Product`); aşım `Imports.FieldTooLong`. Noktasız ı onarımı (2026-11-23, `ProductNameSpelling`): küçük ı içeren ve sözlükte bulunan kelime düzeltilir ("Flexı" → "Flexi", "8ın1" → "8in1", "Ikılı" → "İkili"); rakam, noktalama ve büyük/küçük harf korunur; doğru Türkçe kelime ("Açık", "Kırmızı") ve sözlükte olmayan kelime değişmez. Düzeltmeden sonra Türkçe olmayan biçimli ı'lı kelime kalırsa (ünlüye bitişik ı, q/w/x, `-ıne`/`-ıc`/`-ıng` gibi ek) uyarı `Imports.ProductNameSpellingSuspect`, ad olduğu gibi. Müşteri, hasta ve diğer alanlara uygulanmaz. Kayıtlı adlar: DbMigrator `fix-product-names --tenant <guid> [--dry-run]` aynı sözlüğü tek kiracıya uygular (tekrar çalıştırılabilir; satış anındaki ad kopyaları değişmez). |
 | `UrunTuru` | Hayır | Katlanmış: `hizmet`, `islem`, `service` → Service; `ilac`, `medicine`, `drug` → Medicine; `asi`, `vaccine` → Vaccine; `diger`, `urun`, `mama`, `malzeme`, `other` → Other. Boş → Other; tanınmayan → uyarı `Imports.ProductKindDefaulted`, Other. |
 | `Kategori` | Hayır | Kiracının aktif ürün kategorisiyle katlanmış ad eşleşirse kategori; eşleşmezse bilgi `Imports.CategoryUnmapped`, kategorisiz (yeni kategori oluşmaz; K6 ilkesi). |
 | `Birim` | Hayır | Boş → `Adet`; ürün birim sınırı. |

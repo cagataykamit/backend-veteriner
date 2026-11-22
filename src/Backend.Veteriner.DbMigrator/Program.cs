@@ -372,6 +372,25 @@ try
 
                 break;
             }
+        case "fix-product-names":
+            {
+                if (!Guid.TryParse(ReadOption(args, "--tenant"), out var tenantId))
+                {
+                    Console.Error.WriteLine("fix-product-names requires --tenant <guid>.");
+                    return 1;
+                }
+
+                var dryRun = args.Contains("--dry-run");
+                var changes = await ProductNameRepair.RunAsync(db, tenantId, dryRun, TimeProvider.System, logger, CancellationToken.None);
+
+                Console.WriteLine("ProductId\tOnce\tSonra");
+                foreach (var change in changes)
+                    Console.WriteLine($"{change.ProductId}\t{change.Before}\t{change.After}");
+                Console.WriteLine(dryRun
+                    ? $"Dry-run: {changes.Count} urun adi degisecek (veritabanina yazilmadi)."
+                    : $"{changes.Count} urun adi duzeltildi.");
+                break;
+            }
         default:
             Console.Error.WriteLine($"Unknown command: {args[0]}");
             PrintHelp();
@@ -475,6 +494,9 @@ static void PrintHelp()
                                             daily stats idempotent doldur (--batch-size 500 ve --tenant <guid> opsiyonel)
           backfill-payment-read-models    — Command DB payment'lerinden Query PaymentReadModels (list read-model)
                                             idempotent doldur (--batch-size 500 ve --tenant <guid> opsiyonel)
+          fix-product-names --tenant <guid> [--dry-run] — Kiracının ürün adlarındaki noktasız ı'yı aktarmayla aynı sözlükle
+                                            düzeltir (ProductNameSpelling; idempotent). Önce/sonra listesi stdout'a (sekmeyle ayrılmış);
+                                            --dry-run veritabanına yazmaz
 
         Load test ortamı (DOTNET_ENVIRONMENT=LoadTest):
           Command DB : VetinityCommandDb_LoadTest  (DefaultConnection / migrate / loadtest-seed)
@@ -495,6 +517,7 @@ static void PrintHelp()
           dotnet run --project src/Backend.Veteriner.DbMigrator -- backfill-payment-finance-projections --tenant 00000000-0000-0000-0000-000000000000
           dotnet run --project src/Backend.Veteriner.DbMigrator -- backfill-payment-read-models --batch-size 500
           dotnet run --project src/Backend.Veteriner.DbMigrator -- backfill-payment-read-models --tenant 00000000-0000-0000-0000-000000000000
+          dotnet run --project src/Backend.Veteriner.DbMigrator -- fix-product-names --tenant 00000000-0000-0000-0000-000000000000 --dry-run
 
         Bağlantı: ConnectionStrings:DefaultConnection (command), ConnectionStrings:QueryConnection (query).
         Şema için alternatif: dotnet ef database update --project src/Backend.Veteriner.Infrastructure --startup-project src/Backend.Veteriner.Api
