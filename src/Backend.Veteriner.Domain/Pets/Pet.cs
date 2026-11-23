@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Backend.Veteriner.Domain.Catalog;
+using Backend.Veteriner.Domain.Clients;
 using Backend.Veteriner.Domain.Shared;
 
 namespace Backend.Veteriner.Domain.Pets;
@@ -73,14 +74,29 @@ public sealed class Pet : AggregateRoot, ITenantOwned, IChangeTracked
     /// <summary>Vefat tarihi (opsiyonel); yalnız <see cref="PetStatus.Deceased"/> iken dolu olabilir.</summary>
     public DateOnly? DeceasedOn { get; private set; }
 
+    /// <summary>Yumuşak silme anı (ADR-054); doluysa kayıt listelerden, aramadan ve hatırlatmalardan çıkar, geçmiş kayıtlar korunur.</summary>
+    public DateTime? DeletedAtUtc { get; private set; }
+
+    /// <summary>Silen kullanıcı; yalnız <see cref="DeletedAtUtc"/> doluyken dolu.</summary>
+    public Guid? DeletedByUserId { get; private set; }
+
+    /// <summary>Müşteriyle birlikte silindi (ADR-054 K4); müşteri geri yüklenince bu hastalar da geri gelir.</summary>
+    public bool DeletedWithClient { get; private set; }
+
+    public bool IsDeleted => DeletedAtUtc is not null;
+
+    /// <summary>Silinmemiş hasta koşulu (tek kural; liste, arama, seçici ve sayım sorguları bunu kullanır, ADR-054 K2).</summary>
+    public static readonly Expression<Func<Pet, bool>> NotDeleted = p => p.DeletedAtUtc == null;
+
     /// <summary>SQL Server rowversion — eşzamanlı güncelleme için.</summary>
     public byte[] RowVersion { get; private set; } = default!;
 
     /// <summary>
     /// Bakım iş akışına giren hayvan koşulu (tek kural): hatırlatma adayları ve gecikmiş/yaklaşan aşı listeleri bu ifadeyle
-    /// süzülür; yeni randevu/geliş/muayene kapısı <see cref="EnsureCanStartCare"/> aynı koşulu kullanır.
+    /// süzülür; yeni randevu/geliş/muayene kapısı <see cref="EnsureCanStartCare"/> aynı koşulu kullanır. Vefat eden ve
+    /// silinen (ADR-054) hayvan bakıma girmez.
     /// </summary>
-    public static readonly Expression<Func<Pet, bool>> ReceivesCare = p => p.Status == PetStatus.Active;
+    public static readonly Expression<Func<Pet, bool>> ReceivesCare = p => p.Status == PetStatus.Active && p.DeletedAtUtc == null;
 
     private static readonly Func<Pet, bool> ReceivesCareCompiled = ReceivesCare.Compile();
 
@@ -268,11 +284,89 @@ public sealed class Pet : AggregateRoot, ITenantOwned, IChangeTracked
         }
     }
 
-    /// <summary>Yeni randevu, geliş ve muayene açılmadan önce çağrılır; vefat eden hayvanda reddeder (geçmiş kayıtlar etkilenmez).</summary>
+    /// <summary>
+    /// Yeni randevu, geliş ve muayene açılmadan önce çağrılır; silinen (<c>Pets.Deleted</c>) ya da vefat eden hayvanda reddeder
+    /// (geçmiş kayıtlar etkilenmez).
+    /// </summary>
     public Result EnsureCanStartCare()
-        => IsReceivingCare
-            ? Result.Success()
+    {
+        if (IsReceivingCare)
+            return Result.Success();
+
+        return IsDeleted
+            ? EnsureNotDeleted()
             : Result.Failure("Pets.Deceased", "Vefat etmiş hayvan için yeni randevu, geliş veya muayene açılamaz.");
+    }
+
+    /// <summary>
+    /// Yumuşak silme (ADR-054 K1/K5): aktif yatış ya da gelecek randevu varsa (<paramref name="blockers"/>) nedenlerin tamamıyla
+    /// reddedilir; zaten silinmişse değişiklik yapılmaz. Vefat etmiş hayvan silinebilir. Kural yalnızca burada yaşar.
+    /// </summary>
+    public Result Delete(Guid deletedByUserId, DateTime utcNow, RecordDeletionBlockers blockers)
+    {
+        if (IsDeleted)
+            return Result.Success();
+        if (deletedByUserId == Guid.Empty)
+            return Result.Failure("Pets.Validation", "Silen kullanıcı geçersiz.");
+        if (blockers.IsBlocking)
+            return Result.Failure(blockers.ToError("Pets.DeleteBlocked", "Hasta"));
+
+        MarkDeleted(deletedByUserId, utcNow, withClient: false);
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Müşteri silinirken (ADR-054 K4) çağrılır; engeller müşteri düzeyinde tüm hastalar için denetlenmiştir.
+    /// Önceden tek başına silinmiş hastaya dokunulmaz.
+    /// </summary>
+    public void DeleteWithClient(Guid deletedByUserId, DateTime utcNow)
+    {
+        if (IsDeleted)
+            return;
+
+        MarkDeleted(deletedByUserId, utcNow, withClient: true);
+    }
+
+    /// <summary>
+    /// Silinmiş hastayı geri yükler (ADR-054 K6); müşterisi silinmişken reddedilir. Silinmemişse değişiklik yapılmaz.
+    /// </summary>
+    public Result Restore(bool clientIsDeleted)
+    {
+        if (!IsDeleted)
+            return Result.Success();
+        if (clientIsDeleted)
+            return Result.Failure("Pets.ClientDeleted", "Hastanın müşterisi silinmiş; önce müşteriyi geri yükleyin.");
+
+        ClearDeletion();
+        return Result.Success();
+    }
+
+    /// <summary>Müşteri geri yüklenince yalnız onunla birlikte silinen hastalar geri gelir (ADR-054 K6).</summary>
+    public void RestoreWithClient()
+    {
+        if (IsDeleted && DeletedWithClient)
+            ClearDeletion();
+    }
+
+    /// <summary>Silinen hastaya yeni iş ve düzenleme yazılmaz (ADR-054 K3).</summary>
+    public Result EnsureNotDeleted()
+        => IsDeleted
+            ? Result.Failure("Pets.Deleted", "Hasta silinmiş; işlem için önce \"Silinenler\" listesinden geri yükleyin.")
+            : Result.Success();
+
+    private void MarkDeleted(Guid deletedByUserId, DateTime utcNow, bool withClient)
+    {
+        DeletedAtUtc = utcNow;
+        DeletedByUserId = deletedByUserId;
+        DeletedWithClient = withClient;
+    }
+
+    private void ClearDeletion()
+    {
+        DeletedAtUtc = null;
+        DeletedByUserId = null;
+        DeletedWithClient = false;
+    }
 
     /// <summary>
     /// İstemcinin gördüğü sürüm: kalıcı yazma yalnızca veritabanındaki sürüm bu değere eşitse gerçekleşir.

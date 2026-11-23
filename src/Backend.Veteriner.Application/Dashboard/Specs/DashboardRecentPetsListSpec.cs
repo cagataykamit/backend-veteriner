@@ -11,6 +11,7 @@ public sealed class DashboardRecentPetsListSpec : Specification<Pet, DashboardRe
     public DashboardRecentPetsListSpec(Guid tenantId, int take)
     {
         Query.AsNoTracking();
+        Query.Where(Pet.NotDeleted);
         Query.Where(p => p.TenantId == tenantId)
             .OrderByDescending(p => p.Id)
             .Take(take)

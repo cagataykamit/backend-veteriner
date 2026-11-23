@@ -38,8 +38,11 @@ public sealed class Client : AggregateRoot, ITenantOwned, IChangeTracked
     /// <summary>Müşteri otomatik hatırlatma istemiyor; true iken aşı/randevu hatırlatma adaylarından dışlanır.</summary>
     public bool RemindersOptedOut { get; private set; }
 
-    /// <summary>Otomatik hatırlatma alabilen müşteri koşulu (tek kural; hatırlatma aday sorguları bunu kullanır).</summary>
-    public static readonly Expression<Func<Client, bool>> AcceptsReminders = c => !c.RemindersOptedOut;
+    /// <summary>
+    /// Otomatik hatırlatma alabilen müşteri koşulu (tek kural; hatırlatma aday sorguları bunu kullanır). Silinen müşteri
+    /// hatırlatma almaz (ADR-054 K2).
+    /// </summary>
+    public static readonly Expression<Func<Client, bool>> AcceptsReminders = c => !c.RemindersOptedOut && c.DeletedAtUtc == null;
 
     private static readonly Func<Client, bool> AcceptsRemindersCompiled = AcceptsReminders.Compile();
 
@@ -97,6 +100,17 @@ public sealed class Client : AggregateRoot, ITenantOwned, IChangeTracked
 
     /// <summary>Fatura adresi: adres satırı.</summary>
     public string? BillingAddressLine { get; private set; }
+
+    /// <summary>Yumuşak silme anı (ADR-054); doluysa kayıt listelerden, aramadan ve hatırlatmalardan çıkar, geçmiş kayıtlar korunur.</summary>
+    public DateTime? DeletedAtUtc { get; private set; }
+
+    /// <summary>Silen kullanıcı; yalnız <see cref="DeletedAtUtc"/> doluyken dolu.</summary>
+    public Guid? DeletedByUserId { get; private set; }
+
+    public bool IsDeleted => DeletedAtUtc is not null;
+
+    /// <summary>Silinmemiş müşteri koşulu (tek kural; liste, arama, seçici ve sayım sorguları bunu kullanır, ADR-054 K2).</summary>
+    public static readonly Expression<Func<Client, bool>> NotDeleted = c => c.DeletedAtUtc == null;
 
     /// <summary>SQL Server rowversion — eşzamanlı güncelleme için.</summary>
     public byte[] RowVersion { get; private set; } = default!;
@@ -312,6 +326,45 @@ public sealed class Client : AggregateRoot, ITenantOwned, IChangeTracked
         UpdatedAtUtc = utcNow;
         return Result.Success();
     }
+
+    /// <summary>
+    /// Yumuşak silme (ADR-054 K1/K5): peşin müşteri silinemez; açık iş varsa (<paramref name="blockers"/>) nedenlerin tamamıyla
+    /// reddedilir; zaten silinmişse değişiklik yapılmaz. Hastaların birlikte silinmesi çağıranın işidir
+    /// (<see cref="Pets.Pet.DeleteWithClient"/>). Kural yalnızca burada yaşar.
+    /// </summary>
+    public Result Delete(Guid deletedByUserId, DateTime utcNow, RecordDeletionBlockers blockers)
+    {
+        if (IsWalkIn)
+            return Result.Failure("Clients.WalkInReadOnly", "Peşin müşteri sistem kaydıdır; silinemez.");
+        if (IsDeleted)
+            return Result.Success();
+        if (deletedByUserId == Guid.Empty)
+            return Result.Failure("Clients.Validation", "Silen kullanıcı geçersiz.");
+        if (blockers.IsBlocking)
+            return Result.Failure(blockers.ToError("Clients.DeleteBlocked", "Müşteri"));
+
+        DeletedAtUtc = utcNow;
+        DeletedByUserId = deletedByUserId;
+        UpdatedAtUtc = utcNow;
+        return Result.Success();
+    }
+
+    /// <summary>Silinmiş müşteriyi geri yükler (ADR-054 K6; süre sınırı yok). Silinmemişse değişiklik yapılmaz.</summary>
+    public void Restore(DateTime utcNow)
+    {
+        if (!IsDeleted)
+            return;
+
+        DeletedAtUtc = null;
+        DeletedByUserId = null;
+        UpdatedAtUtc = utcNow;
+    }
+
+    /// <summary>Silinen müşteriye yeni iş ve düzenleme yazılmaz (ADR-054 K3).</summary>
+    public Result EnsureNotDeleted()
+        => IsDeleted
+            ? Result.Failure("Clients.Deleted", "Müşteri silinmiş; işlem için önce \"Silinenler\" listesinden geri yükleyin.")
+            : Result.Success();
 
     /// <summary>
     /// İstemcinin gördüğü sürüm: kalıcı yazma yalnızca veritabanındaki sürüm bu değere eşitse gerçekleşir.

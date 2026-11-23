@@ -2580,6 +2580,12 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Email")
                         .HasMaxLength(320)
                         .HasColumnType("nvarchar(320)");
@@ -2684,7 +2690,7 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "Email", "PhoneNormalized")
                         .IsUnique()
-                        .HasFilter("[Email] IS NOT NULL AND [PhoneNormalized] IS NOT NULL");
+                        .HasFilter("[Email] IS NOT NULL AND [PhoneNormalized] IS NOT NULL AND [DeletedAtUtc] IS NULL");
 
                     b.ToTable("Clients", (string)null);
                 });
@@ -6053,6 +6059,17 @@ namespace Backend.Veteriner.Infrastructure.Migrations
 
                     b.Property<DateOnly?>("DeceasedOn")
                         .HasColumnType("date");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("DeletedWithClient")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
 
                     b.Property<int?>("Gender")
                         .HasColumnType("int");

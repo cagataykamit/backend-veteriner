@@ -9,6 +9,7 @@ using Backend.Veteriner.Application.Pets.Commands.Create;
 using Backend.Veteriner.Application.Pets.Commands.SetStatus;
 using Backend.Veteriner.Application.Pets.Commands.Update;
 using Backend.Veteriner.Application.Pets.Contracts.Dtos;
+using Backend.Veteriner.Application.Pets.Deletion;
 using Backend.Veteriner.Application.Pets.Queries.GetById;
 using Backend.Veteriner.Application.Pets.Queries.GetHistorySummary;
 using Backend.Veteriner.Application.Pets.Queries.GetList;
@@ -260,6 +261,57 @@ public sealed class PetsController : ControllerBase
         var result = await _mediator.Send(
             new GetPetsListQuery(PageRequestQuery.WithMergedSearch(paging, search), clientId, speciesId, status),
             ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Yumuşak silme (ADR-054): hasta listelerden, aramadan ve hatırlatmalardan çıkar; geçmiş kayıtlar korunur. Aktif yatış ya da
+    /// gelecek planlı randevu varsa 409 <c>Pets.DeleteBlocked</c> (<c>reasons</c>). Zaten silinmişse 204.
+    /// Bkz. docs/CLIENT_PET_DELETION_API_CONTRACT.md.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    [Authorize(Policy = PermissionCatalog.Pets.Delete)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Delete([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        return (await _mediator.Send(new DeletePetCommand(id), ct)).ToActionResult(this);
+    }
+
+    /// <summary>Silinen hastayı geri yükler; müşterisi silinmişse 409 <c>Pets.ClientDeleted</c>. Silinmemişse 204.</summary>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Policy = PermissionCatalog.Pets.Delete)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Restore([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        return (await _mediator.Send(new RestorePetCommand(id), ct)).ToActionResult(this);
+    }
+
+    /// <summary>"Silinenler": silinen hastalar, en son silinen önce; <c>search</c> hasta kartı alanlarında arar.</summary>
+    [HttpGet("deleted")]
+    [Authorize(Policy = PermissionCatalog.Pets.Delete)]
+    [ProducesResponseType(typeof(PagedResult<DeletedPetListItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetDeleted(
+        [FromQuery] PageRequest page,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+        var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
+        var result = await _mediator.Send(new GetDeletedPetsQuery(PageRequestQuery.WithMergedSearch(paging, search)), ct);
         return result.ToActionResult(this);
     }
 }

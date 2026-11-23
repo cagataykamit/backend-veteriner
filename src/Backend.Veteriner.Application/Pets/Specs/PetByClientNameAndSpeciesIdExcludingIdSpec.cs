@@ -9,5 +9,6 @@ public sealed class PetByClientNameAndSpeciesIdExcludingIdSpec : Specification<P
     {
         Query.Where(p => p.ClientId == clientId && p.SpeciesId == speciesId && p.Id != excludeId);
         Query.Where(PetNameDuplicateKey.Matches(nameDuplicateKey));
+        Query.Where(Pet.NotDeleted);
     }
 }

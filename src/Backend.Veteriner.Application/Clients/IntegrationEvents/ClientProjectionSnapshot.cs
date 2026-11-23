@@ -13,4 +13,5 @@ public sealed record ClientProjectionSnapshot(
     string? Email,
     string? Phone,
     string? PhoneNormalized,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    bool IsDeleted = false);

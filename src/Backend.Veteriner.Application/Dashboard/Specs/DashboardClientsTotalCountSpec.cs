@@ -9,5 +9,6 @@ public sealed class DashboardClientsTotalCountSpec : Specification<Client>
     {
         Query.AsNoTracking();
         Query.Where(c => c.TenantId == tenantId);
+        Query.Where(Client.NotDeleted);
     }
 }

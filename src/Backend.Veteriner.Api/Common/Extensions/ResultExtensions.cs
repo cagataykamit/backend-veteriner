@@ -346,6 +346,14 @@ public static class ResultExtensions
             return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
         }
 
+        // Yumuşak silme (ADR-054, CLIENT_PET_DELETION_API_CONTRACT.md): silinen kayda iş, açık işli kaydı silme ve geri yükleme
+        // çakışmaları kaydın durumu ile çakışmadır.
+        if (normalized is "clients.deleted" or "pets.deleted" or "clients.deleteblocked" or "pets.deleteblocked"
+            or "pets.clientdeleted" or "clients.restoreconflict")
+        {
+            return (StatusCodes.Status409Conflict, "https://httpstatuses.io/409");
+        }
+
         // Satış ortağı komisyonu (ADR-037): ödenmiş/iptal satır yeniden "ödendi" işaretlenemez (durum çakışması).
         if (normalized is "discountredemptions.commissionnotaccrued")
         {

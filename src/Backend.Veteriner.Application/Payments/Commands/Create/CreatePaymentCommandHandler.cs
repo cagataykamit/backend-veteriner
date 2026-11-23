@@ -158,6 +158,10 @@ public sealed class CreatePaymentCommandHandler : IRequestHandler<CreatePaymentC
         if (client is null)
             return Result<PaymentCreateResultDto>.Failure("Clients.NotFound", "Müşteri bulunamadı veya kiracıya ait değil.");
 
+        var clientNotDeleted = client.EnsureNotDeleted();
+        if (!clientNotDeleted.IsSuccess)
+            return Result<PaymentCreateResultDto>.Failure(clientNotDeleted.Error);
+
         string? petName = null;
         if (request.PetId is { } pid)
         {

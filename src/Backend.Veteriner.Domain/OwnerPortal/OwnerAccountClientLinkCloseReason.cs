@@ -8,4 +8,7 @@ public enum OwnerAccountClientLinkCloseReason
 
     /// <summary>Hasta sahibi portal hesabını sildi.</summary>
     OwnerAccountDeleted = 1,
+
+    /// <summary>Klinik müşteriyi sildi (ADR-054 K9); geri yükleme bağı açmaz.</summary>
+    ClientDeleted = 2,
 }

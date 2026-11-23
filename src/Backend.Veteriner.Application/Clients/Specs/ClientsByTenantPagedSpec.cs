@@ -11,6 +11,7 @@ public sealed class ClientsByTenantPagedSpec : Specification<Client, ClientListI
     {
         Query.AsNoTracking();
         Query.Where(c => c.TenantId == tenantId);
+        Query.Where(Client.NotDeleted);
         if (searchTerm is not null)
             Query.WhereDailySearch(searchTerm);
 

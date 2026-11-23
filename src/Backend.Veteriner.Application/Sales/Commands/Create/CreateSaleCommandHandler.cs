@@ -285,9 +285,11 @@ public sealed class CreateSaleCommandHandler : IRequestHandler<CreateSaleCommand
         }
 
         var client = await _clients.FirstOrDefaultAsync(new ClientByIdSpec(tenantId, id.Value), ct);
-        return client is null
-            ? Result<Client>.Failure("Clients.NotFound", "Müşteri bulunamadı veya kiracıya ait değil.")
-            : Result<Client>.Success(client);
+        if (client is null)
+            return Result<Client>.Failure("Clients.NotFound", "Müşteri bulunamadı veya kiracıya ait değil.");
+
+        var notDeleted = client.EnsureNotDeleted();
+        return notDeleted.IsSuccess ? Result<Client>.Success(client) : Result<Client>.Failure(notDeleted.Error);
     }
 
     private static Result<PaymentMethod> ParsePaymentMethod(CreateSalePaymentDto? payment)

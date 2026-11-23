@@ -101,6 +101,13 @@ public sealed class PetConfiguration : IEntityTypeConfiguration<Pet>
             .HasForeignKey(x => x.PatternId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Yumuşak silme (ADR-054); mevcut satırlar silinmemiş kalır.
+        b.Property(x => x.DeletedAtUtc);
+        b.Property(x => x.DeletedByUserId);
+        b.Property(x => x.DeletedWithClient)
+            .IsRequired()
+            .HasDefaultValue(false);
+
         b.HasIndex(x => x.TenantId);
         b.HasIndex(x => new { x.TenantId, x.ClientId });
         b.HasIndex(x => new { x.TenantId, x.Status });

@@ -17,7 +17,7 @@ namespace Backend.Veteriner.Infrastructure.Persistence.Migrations.Query
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.9")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -148,6 +148,11 @@ namespace Backend.Veteriner.Infrastructure.Persistence.Migrations.Query
                         .IsRequired()
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
 
                     b.Property<Guid>("LastEventId")
                         .HasColumnType("uniqueidentifier");
@@ -527,6 +532,11 @@ namespace Backend.Veteriner.Infrastructure.Persistence.Migrations.Query
 
                     b.Property<int?>("Gender")
                         .HasColumnType("int");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
 
                     b.Property<Guid>("LastEventId")
                         .HasColumnType("uniqueidentifier");

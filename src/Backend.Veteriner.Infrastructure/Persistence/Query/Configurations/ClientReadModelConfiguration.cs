@@ -18,6 +18,7 @@ public sealed class ClientReadModelConfiguration : IEntityTypeConfiguration<Clie
         b.Property(x => x.Phone).HasMaxLength(QueryReadModelConstraints.ClientPhone);
         b.Property(x => x.PhoneNormalized).HasMaxLength(QueryReadModelConstraints.ClientPhoneNormalized);
         b.Property(x => x.CreatedAtUtc).IsRequired();
+        b.Property(x => x.IsDeleted).IsRequired().HasDefaultValue(false);
         b.Property(x => x.LastEventId).IsRequired();
         b.Property(x => x.LastProjectedAtUtc).IsRequired();
         b.Property(x => x.LastEventOccurredAtUtc).IsRequired();

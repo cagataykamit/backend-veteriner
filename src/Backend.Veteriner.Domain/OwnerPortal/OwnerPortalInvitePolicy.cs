@@ -18,6 +18,11 @@ public static class OwnerPortalInvitePolicy
         if (client.IsWalkIn)
             return Result.Failure("OwnerPortal.ClientNotInvitable", "Peşin müşteri sistem kaydıdır; portala davet edilemez.");
 
+        // Silinen müşteri davet edilemez (ADR-054 K9); geri yüklenince yeniden davet edilir.
+        var notDeleted = client.EnsureNotDeleted();
+        if (!notDeleted.IsSuccess)
+            return notDeleted;
+
         if (string.IsNullOrWhiteSpace(client.Email))
             return Result.Failure("OwnerPortal.ClientEmailMissing", "Müşteri kaydında e-posta yok; davet gönderilemez.");
 

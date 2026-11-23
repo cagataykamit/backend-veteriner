@@ -7,6 +7,7 @@ using Backend.Veteriner.Application.Clients.Commands.QuickRegister;
 using Backend.Veteriner.Application.Clients.Commands.SetKvkkConsent;
 using Backend.Veteriner.Application.Clients.Commands.Update;
 using Backend.Veteriner.Application.Clients.Contracts.Dtos;
+using Backend.Veteriner.Application.Clients.Deletion;
 using Backend.Veteriner.Application.Clients.Queries.GetById;
 using Backend.Veteriner.Application.Clients.Queries.GetBalance;
 using Backend.Veteriner.Application.Clients.Queries.GetDataExport;
@@ -292,6 +293,62 @@ public sealed class ClientsController : ControllerBase
             return problem!;
         var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
         var result = await _mediator.Send(new GetClientsListQuery(PageRequestQuery.WithMergedSearch(paging, search)), ct);
+        return result.ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Yumuşak silme (ADR-054): müşteri ve silinmemiş hastaları listelerden, aramadan ve hatırlatmalardan çıkar; geçmiş kayıtlar
+    /// korunur, portal bağları kapanır. Açık hesap, aktif yatış ya da gelecek planlı randevu varsa 409 <c>Clients.DeleteBlocked</c>
+    /// (<c>reasons</c>); peşin müşteri 400 <c>Clients.WalkInReadOnly</c>. Zaten silinmişse 204.
+    /// Bkz. docs/CLIENT_PET_DELETION_API_CONTRACT.md.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    [Authorize(Policy = PermissionCatalog.Clients.Delete)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Delete([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        return (await _mediator.Send(new DeleteClientCommand(id), ct)).ToActionResult(this);
+    }
+
+    /// <summary>
+    /// Silinen müşteriyi ve onunla birlikte silinen hastaları geri yükler; aynı bilgilerle aktif müşteri varsa 409
+    /// <c>Clients.RestoreConflict</c> (<c>conflictingClientId</c>). Portal bağı açılmaz. Silinmemişse 204.
+    /// </summary>
+    [HttpPost("{id:guid}/restore")]
+    [Authorize(Policy = PermissionCatalog.Clients.Delete)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Restore([FromRoute] Guid id, CancellationToken ct)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+
+        return (await _mediator.Send(new RestoreClientCommand(id), ct)).ToActionResult(this);
+    }
+
+    /// <summary>"Silinenler": silinen müşteriler, en son silinen önce; <c>search</c> müşteri listesiyle aynı kural.</summary>
+    [HttpGet("deleted")]
+    [Authorize(Policy = PermissionCatalog.Clients.Delete)]
+    [ProducesResponseType(typeof(PagedResult<DeletedClientListItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetDeleted(
+        [FromQuery] PageRequest page,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
+    {
+        if (!this.TryGetResolvedTenant(_tenantContext, out _, out var problem))
+            return problem!;
+        var paging = PageRequestQuery.BindFromQuery(Request.Query, page);
+        var result = await _mediator.Send(new GetDeletedClientsQuery(PageRequestQuery.WithMergedSearch(paging, search)), ct);
         return result.ToActionResult(this);
     }
 }

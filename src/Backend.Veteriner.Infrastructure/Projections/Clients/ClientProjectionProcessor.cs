@@ -415,6 +415,7 @@ public sealed class ClientProjectionProcessor : IClientProjectionProcessor
                 Phone = snap.Phone,
                 PhoneNormalized = snap.PhoneNormalized,
                 CreatedAtUtc = snap.CreatedAtUtc,
+                IsDeleted = snap.IsDeleted,
                 LastEventId = eventId,
                 LastProjectedAtUtc = projectedAtUtc,
                 LastEventOccurredAtUtc = occurredAtUtc
@@ -434,6 +435,7 @@ public sealed class ClientProjectionProcessor : IClientProjectionProcessor
         existing.Phone = snap.Phone;
         existing.PhoneNormalized = snap.PhoneNormalized;
         existing.CreatedAtUtc = snap.CreatedAtUtc;
+        existing.IsDeleted = snap.IsDeleted;
         existing.LastEventId = eventId;
         existing.LastProjectedAtUtc = projectedAtUtc;
         existing.LastEventOccurredAtUtc = occurredAtUtc;

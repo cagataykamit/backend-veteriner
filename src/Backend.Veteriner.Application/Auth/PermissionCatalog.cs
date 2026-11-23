@@ -70,6 +70,9 @@ public static class PermissionCatalog
         public const string Read = "Clients.Read";
         public const string Create = "Clients.Create";
         public const string Update = "Clients.Update";
+
+        /// <summary>Yumuşak silme, "Silinenler" listesi ve geri yükleme (ADR-054 K8).</summary>
+        public const string Delete = "Clients.Delete";
     }
 
     public static class Pets
@@ -77,6 +80,9 @@ public static class PermissionCatalog
         public const string Read = "Pets.Read";
         public const string Create = "Pets.Create";
         public const string Update = "Pets.Update";
+
+        /// <summary>Yumuşak silme, "Silinenler" listesi ve geri yükleme (ADR-054 K8).</summary>
+        public const string Delete = "Pets.Delete";
     }
 
     public static class Species
@@ -399,10 +405,12 @@ public static class PermissionCatalog
         new(Clients.Read, "Müşterileri listeleme ve görüntüleme yetkisi", "Clients"),
         new(Clients.Create, "Müşteri oluşturma yetkisi", "Clients"),
         new(Clients.Update, "Müşteri bilgilerini güncelleme yetkisi", "Clients"),
+        new(Clients.Delete, "Müşteriyi silme, silinenleri görme ve geri yükleme yetkisi", "Clients"),
 
         new(Pets.Read, "Hayvan kayıtlarını listeleme ve görüntüleme yetkisi", "Pets"),
         new(Pets.Create, "Hayvan kaydı oluşturma yetkisi", "Pets"),
         new(Pets.Update, "Hayvan kaydı güncelleme yetkisi", "Pets"),
+        new(Pets.Delete, "Hasta kaydını silme, silinenleri görme ve geri yükleme yetkisi", "Pets"),
 
         new(Species.Read, "Tür (species) referanslarını listeleme ve görüntüleme yetkisi", "Species"),
         new(Species.Create, "Tür (species) oluşturma yetkisi", "Species"),

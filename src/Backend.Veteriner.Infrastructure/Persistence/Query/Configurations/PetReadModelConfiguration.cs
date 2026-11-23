@@ -33,6 +33,7 @@ public sealed class PetReadModelConfiguration : IEntityTypeConfiguration<PetRead
         b.Property(x => x.ColorNameNormalized).HasMaxLength(QueryReadModelConstraints.PetColorNameNormalized);
 
         b.Property(x => x.Weight).HasColumnType("decimal(6,2)");
+        b.Property(x => x.IsDeleted).IsRequired().HasDefaultValue(false);
 
         b.Property(x => x.LastEventId).IsRequired();
         b.Property(x => x.LastEventOccurredAtUtc).IsRequired();

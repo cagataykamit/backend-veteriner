@@ -59,7 +59,7 @@ Yanıt:
 - Sıra (`changedAtUtc`, `id`) artandır; `nextCursor` null ise son sayfadır. İmleç son kaydın bu ikilisidir (keyset), sayfa numarası yoktur: gezinirken değişen kayıt sona taşınır, atlanmaz.
 - `changedAtUtc` kaydın eklendiği ya da değiştiği andır; kaydetme anında altyapı damgalar (`ChangeTrackedSaveChangesInterceptor`, `IChangeTracked`). Migration öncesi satırlar: müşteri ve aşıda `UpdatedAtUtc ?? CreatedAtUtc`, hayvan ve randevuda migration anı.
 - Önerilen eşitleme: ilk seferde `updatedSince` olmadan tüm sayfalar; sonraki seferlerde son görülen en büyük `changedAtUtc` ile `updatedSince` (aynı anı taşıyan kayıtlar yeniden gelebilir, `id` ile tekilleştirilir).
-- **Silinen kayıt bildirilmez** (bu dilimde silme akışı yok; bkz. §10).
+- **Silinen müşteri ve hasta** (yumuşak silme, ADR-054) listeden düşmez: `deletedAtUtc` dolu gelir ve silme anı `changedAtUtc`'yi ilerletir; eşitleyen sistem kaydı kendi tarafında silinmiş işaretler. Geri yüklenince `deletedAtUtc` yeniden `null` olur. Kalıcı silme (içe aktarma geri alması) bildirilmez. Bkz. `CLIENT_PET_DELETION_API_CONTRACT.md`.
 
 ## 5) Verilen alanlar (KVKK asgari veri)
 
@@ -75,6 +75,7 @@ Alanlar varlıktan doğrudan değil, tek tek seçilerek verilir (`ExternalReadFe
 | `email` | string? | |
 | `createdAtUtc` | tarih-saat | |
 | `changedAtUtc` | tarih-saat | |
+| `deletedAtUtc` | tarih-saat? | Doluysa müşteri silinmiştir (ADR-054) |
 
 **Hayvan** (`pets`)
 
@@ -89,6 +90,7 @@ Alanlar varlıktan doğrudan değil, tek tek seçilerek verilir (`ExternalReadFe
 | `isNeutered` | bool | |
 | `status` | `Active` \| `Deceased` | |
 | `changedAtUtc` | tarih-saat | |
+| `deletedAtUtc` | tarih-saat? | Doluysa hasta silinmiştir (ADR-054); vefat `status` ile ayrıdır |
 
 **Randevu** (`appointments`)
 
@@ -192,7 +194,7 @@ Anahtar ortam değişkeninde ya da gizli kasada tutulmalı; adreste (query strin
 3. Hız sınırı anahtar başına 60/dk; sayfa en çok 200.
 4. Süresi dolmuş deneme, salt okunur ya da iptal abonelikte dış API kapalı (panel okuması açık).
 5. Verilen alanlar §5 tablosu; müşteri adresi ve iletişim tercihi dahil değil.
-6. Silinen kaydın bildirimi yok; okumalar denetim kaydına yazılmaz, yalnız anahtarın son kullanımı tutulur.
+6. Kalıcı silinen kaydın bildirimi yok (yumuşak silinen müşteri/hasta `deletedAtUtc` ile gelir, §4); okumalar denetim kaydına yazılmaz, yalnız anahtarın son kullanımı tutulur.
 7. Kurumsal denemesi dış API'yi açar (paket kuralı TIER-001 ile aynı).
 
 ## 11) Testler

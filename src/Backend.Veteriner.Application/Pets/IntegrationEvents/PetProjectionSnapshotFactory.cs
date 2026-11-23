@@ -40,7 +40,8 @@ public static class PetProjectionSnapshotFactory
             NormalizeOptionalName(colorRef?.Name),
             pet.Gender is { } gender ? (int)gender : null,
             pet.BirthDate,
-            pet.Weight);
+            pet.Weight,
+            pet.IsDeleted);
     }
 
     internal static string NormalizeName(string value)

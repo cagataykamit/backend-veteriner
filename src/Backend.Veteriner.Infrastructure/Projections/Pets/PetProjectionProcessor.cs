@@ -457,6 +457,7 @@ public sealed class PetProjectionProcessor : IPetProjectionProcessor
             Gender = snap.Gender,
             BirthDate = snap.BirthDate,
             Weight = snap.Weight,
+            IsDeleted = snap.IsDeleted,
             LastEventId = eventId,
             LastEventOccurredAtUtc = occurredAtUtc,
             LastProjectedAtUtc = projectedAtUtc
@@ -487,6 +488,7 @@ public sealed class PetProjectionProcessor : IPetProjectionProcessor
         existing.Gender = snap.Gender;
         existing.BirthDate = snap.BirthDate;
         existing.Weight = snap.Weight;
+        existing.IsDeleted = snap.IsDeleted;
         existing.LastEventId = eventId;
         existing.LastEventOccurredAtUtc = occurredAtUtc;
         existing.LastProjectedAtUtc = projectedAtUtc;

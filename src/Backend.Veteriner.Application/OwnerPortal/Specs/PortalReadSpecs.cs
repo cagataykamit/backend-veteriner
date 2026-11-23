@@ -8,13 +8,15 @@ using Backend.Veteriner.Domain.Vaccinations;
 namespace Backend.Veteriner.Application.OwnerPortal.Specs;
 
 // Dilim B okuma sorguları (docs/PORTAL_API_CONTRACT.md §6). Her sorgu bağdan çözülen kiracı + müşteri (gerekirse klinik)
-// filtresiyle çalışır; projeksiyonlar yalnız portal sözleşmesindeki alanları okur.
+// filtresiyle çalışır; projeksiyonlar yalnız portal sözleşmesindeki alanları okur. Silinen hasta (ADR-054 K9) listede ve
+// ayrıntıda yoktur; ad eşlemesi (randevu/ödeme satırları) dışlamaz.
 
 public sealed class PortalPetsByClientSpec : Specification<Pet, PortalPetDto>
 {
     public PortalPetsByClientSpec(Guid tenantId, Guid clientId)
     {
         Query.AsNoTracking();
+        Query.Where(Pet.NotDeleted);
         Query.Where(p => p.TenantId == tenantId && p.ClientId == clientId)
             .OrderBy(p => p.Status)
             .ThenBy(p => p.Name)
@@ -38,6 +40,7 @@ public sealed class PortalPetDetailSpec : Specification<Pet, PortalPetDetailDto>
     {
         Query.AsNoTracking();
         Query.Where(p => p.TenantId == tenantId && p.ClientId == clientId && p.Id == petId);
+        Query.Where(Pet.NotDeleted);
         Query.Select(p => new PortalPetDetailDto(
             p.Id,
             p.Name,
@@ -60,6 +63,7 @@ public sealed class PortalPetOfClientSpec : Specification<Pet>
     {
         Query.AsNoTracking();
         Query.Where(p => p.TenantId == tenantId && p.ClientId == clientId && p.Id == petId);
+        Query.Where(Pet.NotDeleted);
     }
 }
 

@@ -17,5 +17,6 @@ public sealed class ClientByTenantNormalizedFullNameAndEmailSpec : Specification
             c.TenantId == tenantId
             && c.Email == normalizedEmail);
         Query.Where(ClientFullNameDuplicateKey.Matches(normalizedFullNameLower));
+        Query.Where(Client.NotDeleted);
     }
 }

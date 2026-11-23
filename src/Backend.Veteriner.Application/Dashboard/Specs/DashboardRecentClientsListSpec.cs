@@ -13,6 +13,7 @@ public sealed class DashboardRecentClientsListSpec : Specification<Client, Dashb
     public DashboardRecentClientsListSpec(Guid tenantId, int take)
     {
         Query.AsNoTracking();
+        Query.Where(Client.NotDeleted);
         Query.Where(c => c.TenantId == tenantId)
             .OrderByDescending(c => c.Id)
             .Take(take)

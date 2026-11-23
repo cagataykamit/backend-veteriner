@@ -50,6 +50,10 @@ public sealed class SetPetStatusCommandHandler : IRequestHandler<SetPetStatusCom
         if (pet is null)
             return Result<PetStatusDto>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
+        var notDeleted = pet.EnsureNotDeleted();
+        if (!notDeleted.IsSuccess)
+            return Result<PetStatusDto>.Failure(notDeleted.Error);
+
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
             return Result<PetStatusDto>.Failure("Pets.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 

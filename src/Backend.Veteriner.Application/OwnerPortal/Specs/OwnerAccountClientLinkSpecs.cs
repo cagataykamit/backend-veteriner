@@ -60,3 +60,10 @@ public sealed class ActiveOwnerAccountClientLinksByAccountSpec : Specification<O
             .OrderBy(x => x.CreatedAtUtc);
     }
 }
+
+/// <summary>Müşterinin aktif bağları (izlenir; müşteri silinince kapatılır, ADR-054 K9).</summary>
+public sealed class ActiveOwnerAccountClientLinksForCloseByClientSpec : Specification<OwnerAccountClientLink>
+{
+    public ActiveOwnerAccountClientLinksForCloseByClientSpec(Guid tenantId, Guid clientId)
+        => Query.Where(x => x.TenantId == tenantId && x.ClientId == clientId && x.Status == OwnerAccountClientLinkStatus.Active);
+}

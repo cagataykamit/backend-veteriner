@@ -96,6 +96,15 @@ public sealed class OwnerAccountClientLink : ITenantOwned
         return Result.Success();
     }
 
+    /// <summary>Klinik müşteriyi sildi (ADR-054 K9); bağ ve aydınlatma onay zamanı korunur, geri yükleme bağı açmaz.</summary>
+    public Result CloseByClientDeletion(Guid closedByUserId, DateTime utcNow)
+    {
+        var closed = Close(closedByUserId, utcNow);
+        if (closed.IsSuccess)
+            CloseReason = OwnerAccountClientLinkCloseReason.ClientDeleted;
+        return closed;
+    }
+
     /// <summary>İlk onay zamanı yazılır; tekrar çağrı değiştirmez.</summary>
     public void AcknowledgeDisclosure(DateTime utcNow)
         => DisclosureAcknowledgedAtUtc ??= ToUtc(utcNow);

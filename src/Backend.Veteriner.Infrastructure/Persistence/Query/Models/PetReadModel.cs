@@ -57,6 +57,9 @@ public sealed class PetReadModel : ITenantOwned
 
     public decimal? Weight { get; set; }
 
+    /// <summary>Yumuşak silinmiş hasta (ADR-054 K11); liste ve metin araması dışlar, kimlikle görüntüleme eşlemesi dışlamaz.</summary>
+    public bool IsDeleted { get; set; }
+
     public Guid LastEventId { get; set; }
 
     /// <summary>
