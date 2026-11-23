@@ -104,6 +104,10 @@ public sealed class ClientConfiguration : IEntityTypeConfiguration<Client>
         b.Property(x => x.Notes)
             .HasMaxLength(Client.MaxNotesLength);
 
+        // Yumuşak silme (ADR-054); mevcut satırlar silinmemiş kalır.
+        b.Property(x => x.DeletedAtUtc);
+        b.Property(x => x.DeletedByUserId);
+
         b.Property(x => x.RowVersion)
             .IsRowVersion()
             .IsConcurrencyToken();
@@ -117,8 +121,9 @@ public sealed class ClientConfiguration : IEntityTypeConfiguration<Client>
             .HasFilter("[IsWalkIn] = 1")
             .HasDatabaseName(WalkInIndexName);
 
+        // Silinen müşterinin bilgileriyle yeni kayıt açılabilir; geri yükleme aynı koşulu uygulamada denetler (ADR-054 K6).
         b.HasIndex(x => new { x.TenantId, x.Email, x.PhoneNormalized })
             .IsUnique()
-            .HasFilter("[Email] IS NOT NULL AND [PhoneNormalized] IS NOT NULL");
+            .HasFilter("[Email] IS NOT NULL AND [PhoneNormalized] IS NOT NULL AND [DeletedAtUtc] IS NULL");
     }
 }
