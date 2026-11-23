@@ -198,7 +198,7 @@ public sealed class GetVaccinationsCalendarQueryHandler
             return [];
 
         var later = await _vaccinations.ListAsync(
-            new AppliedVaccinationDosesForPetsSpec(tenantId, sources.Select(s => s.PetId).Distinct().ToArray(), sources.Min(s => s.AppliedAtUtc)),
+            new NextDueClosingDosesForPetsSpec(tenantId, sources.Select(s => s.PetId).Distinct().ToArray(), sources.Min(s => s.AtUtc)),
             ct);
         return VaccinationDueRule.FulfilledNextDueIds(sources, later);
     }

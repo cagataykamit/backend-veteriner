@@ -39,20 +39,17 @@ public sealed class NextDueSourcesSpec : Specification<Vaccination, VaccinationD
 }
 
 /// <summary>
-/// Hayvanların <paramref name="appliedAfterUtc"/>'den sonra uygulanmış aşıları (sonraki tarihin karşılanıp karşılanmadığı için); kiracının
-/// bütün kliniklerinden (<see cref="VaccinationDueRule.IsNextDueFulfilled"/>).
+/// Hayvanların <paramref name="afterUtc"/>'den sonra uygulanmış ya da planlanmış aşıları (sonraki tarihin karşılanıp karşılanmadığı için,
+/// <see cref="VaccinationDueRule.ClosesNextDueAfter"/>); kiracının bütün kliniklerinden (<see cref="VaccinationDueRule.IsNextDueFulfilled"/>).
 /// </summary>
-public sealed class AppliedVaccinationDosesForPetsSpec : Specification<Vaccination, VaccinationDose>
+public sealed class NextDueClosingDosesForPetsSpec : Specification<Vaccination, VaccinationDose>
 {
-    public AppliedVaccinationDosesForPetsSpec(Guid tenantId, IReadOnlyCollection<Guid> petIds, DateTime appliedAfterUtc)
+    public NextDueClosingDosesForPetsSpec(Guid tenantId, IReadOnlyCollection<Guid> petIds, DateTime afterUtc)
     {
         var ids = petIds.ToArray();
         Query.AsNoTracking();
-        Query.Where(v => v.TenantId == tenantId
-                         && ids.Contains(v.PetId)
-                         && v.Status == VaccinationStatus.Applied
-                         && v.AppliedAtUtc != null
-                         && v.AppliedAtUtc > appliedAfterUtc);
-        Query.Select(v => new VaccinationDose(v.Id, v.PetId, v.VaccineDefinitionId, v.VaccineName, v.AppliedAtUtc!.Value));
+        Query.Where(v => v.TenantId == tenantId && ids.Contains(v.PetId));
+        Query.Where(VaccinationDueRule.ClosesNextDueAfter(afterUtc));
+        Query.Select(VaccinationDueRule.AsClosingDose);
     }
 }

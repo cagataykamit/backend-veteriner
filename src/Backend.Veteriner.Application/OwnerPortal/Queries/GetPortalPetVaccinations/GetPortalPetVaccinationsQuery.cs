@@ -65,11 +65,16 @@ public sealed class GetPortalPetVaccinationsQueryHandler
 
         var overdueWindow = VaccinationDueRule.OverdueWindow(_timeProvider.GetUtcNow().UtcDateTime);
         // Yaklaşan: planlı aşı ve uygulanmış aşının karşılanmamış sonraki tarihi (VaccinationDueRule; satırlar hayvanın bütün aşıları).
-        var doses = rows
+        var sources = rows
             .Where(v => v.Status == VaccinationStatus.Applied && v.AppliedAtUtc is not null)
             .Select(v => new VaccinationDose(v.Id, pet.Id, v.VaccineDefinitionId, v.VaccineName, v.AppliedAtUtc!.Value))
             .ToList();
-        var fulfilled = VaccinationDueRule.FulfilledNextDueIds(doses, doses);
+        var closing = rows
+            .Select(v => (Row: v, AtUtc: VaccinationDueRule.ClosingDoseAtUtc(v.Status, v.AppliedAtUtc, v.DueAtUtc)))
+            .Where(x => x.AtUtc is not null)
+            .Select(x => new VaccinationDose(x.Row.Id, pet.Id, x.Row.VaccineDefinitionId, x.Row.VaccineName, x.AtUtc!.Value))
+            .ToList();
+        var fulfilled = VaccinationDueRule.FulfilledNextDueIds(sources, closing);
         var upcoming = pet.IsReceivingCare
             ? rows
                 .Where(v => VaccinationDueRule.IsOpenDue(v.Id, v.Status, v.AppliedAtUtc, v.DueAtUtc, fulfilled)

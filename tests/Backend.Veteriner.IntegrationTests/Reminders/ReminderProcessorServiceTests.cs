@@ -362,8 +362,8 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// VaccinationDueRule: aynı aşı hayvana sonra uygulandıysa önceki dozun sonraki tarihi karşılanmıştır (hatırlatılmaz); aynı aşının aynı
-    /// penceredeki planlı kaydı varsa hatırlatma yalnız planlı kayıttan gider (aynı aşı iki kez gönderilmez).
+    /// VaccinationDueRule: aynı aşı hayvana sonra uygulandıysa ya da planlandıysa önceki dozun sonraki tarihi karşılanmıştır (hatırlatılmaz);
+    /// hatırlatma yalnız planlı kayıttan, kendi vadesi gelince gider (aynı aşı iki kez gönderilmez).
     /// </summary>
     [Fact]
     public async Task ProcessOnce_Should_Skip_Fulfilled_NextDue_And_Remind_Same_Vaccine_Once()
@@ -378,6 +378,11 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         var rabies = await GetRabiesVaccineDefinitionAsync(db);
         var fulfilledPet = new Pet(tenant.Id, client.Id, "Pamuk", speciesId);
         var duplicatePet = new Pet(tenant.Id, client.Id, "Boncuk", speciesId);
+        var laterPlannedPet = new Pet(tenant.Id, client.Id, "Zeytin", speciesId);
+        var nextDueBeforePlan = new Vaccination(
+            tenant.Id, laterPlannedPet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Applied, now.AddDays(-30), now.AddDays(2), null, DateTime.UtcNow);
+        var plannedAfterWindow = new Vaccination(
+            tenant.Id, laterPlannedPet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(60), null, DateTime.UtcNow);
         var earlier = new Vaccination(
             tenant.Id, fulfilledPet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Applied, now.AddDays(-30), now.AddDays(2), null, DateTime.UtcNow);
         var later = new Vaccination(
@@ -389,7 +394,9 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
         settings.Update(false, 24, true, 3, true, DateTime.UtcNow);
 
-        db.AddRange(tenant, clinic, client, fulfilledPet, duplicatePet, earlier, later, nextDue, planned, settings);
+        db.AddRange(
+            tenant, clinic, client, fulfilledPet, duplicatePet, laterPlannedPet, earlier, later, nextDue, planned, nextDueBeforePlan,
+            plannedAfterWindow, settings);
         db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
         await db.SaveChangesAsync();
 

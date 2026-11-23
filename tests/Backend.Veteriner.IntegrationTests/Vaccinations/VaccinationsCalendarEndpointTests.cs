@@ -149,9 +149,9 @@ public sealed class VaccinationsCalendarEndpointTests : IClassFixture<CustomWebA
             .Where(v => v.TenantId == null && v.IsActive)
             .OrderBy(v => v.Code)
             .Select(v => v.Id)
-            .Take(3)
+            .Take(4)
             .ToListAsync();
-        var (karma, kuduz, parazit) = (definitions[0], definitions[1], definitions[2]);
+        var (karma, kuduz, parazit, lepto) = (definitions[0], definitions[1], definitions[2], definitions[3]);
 
         var now = DateTime.UtcNow;
         var today = OperationDayBounds.ToLocalDate(now);
@@ -164,12 +164,13 @@ public sealed class VaccinationsCalendarEndpointTests : IClassFixture<CustomWebA
         var plannedTomorrow = Make(kuduz, "Kuduz", VaccinationStatus.Scheduled, null, todayNoonUtc.AddDays(1));
         var importedNextDueToday = Vaccination.CreateImported(tenant.Id, pet.Id, clinic.Id, karma, "Karma", todayNoonUtc.AddYears(-1), todayNoonUtc, null, importBatch.Id, now);
         var appliedToday = Make(parazit, "İç parazit", VaccinationStatus.Applied, OperationDayBounds.ForLocalDate(today).DayStartUtc.AddMinutes(1), null);
-        // 1 aylık gecikmiş penceresi (2026-11-21): pencere başı günündeki vade görünür, bir gün öncesi görünmez.
+        // 1 aylık gecikmiş penceresi (2026-11-21): pencere başı günündeki vade görünür, bir gün öncesi görünmez. Aynı aşının planlı kaydı
+        // sonraki tarihi kapatır (2026-11-23); pencere satırları planlısı olmayan aşılarla kurulur.
         var windowStartNextDue = Vaccination.CreateImported(
-            tenant.Id, pet.Id, clinic.Id, kuduz, "Kuduz", todayNoonUtc.AddYears(-2),
+            tenant.Id, pet.Id, clinic.Id, lepto, "Lepto", todayNoonUtc.AddYears(-2),
             OperationDayBounds.ForLocalDate(today.AddMonths(-1)).DayStartUtc, null, importBatch.Id, now);
-        // Planlı kayıt karşılanma kuralına girmez; görünmemesinin tek nedeni pencere olsun.
-        var tooOldPlanned = Make(karma, "Karma", VaccinationStatus.Scheduled, null, OperationDayBounds.NoonUtcForLocalDate(today.AddMonths(-1).AddDays(-1)));
+        // Görünmemesinin tek nedeni pencere olsun (iç parazitin sonraki tarihi zaten karşılanmış).
+        var tooOldPlanned = Make(parazit, "İç parazit", VaccinationStatus.Scheduled, null, OperationDayBounds.NoonUtcForLocalDate(today.AddMonths(-1).AddDays(-1)));
         var overdue = Make(kuduz, "Kuduz", VaccinationStatus.Scheduled, null, todayNoonUtc.AddDays(-3));
         // Karşılanmış sonraki tarih: aynı aşı sonradan yeniden uygulanmış (o uygulama aralık dışında).
         var fulfilledSource = Make(parazit, "İç parazit", VaccinationStatus.Applied, todayNoonUtc.AddMonths(-6), todayNoonUtc.AddDays(2));

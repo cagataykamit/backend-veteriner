@@ -167,6 +167,12 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
             .Where(v => v.TenantId == null && v.Code == "RABIES")
             .Select(v => new { v.Id, v.Name })
             .FirstAsync();
+        // Uygulanmış aşılar başka aşı: aynı aşının planlı kaydı sonraki tarihi kapatırdı (VaccinationDueRule, 2026-11-23).
+        var otherVaccineId = await db.VaccineDefinitions.AsNoTracking()
+            .Where(v => v.TenantId == null && v.IsActive && v.Id != catalogVaccine.Id)
+            .OrderBy(v => v.Code)
+            .Select(v => v.Id)
+            .FirstAsync();
 
         var now = DateTime.UtcNow;
         var overdue = new Vaccination(
@@ -213,7 +219,7 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
             pet.Id,
             clinic.Id,
             null,
-            catalogVaccine.Id,
+            otherVaccineId,
             "AppliedPastCase",
             VaccinationStatus.Applied,
             now.AddDays(-20),
@@ -223,7 +229,7 @@ public sealed class VaccinationsListOverdueEndpointTests : IClassFixture<CustomW
 
         // AppliedPastCase aynı aşının sonraki dozu olduğundan bu kaydın sonraki tarihi karşılanmıştır.
         var fulfilledPast = new Vaccination(
-            tenant.Id, pet.Id, clinic.Id, null, catalogVaccine.Id, "FulfilledPastCase", VaccinationStatus.Applied,
+            tenant.Id, pet.Id, clinic.Id, null, otherVaccineId, "FulfilledPastCase", VaccinationStatus.Applied,
             now.AddDays(-60), now.AddDays(-7), null, DateTime.UtcNow);
 
         var cancelledPast = new Vaccination(

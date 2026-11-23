@@ -93,7 +93,7 @@ public sealed class GetDashboardOperationalAlertsQueryHandler
         var upcomingAppointmentsNext24HoursCount = await _appointments.CountAsync(
             new DashboardUpcomingAppointmentsNext24HoursCountSpec(
                 tenantId, singleClinicId, nowUtc, next24HoursUtcExclusive, accessibleClinicIds), ct);
-        // Uygulanmış aşının sonraki tarihi de vadelidir; aynı aşı sonra uygulandıysa sayılmaz (VaccinationDueRule).
+        // Uygulanmış aşının sonraki tarihi de vadelidir; aynı aşı sonra uygulandıysa ya da planlandıysa sayılmaz (VaccinationDueRule).
         var fulfilledNextDueIds = await _vaccinations.FulfilledNextDueIdsAsync(
             tenantId, singleClinicId, accessibleClinicIds, overdueVaccinationsWindow.FromUtc, upcomingVaccinationsToUtcExclusive, ct);
         var overdueVaccinationsCount = await _vaccinations.CountAsync(

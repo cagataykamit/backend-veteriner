@@ -495,9 +495,9 @@ public sealed partial class ReminderProcessorService
     }
 
     /// <summary>
-    /// Vadesi <c>(nowUtc, maxDueUtc]</c> içindeki sonraki tarihlerden hatırlatılmayacak olanlar: aynı aşı hayvana sonra uygulanmışsa
-    /// (karşılanmış, <see cref="VaccinationDueRule.IsNextDueFulfilled"/>) ya da aynı aşının aynı penceredeki planlı kaydı varsa (aynı aşı
-    /// iki kez hatırlatılmaz; hatırlatma planlı kayıttan gider).
+    /// Vadesi <c>(nowUtc, maxDueUtc]</c> içindeki sonraki tarihlerden hatırlatılmayacak olanlar: aynı aşı hayvana sonra uygulanmış ya da
+    /// planlanmışsa karşılanmıştır (<see cref="VaccinationDueRule.IsNextDueFulfilled"/>; aynı aşı iki kez hatırlatılmaz, hatırlatma planlı
+    /// kayıttan gider).
     /// </summary>
     private async Task<HashSet<Guid>> NextDueIdsWithoutReminderAsync(Guid tenantId, DateTime nowUtc, DateTime maxDueUtc, CancellationToken ct)
     {
@@ -514,27 +514,13 @@ public sealed partial class ReminderProcessorService
             return [];
 
         var petIds = sources.Select(s => s.PetId).Distinct().ToArray();
-        var later = await _db.Vaccinations
+        var closing = await _db.Vaccinations
             .WithSpecification(
-                new AppliedVaccinationDosesForPetsSpec(tenantId, petIds, sources.Min(s => s.AppliedAtUtc)),
+                new NextDueClosingDosesForPetsSpec(tenantId, petIds, sources.Min(s => s.AtUtc)),
                 TenantSafeSpecificationEvaluator.Instance)
             .ToListAsync(ct);
-        var planned = await _db.Vaccinations
-            .AsNoTracking()
-            .Where(v => v.TenantId == tenantId
-                && petIds.Contains(v.PetId)
-                && v.Status == VaccinationStatus.Scheduled
-                && v.DueAtUtc > nowUtc
-                && v.DueAtUtc <= maxDueUtc)
-            .Select(v => new { v.PetId, v.VaccineDefinitionId, v.VaccineName })
-            .ToListAsync(ct);
 
-        var excluded = VaccinationDueRule.FulfilledNextDueIds(sources, later);
-        excluded.UnionWith(sources
-            .Where(s => planned.Any(p => p.PetId == s.PetId
-                                         && VaccinationDueRule.IsSameVaccine(p.VaccineDefinitionId, p.VaccineName, s.VaccineDefinitionId, s.VaccineName)))
-            .Select(s => s.Id));
-        return excluded;
+        return VaccinationDueRule.FulfilledNextDueIds(sources, closing);
     }
 
     /// <summary>
