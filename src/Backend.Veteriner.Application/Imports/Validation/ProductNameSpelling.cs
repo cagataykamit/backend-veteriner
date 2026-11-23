@@ -7,6 +7,7 @@ namespace Backend.Veteriner.Application.Imports.Validation;
 /// Ürün adındaki noktasız ı onarımı (IMPORT_API_CONTRACT.md §12.3, 2026-11-23). Kaynak program büyük harfle ve İngilizce klavyeyle
 /// yazılmış adı ("MAVI", "FLEXI") Türkçe kurala göre küçültünce "Mavı", "Flexı" olur. Yalnız küçük ı içeren ve sözlükte bulunan kelime
 /// düzeltilir; rakam, noktalama ve harflerin büyük/küçük biçimi korunur. Doğru Türkçe kelimeler ("Açık", "Kırmızı") sözlükte yoktur.
+/// İlk harfi büyük kalan kelimede ı yerine I kalır ("IP" → "Ip"): doğru yazımı İ içeren sözlük kelimesi ("İp") bu I'yı da düzeltir.
 /// Aktarma (ürün adı) ve kayıtlı adların onarımı (DbMigrator <c>fix-product-names</c>) bu sınıfı kullanır; kural yalnız burada yaşar.
 /// </summary>
 public static class ProductNameSpelling
@@ -36,12 +37,13 @@ public static class ProductNameSpelling
         "Canine", "Canirex", "Cardiac", "Cardiobalans", "Carni", "Carnivet", "Cazitel", "Cefasid", "Cenmicin", "Cerenia",
         "Certifect", "Cesamolin", "Cevit", "Chicken", "City", "Classic", "Cloteid", "Collection", "Combevit", "Combiotic",
         "Combipet", "Compositum", "Compovit", "Comprehensive", "Controline", "Cortizeme", "Dekstrovip", "Deli", "Delicate",
-        "Delice", "Delight", "Delights", "Deposilin", "Deri", "Design", "Desing", "Diabetic", "Diet", "Dimer", "Droncit",
+        "Delice", "Delight", "Delights", "Deposilin", "Deri", "Design", "Desing", "Diabetic", "Diet", "Digestive", "Dimer", "Droncit",
         "Edit", "Engemycine", "Exigent", "Fashion", "Feline", "Felix", "Fibroline", "Fip", "Fiprex", "Fiproes", "Fiprojin",
         "Fiprovet", "Fiproxin", "Fit", "Fitadinon", "Fiv", "Flamingo", "Flexi", "Floksisem", "Flumeglin", "Friskies",
         "Frontline", "Fulimed", "Fulinaljin", "Fundamin", "Funtime", "Gabiotan", "Gentamis", "Gentasamix", "Gentavilin", "Gi",
         "Giant", "Glucosamine", "Granit", "Gri", "Hair", "Hairball", "Hepatic", "Hepatonik", "Hepavita", "Hi", "Hip",
-        "Histavet", "Histeral", "Hypoallergenic", "Imida", "Imidamix", "Immushield", "Instinctive", "Intestinal", "İkili", "in",
+        "Histavet", "Histeral", "Hypoallergenic", "Imida", "Imidamix", "Immushield", "Indoor", "Instinctive", "Intestinal", "İkili", "in",
+        "İntrameduller", "İp", "İyodür", "İyot",
         "Jnragail", "Joint", "Junior", "Kafemin", "Kalsimin", "Katovil", "Kattovit", "Kedi", "Kenecid", "Kidney", "Kiltix",
         "Kitten", "Klavil", "Lacristal", "Ladies", "Lagrinet", "Light", "Limited", "Liq", "Liquid", "Liver", "Luquid",
         "Magnesie", "Mai", "Mandibula", "Mandibular", "Mandibulektomi", "Mavi", "Maxi", "Maxicam", "Maxillar", "Maxisilin",
@@ -50,7 +52,7 @@ public static class ProductNameSpelling
         "Opticlox", "Optivil", "Oridermyl", "Original", "Orignal", "Otimix", "Otrizol", "Paisley", "Pediat", "Pediatric",
         "Pentamycin", "Persian", "Pink", "Prazitel", "Prazivet", "Presurgical", "Primamycin", "Primavilin", "Pumkkin", "Rice",
         "Ridx", "Rilexine", "Rimadyl", "Ringer", "Ringesol", "Riv", "Rivanol", "Rumix", "Safari", "Salisil", "Satiety", "Sebil",
-        "Sensible", "Serit", "Shih", "Shorthair", "Siamese", "Silvezin", "Sistemi", "Siyah", "Skin", "Spider", "Spiramet",
+        "Senior", "Sensible", "Sensitive", "Serit", "Shih", "Shorthair", "Siamese", "Silvezin", "Sistemi", "Siyah", "Skin", "Spider", "Spiramet",
         "Spotline", "Sterilisd", "Sterilised", "Sterilisedsnrcat", "Sticks", "Stripes", "Symphisis", "Synpivet", "Tbil",
         "Tenidur", "Tenikur", "Tenisil", "Tenizol", "Tenyasid", "Tetramezatin", "Tetramisin", "Tetroksil", "Tifrol", "Til",
         "Tilmicos", "Tilmicure", "Tilocen", "Tiofur", "Tioned", "Tolfedine", "Tomidin", "Tricopom", "Tridox", "Trikofit",
@@ -74,7 +76,8 @@ public static class ProductNameSpelling
 
     private static string CorrectWord(string word)
     {
-        if (!word.Contains('ı') || !ByDotlessKey.TryGetValue(DotlessKey(word), out var correct))
+        if (!(word.Contains('ı') || word.Contains('I')) || !ByDotlessKey.TryGetValue(DotlessKey(word), out var correct)
+            || !IsBroken(word, correct))
             return word;
 
         // Yalnız ı/i farkı olan konum değişir; büyük harf Türkçe kuralla büyük kalır ("Ikılı" → "İkili").
@@ -88,6 +91,13 @@ public static class ProductNameSpelling
 
         return new string(chars);
     }
+
+    /// <summary>
+    /// Bozulma belirtisi: küçük ı ya da doğru yazımı İ olan kelimede I ("Ip" → "İp"). Tamamı büyük harf kelime ("IP" kısaltması) ve
+    /// doğru yazımı I ya da i olan kelime ("Indoor", "8In1") I yüzünden değişmez; sözlükte olmayan Türkçe kelime ("Irk") hiç değişmez.
+    /// </summary>
+    private static bool IsBroken(string word, string correct)
+        => word.Contains('ı') || (correct.Contains('İ') && word.Any(char.IsLower));
 
     /// <summary>Küçük harf ve tüm i → ı: "Mavi", "Mavı", "MAVı" aynı anahtara düşer.</summary>
     private static string DotlessKey(string word) => word.ToLower(Turkish).Replace('i', 'ı');
