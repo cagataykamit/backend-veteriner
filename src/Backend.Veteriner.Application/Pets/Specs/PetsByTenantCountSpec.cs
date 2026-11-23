@@ -12,10 +12,13 @@ public sealed class PetsByTenantCountSpec : Specification<Pet>
         Guid? speciesId,
         PetStatus? status,
         DailySearchTerm? searchTerm,
-        Guid[] petIdsMatchingClientTextOrEmpty)
+        Guid[] petIdsMatchingClientTextOrEmpty,
+        bool includeDeleted = false)
     {
         Query.AsNoTracking();
         Query.Where(p => p.TenantId == tenantId);
+        if (!includeDeleted)
+            Query.Where(Pet.NotDeleted);
         if (clientId.HasValue)
             Query.Where(p => p.ClientId == clientId.Value);
         if (status.HasValue)

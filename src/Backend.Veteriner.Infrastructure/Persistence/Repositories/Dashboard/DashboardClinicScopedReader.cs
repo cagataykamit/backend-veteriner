@@ -1,5 +1,7 @@
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Dashboard.Specs;
+using Backend.Veteriner.Domain.Clients;
+using Backend.Veteriner.Domain.Pets;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Veteriner.Infrastructure.Persistence.Repositories.Dashboard;
@@ -18,6 +20,7 @@ public sealed class DashboardClinicScopedReader : IDashboardClinicScopedReader
     public Task<int> CountPetsAtClinicAsync(Guid tenantId, Guid clinicId, CancellationToken ct = default)
         => _db.Appointments.AsNoTracking()
             .Where(a => a.TenantId == tenantId && a.ClinicId == clinicId)
+            .Where(a => _db.Pets.Where(Pet.NotDeleted).Select(p => p.Id).Contains(a.PetId))
             .Select(a => a.PetId)
             .Distinct()
             .CountAsync(ct);
@@ -25,7 +28,7 @@ public sealed class DashboardClinicScopedReader : IDashboardClinicScopedReader
     public Task<int> CountClientsAtClinicAsync(Guid tenantId, Guid clinicId, CancellationToken ct = default)
         => (
             from a in _db.Appointments.AsNoTracking()
-            join p in _db.Pets.AsNoTracking() on a.PetId equals p.Id
+            join p in _db.Pets.AsNoTracking().Where(Pet.NotDeleted) on a.PetId equals p.Id
             where a.TenantId == tenantId
                   && a.ClinicId == clinicId
                   && p.TenantId == tenantId
@@ -44,6 +47,7 @@ public sealed class DashboardClinicScopedReader : IDashboardClinicScopedReader
         // Adım 1: bu klinikteki her Pet için en güncel ScheduledAtUtc; DESC sıralı top N.
         var topPets = await _db.Appointments.AsNoTracking()
             .Where(a => a.TenantId == tenantId && a.ClinicId == clinicId)
+            .Where(a => _db.Pets.Where(Pet.NotDeleted).Select(p => p.Id).Contains(a.PetId))
             .GroupBy(a => a.PetId)
             .Select(g => new { PetId = g.Key, LastAt = g.Max(a => a.ScheduledAtUtc) })
             .OrderByDescending(x => x.LastAt)
@@ -93,6 +97,7 @@ public sealed class DashboardClinicScopedReader : IDashboardClinicScopedReader
         // Pet bazında daralt (satır sayısı ≈ benzersiz pet), sonra client bazında Max(LastAt); doğrudan appointment→pet satır çarpanından kaçınır.
         var latestAppointmentByPet = _db.Appointments.AsNoTracking()
             .Where(a => a.TenantId == tenantId && a.ClinicId == clinicId)
+            .Where(a => _db.Pets.Where(Pet.NotDeleted).Select(p => p.Id).Contains(a.PetId))
             .GroupBy(a => a.PetId)
             .Select(g => new
             {
@@ -119,7 +124,7 @@ public sealed class DashboardClinicScopedReader : IDashboardClinicScopedReader
 
         return await latestAppointmentByClient
             .Join(
-                _db.Clients.AsNoTracking().Where(c => c.TenantId == tenantId),
+                _db.Clients.AsNoTracking().Where(c => c.TenantId == tenantId).Where(Client.NotDeleted),
                 x => x.ClientId,
                 c => c.Id,
                 (x, c) => new
@@ -146,6 +151,7 @@ public sealed class DashboardClinicScopedReader : IDashboardClinicScopedReader
 
         return _db.Appointments.AsNoTracking()
             .Where(a => a.TenantId == tenantId && clinicIds.Contains(a.ClinicId))
+            .Where(a => _db.Pets.Where(Pet.NotDeleted).Select(p => p.Id).Contains(a.PetId))
             .Select(a => a.PetId)
             .Distinct()
             .CountAsync(ct);
@@ -161,7 +167,7 @@ public sealed class DashboardClinicScopedReader : IDashboardClinicScopedReader
 
         return (
             from a in _db.Appointments.AsNoTracking()
-            join p in _db.Pets.AsNoTracking() on a.PetId equals p.Id
+            join p in _db.Pets.AsNoTracking().Where(Pet.NotDeleted) on a.PetId equals p.Id
             where a.TenantId == tenantId
                   && clinicIds.Contains(a.ClinicId)
                   && p.TenantId == tenantId
@@ -180,6 +186,7 @@ public sealed class DashboardClinicScopedReader : IDashboardClinicScopedReader
 
         var topPets = await _db.Appointments.AsNoTracking()
             .Where(a => a.TenantId == tenantId && clinicIds.Contains(a.ClinicId))
+            .Where(a => _db.Pets.Where(Pet.NotDeleted).Select(p => p.Id).Contains(a.PetId))
             .GroupBy(a => a.PetId)
             .Select(g => new { PetId = g.Key, LastAt = g.Max(a => a.ScheduledAtUtc) })
             .OrderByDescending(x => x.LastAt)
@@ -226,6 +233,7 @@ public sealed class DashboardClinicScopedReader : IDashboardClinicScopedReader
 
         var latestAppointmentByPet = _db.Appointments.AsNoTracking()
             .Where(a => a.TenantId == tenantId && clinicIds.Contains(a.ClinicId))
+            .Where(a => _db.Pets.Where(Pet.NotDeleted).Select(p => p.Id).Contains(a.PetId))
             .GroupBy(a => a.PetId)
             .Select(g => new
             {
@@ -252,7 +260,7 @@ public sealed class DashboardClinicScopedReader : IDashboardClinicScopedReader
 
         return await latestAppointmentByClient
             .Join(
-                _db.Clients.AsNoTracking().Where(c => c.TenantId == tenantId),
+                _db.Clients.AsNoTracking().Where(c => c.TenantId == tenantId).Where(Client.NotDeleted),
                 x => x.ClientId,
                 c => c.Id,
                 (x, c) => new

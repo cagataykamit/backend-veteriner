@@ -202,6 +202,7 @@ public sealed class ClientMatchesSpec : Specification<Client>
         => Query.AsNoTracking()
             .Where(c => c.TenantId == tenantId
                         && !c.IsWalkIn
+                        && c.DeletedAtUtc == null
                         && (c.Email == email || (phoneNormalized != null && c.PhoneNormalized == phoneNormalized)))
             .OrderBy(c => c.FullName)
             .Take(5);

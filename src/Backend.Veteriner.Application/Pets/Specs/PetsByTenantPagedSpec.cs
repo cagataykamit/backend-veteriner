@@ -18,6 +18,7 @@ public sealed class PetsByTenantPagedSpec : Specification<Pet, PetListProjection
     {
         Query.AsNoTracking();
         Query.Where(p => p.TenantId == tenantId);
+        Query.Where(Pet.NotDeleted);
         if (clientId.HasValue)
             Query.Where(p => p.ClientId == clientId.Value);
         if (status.HasValue)

@@ -13,5 +13,6 @@ public sealed class PetByClientNameAndSpeciesIdSpec : Specification<Pet>
     {
         Query.Where(p => p.ClientId == clientId && p.SpeciesId == speciesId);
         Query.Where(PetNameDuplicateKey.Matches(nameDuplicateKey));
+        Query.Where(Pet.NotDeleted);
     }
 }

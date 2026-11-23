@@ -33,7 +33,8 @@ public sealed record ExternalClientDto(
     string? Phone,
     string? Email,
     DateTime CreatedAtUtc,
-    DateTime ChangedAtUtc) : IExternalRecord;
+    DateTime ChangedAtUtc,
+    DateTime? DeletedAtUtc) : IExternalRecord;
 
 public sealed record ExternalPetDto(
     Guid Id,
@@ -45,7 +46,8 @@ public sealed record ExternalPetDto(
     DateOnly? BirthDate,
     bool IsNeutered,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] PetStatus Status,
-    DateTime ChangedAtUtc) : IExternalRecord;
+    DateTime ChangedAtUtc,
+    DateTime? DeletedAtUtc) : IExternalRecord;
 
 public sealed record ExternalAppointmentDto(
     Guid Id,
@@ -178,14 +180,17 @@ internal static class ExternalListRunner
     }
 }
 
-/// <summary>Peşin (kayıtsız) satış müşterisi gerçek kişi değildir, listelenmez.</summary>
+/// <summary>
+/// Peşin (kayıtsız) satış müşterisi gerçek kişi değildir, listelenmez. Silinen müşteri ve hasta (ADR-054) eşitlemede
+/// silindiği görülsün diye <c>deletedAtUtc</c> dolu olarak listelenir.
+/// </summary>
 public sealed class ExternalClientsPageSpec : Specification<Client, ExternalClientDto>
 {
     public ExternalClientsPageSpec(ExternalPaging.Resolved page)
     {
         ExternalPaging.Apply(Query, page);
         Query.Where(c => !c.IsWalkIn);
-        Query.Select(c => new ExternalClientDto(c.Id, c.FullName, c.Phone, c.Email, c.CreatedAtUtc, c.ChangedAtUtc));
+        Query.Select(c => new ExternalClientDto(c.Id, c.FullName, c.Phone, c.Email, c.CreatedAtUtc, c.ChangedAtUtc, c.DeletedAtUtc));
     }
 }
 
@@ -196,7 +201,7 @@ public sealed class ExternalPetsPageSpec : Specification<Pet, ExternalPetDto>
         ExternalPaging.Apply(Query, page);
         Query.Select(p => new ExternalPetDto(
             p.Id, p.ClientId, p.Name, p.Species != null ? p.Species.Name : null, p.BreedRef != null ? p.BreedRef.Name : p.Breed,
-            p.Gender, p.BirthDate, p.IsNeutered, p.Status, p.ChangedAtUtc));
+            p.Gender, p.BirthDate, p.IsNeutered, p.Status, p.ChangedAtUtc, p.DeletedAtUtc));
     }
 }
 

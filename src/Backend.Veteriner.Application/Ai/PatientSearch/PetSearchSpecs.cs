@@ -236,6 +236,7 @@ public sealed record PetSearchPetCriteria(
     internal static void Apply(ISpecificationBuilder<Pet> query, Guid tenantId, PetSearchPetCriteria c, IReadOnlyCollection<Guid>? petIds)
     {
         query.Where(p => p.TenantId == tenantId);
+        query.Where(Pet.NotDeleted);
         if (petIds is not null)
             query.Where(p => petIds.Contains(p.Id));
         if (c.SpeciesIds is { Count: > 0 } speciesIds)

@@ -106,9 +106,9 @@ public sealed class LoadExampleClinicCommandHandler
         if (clinic is null)
             return Result<ExampleClinicLoadSummaryDto>.Failure("Clinics.NotFound", "Kiracının aktif kliniği bulunamadı.");
 
-        var hasClients = await _clients.AnyAsync(new ClientsByTenantCountSpec(tenant.Id, null), ct);
+        var hasClients = await _clients.AnyAsync(new ClientsByTenantCountSpec(tenant.Id, null, includeDeleted: true), ct);
         var hasPets = !hasClients
-            && await _pets.AnyAsync(new PetsByTenantCountSpec(tenant.Id, null, null, null, null, []), ct);
+            && await _pets.AnyAsync(new PetsByTenantCountSpec(tenant.Id, null, null, null, null, [], includeDeleted: true), ct);
         if (hasClients || hasPets)
         {
             return Result<ExampleClinicLoadSummaryDto>.Failure(
