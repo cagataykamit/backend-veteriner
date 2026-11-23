@@ -91,6 +91,10 @@ public sealed class CreatePetCommandHandler : IRequestHandler<CreatePetCommand, 
         if (client is null)
             return Result<Guid>.Failure("Clients.NotFound", "Müşteri bulunamadı veya kiracıya ait değil.");
 
+        var clientNotDeleted = client.EnsureNotDeleted();
+        if (!clientNotDeleted.IsSuccess)
+            return Result<Guid>.Failure(clientNotDeleted.Error);
+
         var species = await _speciesRead.FirstOrDefaultAsync(new SpeciesByIdSpec(request.SpeciesId), ct);
         if (species is null || !species.IsActive)
             return Result<Guid>.Failure(

@@ -123,6 +123,10 @@ public sealed class CreateHospitalizationCommandHandler : IRequestHandler<Create
         if (pet is null)
             return Result<Guid>.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
+        var petNotDeleted = pet.EnsureNotDeleted();
+        if (!petNotDeleted.IsSuccess)
+            return Result<Guid>.Failure(petNotDeleted.Error);
+
         Examination? exam = null;
         if (request.ExaminationId is { } examId)
         {

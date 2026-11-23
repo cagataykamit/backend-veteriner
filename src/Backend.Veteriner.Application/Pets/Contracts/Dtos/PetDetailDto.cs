@@ -31,4 +31,6 @@ public sealed record PetDetailDto(
     string RowVersion,
     string? HbsAnimalId = null,
     Guid? PatternId = null,
-    string? PatternName = null);
+    string? PatternName = null,
+    DateTime? DeletedAtUtc = null,
+    bool DeletedWithClient = false);

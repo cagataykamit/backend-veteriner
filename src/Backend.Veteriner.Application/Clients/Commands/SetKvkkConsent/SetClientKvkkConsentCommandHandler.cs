@@ -80,6 +80,10 @@ public sealed class SetClientKvkkConsentCommandHandler
         if (client.IsWalkIn)
             return Result<ClientKvkkConsentDto>.Failure("Clients.WalkInReadOnly", "Peşin müşteri sistem kaydıdır; düzenlenemez.");
 
+        var notDeleted = client.EnsureNotDeleted();
+        if (!notDeleted.IsSuccess)
+            return Result<ClientKvkkConsentDto>.Failure(notDeleted.Error);
+
         if (!ExaminationRowVersion.TryDecode(request.RowVersion, out var expectedRowVersion))
             return Result<ClientKvkkConsentDto>.Failure("Clients.Validation", "Kayıt sürümü eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.");
 

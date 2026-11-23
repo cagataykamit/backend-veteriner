@@ -108,6 +108,10 @@ public sealed class CreateChargeCommandHandler : IRequestHandler<CreateChargeCom
                 return await ExistingAsync(existing, clinicId, client, ct);
         }
 
+        var clientNotDeleted = client.EnsureNotDeleted();
+        if (!clientNotDeleted.IsSuccess)
+            return Fail(clientNotDeleted.Error.Code, clientNotDeleted.Error.Message);
+
         var petId = request.PetId;
         Pet? pet = null;
         if (petId is { } requestedPetId)

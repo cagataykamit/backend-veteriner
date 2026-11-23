@@ -14,6 +14,7 @@ namespace Backend.Veteriner.Application.Clients.Contracts.Dtos;
 /// <param name="RowVersion">Base64 kayıt sürümü; <c>PUT /clients/{id}/kvkk-consent</c> için zorunlu.</param>
 /// <param name="Invoicing">Fatura kimliği, TCKN/VKN maskeli (ADR-036).</param>
 /// <param name="Notes">Kliniğin iç notu; liste, arama ve hızlı kayıt yanıtlarında yoktur.</param>
+/// <param name="DeletedAtUtc">Doluysa müşteri silinmiştir (ADR-054); kart "Silindi" bandıyla açılır, düzenleme 409 <c>Clients.Deleted</c>.</param>
 public sealed record ClientDetailDto(
     Guid Id,
     Guid TenantId,
@@ -33,4 +34,5 @@ public sealed record ClientDetailDto(
     string? KvkkConsentTemplateHash,
     string RowVersion,
     ClientInvoicingSummaryDto Invoicing,
-    string? Notes);
+    string? Notes,
+    DateTime? DeletedAtUtc = null);

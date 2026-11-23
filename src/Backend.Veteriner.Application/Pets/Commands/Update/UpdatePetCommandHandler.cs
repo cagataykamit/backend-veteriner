@@ -72,9 +72,17 @@ public sealed class UpdatePetCommandHandler : IRequestHandler<UpdatePetCommand, 
         if (pet is null)
             return Result.Failure("Pets.NotFound", "Hayvan kaydı bulunamadı veya kiracıya ait değil.");
 
+        var petNotDeleted = pet.EnsureNotDeleted();
+        if (!petNotDeleted.IsSuccess)
+            return petNotDeleted;
+
         var client = await _clients.FirstOrDefaultAsync(new ClientByIdSpec(tenantId, request.ClientId), ct);
         if (client is null)
             return Result.Failure("Clients.NotFound", "Müşteri bulunamadı veya kiracıya ait değil.");
+
+        var clientNotDeleted = client.EnsureNotDeleted();
+        if (!clientNotDeleted.IsSuccess)
+            return clientNotDeleted;
 
         var species = await _speciesRead.FirstOrDefaultAsync(new SpeciesByIdSpec(request.SpeciesId), ct);
         if (species is null || !species.IsActive)
