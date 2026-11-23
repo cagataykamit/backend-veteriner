@@ -16,6 +16,9 @@ public sealed class ClientReadModel : ITenantOwned
     public string? Phone { get; set; }
     public string? PhoneNormalized { get; set; }
     public DateTime CreatedAtUtc { get; set; }
+
+    /// <summary>Yumuşak silinmiş müşteri (ADR-054 K11); liste ve metin araması dışlar, kimlikle ad eşlemesi dışlamaz.</summary>
+    public bool IsDeleted { get; set; }
     public Guid LastEventId { get; set; }
     public DateTime LastProjectedAtUtc { get; set; }
 

@@ -24,6 +24,7 @@ public static class ClientProjectionSnapshotFactory
             client.Email,
             client.Phone,
             client.PhoneNormalized,
-            client.CreatedAtUtc);
+            client.CreatedAtUtc,
+            client.IsDeleted);
     }
 }

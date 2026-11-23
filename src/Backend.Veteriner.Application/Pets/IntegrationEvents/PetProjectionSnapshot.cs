@@ -26,4 +26,5 @@ public sealed record PetProjectionSnapshot(
     string? ColorNameNormalized,
     int? Gender,
     DateOnly? BirthDate,
-    decimal? Weight);
+    decimal? Weight,
+    bool IsDeleted = false);

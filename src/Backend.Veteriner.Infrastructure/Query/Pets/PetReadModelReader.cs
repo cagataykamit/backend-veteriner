@@ -113,7 +113,8 @@ public sealed class PetReadModelReader : IPetReadModelReader, IPetReadModelLooku
         IQueryable<PetReadModel> query,
         PetListReadRequest request)
     {
-        query = query.Where(x => x.TenantId == request.TenantId);
+        // Silinen kayıt listede yok (ADR-054 K11); kimlikle eşleme ve geçmiş listelerin araması dışlamaz.
+        query = query.Where(x => x.TenantId == request.TenantId && !x.IsDeleted);
 
         if (request.ClientId is { } clientId)
             query = query.Where(x => x.ClientId == clientId);

@@ -71,7 +71,8 @@ public sealed class ClientReadModelReader : IClientReadModelReader, IClientReadM
         IQueryable<ClientReadModel> query,
         ClientListReadRequest request)
     {
-        query = query.Where(x => x.TenantId == request.TenantId);
+        // Silinen kayıt listede yok (ADR-054 K11); kimlikle eşleme ve geçmiş listelerin araması dışlamaz.
+        query = query.Where(x => x.TenantId == request.TenantId && !x.IsDeleted);
 
         if (request.SearchContainsLikePattern is { } pattern)
             query = ApplyTextSearchFilter(query, request.TenantId, pattern);
