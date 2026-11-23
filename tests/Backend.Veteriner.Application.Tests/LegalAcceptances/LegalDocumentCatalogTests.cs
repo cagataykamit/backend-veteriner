@@ -76,7 +76,7 @@ public sealed class LegalDocumentCatalogTests
     {
         var result = LegalDocumentCatalog.EnsureAcceptsCurrent(
             [LegalDocumentType.Terms, LegalDocumentType.Privacy],
-            [new LegalDocumentAcceptanceInput(LegalDocumentType.Terms, "1.0")]);
+            [new LegalDocumentAcceptanceInput(LegalDocumentType.Terms, LegalDocumentCatalog.CurrentVersion(LegalDocumentType.Terms))]);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("LegalAcceptances.Required");
