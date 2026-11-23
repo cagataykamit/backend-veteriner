@@ -1350,6 +1350,52 @@ public sealed class ReminderProcessorServiceTests : IAsyncLifetime
         (await db.ReminderDispatchLogs.CountAsync()).Should().Be(2, "dışlanan kayıt için günlük yazılmaz");
     }
 
+    /// <summary>ADR-054 K2: silinen hasta ve silinen müşteri (hastalarıyla) aday değildir; dışlama aynı tek kuraldadır.</summary>
+    [Fact]
+    public async Task ProcessOnce_Should_Exclude_Deleted_Pets_And_Deleted_Clients()
+    {
+        await using var db = await CreateDbContextAsync();
+        var email = new FakeReminderEmailOutboxEnqueuer();
+        var now = DateTime.UtcNow;
+        var deletedBy = Guid.NewGuid();
+        var tenant = new Tenant("Tenant A", DateTime.UtcNow);
+        var clinic = new Clinic(tenant.Id, "Klinik", "Istanbul");
+        var speciesId = await GetAnySpeciesIdAsync(db);
+        var rabies = await GetRabiesVaccineDefinitionAsync(db);
+        var settings = TenantReminderSettings.CreateDefault(tenant.Id, DateTime.UtcNow);
+        settings.Update(true, 24, true, 3, true, DateTime.UtcNow);
+        db.AddRange(tenant, clinic, settings);
+        db.TenantSubscriptions.Add(TenantSubscription.StartTrial(tenant.Id, SubscriptionPlanCode.Basic, now, 14));
+
+        var petOwner = new Client(tenant.Id, "Hasta Silinen", DateTime.UtcNow, "905555555511", "hasta-silinen@example.com");
+        var deletedPet = new Pet(tenant.Id, petOwner.Id, "Boncuk", speciesId);
+        deletedPet.Delete(deletedBy, now, RecordDeletionBlockers.None).IsSuccess.Should().BeTrue();
+
+        var deletedOwner = new Client(tenant.Id, "Müşteri Silinen", DateTime.UtcNow, "905555555512", "musteri-silinen@example.com");
+        var cascadedPet = new Pet(tenant.Id, deletedOwner.Id, "Tarçın", speciesId);
+        deletedOwner.Delete(deletedBy, now, RecordDeletionBlockers.None).IsSuccess.Should().BeTrue();
+        cascadedPet.DeleteWithClient(deletedBy, now);
+
+        var activeOwner = new Client(tenant.Id, "Aktif Sahibi", DateTime.UtcNow, "905555555513", "aktif@example.com");
+        var activePet = new Pet(tenant.Id, activeOwner.Id, "Pamuk", speciesId);
+
+        db.AddRange(petOwner, deletedPet, deletedOwner, cascadedPet, activeOwner, activePet);
+        db.AddRange(
+            new Vaccination(tenant.Id, deletedPet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(1), null, DateTime.UtcNow),
+            new Vaccination(tenant.Id, cascadedPet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(1).AddMinutes(1), null, DateTime.UtcNow),
+            new Vaccination(tenant.Id, activePet.Id, clinic.Id, null, rabies.Id, rabies.Name, VaccinationStatus.Scheduled, null, now.AddDays(2), null, DateTime.UtcNow),
+            new Appointment(tenant.Id, clinic.Id, deletedPet.Id, now.AddHours(2), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled),
+            new Appointment(tenant.Id, clinic.Id, cascadedPet.Id, now.AddHours(3), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled),
+            new Appointment(tenant.Id, clinic.Id, activePet.Id, now.AddHours(12), 30, AppointmentType.Checkup, AppointmentStatus.Scheduled));
+        await db.SaveChangesAsync();
+
+        await CreateService(db, email, batchSize: 1).ProcessOnceAsync(CancellationToken.None);
+
+        email.Enqueued.Should().HaveCount(2, "yalnız silinmemiş hastanın aşı ve randevu hatırlatması gider");
+        email.Enqueued.Should().OnlyContain(e => e.To == "aktif@example.com");
+        (await db.ReminderDispatchLogs.CountAsync()).Should().Be(2, "dışlanan kayıt için günlük yazılmaz");
+    }
+
     [Fact]
     public async Task ProcessOnce_Should_Include_Pet_Again_When_Status_Reverted_To_Active()
     {
