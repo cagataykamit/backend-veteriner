@@ -10,10 +10,14 @@ public sealed record PublicSubscriptionPlanCatalogDto(
     int YearlyBilledMonths,
     IReadOnlyList<PublicSubscriptionPlanDto> Plans);
 
-/// <summary>Fiyat yapılandırılmamışsa <see cref="MonthlyPriceMinor"/> ve <see cref="YearlyPriceMinor"/> <c>null</c> döner.</summary>
+/// <summary>
+/// Fiyat yapılandırılmamışsa <see cref="MonthlyPriceMinor"/> ve <see cref="YearlyPriceMinor"/> <c>null</c> döner.
+/// <see cref="MonthlyAiCredits"/>: paketin klinik başına aylık yapay zekâ kredisi hediyesi (ADR-044 madde 5; <c>Ai:PlanMonthlyCredits</c>).
+/// </summary>
 public sealed record PublicSubscriptionPlanDto(
     string PlanCode,
     string Name,
     int MaxUsers,
     long? MonthlyPriceMinor,
-    long? YearlyPriceMinor);
+    long? YearlyPriceMinor,
+    int MonthlyAiCredits);
