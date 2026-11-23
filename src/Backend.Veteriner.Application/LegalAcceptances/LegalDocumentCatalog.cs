@@ -15,15 +15,22 @@ public static class LegalDocumentCatalog
     public static IReadOnlyDictionary<LegalDocumentType, string> CurrentVersions { get; } =
         new Dictionary<LegalDocumentType, string>
         {
-            [LegalDocumentType.Terms] = "1.0",
+            // 1.1 (2026-11-23): yer tutucular dolduruldu: deneme 14 gün, deneme sonrası 90 gün saklama, iade/iptal
+            // (ödenen dönem, kısmi iade yok), fesihte 30 gün dışa aktarma, yetkili mahkeme.
+            [LegalDocumentType.Terms] = "1.1",
             // 1.1 (2026-11-15): deneme kaydı e-posta kodu, vergi numarasıyla tek deneme ve Cloudflare Turnstile (TRIAL-001).
             // 1.2 (2026-11-20): yapay zekâ kullanım kaydı, kullanıcı bazlı izleme ve yurt dışı aktarım (Anthropic PBC, ABD).
-            [LegalDocumentType.Privacy] = "1.2",
+            // 1.3 (2026-11-23): yer tutucular dolduruldu: veri sorumlusu ve başvuru e-postası, yalnız zorunlu çerez.
+            [LegalDocumentType.Privacy] = "1.3",
             // 1.1 (2026-11-20): yapay zekâ özellikleri, alt işleyen Anthropic PBC (ABD) ve gönderilen veri.
-            [LegalDocumentType.DataProcessing] = "1.1",
-            [LegalDocumentType.PortalTerms] = "1.0",
+            // 1.2 (2026-11-23): yer tutucular dolduruldu: alt işleyen listesi usulü, en geç 48 saatte ihlal bildirimi,
+            // barındırma, 30 gün dışa aktarma, 90 gün sonra silme/anonimleştirme.
+            [LegalDocumentType.DataProcessing] = "1.2",
+            // 1.1 (2026-11-23): yer tutucular dolduruldu: taraf, iletişim e-postası, yetkili mahkeme.
+            [LegalDocumentType.PortalTerms] = "1.1",
             // 1.1 (2026-11-15): portal giriş ve online randevu kodunda Cloudflare Turnstile.
-            [LegalDocumentType.PortalPrivacy] = "1.1",
+            // 1.2 (2026-11-23): yer tutucular dolduruldu: veri sorumlusu, başvuru e-postası, sağlayıcılar, yalnız zorunlu çerez.
+            [LegalDocumentType.PortalPrivacy] = "1.2",
         };
 
     public static string CurrentVersion(LegalDocumentType documentType) => CurrentVersions[documentType];

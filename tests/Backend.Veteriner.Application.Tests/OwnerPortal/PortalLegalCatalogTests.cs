@@ -13,8 +13,8 @@ public sealed class PortalLegalCatalogTests
     public void Portal_Documents_Should_Be_Draft_0_1()
     {
         LegalDocumentCatalog.RequiredForOwnerAccount.Should().Equal(LegalDocumentType.PortalTerms, LegalDocumentType.PortalPrivacy);
-        LegalDocumentCatalog.CurrentVersion(LegalDocumentType.PortalTerms).Should().Be("1.0");
-        LegalDocumentCatalog.CurrentVersion(LegalDocumentType.PortalPrivacy).Should().Be("1.1");
+        LegalDocumentCatalog.CurrentVersion(LegalDocumentType.PortalTerms).Should().Be("1.1");
+        LegalDocumentCatalog.CurrentVersion(LegalDocumentType.PortalPrivacy).Should().Be("1.2");
     }
 
     [Theory]
