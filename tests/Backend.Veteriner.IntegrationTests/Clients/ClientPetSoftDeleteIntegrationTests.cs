@@ -142,6 +142,28 @@ public sealed class ClientPetSoftDeleteIntegrationTests : IClassFixture<CustomWe
     }
 
     [Fact]
+    public async Task Open_Visit_Today_Should_Block_Pet_And_Client_Deletion_Until_Voided()
+    {
+        var ctx = await SeedAsync();
+        var petId = await ctx.CreatePetAsync("GelisPet");
+        var visit = await ctx.Http.PostAsJsonAsync("/api/v1/visits", new { clinicId = ctx.ClinicId, petId });
+        visit.StatusCode.Should().Be(HttpStatusCode.Created, await visit.Content.ReadAsStringAsync());
+
+        foreach (var url in new[] { $"/api/v1/pets/{petId}", $"/api/v1/clients/{ctx.ClientId}" })
+        {
+            var response = await ctx.Http.DeleteAsync(url);
+            response.StatusCode.Should().Be(HttpStatusCode.Conflict, url);
+            var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+            problem.GetProperty("reasons").EnumerateArray().Select(r => r.GetString()).Should().Equal(RecordDeletionBlockers.OpenVisit);
+            problem.GetProperty("openVisitCount").GetInt32().Should().Be(1);
+        }
+
+        await ctx.VoidVisitsAsync(petId);
+        var deleted = await ctx.Http.DeleteAsync($"/api/v1/pets/{petId}");
+        deleted.StatusCode.Should().Be(HttpStatusCode.NoContent, await deleted.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Delete_Pet_Should_Be_Blocked_By_Future_Appointment_But_Not_By_Client_Account()
     {
         var ctx = await SeedAsync();
@@ -398,6 +420,15 @@ public sealed class ClientPetSoftDeleteIntegrationTests : IClassFixture<CustomWe
                 db.Vaccinations.Add(vaccination);
                 return vaccination.Id;
             });
+        }
+
+        public async Task VoidVisitsAsync(Guid petId)
+        {
+            await using var scope = Services.CreateSystemScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            foreach (var visit in await db.Visits.Where(v => v.TenantId == TenantId && v.PetId == petId).ToListAsync())
+                visit.MarkAsMistaken("Silme testi geliş iptali", DateTime.UtcNow).IsSuccess.Should().BeTrue();
+            await db.SaveChangesAsync();
         }
 
         public Task<Guid> SeedPortalLinkAsync()

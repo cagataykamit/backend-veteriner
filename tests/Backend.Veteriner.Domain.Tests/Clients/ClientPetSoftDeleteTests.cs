@@ -58,18 +58,20 @@ public sealed class ClientPetSoftDeleteTests
     {
         var client = CreateClient();
 
-        var result = client.Delete(UserId, Now, new RecordDeletionBlockers(HasOpenAccount: true, ActiveHospitalizationCount: 1, FutureAppointmentCount: 2));
+        var result = client.Delete(UserId, Now, new RecordDeletionBlockers(HasOpenAccount: true, ActiveHospitalizationCount: 1, FutureAppointmentCount: 2, OpenVisitCount: 1));
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Clients.DeleteBlocked");
-        result.Error.Message.Should().Contain("açık hesabı").And.Contain("aktif yatışı").And.Contain("2 gelecek randevusu");
+        result.Error.Message.Should().Contain("açık hesabı").And.Contain("aktif yatışı").And.Contain("açık gelişi").And.Contain("2 gelecek randevusu");
         result.Error.Extensions!["reasons"].Should().BeEquivalentTo(new[]
         {
             RecordDeletionBlockers.OpenAccount,
             RecordDeletionBlockers.ActiveHospitalization,
+            RecordDeletionBlockers.OpenVisit,
             RecordDeletionBlockers.FutureAppointments,
         });
         result.Error.Extensions["futureAppointmentCount"].Should().Be(2);
+        result.Error.Extensions["openVisitCount"].Should().Be(1);
         client.IsDeleted.Should().BeFalse();
     }
 

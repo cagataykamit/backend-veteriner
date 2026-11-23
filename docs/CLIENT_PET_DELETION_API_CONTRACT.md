@@ -43,6 +43,7 @@ Yanıt **204**.
   "detail": "Müşteri silinemez: açık hesabı var (borç, tahsis edilmemiş ödeme ya da kredi); önce hesabı kapatın; 2 gelecek randevusu var; önce randevuları iptal edin.",
   "reasons": ["OpenAccount", "FutureAppointments"],
   "activeHospitalizationCount": 0,
+  "openVisitCount": 0,
   "futureAppointmentCount": 2
 }
 ```
@@ -51,6 +52,7 @@ Yanıt **204**.
 |---|---|
 | `OpenAccount` | Kalanı olan ücret (devir borcu dahil), tahsis edilmemiş ödeme ya da açık kredi (devir alacağı dahil); kiracı genelinde, iptal edilenler hariç |
 | `ActiveHospitalization` | Müşterinin herhangi bir hastasında taburcu edilmemiş, iptal edilmemiş yatış |
+| `OpenVisit` | Müşterinin herhangi bir hastasında bugün (İstanbul günü) kliniğe gelmiş, tamamlanmamış ve iptal edilmemiş geliş. Önceki günlerden açık kalan geliş engellemez ("Açık işler"de izlenir) |
 | `FutureAppointments` | Müşterinin hastalarında zamanı gelmemiş planlı (`Scheduled`) randevu. **Otomatik iptal edilmez**; kullanıcı önce iptal eder |
 
 ### `POST /api/v1/clients/{id}/restore`
@@ -104,7 +106,7 @@ Yanıt **204**.
 | Kod | HTTP | Durum |
 |---|---|---|
 | `Pets.NotFound` | 404 | |
-| `Pets.DeleteBlocked` | 409 | `reasons`: `ActiveHospitalization`, `FutureAppointments` (açık hesap hasta silmeyi engellemez; hesap müşteri düzeyindedir). Ekler müşteriyle aynı |
+| `Pets.DeleteBlocked` | 409 | `reasons`: `ActiveHospitalization`, `OpenVisit`, `FutureAppointments` (açık hesap hasta silmeyi engellemez; hesap müşteri düzeyindedir). Ekler müşteriyle aynı |
 | `Pets.ConcurrencyConflict` | 409 | |
 
 ### `POST /api/v1/pets/{id}/restore`
@@ -161,6 +163,7 @@ Hata mesajları `detail` alanında Türkçe döner; panel doğrudan gösterebili
 | `deletion.confirm.pet` | Hasta listelerden ve hatırlatmalardan kalkar. Geçmiş kayıtları korunur. Yönetici "Silinenler"den geri yükleyebilir. |
 | `deletion.blocked.OpenAccount` | Açık hesabı var (borç, tahsis edilmemiş ödeme ya da kredi); önce hesabı kapatın. |
 | `deletion.blocked.ActiveHospitalization` | Aktif yatışı var; önce taburcu edin ya da yatışı iptal edin. |
+| `deletion.blocked.OpenVisit` | Bugün açık gelişi var; önce gelişi tamamlayın ya da iptal edin. |
 | `deletion.blocked.FutureAppointments` | {futureAppointmentCount} gelecek randevusu var; önce randevuları iptal edin. |
 | `deletion.deletedBanner` | Bu kayıt {deletedAtUtc} tarihinde silindi. |
 | `deletion.restore.clientDeleted` | Hastanın müşterisi silinmiş; önce müşteriyi geri yükleyin. |
