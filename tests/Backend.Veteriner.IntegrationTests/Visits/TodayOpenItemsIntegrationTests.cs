@@ -6,6 +6,7 @@ using Backend.Veteriner.Application.Auth;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.Examinations.Contracts.Dtos;
+using Backend.Veteriner.Application.Reports.Hub;
 using Backend.Veteriner.Application.Visits.Contracts.Dtos;
 using Backend.Veteriner.Domain.Administrations;
 using Backend.Veteriner.Domain.Appointments;
@@ -386,6 +387,27 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
             .Should().Be(1, "bugünkü, 30 günden eski, iptal, vefat eden hayvanın ve gelişi açılmış randevu sayılmaz");
     }
 
+    /// <summary>B-02: gecikmiş randevu Rapor Merkezi "Bakmanız gerekenler" bandında da durur; sayı ve izin Bugün'le aynı.</summary>
+    [Fact]
+    public async Task Report_Hub_Overdue_Appointments_Should_Equal_Today_And_Follow_Its_Permissions()
+    {
+        var ctx = await SeedAsync();
+        var todayStart = OperationDayBounds.ForUtcNow(DateTime.UtcNow).DayStartUtc;
+        await ctx.SeedAppointmentAsync(todayStart.AddDays(-3).AddHours(7), AppointmentStatus.Scheduled);
+        await ctx.SeedAppointmentAsync(todayStart.AddDays(-1).AddHours(7), AppointmentStatus.Scheduled);
+        await ctx.SeedAppointmentAsync(todayStart.AddMinutes(1), AppointmentStatus.Scheduled);
+        await ctx.SeedAppointmentAsync(todayStart.AddDays(-31).AddHours(7), AppointmentStatus.Scheduled);
+
+        var withAppointments = ctx.WithPermissions([.. AllPermissions, PermissionCatalog.Appointments.Read]);
+        var today = (await withAppointments.GetTodayAsync()).OpenItems!.OverdueAppointmentCount;
+        today.Should().Be(2, "bugünkü ve 30 günden eski randevu sayılmaz");
+        (await withAppointments.GetHubAttentionAsync()).OverdueAppointmentCount.Should().Be(today);
+
+        (await ctx.GetHubAttentionAsync()).OverdueAppointmentCount.Should().BeNull("randevu okuma izni yok");
+        var withoutToday = ctx.WithPermissions([PermissionCatalog.Appointments.Read]);
+        (await withoutToday.GetHubAttentionAsync()).OverdueAppointmentCount.Should().BeNull("Bugün'ü göremeyen çipi de görmez");
+    }
+
     [Fact]
     public async Task Cancelled_Appointment_Count_Should_Cover_The_Selected_Day_Only()
     {
@@ -486,6 +508,13 @@ public sealed class TodayOpenItemsIntegrationTests : IClassFixture<CustomWebAppl
             var response = await _http.GetAsync(url);
             response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
             return (await response.Content.ReadFromJsonAsync<TodayDto>())!;
+        }
+
+        public async Task<ReportHubAttentionDto> GetHubAttentionAsync()
+        {
+            var response = await _http.GetAsync($"/api/v1/reports/hub-summary?period=today&clinicId={ClinicId}");
+            response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+            return (await response.Content.ReadFromJsonAsync<ReportHubSummaryDto>())!.Attention;
         }
 
         public Task<HttpResponseMessage> GetOpenItemVisitsResponseAsync(string kind)

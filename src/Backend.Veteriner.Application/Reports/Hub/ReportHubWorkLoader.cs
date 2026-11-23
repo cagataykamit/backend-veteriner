@@ -118,15 +118,16 @@ public sealed class ReportHubWorkLoader
 
     /// <summary>
     /// Bant. HBS sayıları Bugün'deki pencereyle (<see cref="OpenItemsSummaryRequest.ForToday"/>) ve HBS takip listesinin kuralıyla; en eski
-    /// kayıt listenin ilk satırıdır (tarihe göre artan). Gün sonu açık işi gün sonu raporunun bugünkü "Ücret yok" sayısıdır.
+    /// kayıt listenin ilk satırıdır (tarihe göre artan). Gün sonu açık işi gün sonu raporunun bugünkü "Ücret yok" sayısıdır. Gecikmiş randevu
+    /// Bugün'ün <c>openItems.overdueAppointmentCount</c>'udur: aynı okuyucu, aynı pencere, aynı izin (B-02).
     /// </summary>
     public async Task<ReportHubAttentionDto> LoadAttentionAsync(
         Guid tenantId, Guid clinicId, DateTime nowUtc, IReadOnlyCollection<Guid>? petIdsNotReceivingCare, CancellationToken ct)
     {
         var scope = OpenItemsScope.For(tenantId, clinicId, _permissions);
-        var hbsWindow = OpenItemsSummaryRequest.ForToday(scope, nowUtc);
-        var hbsFromUtc = hbsWindow.HbsFromUtc!.Value;
-        var hbsToUtc = hbsWindow.HbsToUtc!.Value;
+        var todayWindow = OpenItemsSummaryRequest.ForToday(scope, nowUtc);
+        var hbsFromUtc = todayWindow.HbsFromUtc!.Value;
+        var hbsToUtc = todayWindow.HbsToUtc!.Value;
 
         ReportHubPendingDto? prescriptions = null;
         if (_permissions.HasPermission(PermissionCatalog.Prescriptions.Read))
@@ -147,12 +148,23 @@ public sealed class ReportHubWorkLoader
                 new DashboardOverdueVaccinationsCountSpec(tenantId, clinicId, overdueWindow, null, petIdsNotReceivingCare, fulfilled), ct);
         }
 
+        // Bugün'ün izni (Visits.Read) ve sayının kendi izni; ikisi tek okumada: ücret yok gün sonu penceresiyle, gecikmiş randevu Bugün'ünkiyle.
+        var seesVisits = _permissions.HasPermission(PermissionCatalog.Visits.Read);
+        var seesUncharged = seesVisits && _permissions.HasPermission(PermissionCatalog.Charges.Read);
+        var seesOverdueAppointments = seesVisits && _permissions.HasPermission(PermissionCatalog.Appointments.Read);
         int? uncharged = null;
-        if (_permissions.HasPermission(PermissionCatalog.Visits.Read) && _permissions.HasPermission(PermissionCatalog.Charges.Read))
+        int? overdueAppointments = null;
+        if (seesUncharged || seesOverdueAppointments)
         {
             var (dayStartUtc, dayEndUtc) = OperationDayBounds.ForUtcNow(nowUtc);
-            var summary = await _openItems.GetSummaryAsync(new OpenItemsSummaryRequest(scope, dayStartUtc, dayEndUtc, dayEndUtc), ct);
-            uncharged = summary.UnchargedVisitCount;
+            var summary = await _openItems.GetSummaryAsync(
+                new OpenItemsSummaryRequest(
+                    scope, dayStartUtc, dayEndUtc, dayEndUtc,
+                    OverdueAppointmentsFromUtc: todayWindow.OverdueAppointmentsFromUtc,
+                    OverdueAppointmentsBeforeUtc: todayWindow.OverdueAppointmentsBeforeUtc),
+                ct);
+            uncharged = seesUncharged ? summary.UnchargedVisitCount : null;
+            overdueAppointments = seesOverdueAppointments ? summary.OverdueAppointmentCount : null;
         }
 
         int? lowStock = null;
@@ -163,7 +175,7 @@ public sealed class ReportHubWorkLoader
                     tenantId, clinicId, null, null, null, isBelowMinimum: true, null, null, OperationDayBounds.ToLocalDate(nowUtc)), ct);
         }
 
-        return new ReportHubAttentionDto(prescriptions, vaccinations, uncharged, overdueVaccinations, lowStock);
+        return new ReportHubAttentionDto(prescriptions, vaccinations, uncharged, overdueVaccinations, lowStock, overdueAppointments);
     }
 
     /// <summary>Vefat eden hayvanlar (aşı uyarılarına girmez); yalnız aşı okuma izni varsa okunur.</summary>
