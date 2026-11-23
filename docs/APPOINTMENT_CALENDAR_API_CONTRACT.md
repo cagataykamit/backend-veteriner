@@ -98,10 +98,10 @@ Kurallar (tek yer `VaccinationCalendarRules`):
   `Applied` geçmişi bu kurala girmez. Kural `VaccinationDueRule.OverdueWindow` + `VaccinationCalendarRules.IsShown`; randevu durumu
   (`CalendarItemStateRule.ForAppointment`) değişmez, randevuda alt sınır yoktur.
 - **Karşılanmış sonraki tarih:** aynı hayvana aynı aşı (aşı tanımı kimliği; tanımsız eski kayıtta ad, büyük/küçük harf duyarsız) bu
-  uygulamadan sonra yeniden uygulanmışsa `NextDue` satırı çıkmaz. Yeniden uygulama kiracının bütün kliniklerinden sayılır (2026-11-22; önce kullanıcının okuyabildiği klinikler). Kural
+  uygulamadan sonra yeniden uygulanmışsa ya da bu uygulamadan sonraki bir tarihe planlanmışsa (iptal edilmemiş planlı kayıt; sonraki tarihten erken ya da geç olsun, 2026-11-23) `NextDue` satırı çıkmaz; aşı bir kez, planlı kayıttan görünür. Yeniden uygulama kiracının bütün kliniklerinden sayılır (2026-11-22; önce kullanıcının okuyabildiği klinikler). Kural
   `VaccinationDueRule.IsNextDueFulfilled`; gecikmiş listesi, pano/Rapor Merkezi sayaçları, hasta özeti, "Yapılacaklar", portal, AI araması ve
   aşı hatırlatması aynı tanımı kullanır.
-  Planlı kayıt bu kurala girmez; uygulanınca durumu `Applied` olur.
+  Planlı kayıt karşılanan kaynak olmaz (yalnız kapatır); uygulanınca durumu `Applied` olur.
 - **Vefat:** bakım dışı hayvanın (`Pet.ReceivesCare` değil) `Planned`/`NextDue` satırı çıkmaz; `Applied` geçmişi görünür.
 - **Randevu değildir:** saat dilimini doldurmaz, çakışma (`ClinicOverlapBlocks`) ve "Boş saat bul" (`AppointmentAvailabilityCalculator`)
   hesabına girmez, randevu hatırlatması üretmez. Aşı hatırlatması değişmedi (`ReminderProcessorService`).
