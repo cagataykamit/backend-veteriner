@@ -23,10 +23,10 @@ namespace Backend.Veteriner.Application.Auth;
 ///   <item><c>Veteriner</c>: tıbbi operasyon rolü. Klinik kayıtlarının (muayene, aşı, tedavi, reçete, lab,
 ///   yatış, vital ölçümü) Read/Create/Update; randevu Read/Create/Complete/Reschedule (Cancel verilmez); pet okuma + güncelleme
 ///   (kilo/medikal not); müşteri ve hasta açma (Create). <b>Verilmez:</b> müşteri güncelleme, ödeme C/U, klinik/tenant/abonelik ve sistem yetkileri,
-    ///   düzeltme izinleri (<c>*.Correct</c>; yönetici düzeyi: Admin, Owner, ClinicAdmin).</item>
+    ///   düzeltme izinleri (<c>*.Correct</c>; yönetici düzeyi: Admin, Owner, ClinicAdmin), müşteri/hasta silme (<c>Clients.Delete</c>, <c>Pets.Delete</c>; ADR-054).</item>
 ///   <item><c>Sekreter</c>: resepsiyon/operasyon rolü. Müşteri/pet R/C/U; randevu R/C/Cancel/Reschedule
 ///   (Complete verilmez); ödeme R/C/U; tıbbi modüller sadece Read. <b>Verilmez:</b> randevu Complete,
-///   muayene/aşı/tedavi/reçete/lab/yatış C/U, klinik/tenant/abonelik ve sistem yetkileri.</item>
+///   muayene/aşı/tedavi/reçete/lab/yatış C/U, müşteri/hasta silme (ADR-054), klinik/tenant/abonelik ve sistem yetkileri.</item>
 /// </list>
 /// </para>
 /// <para>
@@ -61,10 +61,12 @@ public static class RolePermissionBindings
                 PermissionCatalog.Clients.Read,
                 PermissionCatalog.Clients.Create,
                 PermissionCatalog.Clients.Update,
+                PermissionCatalog.Clients.Delete,
 
                 PermissionCatalog.Pets.Read,
                 PermissionCatalog.Pets.Create,
                 PermissionCatalog.Pets.Update,
+                PermissionCatalog.Pets.Delete,
 
                 PermissionCatalog.Appointments.Read,
                 PermissionCatalog.Appointments.Create,
@@ -228,10 +230,12 @@ public static class RolePermissionBindings
                 PermissionCatalog.Clients.Read,
                 PermissionCatalog.Clients.Create,
                 PermissionCatalog.Clients.Update,
+                PermissionCatalog.Clients.Delete,
 
                 PermissionCatalog.Pets.Read,
                 PermissionCatalog.Pets.Create,
                 PermissionCatalog.Pets.Update,
+                PermissionCatalog.Pets.Delete,
 
                 PermissionCatalog.Appointments.Read,
                 PermissionCatalog.Appointments.Create,
@@ -409,10 +413,12 @@ public static class RolePermissionBindings
                 PermissionCatalog.Clients.Read,
                 PermissionCatalog.Clients.Create,
                 PermissionCatalog.Clients.Update,
+                PermissionCatalog.Clients.Delete,
 
                 PermissionCatalog.Pets.Read,
                 PermissionCatalog.Pets.Create,
                 PermissionCatalog.Pets.Update,
+                PermissionCatalog.Pets.Delete,
 
                 PermissionCatalog.Clinics.Read,
                 PermissionCatalog.Clinics.Update,

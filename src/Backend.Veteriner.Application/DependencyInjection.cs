@@ -81,6 +81,9 @@ public static class DependencyInjection
         services.AddScoped<AppointmentOwnerLinkResolver>();
         services.AddScoped<AppointmentOwnerLinkActions>();
 
+        // Müşteri/hasta yumuşak silme engelleri (ADR-054 K5).
+        services.AddScoped<Clients.Deletion.RecordDeletionBlockerReader>();
+
         // Bekleme listesi (TIER-018): teklif gönderimi, panel erişimi, kabul bağlantısı ve işleyici.
         services.AddScoped<Waitlist.WaitlistOfferService>();
         services.AddScoped<Waitlist.WaitlistAccess>();
