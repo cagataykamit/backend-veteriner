@@ -13,7 +13,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu backlog `TIER-006` (b
 | Ürün kartında barkod | Her pakette | Mevcut `barcode` alanı; artık kiracı içinde benzersiz |
 | Barkodla tam eşleşme araması | Her pakette | `GET /api/v1/products?barcode=` |
 | Elle ya da okuyucuyla barkod yazmak | Her pakette | Bugünkü `search` (ad, SKU, barkod içinde geçen) aynen kalır |
-| Telefon kamerasıyla okutma | Profesyonel, Kurumsal (`PlanFeature.MobileBarcode`) | Okuma tarayıcıda yapılır; sunucuya yalnız okunan barkod gelir |
+| Telefon kamerasıyla okutma | Her pakette (`PlanFeature.MobileBarcode`; 2026-11-23 kullanıcı kararı, önce Profesyonel ve Kurumsal) | Okuma tarayıcıda yapılır; sunucuya yalnız okunan barkod gelir |
 
 Kuralların tek yeri: barkod biçimi `Product.NormalizeBarcode` (kayıt, benzersizlik ve arama aynı biçimi kullanır); benzersizlik hatası `ProductErrors`; paket tablosu `SubscriptionPlanCatalog`.
 
@@ -49,7 +49,9 @@ Bulunamazsa `items: []` (404 değil). Panel kullanımı: satışta `isActive=tru
 
 | Basic | Pro | Premium |
 |---|---|---|
-| yok | var | var |
+| var | var | var |
+
+2026-11-23 kullanıcı kararıyla Temel dahil tüm paketlerde açık (ADR-035 ek; dal `feature/barkod-tum-paketler`, migration yok). Değer ileride yeniden kilitlenebilsin diye durur; bugün yalnız abonelik kaydı olmayan kiracıda kapalıdır.
 
 Kamera tarayıcıda çalıştığı için **ayrı sunucu kapısı yoktur**; `PortalAppointmentRequests` gibi satır yalnız `access-state` (`planFeatures`) ve paket tablosu içindir. Panel `MobileBarcode` kapalıyken kamera düğmesi yerine kilitli düğme ve "üst pakete geç" kutusu gösterir. §3 ucu paket sormaz: elle girilen barkodla arama her pakette açıktır.
 
