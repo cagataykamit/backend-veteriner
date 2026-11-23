@@ -1,5 +1,6 @@
 using Backend.Veteriner.Application.Tests;
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Pets.Queries.GetById;
 using Backend.Veteriner.Application.Pets.Specs;
@@ -16,8 +17,9 @@ public sealed class GetPetByIdQueryHandlerTests
     private readonly Mock<ITenantContext> _tenant = new();
     private readonly Mock<IReadRepository<Pet>> _pets = new();
     private readonly Mock<IReadRepository<Client>> _clients = new();
+    private readonly Mock<IClinicVeterinarianReader> _userNames = new();
 
-    private GetPetByIdQueryHandler CreateHandler() => new(_tenant.Object, _pets.Object, _clients.Object);
+    private GetPetByIdQueryHandler CreateHandler() => new(_tenant.Object, _pets.Object, _clients.Object, _userNames.Object);
 
     [Fact]
     public async Task Handle_Should_MapSpeciesName_When_SpeciesLoaded()
@@ -173,5 +175,52 @@ public sealed class GetPetByIdQueryHandlerTests
         result.Value.PassportOrTagNumber.Should().Be("TR-12345");
         result.Value.SpecialProtocolNumber.Should().Be("PROT-001");
         result.Value.IsNeutered.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Handle_Should_Return_Deleter_Name_When_Pet_Deleted()
+    {
+        var tid = Guid.NewGuid();
+        var deleterId = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+
+        var species = new Species("CAT", "Kedi");
+        var pet = new Pet(tid, Guid.NewGuid(), "Pamuk", TestSpeciesIds.Cat, null, null);
+        typeof(Pet).GetProperty(nameof(Pet.Species))!.SetValue(pet, species);
+        pet.Delete(deleterId, DateTime.UtcNow, RecordDeletionBlockers.None).IsSuccess.Should().BeTrue();
+
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(pet);
+        _clients.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Client?)null);
+        _userNames.Setup(r => r.GetNamesAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, string?> { [deleterId] = "Dr. Ali Veli" });
+
+        var dto = (await CreateHandler().Handle(new GetPetByIdQuery(pet.Id), CancellationToken.None)).Value!;
+
+        dto.DeletedAtUtc.Should().NotBeNull();
+        dto.DeletedByUserId.Should().Be(deleterId);
+        dto.DeletedByUserName.Should().Be("Dr. Ali Veli");
+    }
+
+    [Fact]
+    public async Task Handle_Should_Not_Resolve_Names_When_Pet_Active()
+    {
+        var tid = Guid.NewGuid();
+        _tenant.SetupGet(t => t.TenantId).Returns(tid);
+
+        var pet = new Pet(tid, Guid.NewGuid(), "Pamuk", TestSpeciesIds.Cat, null, null);
+        typeof(Pet).GetProperty(nameof(Pet.Species))!.SetValue(pet, new Species("CAT", "Kedi"));
+
+        _pets.Setup(r => r.FirstOrDefaultAsync(It.IsAny<PetByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(pet);
+        _clients.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Client?)null);
+
+        var dto = (await CreateHandler().Handle(new GetPetByIdQuery(pet.Id), CancellationToken.None)).Value!;
+
+        dto.DeletedByUserId.Should().BeNull();
+        dto.DeletedByUserName.Should().BeNull();
+        _userNames.Verify(r => r.GetNamesAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

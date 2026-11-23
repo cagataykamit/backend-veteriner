@@ -33,4 +33,6 @@ public sealed record PetDetailDto(
     Guid? PatternId = null,
     string? PatternName = null,
     DateTime? DeletedAtUtc = null,
-    bool DeletedWithClient = false);
+    bool DeletedWithClient = false,
+    Guid? DeletedByUserId = null,
+    string? DeletedByUserName = null);

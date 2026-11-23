@@ -15,6 +15,8 @@ namespace Backend.Veteriner.Application.Clients.Contracts.Dtos;
 /// <param name="Invoicing">Fatura kimliği, TCKN/VKN maskeli (ADR-036).</param>
 /// <param name="Notes">Kliniğin iç notu; liste, arama ve hızlı kayıt yanıtlarında yoktur.</param>
 /// <param name="DeletedAtUtc">Doluysa müşteri silinmiştir (ADR-054); kart "Silindi" bandıyla açılır, düzenleme 409 <c>Clients.Deleted</c>.</param>
+/// <param name="DeletedByUserId">Silen kullanıcı; aktif kayıtta null.</param>
+/// <param name="DeletedByUserName">Silen kullanıcının görünen adı ("Silinenler" listesiyle aynı çözüm; bulunamazsa null).</param>
 public sealed record ClientDetailDto(
     Guid Id,
     Guid TenantId,
@@ -35,4 +37,6 @@ public sealed record ClientDetailDto(
     string RowVersion,
     ClientInvoicingSummaryDto Invoicing,
     string? Notes,
-    DateTime? DeletedAtUtc = null);
+    DateTime? DeletedAtUtc = null,
+    Guid? DeletedByUserId = null,
+    string? DeletedByUserName = null);

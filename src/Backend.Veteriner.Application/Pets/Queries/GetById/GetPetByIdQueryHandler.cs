@@ -1,4 +1,5 @@
 using Backend.Veteriner.Application.Clients.Specs;
+using Backend.Veteriner.Application.Clinics.Veterinarians;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Examinations;
 using Backend.Veteriner.Application.Pets.Contracts.Dtos;
@@ -15,15 +16,18 @@ public sealed class GetPetByIdQueryHandler : IRequestHandler<GetPetByIdQuery, Re
     private readonly ITenantContext _tenantContext;
     private readonly IReadRepository<Pet> _pets;
     private readonly IReadRepository<Client> _clients;
+    private readonly IClinicVeterinarianReader _userNames;
 
     public GetPetByIdQueryHandler(
         ITenantContext tenantContext,
         IReadRepository<Pet> pets,
-        IReadRepository<Client> clients)
+        IReadRepository<Client> clients,
+        IClinicVeterinarianReader userNames)
     {
         _tenantContext = tenantContext;
         _pets = pets;
         _clients = clients;
+        _userNames = userNames;
     }
 
     public async ValueTask<Result<PetDetailDto>> Handle(GetPetByIdQuery request, CancellationToken ct)
@@ -46,6 +50,11 @@ public sealed class GetPetByIdQueryHandler : IRequestHandler<GetPetByIdQuery, Re
         var clientName = client?.FullName ?? string.Empty;
         var clientPhone = client?.Phone;
         var clientEmail = client?.Email;
+
+        // Silen kullanıcının adı: "Silinenler" listesiyle aynı ad çözümü (ADR-054).
+        string? deletedByName = null;
+        if (pet.DeletedByUserId is { } deletedBy)
+            deletedByName = (await _userNames.GetNamesAsync([deletedBy], ct)).GetValueOrDefault(deletedBy);
 
         var dto = new PetDetailDto(
             pet.Id,
@@ -77,7 +86,9 @@ public sealed class GetPetByIdQueryHandler : IRequestHandler<GetPetByIdQuery, Re
             pet.PatternId,
             pet.PatternRef?.Name,
             pet.DeletedAtUtc,
-            pet.DeletedWithClient);
+            pet.DeletedWithClient,
+            pet.DeletedByUserId,
+            deletedByName);
         return Result<PetDetailDto>.Success(dto);
     }
 }

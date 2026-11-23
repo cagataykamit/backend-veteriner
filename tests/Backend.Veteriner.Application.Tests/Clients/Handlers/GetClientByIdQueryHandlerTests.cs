@@ -113,4 +113,30 @@ public sealed class GetClientByIdQueryHandlerTests
         dto.KvkkConsentTemplateHash.Should().Be(ClinicKvkkFormTemplate.ComputeTextHash("Rıza metni"));
         dto.RowVersion.Should().Be(Convert.ToBase64String(new byte[] { 0, 0, 0, 0, 0, 0, 0, 7 }));
     }
+
+    [Fact]
+    public async Task Handle_Should_Return_Deleter_And_Kvkk_Recorder_Names_With_Single_Lookup()
+    {
+        var tid = Guid.NewGuid();
+        var recorderId = Guid.NewGuid();
+        var deleterId = Guid.NewGuid();
+        var entity = new Client(tid, "Ali Veli", DateTime.UtcNow, "05321234567");
+        entity.RecordKvkkConsent(KvkkConsentStatus.Accepted, new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 15), recorderId,
+            null, null, DateTime.UtcNow);
+        entity.Delete(deleterId, DateTime.UtcNow, RecordDeletionBlockers.None).IsSuccess.Should().BeTrue();
+
+        _tenantContext.SetupGet(t => t.TenantId).Returns(tid);
+        _clients.Setup(r => r.FirstOrDefaultAsync(It.IsAny<ClientByIdSpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(entity);
+        _userNames.Setup(r => r.GetNamesAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, string?> { [recorderId] = "Dr. Can", [deleterId] = "Dr. Ali Veli" });
+
+        var dto = (await CreateHandler().Handle(new GetClientByIdQuery(entity.Id), CancellationToken.None)).Value!;
+
+        dto.DeletedAtUtc.Should().NotBeNull();
+        dto.DeletedByUserId.Should().Be(deleterId);
+        dto.DeletedByUserName.Should().Be("Dr. Ali Veli");
+        dto.KvkkConsentRecordedByName.Should().Be("Dr. Can");
+        _userNames.Verify(r => r.GetNamesAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
 }
