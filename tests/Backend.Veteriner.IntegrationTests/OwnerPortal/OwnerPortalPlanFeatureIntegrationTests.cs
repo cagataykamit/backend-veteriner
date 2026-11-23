@@ -230,6 +230,9 @@ public sealed partial class OwnerPortalIntegrationTests
         features["OwnerPortal"].GetProperty("isEnabled").GetBoolean().Should().BeTrue();
         features["OwnerPortal"].GetProperty("requiredPlanCode").GetString().Should().Be("Basic");
         features["PortalAppointmentRequests"].GetProperty("isEnabled").GetBoolean().Should().BeTrue();
+        // 2026-11-23: kamerayla barkod okutma tüm paketlerde (ADR-035).
+        features["MobileBarcode"].GetProperty("isEnabled").GetBoolean().Should().BeTrue();
+        features["MobileBarcode"].GetProperty("requiredPlanCode").GetString().Should().Be("Basic");
         features["Waitlist"].GetProperty("isEnabled").GetBoolean().Should().BeFalse();
         features["MultiClinic"].GetProperty("isEnabled").GetBoolean().Should().BeFalse();
         features["MultiClinic"].GetProperty("requiredPlanCode").GetString().Should().Be("Premium");

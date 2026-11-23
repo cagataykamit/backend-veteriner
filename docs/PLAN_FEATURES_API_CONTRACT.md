@@ -2,7 +2,7 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu backlog `TIER-001`, ADR-035 (paket tablosu), ADR-045 K13 (klinik web sitesi tüm paketlerde), `TRIAL_LIMITS_API_CONTRACT.md` K7. İlgili: `SUBSCRIPTION_PLAN_CATALOG_API_CONTRACT.md` (fiyat ve kullanıcı sınırı), `PORTAL_API_CONTRACT.md`, `ONLINE_APPOINTMENT_API_CONTRACT.md`.
 
-> **Durum:** Uygulandı (kod + test), dal `feat/tier-001-paket-ozellik`. Migration yok, yeni izin yok, yeni uç yok. §4 2026-11-08 kullanıcı kararıyla seçenek A'ya geçti (dal `feat/kararlar-2026-11-08`); dönem sonu davranışı çalışma varsayımıdır. 2026-11-16 kullanıcı kararıyla `OwnerPortal` ve `PortalAppointmentRequests` Temel dahil tüm paketlerde açık (ADR-035; dal `feature/portal-tum-paketler`, migration yok); değerler ve kapılar ileride yeniden kilitlenebilsin diye durur, bugün yalnız abonelik kaydı olmayan kiracıda kapalıdır.
+> **Durum:** Uygulandı (kod + test), dal `feat/tier-001-paket-ozellik`. Migration yok, yeni izin yok, yeni uç yok. §4 2026-11-08 kullanıcı kararıyla seçenek A'ya geçti (dal `feat/kararlar-2026-11-08`); dönem sonu davranışı çalışma varsayımıdır. 2026-11-16 kullanıcı kararıyla `OwnerPortal` ve `PortalAppointmentRequests` Temel dahil tüm paketlerde açık (ADR-035; dal `feature/portal-tum-paketler`, migration yok); değerler ve kapılar ileride yeniden kilitlenebilsin diye durur, bugün yalnız abonelik kaydı olmayan kiracıda kapalıdır. 2026-11-23 kullanıcı kararıyla `MobileBarcode` (kamerayla barkod okutma) da aynı biçimde tüm paketlerde açık (dal `feature/barkod-tum-paketler`, migration yok).
 
 ---
 
@@ -12,6 +12,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu backlog `TIER-001`, A
 |---|---|---|---|
 | `OwnerPortal` (2026-11-16 kullanıcı kararı: tüm paketler) | var | var | var |
 | `PortalAppointmentRequests` (2026-11-16 kullanıcı kararı: tüm paketler) | var | var | var |
+| `MobileBarcode` (TIER-006, `MOBILE_BARCODE_API_CONTRACT.md`; 2026-11-23 kullanıcı kararı: tüm paketler) | var | var | var |
 | `MultiClinic` | yok | yok | var |
 | `Waitlist` (TIER-018, `WAITLIST_API_CONTRACT.md`) | yok | var | var |
 | `CashManagement` (TIER-008, `CASH_REGISTERS_API_CONTRACT.md`; 2026-11-09 kullanıcı kararı: Profesyonel ve Kurumsal. Okumalar, gün sonu raporu ve Ana kasaya nakit tahsilat her pakette) | yok | var | var |

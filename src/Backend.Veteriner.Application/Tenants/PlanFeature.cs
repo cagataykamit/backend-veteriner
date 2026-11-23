@@ -47,7 +47,8 @@ public enum PlanFeature
     /// <summary>
     /// Telefon kamerasıyla barkod okutma (TIER-006; docs/MOBILE_BARCODE_API_CONTRACT.md). Okuma tarayıcıda yapılır, ayrı sunucu kapısı
     /// yoktur; satır <c>access-state</c> ve paket tablosu içindir. Ürün kartındaki barkod alanı ve elle ya da okuyucuyla girilen
-    /// barkodla arama bu kuralın dışındadır; her pakette açık.
+    /// barkodla arama bu kuralın dışındadır; her pakette açık. 2026-11-23 kullanıcı kararıyla kamera da tüm paketlerde açık (ADR-035);
+    /// değer ileride yeniden kilitlenebilsin diye durur.
     /// </summary>
     MobileBarcode = 6,
 
