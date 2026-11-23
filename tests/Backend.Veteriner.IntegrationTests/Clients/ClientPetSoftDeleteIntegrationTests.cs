@@ -93,6 +93,12 @@ public sealed class ClientPetSoftDeleteIntegrationTests : IClassFixture<CustomWe
         var deletedClient = deletedClients.GetProperty("items").EnumerateArray().Should().ContainSingle().Subject;
         deletedClient.GetProperty("id").GetGuid().Should().Be(ctx.ClientId);
         deletedClient.GetProperty("deletedByUserId").GetGuid().Should().Be(ctx.UserId);
+        // Kart silen kişiyi "Silinenler" listesiyle aynı adla verir.
+        var deleterName = deletedClient.GetProperty("deletedByUserName").GetString();
+        deleterName.Should().NotBeNullOrWhiteSpace();
+        clientCard.GetProperty("deletedByUserId").GetGuid().Should().Be(ctx.UserId);
+        clientCard.GetProperty("deletedByUserName").GetString().Should().Be(deleterName);
+        petCard.GetProperty("deletedByUserName").GetString().Should().Be(deleterName);
         var deletedPets = await ctx.Http.GetFromJsonAsync<JsonElement>("/api/v1/pets/deleted?search=SilPamuk&pageSize=50");
         var deletedPet = deletedPets.GetProperty("items").EnumerateArray().Single(i => i.GetProperty("id").GetGuid() == petId);
         deletedPet.GetProperty("clientIsDeleted").GetBoolean().Should().BeTrue();
@@ -113,8 +119,9 @@ public sealed class ClientPetSoftDeleteIntegrationTests : IClassFixture<CustomWe
 
         (await ctx.SearchClientIdsAsync(ctx.ClientName)).Should().Contain(ctx.ClientId);
         (await ctx.ListPetIdsOfClientAsync()).Should().Equal(petId);
-        (await ctx.Http.GetFromJsonAsync<JsonElement>($"/api/v1/clients/{ctx.ClientId}"))
-            .GetProperty("deletedAtUtc").ValueKind.Should().Be(JsonValueKind.Null);
+        var restoredCard = await ctx.Http.GetFromJsonAsync<JsonElement>($"/api/v1/clients/{ctx.ClientId}");
+        restoredCard.GetProperty("deletedAtUtc").ValueKind.Should().Be(JsonValueKind.Null);
+        restoredCard.GetProperty("deletedByUserName").ValueKind.Should().Be(JsonValueKind.Null);
         (await ctx.Http.PostAsJsonAsync("/api/v1/visits", new { clinicId = ctx.ClinicId, petId }))
             .StatusCode.Should().Be(HttpStatusCode.Created);
     }

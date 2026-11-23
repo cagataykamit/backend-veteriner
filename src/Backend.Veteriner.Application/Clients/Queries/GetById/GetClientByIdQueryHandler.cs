@@ -38,9 +38,11 @@ public sealed class GetClientByIdQueryHandler : IRequestHandler<GetClientByIdQue
         if (client is null)
             return Result<ClientDetailDto>.Failure("Clients.NotFound", "Müşteri bulunamadı.");
 
-        string? kvkkRecordedByName = null;
-        if (client.KvkkConsentRecordedByUserId is { } recordedBy)
-            (await _userNames.GetNamesAsync([recordedBy], ct)).TryGetValue(recordedBy, out kvkkRecordedByName);
+        // Rızayı işaretleyen ve silen kullanıcının adı tek çağrıyla ("Silinenler" listesiyle aynı ad çözümü, ADR-054).
+        Guid[] userIds = [.. new[] { client.KvkkConsentRecordedByUserId, client.DeletedByUserId }.OfType<Guid>().Distinct()];
+        var names = userIds.Length == 0 ? new Dictionary<Guid, string?>() : await _userNames.GetNamesAsync(userIds, ct);
+        var kvkkRecordedByName = client.KvkkConsentRecordedByUserId is { } recordedBy ? names.GetValueOrDefault(recordedBy) : null;
+        var deletedByName = client.DeletedByUserId is { } deletedBy ? names.GetValueOrDefault(deletedBy) : null;
 
         var dto = new ClientDetailDto(
             client.Id,
@@ -62,7 +64,9 @@ public sealed class GetClientByIdQueryHandler : IRequestHandler<GetClientByIdQue
             ExaminationRowVersion.Encode(client.RowVersion),
             ClientInvoicingSummaryDto.From(client),
             client.Notes,
-            client.DeletedAtUtc);
+            client.DeletedAtUtc,
+            client.DeletedByUserId,
+            deletedByName);
         return Result<ClientDetailDto>.Success(dto);
     }
 }

@@ -89,9 +89,10 @@ Yanıt **204**.
 }
 ```
 
-### `GET /api/v1/clients/{id}` (değişen alan)
+### `GET /api/v1/clients/{id}` (değişen alanlar)
 
 - `deletedAtUtc`: `null` = aktif; dolu = silinmiş.
+- `deletedByUserId`, `deletedByUserName`: silen kullanıcı ve görünen adı; aktif kayıtta `null`. Ad "Silinenler" listesiyle aynı yerden çözülür; kullanıcı bulunamazsa `null`. Panel bandı "Bu kayıt silindi · tarih · kim" gösterir.
 
 ### Silinen müşteriye yazma
 
@@ -148,6 +149,7 @@ Yanıt **204**.
 ### `GET /api/v1/pets/{id}` (değişen alanlar)
 
 - `deletedAtUtc`, `deletedWithClient`.
+- `deletedByUserId`, `deletedByUserName`: müşteriyle aynı kural.
 
 ### Silinen hastaya yazma
 
@@ -165,7 +167,7 @@ Hata mesajları `detail` alanında Türkçe döner; panel doğrudan gösterebili
 | `deletion.blocked.ActiveHospitalization` | Aktif yatışı var; önce taburcu edin ya da yatışı iptal edin. |
 | `deletion.blocked.OpenVisit` | Bugün açık gelişi var; önce gelişi tamamlayın ya da iptal edin. |
 | `deletion.blocked.FutureAppointments` | {futureAppointmentCount} gelecek randevusu var; önce randevuları iptal edin. |
-| `deletion.deletedBanner` | Bu kayıt {deletedAtUtc} tarihinde silindi. |
+| `deletion.deletedBanner` | Bu kayıt silindi · {deletedAtUtc} · {deletedByUserName} |
 | `deletion.restore.clientDeleted` | Hastanın müşterisi silinmiş; önce müşteriyi geri yükleyin. |
 | `deletion.restore.conflict` | Aynı bilgilerle aktif bir müşteri var; o kaydı kullanın ya da bilgileri düzenleyin. |
 
