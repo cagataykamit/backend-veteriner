@@ -1,3 +1,4 @@
+using Backend.Veteriner.Application.Ai;
 using Backend.Veteriner.Application.Common.Options;
 using Backend.Veteriner.Application.Public.Queries.SubscriptionPlans;
 using Backend.Veteriner.Application.Tenants;
@@ -10,8 +11,8 @@ namespace Backend.Veteriner.Application.Tests.Public.Queries;
 /// <summary>WEB-007: herkese açık paket kataloğu; sınır katalogdan, fiyat checkout kuralından.</summary>
 public sealed class GetPublicSubscriptionPlansQueryHandlerTests
 {
-    private static Task<Backend.Veteriner.Application.Public.Contracts.Dtos.PublicSubscriptionPlanCatalogDto> HandleAsync(BillingOptions options)
-        => new GetPublicSubscriptionPlansQueryHandler(Options.Create(options))
+    private static Task<Backend.Veteriner.Application.Public.Contracts.Dtos.PublicSubscriptionPlanCatalogDto> HandleAsync(BillingOptions options, AiOptions? ai = null)
+        => new GetPublicSubscriptionPlansQueryHandler(Options.Create(options), Options.Create(ai ?? new AiOptions()))
             .Handle(new GetPublicSubscriptionPlansQuery(), CancellationToken.None).AsTask();
 
     [Fact]
@@ -45,5 +46,27 @@ public sealed class GetPublicSubscriptionPlansQueryHandlerTests
 
         result.Plans.Should().HaveCount(SubscriptionPlanCatalog.All.Count);
         result.Plans.Should().OnlyContain(p => p.MonthlyPriceMinor == null && p.YearlyPriceMinor == null);
+    }
+
+    [Fact]
+    public async Task Should_Return_Monthly_Ai_Credits_From_Ai_Options()
+    {
+        var ai = new AiOptions
+        {
+            PlanMonthlyCredits = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["Basic"] = 0, ["Pro"] = 700, ["Premium"] = 3_000 },
+        };
+
+        var result = await HandleAsync(new BillingOptions(), ai);
+
+        result.Plans.Select(p => (p.PlanCode, p.MonthlyAiCredits)).Should().Equal(("Basic", 0), ("Pro", 700), ("Premium", 3_000));
+    }
+
+    [Fact]
+    public async Task Should_Return_Default_Monthly_Ai_Credits_When_Not_Configured()
+    {
+        var result = await HandleAsync(new BillingOptions());
+
+        result.Plans.Select(p => p.MonthlyAiCredits).Should().Equal(
+            result.Plans.Select(p => new AiOptions().MonthlyCreditsFor(p.PlanCode)));
     }
 }

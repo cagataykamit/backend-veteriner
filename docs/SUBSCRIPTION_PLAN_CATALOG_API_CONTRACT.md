@@ -2,7 +2,7 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu backlog `WEB-007`, ADR-034 karar 4 (fiyat belirlenince paket başına aylık TL; kullanıcı sınırlarının tek doğrusu backend kataloğu), ADR-035 (paketler), fiyat kararı (kullanıcı/koordinatör, 2026-11-05, geçici). İlgili: `SUBSCRIPTION_YEARLY_BILLING_API_CONTRACT.md` (yıllık = 10 ay), `SALES_PARTNER_DISCOUNT_API_CONTRACT.md` (fiyat KDV hariç), `BACKEND-CONTRACT-STANDARD.md` §20–24 (abonelik özeti ve checkout).
 
-> **Durum:** Uygulandı (kod + test), dal `feat/web-007-paketler`. Migration yok, yeni izin yok, **1 yeni anonim uç**; `subscription-summary` plan seçeneklerine iki alan eklendi (geriye uyumlu).
+> **Durum:** Uygulandı (kod + test), dal `feat/web-007-paketler`. Migration yok, yeni izin yok, **1 yeni anonim uç**; `subscription-summary` plan seçeneklerine iki alan eklendi (geriye uyumlu). 2026-11-23: `plans[]`'e `monthlyAiCredits` eklendi (geriye uyumlu; dal `feature/katalog-ai-kredisi`).
 
 ---
 
@@ -31,9 +31,9 @@ Yetki yok (`AllowAnonymous`), hız sınırı yok (statik okuma; genel sınır ge
   "vatIncluded": false,
   "yearlyBilledMonths": 10,
   "plans": [
-    { "planCode": "Basic", "name": "Basic", "maxUsers": 3, "monthlyPriceMinor": 89000, "yearlyPriceMinor": 890000 },
-    { "planCode": "Pro", "name": "Pro", "maxUsers": 5, "monthlyPriceMinor": 179000, "yearlyPriceMinor": 1790000 },
-    { "planCode": "Premium", "name": "Premium", "maxUsers": 15, "monthlyPriceMinor": 379000, "yearlyPriceMinor": 3790000 }
+    { "planCode": "Basic", "name": "Basic", "maxUsers": 3, "monthlyPriceMinor": 89000, "yearlyPriceMinor": 890000, "monthlyAiCredits": 0 },
+    { "planCode": "Pro", "name": "Pro", "maxUsers": 5, "monthlyPriceMinor": 179000, "yearlyPriceMinor": 1790000, "monthlyAiCredits": 500 },
+    { "planCode": "Premium", "name": "Premium", "maxUsers": 15, "monthlyPriceMinor": 379000, "yearlyPriceMinor": 3790000, "monthlyAiCredits": 2000 }
   ]
 }
 ```
@@ -48,6 +48,7 @@ Yetki yok (`AllowAnonymous`), hız sınırı yok (statik okuma; genel sınır ge
 | `name` | Katalog adı (`subscription-summary` `planName` ile aynı). Tanıtım sitesi görünen paket adını kendi metninden alır (Temel/Profesyonel/Kurumsal). |
 | `maxUsers` | Kullanıcı sınırı. |
 | `monthlyPriceMinor`, `yearlyPriceMinor` | Kuruş, KDV hariç, kod indirimi öncesi. Fiyat yapılandırılmamışsa ikisi de `null`; site bu durumda tutar yazmaz ("Fiyat için bize yazın"). |
+| `monthlyAiCredits` | Paketin klinik başına aylık yapay zekâ kredisi hediyesi (ADR-044 madde 5), `Ai:PlanMonthlyCredits` ayarından; kotanın okuduğu `AiOptions.MonthlyCreditsFor` ile aynı. Listede olmayan paket `0`. Deneme süresinde hediye verilmez (ADR-044, 2026-11-20); bu alan ücretli abonelikteki değerdir. Yapay zekâ klinikte kapalı başlar; alan özelliğin açık olduğunu söylemez. |
 
 ## 3) `GET /api/v1/tenants/{tenantId}/subscription-summary` (değişti, geriye uyumlu)
 
@@ -61,7 +62,7 @@ Yetki yok (`AllowAnonymous`), hız sınırı yok (statik okuma; genel sınır ge
 
 ## 5) Testler
 
-- Application: `SubscriptionPlanPricesTests` (öncelik, TL→kuruş, sıfır/eksik, yıllık kural, para birimi), `GetPublicSubscriptionPlansQueryHandlerTests` (katalog sınırları ve fiyatlar, fiyatsız durum), `GetTenantSubscriptionSummaryQueryHandlerTests.Handle_Should_Return_PlanPrices_From_Billing_Configuration`.
+- Application: `SubscriptionPlanPricesTests` (öncelik, TL→kuruş, sıfır/eksik, yıllık kural, para birimi), `GetPublicSubscriptionPlansQueryHandlerTests` (katalog sınırları ve fiyatlar, fiyatsız durum, aylık yapay zekâ kredisi ayardan ve varsayılandan), `GetTenantSubscriptionSummaryQueryHandlerTests.Handle_Should_Return_PlanPrices_From_Billing_Configuration`.
 - Entegrasyon: `PublicSubscriptionPlansIntegrationTests` (anonim uç katalog ve yapılandırmayla aynı; süresi dolmuş dönemde aylık ve yıllık yenilemede checkout tutarı = sitedeki fiyat = panel özetindeki fiyat).
 
 ## 6) Bilinen sınırlar
