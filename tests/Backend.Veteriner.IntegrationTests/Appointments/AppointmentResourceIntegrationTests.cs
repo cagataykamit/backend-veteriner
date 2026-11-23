@@ -137,6 +137,51 @@ public sealed class AppointmentResourceIntegrationTests : IClassFixture<CustomWe
     }
 
     [Fact]
+    public async Task Cleared_Room_Should_Free_Resource_For_Another_Appointment_At_Same_Time()
+    {
+        var ctx = await OnlineAppointmentTestContext.CreateAsync(_factory);
+        var vetA = await ctx.SeedClinicUserAsync("Veteriner", "Dr. Ayşe");
+        var vetB = await ctx.SeedClinicUserAsync("Veteriner", "Dr. Mert");
+        var surgery = await CreateResourceAsync(ctx, "Ameliyathane", "Room");
+        var ultrasound = await CreateResourceAsync(ctx, "Ultrason", "Equipment");
+        var (_, pet1) = await ctx.SeedClientWithPetAsync();
+        var (_, pet2) = await ctx.SeedClientWithPetAsync();
+        var at = OnlineAppointmentTestContext.NextIstanbul(DayOfWeek.Tuesday, 10);
+
+        (await PostAsync(ctx, pet1, at, vetA, room: surgery, equipment: ultrasound)).StatusCode.Should().Be(HttpStatusCode.Created);
+        var blocked = await PostAsync(ctx, pet2, at, vetB, room: surgery);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(blocked)).Should().Be("Appointments.ResourceTimeConflict");
+
+        var firstId = await GetIdAsync(ctx, pet1, at);
+        var cleared = await ctx.Http.PutAsJsonAsync($"/api/v1/appointments/{firstId}", new
+        {
+            id = firstId,
+            clinicId = ctx.ClinicId,
+            petId = pet1,
+            scheduledAtUtc = at,
+            appointmentType = 0,
+            status = 0,
+            veterinarianUserId = vetA,
+            roomResourceId = (Guid?)null,
+            equipmentResourceId = ultrasound,
+        });
+        cleared.StatusCode.Should().Be(HttpStatusCode.NoContent, await cleared.Content.ReadAsStringAsync());
+        var detail = await ctx.Http.GetFromJsonAsync<JsonElement>($"/api/v1/appointments/{firstId}");
+        detail.GetProperty("roomResourceId").ValueKind.Should().Be(JsonValueKind.Null);
+        detail.GetProperty("equipmentResourceId").GetGuid().Should().Be(ultrasound);
+
+        var second = await PostAsync(ctx, pet2, at, vetB, room: surgery);
+        second.StatusCode.Should().Be(HttpStatusCode.Created, "odası boşaltılmış randevu odayı artık kullanmaz: " + await second.Content.ReadAsStringAsync());
+        var stillBusyDevice = await PostAsync(ctx, pet2, at.AddHours(2), vetB, equipment: ultrasound);
+        stillBusyDevice.StatusCode.Should().Be(HttpStatusCode.Created, "farklı saatte cihaz boştur");
+        var (_, pet3) = await ctx.SeedClientWithPetAsync();
+        var vetC = await ctx.SeedClinicUserAsync("Veteriner", "Dr. Can");
+        var deviceConflict = await PostAsync(ctx, pet3, at, vetC, equipment: ultrasound);
+        (await IntegrationTestProblemDetails.ReadCodeAsync(deviceConflict))
+            .Should().Be("Appointments.ResourceTimeConflict", "yalnız oda boşaltıldı; cihaz ilk randevuda kalır");
+    }
+
+    [Fact]
     public async Task Calendar_Should_Return_Resource_Ids_And_Names()
     {
         var ctx = await OnlineAppointmentTestContext.CreateAsync(_factory);
