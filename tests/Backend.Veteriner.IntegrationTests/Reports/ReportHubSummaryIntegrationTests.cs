@@ -91,6 +91,7 @@ public sealed partial class DailyTransactionsReportIntegrationTests
         hub.Attention.HbsNotEnteredPrescriptions.OldestAtUtc.Should().BeNull();
         hub.Attention.OverdueVaccinationCount.Should().Be(0);
         hub.Attention.LowStockProductCount.Should().Be(1, "yalnız asgari seviyenin altındaki stok sayılır");
+        hub.Attention.OverdueAppointmentCount.Should().Be(todayView.OpenItems.OverdueAppointmentCount!.Value);
     }
 
     [Fact]
@@ -110,12 +111,12 @@ public sealed partial class DailyTransactionsReportIntegrationTests
         summary.Appointments.Should().BeNull();
         summary.Examinations.Should().BeNull();
         summary.Vaccinations.Should().BeNull();
-        summary.Attention.Should().Be(new ReportHubAttentionDto(null, null, null, null, null));
+        summary.Attention.Should().Be(new ReportHubAttentionDto(null, null, null, null, null, null));
 
         var none = await GetHubAsync(unrelated, $"{Hub}?period=week&clinicId={env.ClinicId}");
         none.TodayCash.Should().BeNull();
         none.Collections.Should().BeNull();
-        none.Attention.Should().Be(new ReportHubAttentionDto(null, null, null, null, null));
+        none.Attention.Should().Be(new ReportHubAttentionDto(null, null, null, null, null, null));
     }
 
     [Fact]

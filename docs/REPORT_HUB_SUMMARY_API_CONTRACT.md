@@ -82,7 +82,8 @@ Nokta şekli: `{ "from": "2026-11-17", "to": "2026-11-17", "value": 0 }`. `from`
     "hbsNotEnteredVaccinations": { "count": 0, "oldestAtUtc": null },
     "endOfDayUnchargedVisitCount": 0,
     "overdueVaccinationCount": 0,
-    "lowStockProductCount": 0
+    "lowStockProductCount": 0,
+    "overdueAppointmentCount": 0
   }
 }
 ```
@@ -108,9 +109,10 @@ Nokta şekli: `{ "from": "2026-11-17", "to": "2026-11-17", "value": 0 }`. `from`
 | `attention.endOfDayUnchargedVisitCount` | `Visits.Read` **ve** `Charges.Read` | Bugünün kasası + bant | Gün sonu açık işlerinin "Ücret yok" sayısı, bugünün penceresi (`IVisitOpenItemsReader`, `GET /reports/end-of-day/open-items` ile aynı) |
 | `attention.overdueVaccinationCount` | `Vaccinations.Read` | bant | `VaccinationDueRule.IsOverdue` (vadesi son 1 takvim ayı içinde geçmiş; daha eskisi sayılmaz); vefat eden hayvanlar hariç (Özet uyarısıyla aynı spec) |
 | `attention.lowStockProductCount` | `Products.Read` | bant | `ProductStockMinimumFilter` (Stok durumu "Düşük stok" süzgeciyle aynı): elde − süresi geçmiş parti < asgari stok |
+| `attention.overdueAppointmentCount` | `Visits.Read` **ve** `Appointments.Read` | bant | Bugün'ün `openItems.overdueAppointmentCount`'u (§7, §11): aynı okuyucu (`IVisitOpenItemsReader.GetSummaryAsync`), aynı pencere (`OpenItemsSummaryRequest.ForToday`), Bugün'deki çiple aynı izin |
 
 - "Denetim gelse defterler hazır mı?" kartı sayı istemez (sabit "6 yasal defter"); BE alanı yoktur.
-- Uyarı bandındaki bağlantılar (FE): HBS → `registers/hbs-prescriptions` ve `registers/hbs-vaccinations`; gün sonu → `end-of-day`; geciken aşı → `/panel/vaccinations?overdue=true`; düşük stok → Stok durumu, düşük stok süzgeci. Sayısı 0 olan uyarı çizilmez (K4).
+- Uyarı bandındaki bağlantılar (FE): HBS → `registers/hbs-prescriptions` ve `registers/hbs-vaccinations`; gün sonu → `end-of-day`; gecikmiş randevu → Randevu takvimi, Durum: Gecikmiş; geciken aşı → `/panel/vaccinations?overdue=true`; düşük stok → Stok durumu, düşük stok süzgeci. Sayısı 0 olan uyarı çizilmez (K4).
 
 ## 5) Hatalar
 
@@ -144,6 +146,7 @@ Nokta şekli: `{ "from": "2026-11-17", "to": "2026-11-17", "value": 0 }`. `from`
 - **Neden 30 gün:** Diğer açık iş sayılarıyla aynı pencere (`OpenItemsDefaults`); sınırsız sayım yıllar önce unutulmuş randevuları da toplar.
 - Tarih ve hekim süzgecinden etkilenmez (diğer `openItems` alanları gibi). Panel bağlantısı: Randevu takvimi, Durum: Gecikmiş.
 - Hesap tek yerde: `IVisitOpenItemsReader.GetSummaryAsync`; pencere `OpenItemsSummaryRequest.ForToday` (`OpenItemsDefaults.OverdueAppointmentLookbackDays`). Gün sonu raporunda `null`.
+- **B-02 (2026-11-23):** Sayı Rapor Merkezi bandına da eklendi (`attention.overdueAppointmentCount`, §11); panel Bugün'de göstermez. Bugün alanı geriye uyum için kalır.
 
 ### 7.1 Bugün: iptal edilen randevular (§10 madde 1)
 
@@ -170,10 +173,20 @@ Birim testleri: `ReportHubPeriod` (ay sonu kırpma, hafta başı Pazartesi, Paza
 ## 9) Frontend etkisi
 
 - Yeni model ve servis `features/reports/hub`; B ana ekranı bu tek uçtan beslenir.
-- Bugün "Açık işler" satırına "Gecikmiş randevu: N" çipi.
+- Bugün "Açık işler" satırına "Gecikmiş randevu: N" çipi. **B-02 ile geri alındı:** gecikmiş randevu ve HBS çipleri Bugün'den kalkar; bant `attention.overdueAppointmentCount` ve `attention.hbsNotEntered*` alanlarını okur (§11).
 - Mevcut uçlar değişmez. `/dashboard/*` uçları Özet kaldırılana kadar aynen çalışır.
 
 ## 10) Açık noktalar (kararlar, 2026-11-20: "açık noktaları da önerine göre yap")
 
 1. **Bugün iptal edilen randevular:** Bugün listesi iptal edilen randevuyu göstermiyordu (`VisitTodayReader`, `Status != Cancelled`). ADR-052 "yoksa Bugün'e" diyor. Karar: gün listesi başlığında "N randevu iptal edildi" sayacı (§7.1).
 2. **Aşı eğilim serisi:** Taslakta "Klinikte ne kadar iş yaptık?" kartında tek çizgi var (muayene). Karar: aşı serisi eklenmez; gerekirse sonradan eklenir.
+
+## 11) Birikmiş işler Bugün'den Rapor Merkezi'ne (B-02, 2026-11-23)
+
+Kullanıcı kararı (seçenek A): Bugün'ün açık iş çiplerinden birikmiş olanlar ("HBS'e girilmedi" reçete ve aşı, "Gecikmiş randevu") Bugün'den çıkar, "Bakmanız gerekenler" bandında durur. ADR-052 K5'teki "zamanı geçmiş randevular Bugün'e" maddesini geri çevirir.
+
+- **Yeni alan:** `attention.overdueAppointmentCount` (int?). Tanım §7 ile aynı; hesap yine tek yerde (`IVisitOpenItemsReader.GetSummaryAsync`, pencere `OpenItemsSummaryRequest.ForToday`). Gün sonu "Ücret yok" sayısıyla tek okumada gelir: ücret yok gün sonu penceresiyle, gecikmiş randevu Bugün penceresiyle.
+- **İzin:** Bugün'deki çiple aynı: `Visits.Read` (Bugün ucunun politikası) **ve** `Appointments.Read`. Biri yoksa `null`. Sayı 0 ise bant çizmez (K4).
+- **HBS:** `attention.hbsNotEnteredPrescriptions` ve `attention.hbsNotEnteredVaccinations` zaten vardı (§4); değişmedi. Sayı Bugün'deki `hbsNotEntered*Count` ile aynı pencere ve kural (§8 testi). İzin: `Prescriptions.Read` / `Vaccinations.Read`; Bugün çipi ayrıca `Visits.Read` ister. Tüm sistem rollerinde (`RolePermissionBindings`) bu izinler `Visits.Read` ile birlikte verildiği için görünürlük fiilen aynıdır.
+- **Bugün ucu değişmez:** `GET /visits/today` yanıtındaki `openItems.overdueAppointmentCount`, `hbsNotEnteredPrescriptionCount` ve `hbsNotEnteredVaccinationCount` kalır (geriye uyum: yayındaki eski panel bir süre aynı ucu çağırabilir). Yeni panel bu alanları Bugün'de göstermez. Alanların kaldırılması, eski panel sürümü yayından çıktıktan sonra ayrı iştir.
+- **Testler:** birim `ReportHubWorkLoaderAttentionTests` (pencere, izin, okuyucu çağrılmaması); entegrasyon `TodayOpenItemsIntegrationTests.Report_Hub_Overdue_Appointments_Should_Equal_Today_And_Follow_Its_Permissions` ve §8 testinde bant sayısı = Bugün sayısı.

@@ -61,12 +61,14 @@ public sealed record ReportHubExaminationsDto(int Count, IReadOnlyList<ReportHub
 public sealed record ReportHubVaccinationsDto(int AppliedCount, int UpcomingCount);
 
 /// <summary>"Bakmanız gerekenler" bandı; her alan kendi izniyle dolar, yoksa null.</summary>
+/// <param name="OverdueAppointmentCount">Bugün'ün <c>openItems.overdueAppointmentCount</c>'u (B-02); <c>Visits.Read</c> ve <c>Appointments.Read</c>.</param>
 public sealed record ReportHubAttentionDto(
     ReportHubPendingDto? HbsNotEnteredPrescriptions,
     ReportHubPendingDto? HbsNotEnteredVaccinations,
     int? EndOfDayUnchargedVisitCount,
     int? OverdueVaccinationCount,
-    int? LowStockProductCount);
+    int? LowStockProductCount,
+    int? OverdueAppointmentCount);
 
 /// <param name="OldestAtUtc">Penceredeki en eski kaydın tarihi; sayı 0 ise null.</param>
 public sealed record ReportHubPendingDto(int Count, DateTime? OldestAtUtc);
