@@ -45,7 +45,7 @@ public sealed class GetVaccinationsCalendarQueryHandlerTests
             .ReturnsAsync(new List<PetNameClientRow> { new(_petId, _clientId, "Pamuk") });
         _clients.Setup(r => r.ListAsync(It.IsAny<ClientsByTenantIdsNameSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<ClientNameRow> { new(_clientId, "Ali Veli") });
-        _vaccinations.Setup(r => r.ListAsync(It.IsAny<AppliedVaccinationDosesForPetsSpec>(), It.IsAny<CancellationToken>()))
+        _vaccinations.Setup(r => r.ListAsync(It.IsAny<NextDueClosingDosesForPetsSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<VaccinationDose>());
     }
 
@@ -192,7 +192,7 @@ public sealed class GetVaccinationsCalendarQueryHandlerTests
         var definitionId = Guid.NewGuid();
         var source = Row(VaccinationStatus.Applied, NowUtc.AddYears(-1), NowUtc.AddDays(2), definitionId: definitionId);
         Rows(source);
-        _vaccinations.Setup(r => r.ListAsync(It.IsAny<AppliedVaccinationDosesForPetsSpec>(), It.IsAny<CancellationToken>()))
+        _vaccinations.Setup(r => r.ListAsync(It.IsAny<NextDueClosingDosesForPetsSpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<VaccinationDose> { new(Guid.NewGuid(), _petId, definitionId, "Karma", NowUtc.AddDays(-10)) });
 
         var result = await CreateHandler().Handle(new GetVaccinationsCalendarQuery(FromUtc, ToUtc), CancellationToken.None);

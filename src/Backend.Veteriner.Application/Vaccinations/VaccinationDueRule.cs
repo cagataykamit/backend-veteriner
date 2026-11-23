@@ -8,8 +8,8 @@ namespace Backend.Veteriner.Application.Vaccinations;
 /// <summary>
 /// Vadeli aşının "gecikmiş" ve "yaklaşan" tanımı (ADR-028): gün sınırı klinik yerel günüdür (Europe/Istanbul).
 /// Vadeli aşı (<see cref="IsOpenDue(IReadOnlyCollection{Guid})"/>) = planlı aşı ya da uygulanmış aşının sonraki uygulama tarihi
-/// (<c>Applied</c> + <c>DueAtUtc</c>; E-vet aktarması dahil). Sonraki tarih, aynı hayvana aynı aşı daha sonra uygulanınca karşılanmıştır
-/// (<see cref="IsNextDueFulfilled"/>) ve vadeli sayılmaz; karşılanmış kayıt kimlikleri sorgudan önce <see cref="VaccinationNextDueReads"/>
+/// (<c>Applied</c> + <c>DueAtUtc</c>; E-vet aktarması dahil). Sonraki tarih, aynı hayvana aynı aşı daha sonra uygulanınca ya da planlanınca
+/// karşılanmıştır (<see cref="IsNextDueFulfilled"/>) ve vadeli sayılmaz; karşılanmış kayıt kimlikleri sorgudan önce <see cref="VaccinationNextDueReads"/>
 /// ile okunur ve ifadelere verilir.
 /// Gecikmiş = vadesi son <see cref="OverdueVisibleMonths"/> takvim ayı içinde ve bugünün başından önce (<see cref="OverdueWindow(DateOnly)"/>);
 /// bugün vadesi olan aşı saati geçse de gecikmiş değildir. Pencereden eski vade hiçbir gecikmiş görünümünde (liste filtresi, sayaçlar,
@@ -94,20 +94,46 @@ public static class VaccinationDueRule
 
     /// <summary>
     /// Sonraki uygulama tarihi karşılandı mı: aynı hayvana aynı aşı (<see cref="IsSameVaccine"/>) bu uygulamadan sonra yeniden uygulanmışsa
-    /// vade kapanmıştır. Planlı kayıt bu kurala girmez; uygulanınca durumu değişir. Kiracının bütün klinikleri sayılır (hayvan kiracıya aittir).
+    /// ya da bu uygulamadan sonraki bir tarihe planlanmışsa (planlı kayıt, sonraki tarihten erken ya da geç olsun) vade kapanmıştır; aynı aşı
+    /// bir kez vadeli sayılır ve vade planlı kayıttan izlenir (2026-11-23 kararı). İptal edilen kayıt kapatmaz. Kaynak kayıt planlı olamaz;
+    /// planlı kayıt uygulanınca durumu değişir. Kiracının bütün klinikleri sayılır (hayvan kiracıya aittir).
     /// </summary>
-    public static bool IsNextDueFulfilled(VaccinationDose source, IEnumerable<VaccinationDose> appliedDoses)
-        => appliedDoses.Any(d => d.Id != source.Id
+    /// <param name="closingDoses">Kapatabilecek kayıtlar (<see cref="ClosesNextDueAfter"/>, <see cref="ClosingDoseAtUtc"/>).</param>
+    public static bool IsNextDueFulfilled(VaccinationDose source, IEnumerable<VaccinationDose> closingDoses)
+        => closingDoses.Any(d => d.Id != source.Id
                                  && d.PetId == source.PetId
-                                 && d.AppliedAtUtc > source.AppliedAtUtc
+                                 && d.AtUtc > source.AtUtc
                                  && IsSameVaccine(d, source));
 
     /// <summary><paramref name="sources"/> içinden sonraki tarihi karşılanmış olanların kimlikleri.</summary>
-    public static HashSet<Guid> FulfilledNextDueIds(IEnumerable<VaccinationDose> sources, IEnumerable<VaccinationDose> appliedDoses)
+    public static HashSet<Guid> FulfilledNextDueIds(IEnumerable<VaccinationDose> sources, IEnumerable<VaccinationDose> closingDoses)
     {
-        var byPet = appliedDoses.ToLookup(d => d.PetId);
+        var byPet = closingDoses.ToLookup(d => d.PetId);
         return sources.Where(s => IsNextDueFulfilled(s, byPet[s.PetId])).Select(s => s.Id).ToHashSet();
     }
+
+    /// <summary>
+    /// Sonraki tarihi kapatabilecek kayıt, anı <paramref name="afterUtc"/>'den sonra: uygulanmış aşı (uygulama anı) ya da planlı aşı
+    /// (planlanan tarih). Anı <see cref="AsClosingDose"/> verir; bellekteki karşılığı <see cref="ClosingDoseAtUtc"/>.
+    /// </summary>
+    public static Expression<Func<Vaccination, bool>> ClosesNextDueAfter(DateTime afterUtc)
+        => v => (v.Status == VaccinationStatus.Applied && v.AppliedAtUtc != null && v.AppliedAtUtc > afterUtc)
+                || (v.Status == VaccinationStatus.Scheduled && v.DueAtUtc != null && v.DueAtUtc > afterUtc);
+
+    /// <summary><see cref="ClosesNextDueAfter"/> kaydının kapatma dozu: uygulanmışta uygulama anı, planlıda planlanan tarih.</summary>
+    public static readonly Expression<Func<Vaccination, VaccinationDose>> AsClosingDose
+        = v => new VaccinationDose(
+            v.Id, v.PetId, v.VaccineDefinitionId, v.VaccineName,
+            v.Status == VaccinationStatus.Applied ? v.AppliedAtUtc!.Value : v.DueAtUtc!.Value);
+
+    /// <summary>Bellekteki kayıt için <see cref="ClosesNextDueAfter"/> + <see cref="AsClosingDose"/> ile aynı an; kapatamayan kayıtta <c>null</c>.</summary>
+    public static DateTime? ClosingDoseAtUtc(VaccinationStatus status, DateTime? appliedAtUtc, DateTime? dueAtUtc)
+        => status switch
+        {
+            VaccinationStatus.Applied => appliedAtUtc,
+            VaccinationStatus.Scheduled => dueAtUtc,
+            _ => null,
+        };
 
     /// <summary>Aynı aşı: iki kayıtta da tanım varsa tanım kimliği, yoksa (tanımsız eski kayıt) Türkçe büyük/küçük harf duyarsız ad.</summary>
     public static bool IsSameVaccine(VaccinationDose a, VaccinationDose b)
@@ -123,5 +149,8 @@ public static class VaccinationDueRule
 /// <summary>Gecikmiş aşı penceresi (UTC, yarı açık): <c>[FromUtc, BeforeUtc)</c>; bkz. <see cref="VaccinationDueRule.OverdueWindow(DateOnly)"/>.</summary>
 public readonly record struct VaccinationOverdueWindow(DateTime FromUtc, DateTime BeforeUtc);
 
-/// <summary>Karşılanma kuralı için uygulanmış doz (<see cref="VaccinationDueRule.IsNextDueFulfilled"/>).</summary>
-public sealed record VaccinationDose(Guid Id, Guid PetId, Guid? VaccineDefinitionId, string VaccineName, DateTime AppliedAtUtc);
+/// <summary>
+/// Karşılanma kuralı için doz (<see cref="VaccinationDueRule.IsNextDueFulfilled"/>). <see cref="AtUtc"/>: kaynak ve uygulanmış dozda uygulama
+/// anı, planlı dozda planlanan tarih.
+/// </summary>
+public sealed record VaccinationDose(Guid Id, Guid PetId, Guid? VaccineDefinitionId, string VaccineName, DateTime AtUtc);

@@ -184,6 +184,23 @@ public sealed class GetPortalPetVaccinationsQueryHandlerTests
     }
 
     [Fact]
+    public async Task Planned_Same_Vaccine_Should_Close_NextDue_So_Vaccine_Is_Listed_Once()
+    {
+        GivenPet();
+        // 2026-11-23 kararı: uygulanmış aşının sonraki tarihi + aynı aşının planlı kaydı çift sayılmaz; planlı kayıt kalır.
+        var now = new DateTime(2026, 11, 22, 9, 0, 0, DateTimeKind.Utc);
+        var kuduz = Guid.NewGuid();
+        var nextDue = Guid.NewGuid();
+        var planned = Guid.NewGuid();
+        _rows.Add(new PortalVaccinationRow(nextDue, "Kuduz", VaccinationStatus.Applied, now.AddYears(-1), now.AddDays(10), now, kuduz));
+        _rows.Add(new PortalVaccinationRow(planned, "Kuduz", VaccinationStatus.Scheduled, null, now.AddDays(20), now, kuduz));
+
+        var result = await SendAsync(now);
+
+        result.Value!.Upcoming.Should().ContainSingle().Which.VaccinationId.Should().Be(planned);
+    }
+
+    [Fact]
     public async Task Pet_Not_Of_Link_Client_Should_Be_Not_Found()
     {
         _pet = null;

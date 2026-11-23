@@ -13,7 +13,7 @@ public static class VaccinationNextDueReads
 {
     /// <summary>
     /// Vadesi <c>[dueFromUtc, dueToUtcExclusive)</c> içinde (verilen uçlarla) ve kapsamdaki sonraki tarihi olan uygulanmış aşılardan,
-    /// aynı hayvana aynı aşı daha sonra uygulanmış olanların kimlikleri.
+    /// aynı hayvana aynı aşı daha sonra uygulanmış ya da planlanmış olanların kimlikleri.
     /// </summary>
     public static async Task<IReadOnlySet<Guid>> FulfilledNextDueIdsAsync(
         this IReadRepository<Vaccination> vaccinations,
@@ -31,8 +31,8 @@ public static class VaccinationNextDueReads
             return new HashSet<Guid>();
 
         var later = await vaccinations.ListAsync(
-            new AppliedVaccinationDosesForPetsSpec(
-                tenantId, sources.Select(s => s.PetId).Distinct().ToArray(), sources.Min(s => s.AppliedAtUtc)),
+            new NextDueClosingDosesForPetsSpec(
+                tenantId, sources.Select(s => s.PetId).Distinct().ToArray(), sources.Min(s => s.AtUtc)),
             ct);
         return VaccinationDueRule.FulfilledNextDueIds(sources, later ?? []);
     }
