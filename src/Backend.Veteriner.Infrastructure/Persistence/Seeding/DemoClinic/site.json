@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "content": {
+    "clinic": {
+      "logo": null,
+      "slogan": "Kedi ve köpekler için mahallenin kliniği",
+      "intro": "Kedi, köpek ve küçük evcil hayvanlar için muayene, aşı, laboratuvar ve yatış hizmeti veriyoruz.",
+      "whatsapp": "",
+      "website": "",
+      "mapUrl": "",
+      "instagram": "",
+      "facebook": ""
+    },
+    "copy": {
+      "heroEyebrow": "Kadıköy, İstanbul",
+      "heroTitle": "Minik dostunuz bugün nasıl?",
+      "heroText": "Randevunuzu internetten alın, aşı hatırlatmaları size gelsin.",
+      "ctaPrimary": "Randevu alalım",
+      "ctaSecondary": "Neler yapıyoruz?",
+      "aboutTitle": "Biz kimiz?",
+      "aboutText": "Küçük hayvanlara bakan bir kliniğiz. Her muayenenin sonunda ne yapıldığını ve sırada ne olduğunu yazılı olarak paylaşırız.\n\nKlinik içi laboratuvarımız ve yatış servisimizle tahlil sonuçlarını aynı gün değerlendiririz.",
+      "servicesTitle": "Neyle geldiniz?",
+      "servicesIntro": "Klinikte yapabildiklerimiz.",
+      "teamTitle": "Tanışalım",
+      "teamIntro": "Hekimlerimizle tanışın.",
+      "featuresTitle": "Burada işler nasıl yürür?",
+      "galleryTitle": "Klinikten kareler",
+      "guideTitle": "Küçük notlar",
+      "contactTitle": "Bize uğrayın",
+      "contactText": "Sorunuz ne olursa olsun çekinmeyin; arayın, yazın ya da gelin."
+    },
+    "heroImage": null,
+    "aboutImage": null,
+    "services": [
+      { "slug": "genel-muayene", "title": "Genel muayene", "summary": "Tartı, ateş, kalp ve akciğer dinleme.", "body": "Her ziyarette önce hayvanınızı tartar, ateşine bakarız.\n\nMuayene sonunda ne bulduğumuzu ve sırada ne olduğunu anlatırız.", "image": null },
+      { "slug": "asi-koruyucu-bakim", "title": "Aşı ve koruyucu bakım", "summary": "Yaşına göre aşı takvimi ve hatırlatma.", "body": "Aşı takvimini birlikte planlar, tarihi yaklaşınca size hatırlatırız.", "image": null },
+      { "slug": "laboratuvar", "title": "Laboratuvar ve görüntüleme", "summary": "Kan, idrar tetkikleri; röntgen ve ultrason.", "body": "Sonuçları ve görüntüleri birlikte inceler, size de iletiriz.", "image": null },
+      { "slug": "yatis", "title": "Yatış ve gözlem", "summary": "Tedavi süresince gözetim altında bakım.", "body": "Yatan hastalarımızın vital bulgularını gün boyu takip ederiz.", "image": null }
+    ],
+    "members": [
+      { "slug": "deniz-aksoy", "kind": "hekim", "name": "Vet. Hek. Deniz Aksoy", "title": "Veteriner hekim", "specialties": "İç hastalıkları, kedi hekimliği", "bio": "Kedi ve köpek iç hastalıklarıyla ilgileniyor.", "image": null },
+      { "slug": "ozan-tekin", "kind": "hekim", "name": "Vet. Hek. Ozan Tekin", "title": "Veteriner hekim", "specialties": "Cerrahi, görüntüleme", "bio": "Küçük hayvan cerrahisi ve ultrason üzerine çalışıyor.", "image": null }
+    ],
+    "features": [
+      { "title": "Önce anlatırız", "text": "İşlemden önce nedenini ve seçenekleri söyleriz." },
+      { "title": "Yazılı takip", "text": "Aşı ve kontrol tarihleri size yazılı ulaşır." },
+      { "title": "Online randevu", "text": "Uygun saati internetten seçip talep gönderebilirsiniz." }
+    ],
+    "gallery": [],
+    "articles": [
+      { "slug": "yavru-kediyle-ilk-ziyaret", "category": "Kedi", "title": "Yavru kediyle ilk ziyaret", "summary": "Gelmeden önce küçük hazırlıklar.", "body": "Taşıma çantasını birkaç gün önceden evde açık bırakın.\n\nİlk aşı tarihini muayenede birlikte belirleriz.", "minutes": 3, "image": null },
+      { "slug": "asi-takvimi", "category": "Koruyucu bakım", "title": "Aşı takvimi nasıl planlanır?", "summary": "Hangi sorularla başlıyoruz.", "body": "Yaş, yaşam alanı ve önceki aşılar takvimin temelini oluşturur.", "minutes": 4, "image": null }
+    ],
+    "faqs": [
+      { "question": "Randevusuz gelebilir miyim?", "answer": "Gelebilirsiniz; ancak önce aramanız bekleme süresini kısaltır." },
+      { "question": "Hafta sonu açık mısınız?", "answer": "Cumartesi açığız, pazar kapalıyız." }
+    ],
+    "emergencyText": "",
+    "branches": []
+  },
+  "design": {
+    "conceptKey": "friendly",
+    "colors": { "primary": "#c8401f", "secondary": "#f2b233", "accent": "#0f6b62" },
+    "ground": "krem",
+    "headFont": "bricolage",
+    "bodyFont": "figtree",
+    "radius": "yuvarlak",
+    "logoPlacement": "sol",
+    "character": "samimi",
+    "sections": { "nav": "friendly", "hero": "friendly", "about": "friendly", "services": "friendly", "team": "friendly", "features": "friendly", "gallery": "friendly", "guide": "friendly", "contact": "friendly", "footer": "friendly" }
+  },
+  "structure": {
+    "pages": { "hakkimizda": true, "hekimler": true, "hizmetler": true, "hizmetDetay": true, "rehber": true, "galeri": false, "iletisim": true, "acil": false, "sss": true, "randevu": true, "ekibimiz": true, "subeler": false },
+    "homeSections": [
+      { "type": "about", "on": true },
+      { "type": "services", "on": true },
+      { "type": "team", "on": true },
+      { "type": "features", "on": true },
+      { "type": "gallery", "on": false },
+      { "type": "guide", "on": true },
+      { "type": "contact", "on": true }
+    ]
+  },
+  "seo": { "title": "", "description": "Kadıköy'de kedi, köpek ve küçük evcil hayvanlar için muayene, aşı, laboratuvar ve yatış hizmeti veren veteriner kliniği.", "ogImage": null, "favicon": null },
+  "publish": { "siteName": "" }
+}
