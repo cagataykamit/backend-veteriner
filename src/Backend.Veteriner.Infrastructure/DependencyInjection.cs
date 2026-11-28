@@ -429,7 +429,14 @@ public static class DependencyInjection
         services.AddScoped<NilveraClient>();
         services.AddScoped<NilveraEDocumentProvider>();
         services.AddScoped<IEDocumentProvider>(sp => sp.GetRequiredService<NilveraEDocumentProvider>());
-        services.AddScoped<IEDocumentCredentialProvider>(sp => sp.GetRequiredService<NilveraEDocumentProvider>());
+        // Test örneği (varsayılandan sonra kaydedilir): EDocuments:TestTenantIds listesindeki kiracı canlı API'de de Nilvera test
+        // ortamına bağlanır (EDocumentEnvironmentOptions).
+        services.AddScoped<IEDocumentProvider>(sp => new NilveraEDocumentProvider(new NilveraClient(
+            sp.GetRequiredService<IHttpClientFactory>(),
+            Microsoft.Extensions.Options.Options.Create(sp.GetRequiredService<IOptions<NilveraOptions>>().Value.ForTest()),
+            sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<ILogger<NilveraClient>>())));
+        services.Configure<EDocumentEnvironmentOptions>(configuration.GetSection(EDocumentEnvironmentOptions.SectionName));
         services.Configure<EDocumentProcessorOptions>(configuration.GetSection(EDocumentProcessorOptions.SectionName));
         services.AddSingleton<EDocumentStatusProcessor>();
         services.AddHostedService<EDocumentStatusHostedService>();

@@ -22,9 +22,9 @@ public sealed class NilveraEDocumentProviderTests
 
     private readonly FakeNilvera _server = new();
 
-    private NilveraEDocumentProvider Provider()
+    private NilveraEDocumentProvider Provider(EDocumentEnvironment environment = EDocumentEnvironment.Test)
     {
-        var options = Options.Create(new NilveraOptions { ApiBaseUrl = "https://nilvera.test", Environment = EDocumentEnvironment.Test });
+        var options = Options.Create(new NilveraOptions { ApiBaseUrl = "https://nilvera.test", Environment = environment });
         var client = new NilveraClient(new StubHttpClientFactory(_server), options, TimeProvider.System, NullLogger<NilveraClient>.Instance);
         return new NilveraEDocumentProvider(client);
     }
@@ -265,15 +265,30 @@ public sealed class NilveraEDocumentProviderTests
     }
 
     [Fact]
-    public async Task Check_EInvoice_Waiting_Should_Stay_Pending()
+    public async Task Check_EInvoice_Waiting_Should_Stay_Pending_In_Live()
     {
         _server.On("GET", $"/einvoice/Sale/{Reference}/Status", HttpStatusCode.OK, """{"InvoiceStatus":{"Code":"waiting"}}""");
 
-        var result = await Provider().CheckAsync(Account(), Refs(EDocumentType.EInvoice), CancellationToken.None);
+        var result = await Provider(EDocumentEnvironment.Live).CheckAsync(Account(), Refs(EDocumentType.EInvoice), CancellationToken.None);
 
         result.Value!.State.Should().Be(ProviderIssueState.Pending);
         result.Value.ProviderJobId.Should().Be(Reference);
         _server.Requests.Should().NotContain(r => r.Path.Contains("/Details"));
+    }
+
+    [Fact]
+    public async Task Check_EInvoice_Saved_With_Number_Should_Be_Issued_In_Test_Without_Buyer_Answer()
+    {
+        // Test ortamı e-Faturayı numaralayıp kaydeder, alıcıya iletmez ("Belge Kaydedildi").
+        _server.On("GET", $"/einvoice/Sale/{Reference}/Status", HttpStatusCode.OK,
+            """{"InvoiceProfile":"TICARIFATURA","InvoiceStatus":{"Code":"waiting","Description":"Belge Kaydedildi."}}""");
+        _server.On("GET", $"/einvoice/Sale/{Reference}/Details", HttpStatusCode.OK, """{"InvoiceNumber":"1002026900000224","InvoiceAmount":2500.0}""");
+
+        var result = await Provider().CheckAsync(Account(), Refs(EDocumentType.EInvoice), CancellationToken.None);
+
+        result.Value!.State.Should().Be(ProviderIssueState.Issued);
+        result.Value.DocumentNumber.Should().Be("1002026900000224");
+        result.Value.AwaitsBuyerAnswer.Should().BeFalse();
     }
 
     [Fact]

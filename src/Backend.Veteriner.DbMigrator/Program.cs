@@ -391,6 +391,26 @@ try
                     : $"{changes.Count} urun adi duzeltildi.");
                 break;
             }
+        case "seed-demo-clinic":
+            {
+                if (!Guid.TryParse(ReadOption(args, "--tenant"), out var tenantId))
+                {
+                    Console.Error.WriteLine("seed-demo-clinic requires --tenant <guid>.");
+                    return 1;
+                }
+
+                var aiCredits = int.TryParse(ReadOption(args, "--ai-credits"), out var parsedCredits) ? parsedCredits : 2000;
+                // Portal parolası komut satırına yazılmaz (kabuk geçmişine düşer); yalnız ortam değişkeninden okunur.
+                var portalPassword = Environment.GetEnvironmentVariable("VETINITY_DEMO_PORTAL_PASSWORD");
+                var seeder = ActivatorUtilities.CreateInstance<DemoClinicSeeder>(sp);
+                // --only karamel: mevcut tanıtım verisine dokunmadan yalnız Karamel'in geçmişini ekler.
+                var lines = string.Equals(ReadOption(args, "--only"), "karamel", StringComparison.OrdinalIgnoreCase)
+                    ? await seeder.ExtendKaramelAsync(tenantId, CancellationToken.None)
+                    : await seeder.RunAsync(tenantId, portalPassword, aiCredits, CancellationToken.None);
+                foreach (var line in lines)
+                    Console.WriteLine(line);
+                break;
+            }
         default:
             Console.Error.WriteLine($"Unknown command: {args[0]}");
             PrintHelp();
@@ -497,6 +517,12 @@ static void PrintHelp()
           fix-product-names --tenant <guid> [--dry-run] — Kiracının ürün adlarındaki noktasız ı'yı aktarmayla aynı sözlükle
                                             düzeltir (ProductNameSpelling; idempotent). Önce/sonra listesi stdout'a (sekmeyle ayrılmış);
                                             --dry-run veritabanına yazmaz
+          seed-demo-clinic --tenant <guid> [--ai-credits 2000] — Tanıtım kliniği: kiracının kliniğini kurgusal veriyle her
+                                            ekranı dolu olacak biçimde doldurur (DemoClinicSeeder; tekrar çalıştırılabilir: örnek
+                                            veriyi silip bugüne göre yeniden üretir). Paketi Kurumsal yapar, yapay zekâyı açar.
+                                            Portal hesabı (demo.sahip@example.com) yalnız VETINITY_DEMO_PORTAL_PASSWORD doluysa
+                                            kurulur. FileStorage:RootPath API ile aynı mutlak yol olmalı. --only karamel: mevcut
+                                            veriyi silmeden yalnız Karamel'in geçmişini ekler (varsa yazmaz)
 
         Load test ortamı (DOTNET_ENVIRONMENT=LoadTest):
           Command DB : VetinityCommandDb_LoadTest  (DefaultConnection / migrate / loadtest-seed)

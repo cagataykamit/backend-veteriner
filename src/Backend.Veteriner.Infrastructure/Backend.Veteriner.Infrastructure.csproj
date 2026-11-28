@@ -49,4 +49,9 @@
     <AdditionalFiles Include="BannedSymbols.txt" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Tanıtım kliniği eklentileri ve web sitesi ayarı (DemoClinicSeeder; kurgusal). -->
+    <EmbeddedResource Include="Persistence\Seeding\DemoClinic\*" LogicalName="DemoClinic.%(Filename)%(Extension)" />
+  </ItemGroup>
+
 </Project>
