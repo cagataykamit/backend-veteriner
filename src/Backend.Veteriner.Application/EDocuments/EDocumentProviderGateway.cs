@@ -2,6 +2,7 @@ using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.EDocuments.Providers;
 using Backend.Veteriner.Domain.EDocuments;
 using Backend.Veteriner.Domain.Shared;
+using Microsoft.Extensions.Options;
 
 namespace Backend.Veteriner.Application.EDocuments;
 
@@ -17,12 +18,18 @@ public sealed class EDocumentProviderGateway
     private readonly IEDocumentProviderResolver _providers;
     private readonly ISecretProtector _protector;
     private readonly TimeProvider _timeProvider;
+    private readonly EDocumentEnvironmentOptions _environment;
 
-    public EDocumentProviderGateway(IEDocumentProviderResolver providers, ISecretProtector protector, TimeProvider timeProvider)
+    public EDocumentProviderGateway(
+        IEDocumentProviderResolver providers,
+        ISecretProtector protector,
+        TimeProvider timeProvider,
+        IOptions<EDocumentEnvironmentOptions> environment)
     {
         _providers = providers;
         _protector = protector;
         _timeProvider = timeProvider;
+        _environment = environment.Value;
     }
 
     public Result<EDocumentProviderSession> Open(EDocumentConnection? connection)
@@ -30,7 +37,14 @@ public sealed class EDocumentProviderGateway
         if (connection is null || !connection.IsUsable)
             return Result<EDocumentProviderSession>.Failure(NotConnected(connection));
 
-        var provider = _providers.Find(connection.ProviderCode);
+        // Test kiracısının listeye alınmadan önce kurulmuş canlı bağlantısı kullanılmaz: belgesi GİB'e gitmesin.
+        if (connection.Environment != EDocumentEnvironment.Test && _environment.IsTestTenant(connection.TenantId))
+        {
+            connection.RequireReauthorization("Bu klinik e-belge test ortamına alındı; hesabı test ortamı anahtarıyla yeniden bağlayın.", Now());
+            return Result<EDocumentProviderSession>.Failure(NotConnected(connection));
+        }
+
+        var provider = _providers.Find(connection.ProviderCode, connection.Environment);
         if (provider is null || !provider.IsConfigured)
             return Result<EDocumentProviderSession>.Failure(ProviderNotConfigured());
 

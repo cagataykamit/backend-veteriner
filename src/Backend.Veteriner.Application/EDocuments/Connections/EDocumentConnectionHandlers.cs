@@ -64,15 +64,15 @@ public sealed class StartEDocumentAuthorizationCommandHandler
         if (!access.IsSuccess)
             return Result<EDocumentAuthorizationStartDto>.Failure(access.Error);
 
+        var caller = access.Value!;
         var code = request.Provider?.Trim() ?? string.Empty;
-        var provider = _providers.Find(code);
+        var provider = _providers.FindForTenant(code, caller.TenantId);
         var oauth = _providers.FindOAuth(code);
         if (provider is null || oauth is null)
             return Result<EDocumentAuthorizationStartDto>.Failure("EDocuments.Validation", "Desteklenmeyen e-belge sağlayıcısı.");
         if (!provider.IsConfigured)
             return Result<EDocumentAuthorizationStartDto>.Failure(EDocumentProviderGateway.ProviderNotConfigured());
 
-        var caller = access.Value!;
         var (verifier, challenge) = EDocumentConnectionService.CreatePkcePair();
         var state = _service.CreateState(new EDocumentAuthorizationState(caller.TenantId, request.ClinicId, caller.UserId, provider.ProviderCode, verifier));
         return Result<EDocumentAuthorizationStartDto>.Success(new EDocumentAuthorizationStartDto(oauth.BuildAuthorizationUrl(state, challenge)));
@@ -129,7 +129,7 @@ public sealed class CompleteEDocumentAuthorizationCommandHandler
         if (string.IsNullOrWhiteSpace(request.Code))
             return Fail(state.ClinicId, "missing-code", "kod yok");
 
-        var provider = _providers.Find(state.Provider);
+        var provider = _providers.FindForTenant(state.Provider, state.TenantId);
         var oauth = _providers.FindOAuth(state.Provider);
         if (provider is null || oauth is null || !provider.IsConfigured)
             return Fail(state.ClinicId, "not-configured", "sağlayıcı yapılandırılmamış");
@@ -254,10 +254,10 @@ public sealed class ConnectEDocumentWithCredentialsCommandHandler
         if (!access.IsSuccess)
             return Result<EDocumentConnectionDto>.Failure(access.Error);
 
+        var caller = access.Value!;
         var code = request.Provider?.Trim() ?? string.Empty;
-        var provider = _providers.Find(code);
-        var credentialProvider = _providers.FindCredential(code);
-        if (provider is null || credentialProvider is null)
+        var provider = _providers.FindForTenant(code, caller.TenantId);
+        if (provider is not IEDocumentCredentialProvider credentialProvider)
             return Result<EDocumentConnectionDto>.Failure("EDocuments.Validation", "Desteklenmeyen e-belge sağlayıcısı.");
         if (!provider.IsConfigured)
             return Result<EDocumentConnectionDto>.Failure(EDocumentProviderGateway.ProviderNotConfigured());
@@ -277,7 +277,6 @@ public sealed class ConnectEDocumentWithCredentialsCommandHandler
                 : EDocumentErrors.FromProvider(error));
         }
 
-        var caller = access.Value!;
         var account = identified.Value!;
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var connection = await _connections.FirstOrDefaultAsync(
