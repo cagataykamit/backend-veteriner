@@ -210,6 +210,8 @@ public sealed class NilveraEDocumentProvider : IEDocumentProvider, IEDocumentCre
     /// <c>unknown</c> "Rapor Oluşturulmadı" kalır; test ortamında görüldü). Bu türlerde belge numara almışsa ve durum
     /// <c>error</c> değilse kesilmiş sayılır. e-Fatura alıcıya iletilince (<c>succeed</c>) kesilmiş sayılır; ticari senaryoda alıcı
     /// yanıtı ayrıca izlenir (<see cref="GetBuyerAnswerAsync"/>), red kesimden sonra gelir.
+    /// <para>Test ortamı e-Faturayı numaralayıp kaydeder ama alıcıya hiç iletmez ("Belge Kaydedildi", zarfsız; 2026-11-28
+    /// portalda tüm test faturalarında görüldü): orada e-Fatura da numara alınca kesilmiş sayılır, alıcı yanıtı beklenmez.</para>
     /// </summary>
     private async Task<ProviderIssueOutcome?> ReadOutcomeAsync(string apiKey, EDocumentType type, Guid reference, CancellationToken ct)
     {
@@ -219,10 +221,11 @@ public sealed class NilveraEDocumentProvider : IEDocumentProvider, IEDocumentCre
         if (status is null)
             return null;
 
+        var undelivered = type == EDocumentType.EInvoice && status.Code != "succeed";
         switch (status.Code)
         {
             case "succeed":
-            case not "error" when type != EDocumentType.EInvoice:
+            case not "error" when type != EDocumentType.EInvoice || Environment == EDocumentEnvironment.Test:
                 var details = await _client.SendAsync(
                     apiKey, HttpMethod.Get, $"/{service.Api}/{service.Collection}/{uuid}/Details", null,
                     $"/{service.Api}/{service.Collection}/{{uuid}}/Details", ct);
@@ -231,7 +234,7 @@ public sealed class NilveraEDocumentProvider : IEDocumentProvider, IEDocumentCre
                 if (string.IsNullOrWhiteSpace(number))
                     return ProviderIssueOutcome.Pending(uuid, uuid);
                 var total = Decimal(details.Body?[service.AmountField]);
-                var awaitsAnswer = type == EDocumentType.EInvoice && (status.Profile ?? CommercialProfile) == CommercialProfile;
+                var awaitsAnswer = type == EDocumentType.EInvoice && !undelivered && (status.Profile ?? CommercialProfile) == CommercialProfile;
                 return new ProviderIssueOutcome(ProviderIssueState.Issued, uuid, uuid, null, number, uuid, total, awaitsAnswer);
             case "error":
                 throw new NilveraException(new ProviderError(
