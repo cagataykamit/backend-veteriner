@@ -2,7 +2,7 @@
 
 Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-008-embedded-ai-assistant.md` (AI yalnız taslak üretir, anahtar yalnız backend'de, AI durursa klinik akış sürer), `decisions/ADR-044-ai-eklentisi-kredi-ve-fon.md` (madde 3 model, madde 7 kota bitince yalnız AI durur, madde 8 maliyet sınırları ve gerçek token/maliyet kaydı), `decisions/ADR-006-patient-timeline.md` (kaynaklar ve kayda bağlantı), backlog `AI-002`, `AI-007`, `AI-008`, `TIER-014`. İlgili: `PET_TIMELINE_API_CONTRACT.md` (tür adları, tür bazlı izin, klinik kapsamı). Hata zarfı standart `ProblemDetails` + `extensions.code`.
 
-> **Durum:** Uygulandı (kod + test), dal `feature/ai-gecmis-ozeti`. **Migration var** (`AddAiUsage`: `AiUsageRecords`, `ClinicAiSettings`; mevcut tablolara dokunmaz). **Yeni izin:** `Ai.Use` (seed gerekir). Claude API hesabı henüz açılmadı: anahtar yokken özellik **kapalıdır** ve hata fırlatmaz; anahtar backend ayarına konunca açılır. Kredi satışı/ödeme (ADR-044 tarifesi) bu işin dışındadır. **4. dalga (`feature/ai-kota`):** kredi kotası, fon ve uyarılar (AI-007, §4a), platform yönetimi klinik listesi / fon / aylık kırılımlar (AI-008, §3); migration `AddAiCredits`.
+> **Durum:** Uygulandı (kod + test), dal `feature/ai-gecmis-ozeti`. **Migration var** (`AddAiUsage`: `AiUsageRecords`, `ClinicAiSettings`; mevcut tablolara dokunmaz). **Yeni izin:** `Ai.Use` (seed gerekir). Claude API hesabı henüz açılmadı: anahtar yokken özellik **kapalıdır** ve hata fırlatmaz; anahtar backend ayarına konunca açılır. Kredi satışı/ödeme (ADR-044 tarifesi) bu işin dışındadır. **4. dalga (`feature/ai-kota`):** kredi kotası, fon ve uyarılar (AI-007, §4a), platform yönetimi klinik listesi / fon / aylık kırılımlar (AI-008, §3); migration `AddAiCredits`. **TIER-013 Dilim 1 (`feature/ai-klinik-ayari`):** kliniğin kendi AI ayarı, aç/kapa ve bilgilendirme kabulü (§3a); migration `AddClinicAiAcknowledgement`.
 
 ---
 
@@ -12,7 +12,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ürün deposu `decisions/ADR-008-em
 |---|---|---|
 | Sağlayıcı anahtarı | `Ai:Anthropic:ApiKey` (user-secrets ya da `Ai__Anthropic__ApiKey` ortam değişkeni; appsettings'e yazılmaz) | `Ai.NotConfigured` |
 | Genel anahtar ve model fiyatı | `Ai:Enabled = true`, `Ai:Model`'in fiyatı `Ai:Prices`'ta | `Ai.NotConfigured` |
-| Klinikte AI açık | `ClinicAiSettings` (kayıt yoksa **kapalı**); yalnız platform yöneticisi açar (§3) | `Ai.ClinicNotEnabled` |
+| Klinikte AI açık | `ClinicAiSettings` (kayıt yoksa **kapalı**); klinik yöneticisi bilgilendirmeyi kabul ederek açar (§3a), platform yöneticisi kabulsüz açıp kapatabilir (§3) | `Ai.ClinicNotEnabled` |
 | Kullanıcı izni | `Ai.Use` (Admin, Owner, ClinicAdmin, Veteriner; Sekreter yok) | 403 (policy) |
 | Aktif klinik | JWT `clinic_id` (ya da mevcut klinik bağlamı) | `Clinics.ClinicSelectionRequired` |
 | Sınırlar | §4 | `Ai.ClinicQuotaExceeded`, `Ai.SystemBudgetExhausted`, `Ai.RateLimited` |
@@ -169,6 +169,42 @@ Fon hareketleri, yeniden eskiye, en çok 100: `[{ "id", "kind": "Manual", "credi
 - `clinics`, `features`, `models` maliyete göre azalan. Bu ay için AI'si açık olup henüz kullanmayan klinikler de sıfırlarla gelir; geçmiş aylarda yalnız kullananlar.
 - `users` (2026-11-20, kötüye kullanım takibi): ayın en çok harcayan **50** kullanıcı–klinik satırı, maliyete sonra istek sayısına göre azalan. Kullanıcı birden çok klinikte kullandıysa her klinik ayrı satırdır. `userName` görünen ad (yoksa boş), `email` hesabın e-postası. Klinik metni dönmez. Kullanıcı başına dakikada `userRequestsPerMinute` sınırı ayrıca geçerlidir.
 - `feature` değerleri: `PetHistorySummary`, `ExamNoteStructure`, `OwnerExplanation`, `DischargeInstructions`.
+
+## 3a) Klinik ayarı — `api/v1/clinics/{clinicId}/ai-settings` (ADR-044 E1, TIER-013 Dilim 1)
+
+Klinik ayarlarındaki "Yapay zekâ" sayfası için. Klinik kiracıda olmalı, atanmış klinik kapsamı uygulanan kullanıcı o kliniğe atanmış olmalı (`ClinicDefinitionAccess`; online randevu ve portal ayarlarıyla aynı kural). Dolar, platform iç notu ve fonu ekleyen kişi dönmez. Migration `AddClinicAiAcknowledgement` (`ClinicAiSettings`: `AcknowledgedVersion`, `AcknowledgedAtUtc`, `AcknowledgedByUserId`; mevcut satırlar boş kalır).
+
+### `GET` — izin `Clinics.Read`
+
+```json
+{
+  "clinicId": "…",
+  "isConfigured": true,
+  "isEnabled": false,
+  "isAvailable": false,
+  "unavailableCode": "Ai.ClinicNotEnabled",
+  "updatedAtUtc": null,
+  "hasAcknowledged": false,
+  "acknowledgedAtUtc": null,
+  "acknowledgement": { "version": 1, "items": ["Yapay zekâ yalnız taslak üretir; …", "…"] },
+  "monthlyCredits": 2000,
+  "creditsUsedThisMonth": 0,
+  "creditsRemaining": 2000,
+  "fundCredits": 0,
+  "usedPercent": 0,
+  "quotaResetsAtUtc": "2026-11-30T21:00:00Z",
+  "creditGrants": [ { "id": "…", "kind": "Manual", "credits": 250, "createdAtUtc": "…" } ]
+}
+```
+
+- Durum ve kredi alanları `/ai/status` (§1) ile aynı hesaptır (`AiUsageGuard`, `AiCreditAccount`); `unavailableCode` sırası da aynı. `usedPercent` §1'deki `clinicMonthUsedPercent`.
+- `acknowledgement`: açmadan önce gösterilecek bilgilendirme; metnin tek yeri `AiAcknowledgement` (Application). Metin değişince sürüm artar; açık klinik açık kalır, yeniden açmak yeni sürümün kabulünü ister.
+- `hasAcknowledged`: güncel sürüm (ya da daha yenisi) bu klinikte kabul edilmiş mi. Platform yöneticisinin açması kabul sayılmaz.
+- `creditGrants`: eklenen krediler, yeniden eskiye, en çok 20. `kind` şimdilik yalnız `Manual`.
+
+### `PUT` — izin `Clinics.Update` (Admin, Owner, ClinicAdmin)
+
+Gövde `{ "isEnabled": true, "acknowledgementVersion": 1 }`. `acknowledgementVersion` yalnız açarken ve güncel sürüm bu klinikte kabul edilmemişse gerekir; o zaman güncel sürüme eşit olmalıdır, değilse `400 Ai.AcknowledgementRequired` (kayıt değişmez). Kabul kimin ve ne zaman yaptığıyla saklanır; sonraki açmalarda yeniden sorulmaz. Kapatmak kabul istemez, veri silmez. Kayıt yoksa oluşturulur. Denetim kaydı `Ai.ClinicSettings.UpdateByClinic`. Yanıt `GET` ile aynı. Süresi dolmuş (salt okunur) abonelikte yazma koruması geçerlidir. Hatalar: `403` (izin ya da klinik kapsamı), `404` (klinik kiracıda yok), `400 Ai.AcknowledgementRequired`.
 
 ## 4) Sınırlar ve kullanım kaydı (ADR-044 madde 8)
 

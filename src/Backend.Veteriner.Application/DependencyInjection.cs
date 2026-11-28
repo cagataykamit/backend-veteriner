@@ -146,6 +146,7 @@ public static class DependencyInjection
         services.AddScoped<Ai.AiCreditAccount>();
         services.AddScoped<Ai.AiUsageGuard>();
         services.AddScoped<Ai.AiAdminClinicReader>();
+        services.AddScoped<Ai.ClinicAiSettingsReader>();
         services.AddScoped<Ai.PetHistorySummary.PetHistoryAiContextBuilder>();
         // AI çağrısı + kullanım/denetim kaydı (AI-010) ve taslak erişimi (AI-009). Özellik uygulayıcıları (IAiDraftApplier) özellikle birlikte eklenir.
         services.AddScoped<Ai.AiInvoker>();
