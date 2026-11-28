@@ -58,6 +58,7 @@ public sealed class ImportsController : ControllerBase
     /// Dosyayı okuyup parti oluşturur (<c>Uploaded</c>). Yeni parti 201; aynı <c>requestId</c> ve aynı içerikle tekrar 200
     /// aynı parti. Gövde <c>multipart/form-data</c>: <c>file</c> (XLSX) veya <c>customersFile</c>/<c>petsFile</c>/<c>vaccinationsFile</c> (CSV).
     /// E-vet profilinde <c>file</c> (Yedek Al) ile <c>productsFile</c>, <c>evetPatientReportFile</c>, <c>evetVaccineReportFile</c> birlikte gelebilir.
+    /// Kolayvet profilinde liste dışa aktarmaları tekrarlanan <c>kolayvetFiles</c> alanıyla gelir.
     /// </summary>
     [HttpPost("batches")]
     [Authorize(Policy = PermissionCatalog.Imports.Manage)]
@@ -82,6 +83,7 @@ public sealed class ImportsController : ControllerBase
                 form.AccountEntriesFile, form.AppointmentsFile, form.ProductsFile, form.EVetPatientReportFile,
                 form.EVetVaccineReportFile,
             }
+            .Concat(form.KolayvetFiles ?? [])
             .Any(f => f is not null && f.Length > _limits.MaxFileBytes))
         {
             return Result.Failure(
@@ -89,6 +91,19 @@ public sealed class ImportsController : ControllerBase
                     $"Dosya en fazla {_limits.MaxFileBytes / (1024 * 1024)} MB olabilir.")
                 .ToActionResult(this);
         }
+
+        // Kolayvet dosya sayısı belleğe almadan önce sınırlanır (kural ImportUploadReader.CheckCombination).
+        if (form.KolayvetFiles is { Count: > ImportUploadReader.MaxKolayvetFiles })
+        {
+            return Result.Failure(
+                    "Imports.UnsupportedFile",
+                    $"En çok {ImportUploadReader.MaxKolayvetFiles} Kolayvet dosyası yüklenir.")
+                .ToActionResult(this);
+        }
+
+        var kolayvetFiles = new List<ImportUploadedFile>();
+        foreach (var file in form.KolayvetFiles ?? [])
+            kolayvetFiles.Add((await ReadAsync(file, ct))!);
 
         var files = new ImportFileSet(
             await ReadAsync(form.File, ct),
@@ -100,7 +115,8 @@ public sealed class ImportsController : ControllerBase
             await ReadAsync(form.AppointmentsFile, ct),
             await ReadAsync(form.ProductsFile, ct),
             await ReadAsync(form.EVetPatientReportFile, ct),
-            await ReadAsync(form.EVetVaccineReportFile, ct));
+            await ReadAsync(form.EVetVaccineReportFile, ct),
+            kolayvetFiles);
 
         // Dosyalar alındıktan sonra parti, istemci ayrılsa da (sayfa yenilendi, sekme kapandı) oluşturulur: okuma ve yazma
         // yarıda kesilmez; kullanıcı partiyi listede bulur, aynı dosyanın yeniden yüklenmesi o partiye yönlenir (409).

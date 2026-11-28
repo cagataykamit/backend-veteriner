@@ -738,9 +738,11 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
 
         var invalid = await PostAsync(client, Guid.NewGuid(), null, null, [("sourceProfile", "Vetinity")], ("file", "x.xlsx", bytes, XlsxType));
         invalid.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        // Kolayvet şimdilik sunulmuyor (2026-11-22 kullanıcı kararı): yeni aktarma reddedilir.
-        (await PostAsync(client, Guid.NewGuid(), null, null, [("sourceProfile", "Kolayvet")], ("file", "x.xlsx", bytes, XlsxType)))
-            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        // Kolayvet yeniden sunulur (2026-11-28); Vetinity şablonu Kolayvet profiliyle de yüklenir (genel okuyucu). Ayrı dosya: aynı içerik
+        // aşağıda yeniden yüklenir.
+        var kolayvetBytes = Workbook(("Musteriler", [["AdSoyad"], [$"Can {Guid.NewGuid():N}"]]));
+        (await PostAsync(client, Guid.NewGuid(), null, null, [("sourceProfile", "Kolayvet")], ("file", "k.xlsx", kolayvetBytes, XlsxType)))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
 
         var requestId = Guid.NewGuid();
         (await PostAsync(client, requestId, null, null, [("sourceProfile", "Generic")], ("file", "x.xlsx", bytes, XlsxType)))
@@ -761,9 +763,9 @@ public sealed class ImportUploadMappingEndpointTests : IClassFixture<CustomWebAp
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var profiles = (await response.Content.ReadFromJsonAsync<JsonElement>()).EnumerateArray().ToList();
-        profiles.Select(p => p.GetProperty("code").GetString()).Should().Equal("Generic", "EVet");
-        profiles.Select(p => p.GetProperty("verified").GetBoolean()).Should().Equal(false, true);
-        profiles[1].GetProperty("mappings").EnumerateArray().Should().OnlyContain(m => m.GetProperty("verified").GetBoolean());
+        profiles.Select(p => p.GetProperty("code").GetString()).Should().Equal("Generic", "Kolayvet", "EVet");
+        profiles.Select(p => p.GetProperty("verified").GetBoolean()).Should().Equal(false, false, true);
+        profiles[2].GetProperty("mappings").EnumerateArray().Should().OnlyContain(m => m.GetProperty("verified").GetBoolean());
 
         (await ClientFor(await TokenAsync(ctx, new[] { "Clients.Read" })).GetAsync("/api/v1/imports/source-profiles"))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);

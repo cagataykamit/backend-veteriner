@@ -43,21 +43,22 @@ public sealed class ImportSourceProfileTests
         => ImportSourceProfiles.All.Select(p => p.Code).Should()
             .Equal(ImportSourceProfile.Generic, ImportSourceProfile.Kolayvet, ImportSourceProfile.EVet);
 
-    /// <summary>2026-11-22 kullanıcı kararı: Kolayvet seçeneği gizli (aktarma yapılmadı); tanım var olan partiler için kalır.</summary>
+    /// <summary>Kolayvet 2026-11-22'de gizlenmişti; gerçek dışa aktarma dosyası görülünce sihirbazda sunulur (2026-11-28).</summary>
     [Fact]
-    public void Kolayvet_Should_Be_Hidden_From_Wizard_But_Kept_For_Existing_Batches()
+    public void All_Profiles_Should_Be_Offered_In_Wizard()
     {
-        ImportSourceProfiles.Offered.Select(p => p.Code).Should().Equal(ImportSourceProfile.Generic, ImportSourceProfile.EVet);
-        ImportSourceProfiles.IsOffered(ImportSourceProfile.Kolayvet).Should().BeFalse();
-        ImportSourceProfiles.Get(ImportSourceProfile.Kolayvet).DisplayName.Should().Be("Kolayvet");
+        ImportSourceProfiles.Offered.Select(p => p.Code).Should()
+            .Equal(ImportSourceProfile.Generic, ImportSourceProfile.Kolayvet, ImportSourceProfile.EVet);
+        ImportSourceProfiles.IsOffered(ImportSourceProfile.Kolayvet).Should().BeTrue();
         ((int)ImportSourceProfile.Kolayvet).Should().Be(1);
     }
 
     [Theory]
-    [InlineData("Kolayvet", false)]
+    [InlineData("Kolayvet", true)]
     [InlineData("EVet", true)]
     [InlineData(null, true)]
-    public void Create_Validator_Should_Reject_Hidden_Profile(string? sourceProfile, bool valid)
+    [InlineData("Vetinity", false)]
+    public void Create_Validator_Should_Accept_Offered_Profiles(string? sourceProfile, bool valid)
     {
         var validator = new CreateImportBatchCommandValidator();
         var errors = validator.Validate(CreateCommand(sourceProfile)).Errors.Where(e => e.PropertyName == nameof(CreateImportBatchCommand.SourceProfile));
@@ -66,7 +67,7 @@ public sealed class ImportSourceProfileTests
     }
 
     [Fact]
-    public void Kolayvet_Should_Have_No_Mapping_Without_Source()
+    public void Kolayvet_Should_Have_No_Mapping_Because_Files_Are_Converted()
         => ImportSourceProfiles.Get(ImportSourceProfile.Kolayvet).Mappings.Should().BeEmpty();
 
     [Fact]
@@ -162,7 +163,7 @@ public sealed class ImportSourceProfileTests
         evet.Verified.Should().BeTrue();
         evet.Mappings.Should().Contain(new ImportProfileMappingDto("pets", "Hasta Irkı", "Irk", evet.Mappings.First(m => m.Header == "Hasta Irkı").Source, true));
         evet.Mappings.Select(m => m.Table).Distinct().Should().BeEquivalentTo("customers", "pets");
-        result.Value.Select(p => p.Code).Should().NotContain(ImportSourceProfile.Kolayvet, "Kolayvet şimdilik sunulmaz");
+        result.Value.Select(p => p.Code).Should().Contain(ImportSourceProfile.Kolayvet);
     }
 
     private static CreateImportBatchCommand CreateCommand(string? sourceProfile)

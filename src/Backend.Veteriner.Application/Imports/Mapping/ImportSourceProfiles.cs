@@ -23,9 +23,10 @@ public sealed record ImportSourceProfileDefinition(
 /// Rakip programlardan gelen dosyalar için hazır sütun eşlemeleri — tek yer (TIER-021; IMPORT_API_CONTRACT.md §4.5). Eşleme
 /// önerisi (<see cref="ImportCanonicalSchema.Suggest"/>) kanonik başlıktan sonra, genel takma adlardan önce bu listeye bakar;
 /// kullanıcı öneriyi her zaman düzeltebilir. Kaynağı bulunamayan başlık buraya yazılmaz, genel takma ad listesine
-/// (<see cref="ImportCanonicalSchema"/>) bırakılır. Kolayvet'in gerçek dosyası görülmedi. E-vet'in "Yedek Al" dosyası ve raporları
-/// görüldü (2026-11-11): yedek eşleme adımına gelmeden kanonik tablolara çevrilir (<see cref="Reading.EVet.EVetBackupConverter"/>);
-/// buradaki E-vet satırları tek sayfanın ayrıca CSV olarak yüklendiği durum içindir ve gerçek başlıklardır.
+/// (<see cref="ImportCanonicalSchema"/>) bırakılır. E-vet'in "Yedek Al" dosyası ve raporları görüldü (2026-11-11): yedek eşleme
+/// adımına gelmeden kanonik tablolara çevrilir (<see cref="Reading.EVet.EVetBackupConverter"/>); buradaki E-vet satırları tek
+/// sayfanın ayrıca CSV olarak yüklendiği durum içindir ve gerçek başlıklardır. Kolayvet'in liste dışa aktarmaları görüldü
+/// (2026-11-28) ve aynı şekilde çevrilir (<see cref="Reading.Kolayvet.KolayvetExportConverter"/>); Kolayvet için hazır eşleme yoktur.
 /// </summary>
 public static class ImportSourceProfiles
 {
@@ -38,8 +39,8 @@ public static class ImportSourceProfiles
             "Vetinity şablonu ya da başka bir programın dosyası. Yalnız genel eş anlamlı başlıklar kullanılır.",
             []),
         new(ImportSourceProfile.Kolayvet, "Kolayvet",
-            "Kolayvet'ten Excel ya da CSV olarak dışa aktardığınız müşteri ve hasta listesini yükleyin. Sütunlar başlık adlarından tanınır; "
-            + "tanınmayan sütunu eşleme adımında kendiniz seçersiniz.",
+            "Kolayvet'in Müşteri Listesi, Hasta Listesi ve Aşı Takvimi ekranlarından \"Dışa Aktar\" ile indirdiğiniz Excel dosyaları doğrudan "
+            + "okunur; Raporlar > Hasta Listesi (Detaylı) doğum tarihi ve mikroçipi tamamlar. Gerçek Kolayvet dosyalarıyla doğrulandı.",
             []),
         new(ImportSourceProfile.EVet, "E-vet",
             "E-vet'in Genel > Yedek Al Excel dosyası (müşteri, hasta, randevu, muayene) doğrudan okunur. Rapor > Genel > Hasta Listesi sahip "
@@ -74,10 +75,10 @@ public static class ImportSourceProfiles
     ];
 
     /// <summary>
-    /// Sihirbazda sunulmayan ve yeni aktarmada kabul edilmeyen profiller (2026-11-22 kullanıcı kararı: Kolayvet'ten aktarma yapılmadı, örnek
-    /// dosya gelince buradan çıkarılır). Tanım <see cref="All"/> içinde kalır: var olan partiler ve talepler adını ve eşlemesini okur.
+    /// Sihirbazda sunulmayan ve yeni aktarmada kabul edilmeyen profiller. Tanım <see cref="All"/> içinde kalır: var olan partiler ve
+    /// talepler adını ve eşlemesini okur. Kolayvet 2026-11-22'de gizlenmişti; gerçek dosya görülünce açıldı (2026-11-28).
     /// </summary>
-    private static readonly HashSet<ImportSourceProfile> Hidden = [ImportSourceProfile.Kolayvet];
+    private static readonly HashSet<ImportSourceProfile> Hidden = [];
 
     /// <summary>"Hangi programdan geliyorsunuz?" seçenekleri: gizlenenler hariç.</summary>
     public static IEnumerable<ImportSourceProfileDefinition> Offered => All.Where(p => IsOffered(p.Code));

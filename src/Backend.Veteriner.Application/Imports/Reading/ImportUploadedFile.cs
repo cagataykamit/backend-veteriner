@@ -8,7 +8,8 @@ public sealed record ImportUploadedFile(string FileName, string? ContentType, by
 /// <summary>
 /// <c>POST /imports/batches</c> dosya alanları: ya <see cref="Workbook"/> (XLSX) ya da tablo başına CSV. E-vet profilinde
 /// yedek (<see cref="Workbook"/>) ürün listesi raporu (<see cref="ProductsCsv"/>) ve iki yardımcı raporla
-/// (<see cref="EVetPatientReport"/>, <see cref="EVetVaccineReport"/>) birlikte gelebilir (IMPORT_API_CONTRACT.md §13).
+/// (<see cref="EVetPatientReport"/>, <see cref="EVetVaccineReport"/>) birlikte gelebilir (IMPORT_API_CONTRACT.md §13). Kolayvet
+/// profilinde liste dışa aktarmaları (<c>.xlsx</c>) tek başına <see cref="KolayvetFiles"/> ile gelir (§15).
 /// </summary>
 public sealed record ImportFileSet(
     ImportUploadedFile? Workbook,
@@ -20,11 +21,13 @@ public sealed record ImportFileSet(
     ImportUploadedFile? AppointmentsCsv = null,
     ImportUploadedFile? ProductsCsv = null,
     ImportUploadedFile? EVetPatientReport = null,
-    ImportUploadedFile? EVetVaccineReport = null)
+    ImportUploadedFile? EVetVaccineReport = null,
+    IReadOnlyList<ImportUploadedFile>? KolayvetFiles = null)
 {
-    public bool HasAny => Workbook is not null || HasCsv;
+    public bool HasAny => Workbook is not null || HasCsv || HasKolayvetFiles;
     public bool HasCsv => CsvFiles.Any();
     public bool HasEVetReports => EVetPatientReport is not null || EVetVaccineReport is not null;
+    public bool HasKolayvetFiles => KolayvetFiles is { Count: > 0 };
 
     /// <summary>E-vet yardımcı raporları (CSV; tabloya dönüşmez, yedeğin bağlantısını ve seri numarasını tamamlar).</summary>
     public IEnumerable<(string Key, ImportUploadedFile File)> EVetReports
@@ -40,7 +43,8 @@ public sealed record ImportFileSet(
 
     /// <summary>Verilen tüm dosyalar (virüs taraması).</summary>
     public IEnumerable<ImportUploadedFile> AllFiles
-        => new[] { Workbook }.Concat(CsvFiles.Select(x => x.File)).Concat(EVetReports.Select(x => x.File)).OfType<ImportUploadedFile>();
+        => new[] { Workbook }.Concat(CsvFiles.Select(x => x.File)).Concat(EVetReports.Select(x => x.File)).Concat(KolayvetFiles ?? [])
+            .OfType<ImportUploadedFile>();
 
     /// <summary>Verilen CSV dosyaları, tablo sırasıyla.</summary>
     public IEnumerable<(ImportTable Table, ImportUploadedFile File)> CsvFiles
