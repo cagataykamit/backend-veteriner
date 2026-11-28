@@ -403,7 +403,11 @@ try
                 // Portal parolası komut satırına yazılmaz (kabuk geçmişine düşer); yalnız ortam değişkeninden okunur.
                 var portalPassword = Environment.GetEnvironmentVariable("VETINITY_DEMO_PORTAL_PASSWORD");
                 var seeder = ActivatorUtilities.CreateInstance<DemoClinicSeeder>(sp);
-                foreach (var line in await seeder.RunAsync(tenantId, portalPassword, aiCredits, CancellationToken.None))
+                // --only karamel: mevcut tanıtım verisine dokunmadan yalnız Karamel'in geçmişini ekler.
+                var lines = string.Equals(ReadOption(args, "--only"), "karamel", StringComparison.OrdinalIgnoreCase)
+                    ? await seeder.ExtendKaramelAsync(tenantId, CancellationToken.None)
+                    : await seeder.RunAsync(tenantId, portalPassword, aiCredits, CancellationToken.None);
+                foreach (var line in lines)
                     Console.WriteLine(line);
                 break;
             }
@@ -517,7 +521,8 @@ static void PrintHelp()
                                             ekranı dolu olacak biçimde doldurur (DemoClinicSeeder; tekrar çalıştırılabilir: örnek
                                             veriyi silip bugüne göre yeniden üretir). Paketi Kurumsal yapar, yapay zekâyı açar.
                                             Portal hesabı (demo.sahip@example.com) yalnız VETINITY_DEMO_PORTAL_PASSWORD doluysa
-                                            kurulur. FileStorage:RootPath API ile aynı mutlak yol olmalı
+                                            kurulur. FileStorage:RootPath API ile aynı mutlak yol olmalı. --only karamel: mevcut
+                                            veriyi silmeden yalnız Karamel'in geçmişini ekler (varsa yazmaz)
 
         Load test ortamı (DOTNET_ENVIRONMENT=LoadTest):
           Command DB : VetinityCommandDb_LoadTest  (DefaultConnection / migrate / loadtest-seed)

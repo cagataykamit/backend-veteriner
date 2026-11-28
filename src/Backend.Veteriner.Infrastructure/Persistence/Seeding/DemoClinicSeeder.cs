@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Backend.Veteriner.Application.Appointments.IntegrationEvents;
 using Backend.Veteriner.Application.Common.Abstractions;
 using Backend.Veteriner.Application.Common.Time;
 using Backend.Veteriner.Application.LegalAcceptances;
@@ -29,6 +30,7 @@ using Backend.Veteriner.Domain.Sales;
 using Backend.Veteriner.Domain.SalesPartners;
 using Backend.Veteriner.Domain.Shared;
 using Backend.Veteriner.Domain.Tenants;
+using Backend.Veteriner.Domain.Treatments;
 using Backend.Veteriner.Domain.Vaccinations;
 using Backend.Veteriner.Domain.VitalMeasurements;
 using Backend.Veteriner.Domain.Visits;
@@ -65,6 +67,8 @@ public sealed class DemoClinicSeeder
     private readonly IFileStorage _fileStorage;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IPaymentIntegrationEventOutbox _paymentEvents;
+    private readonly IAppointmentIntegrationEventOutbox _appointmentEvents;
+    private readonly IAppointmentProjectionSnapshotFactory _appointmentSnapshots;
     private readonly ILogger<DemoClinicSeeder> _logger;
 
     public DemoClinicSeeder(
@@ -75,6 +79,8 @@ public sealed class DemoClinicSeeder
         IFileStorage fileStorage,
         IPasswordHasher passwordHasher,
         IPaymentIntegrationEventOutbox paymentEvents,
+        IAppointmentIntegrationEventOutbox appointmentEvents,
+        IAppointmentProjectionSnapshotFactory appointmentSnapshots,
         ILogger<DemoClinicSeeder> logger)
     {
         _db = db;
@@ -84,12 +90,26 @@ public sealed class DemoClinicSeeder
         _fileStorage = fileStorage;
         _passwordHasher = passwordHasher;
         _paymentEvents = paymentEvents;
+        _appointmentEvents = appointmentEvents;
+        _appointmentSnapshots = appointmentSnapshots;
         _logger = logger;
     }
 
-    /// <param name="portalPassword">Örnek sahibin portal parolası; boşsa portal hesabı kurulmaz.</param>
-    /// <param name="aiCredits">Kliniğe bir kez verilecek yapay zekâ kredisi; 0 ise verilmez.</param>
-    public async Task<IReadOnlyList<string>> RunAsync(Guid tenantId, string? portalPassword, int aiCredits, CancellationToken ct)
+    /// <summary>
+    /// Yalnız Karamel'in geçmişini mevcut tanıtım verisine ekler (temizlemez, yeniden üretmez; sunum sırasında girilen kayıtlar
+    /// korunur). Geçmiş zaten varsa hiçbir şey yazmaz.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> ExtendKaramelAsync(Guid tenantId, CancellationToken ct)
+    {
+        var (tenant, clinic, userId) = await TargetAsync(tenantId, ct);
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        var ctx = await ContextAsync(tenant, clinic, userId, ct);
+        var line = await WriteKaramelHistoryAsync(ctx, ct);
+        await transaction.CommitAsync(ct);
+        return [line];
+    }
+
+    private async Task<(Tenant Tenant, Clinic Clinic, Guid UserId)> TargetAsync(Guid tenantId, CancellationToken ct)
     {
         var tenant = await _db.Tenants.FirstOrDefaultAsync(t => t.Id == tenantId, ct)
             ?? throw new InvalidOperationException($"Kiracı bulunamadı: {tenantId}.");
@@ -98,6 +118,14 @@ public sealed class DemoClinicSeeder
         var userId = await _db.UserTenants.Where(u => u.TenantId == tenantId).OrderBy(u => u.CreatedAtUtc).Select(u => u.UserId).FirstOrDefaultAsync(ct);
         if (userId == Guid.Empty)
             throw new InvalidOperationException("Kiracının kullanıcısı yok.");
+        return (tenant, clinic, userId);
+    }
+
+    /// <param name="portalPassword">Örnek sahibin portal parolası; boşsa portal hesabı kurulmaz.</param>
+    /// <param name="aiCredits">Kliniğe bir kez verilecek yapay zekâ kredisi; 0 ise verilmez.</param>
+    public async Task<IReadOnlyList<string>> RunAsync(Guid tenantId, string? portalPassword, int aiCredits, CancellationToken ct)
+    {
+        var (tenant, clinic, userId) = await TargetAsync(tenantId, ct);
 
         var report = new List<string>();
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
@@ -113,6 +141,7 @@ public sealed class DemoClinicSeeder
         report.Add(await EnsurePremiumPlanAsync(ctx, ct));
         report.Add(await EnsureAiAsync(ctx, aiCredits, ct));
         report.Add(await EnsureEDocumentSetupAsync(ctx, ct));
+        report.Add(await WriteKaramelHistoryAsync(ctx, ct));
         report.Add(await WriteHospitalizationsAsync(ctx, ct));
         report.Add(await WritePrescriptionsAsync(ctx, ct));
         report.Add(await WriteLabAndImagingAsync(ctx, ct));
@@ -267,6 +296,175 @@ public sealed class DemoClinicSeeder
     // ---------------------------------------------------------------------------------------------
     // Klinik kayıtlar
     // ---------------------------------------------------------------------------------------------
+
+    /// <summary>Karamel'in geçmiş muayenelerini tanır (tekrar yazılmasın diye işaret).</summary>
+    private const string KaramelHistoryNote = "Karamel geçmişi.";
+
+    /// <summary>
+    /// Sunumun ana hastası Karamel: son 11 aya yayılan muayeneler (vital bulgu ve kilo eğrisi), aşı ve parazit karnesi, lab,
+    /// reçete, tedavi, uyarı notu, ödemeler ve yaklaşan kontrol. Örnek Klinik'in son bir aydaki kayıtlarına eklenir.
+    /// </summary>
+    private async Task<string> WriteKaramelHistoryAsync(Ctx ctx, CancellationToken ct)
+    {
+        var karamel = ctx.Pet("Karamel");
+        if (await _db.Examinations.AnyAsync(e => e.PetId == karamel.Id && e.Notes != null && e.Notes.EndsWith(KaramelHistoryNote), ct))
+            return "Karamel geçmişi zaten var.";
+        var owner = ctx.OwnerOf(karamel.Id)!;
+
+        var alerts = karamel.ApplyAlerts(
+            [nameof(PetAlertFlags.Allergy), nameof(PetAlertFlags.Aggressive)],
+            "Tavuk proteinine besin alerjisi. Tırnak kesiminde huzursuz; ağızlık önerilir.");
+        if (!alerts.IsSuccess)
+            throw new InvalidOperationException($"Hasta uyarısı yazılamadı: {alerts.Error.Code}");
+
+        var visits = new (int DaysAgo, decimal Weight, decimal Temp, int Hr, int Rr, string Reason, string Anamnesis, string Findings, string Assessment, string Plan)[]
+        {
+            (330, 29.8m, 38.6m, 92, 22, "Yıllık genel kontrol ve aşı", "Şikâyet yok; iştah ve dışkı normal.",
+                "Genel durum iyi; deri, tüy ve kulaklar normal; kalp ve akciğer sesleri temiz.", "Sağlıklı yetişkin köpek.",
+                "Karma (DHPPi+L) ve leptospiroz aşısı; iç-dış parazit uygulaması; 1 ay sonra kuduz."),
+            (300, 30.1m, 38.5m, 88, 20, "Kuduz aşısı", "Önceki aşıdan sonra yan etki görülmemiş.",
+                "Klinik muayene normal.", "Aşıya uygun.", "Kuduz aşısı uygulandı; 1 yıl sonra rapel."),
+            (240, 30.6m, 39.1m, 104, 26, "Sağ kulakta kaşıntı ve baş sallama", "3 gündür baş sallıyor, sağ kulağını kaşıyor; yüzmeye gitmiş.",
+                "Sağ dış kulak yolunda kahverengi akıntı ve kızarıklık; sitolojide maya (Malassezia).", "Otitis externa (Malassezia).",
+                "Kulak temizliği; antifungal-kortikosteroidli kulak damlası 10 gün; 2 hafta sonra kontrol."),
+            (200, 30.9m, 38.7m, 90, 22, "Kulak kontrolü ve bronşin aşısı", "Damlayı düzenli kullanmış; baş sallama geçmiş.",
+                "Kulak yolu temiz, akıntı yok.", "Otitis iyileşti.", "Bordetella/parainfluenza (bronşin) aşısı intranazal uygulandı."),
+            (140, 31.4m, 38.8m, 96, 24, "Kaşıntı ve tüy dökülmesi", "Özellikle kuyruk kökünü kaşıyor; yeni mama (tavuklu) başlanmış.",
+                "Sırt ve kuyruk kökünde papüller, pire dışkısı görüldü; kulaklar temiz.",
+                "Pire alerjisi dermatiti; besin alerjisi ayırıcı tanıda.",
+                "Dış parazit pipeti; 8 hafta hidrolize protein diyeti (tavuksuz); dışkı muayenesi."),
+            (75, 31.9m, 38.6m, 92, 22, "Kilo artışı ve halsizlik", "Son 2 ayda kilo almış, yürüyüşte çabuk yoruluyor.",
+                "Vücut kondisyonu 6/9; tüy mat; diğer sistemler normal.", "Kilo artışı; hipotiroidi ayırıcı tanı için tahlil istendi.",
+                "Total T4 ve idrar tahlili; günlük kalori %10 azaltma ve 2 x 30 dk yürüyüş."),
+        };
+
+        var exams = new List<Examination>();
+        var payments = 0;
+        foreach (var v in visits)
+        {
+            var at = ctx.LocalToUtc(ctx.Today.AddDays(-v.DaysAgo), new TimeOnly(10, 30));
+            var exam = new Examination(ctx.TenantId, ctx.Clinic.Id, karamel.Id, null, at, v.Reason, v.Findings, v.Assessment,
+                Tag(KaramelHistoryNote), ctx.NowUtc, anamnesis: v.Anamnesis, plan: v.Plan, weightKg: v.Weight, temperatureC: v.Temp,
+                heartRateBpm: v.Hr, respiratoryRatePerMin: v.Rr, vitalsMeasuredAtUtc: at);
+            var finalized = exam.Finalize(ctx.UserId, at.AddMinutes(25));
+            if (!finalized.IsSuccess)
+                throw new InvalidOperationException($"Karamel muayenesi kesinleştirilemedi: {finalized.Error.Code}");
+            _db.Examinations.Add(exam);
+            exams.Add(exam);
+        }
+
+        await _db.SaveChangesAsync(ct);
+
+        // Aşı ve parazit karnesi: uygulananlar (parti notuyla) ve vadesi gelecek dozlar.
+        var applied = new (int Exam, string Code, string Note, int? NextInDays)[]
+        {
+            (0, "MIXED_DOG", "Parti: KRM-2512-17 · SKT 09.2027 · sol omuz SC", 35),
+            (0, "LEPTOSPIROSIS", "Parti: LPT-2512-04 · SKT 06.2027 · sağ omuz SC", 35),
+            (0, "INTERNAL_EXTERNAL_PARASITE", "Kombine tablet, kiloya göre tam doz", null),
+            (1, "RABIES", "Parti: KDZ-2601-22 · SKT 11.2027 · sağ omuz SC", 65),
+            (3, "BRONCHINE", "Parti: BRN-2604-09 · SKT 03.2027 · intranazal", 165),
+            (4, "EXTERNAL_PARASITE", "Spot-on pipet, 20–40 kg dozu", null),
+            (5, "INTERNAL_PARASITE", "Tablet, kiloya göre tam doz", 15),
+        };
+        var codes = applied.Select(a => a.Code).Distinct().ToList();
+        var definitions = await _db.VaccineDefinitions.Where(d => codes.Contains(d.Code)).ToListAsync(ct);
+        foreach (var a in applied)
+        {
+            var definition = definitions.FirstOrDefault(d => d.Code == a.Code);
+            if (definition is null)
+                continue;
+            var exam = exams[a.Exam];
+            var at = exam.ExaminedAtUtc.AddMinutes(15);
+            _db.Vaccinations.Add(new Vaccination(ctx.TenantId, karamel.Id, ctx.Clinic.Id, exam.Id, definition.Id, definition.Name,
+                VaccinationStatus.Applied, at, null, Tag(a.Note), ctx.NowUtc));
+            if (a.NextInDays is { } next)
+            {
+                _db.Vaccinations.Add(new Vaccination(ctx.TenantId, karamel.Id, ctx.Clinic.Id, null, definition.Id, definition.Name,
+                    VaccinationStatus.Scheduled, null, ctx.LocalToUtc(ctx.Today.AddDays(next), new TimeOnly(10, 0)), Tag("Rapel dozu."), ctx.NowUtc));
+            }
+        }
+
+        // Lab: dışkı (pire/diyet dönemi), T4 ve idrar (kilo artışı).
+        var labs = new (int Exam, string Test, string Result, string Interpretation)[]
+        {
+            (4, "Dışkı muayenesi (flotasyon)", "Helmint yumurtası ve protozoon kisti görülmedi.", "Negatif; iç parazit uygulaması etkili."),
+            (5, "Total T4", "Total T4: 1,9 µg/dL (referans 1,0–4,0).", "Normal; hipotiroidi desteklenmedi, kilo artışı beslenmeye bağlı."),
+            (5, "İdrar tahlili", "Dansite 1,030; pH 6,5; protein, glukoz ve keton negatif; sediment temiz.", "Normal."),
+        };
+        foreach (var l in labs)
+        {
+            var exam = exams[l.Exam];
+            _db.LabResults.Add(new LabResult(ctx.TenantId, ctx.Clinic.Id, karamel.Id, exam.Id, null, ctx.UserId, exam.ExaminedAtUtc.AddHours(4),
+                l.Test, l.Result, l.Interpretation, Tag("Klinik içi laboratuvar."), ctx.NowUtc));
+        }
+
+        // Tedavi ve reçeteler.
+        var otitis = exams[2];
+        var skin = exams[4];
+        _db.Treatments.Add(new Treatment(ctx.TenantId, ctx.Clinic.Id, karamel.Id, otitis.Id, otitis.ExaminedAtUtc.AddMinutes(20),
+            "Kulak temizliği", "Sağ kulak yolu serum fizyolojik ve temizleme solüsyonuyla yıkandı.", Tag("Tolere etti."), otitis.ExaminedAtUtc.AddDays(14), ctx.NowUtc));
+        _db.Treatments.Add(new Treatment(ctx.TenantId, ctx.Clinic.Id, karamel.Id, skin.Id, skin.ExaminedAtUtc.AddMinutes(20),
+            "Dış parazit uygulaması", "Spot-on pipet ense bölgesine uygulandı.", Tag("Tırnak kesiminde huzursuzdu; ağızlıkla yapıldı."), null, ctx.NowUtc));
+
+        var prescriptions = new (Examination Exam, string Title, string Content, PrescriptionItemDraft[] Items)[]
+        {
+            (otitis, "Otitis tedavisi", "Damlayı kulak temizliğinden 10 dakika sonra uygulayınız; 10 gün aksatmayınız.",
+                [new("Kulak damlası (antifungal + kortikosteroid)", null, "Sağ kulağa günde 2 kez 5 damla", 1m, "5 damla", "şişe"),
+                 new("Kulak Temizleme Solüsyonu 100 ml", null, "2 günde bir", 1m, "1 ml", "şişe")]),
+            (skin, "Dermatit ve diyet", "8 hafta yalnız reçeteli mamayı veriniz; ödül maması vermeyiniz.",
+                [new("Hidrolize protein diyeti 12 kg", null, "Günde 2 öğün, toplam 380 g", 1m, "380 g/gün", "paket"),
+                 new("Omega-3 takviyesi", null, "Günde 1 kapsül mamayla", 60m, "1 kapsül", "kapsül")]),
+        };
+        foreach (var p in prescriptions)
+        {
+            var at = p.Exam.ExaminedAtUtc.AddMinutes(22);
+            var prescription = new Prescription(ctx.TenantId, ctx.Clinic.Id, karamel.Id, p.Exam.Id, null, at, p.Title, p.Content,
+                Tag("Karamel reçetesi."), at.AddDays(14), ctx.NowUtc);
+            var items = prescription.ReplaceItems(p.Items);
+            if (!items.IsSuccess)
+                throw new InvalidOperationException($"Karamel reçetesi yazılamadı: {items.Error.Code}");
+            _db.Prescriptions.Add(prescription);
+        }
+
+        // Ödeme geçmişi: her ziyaretin ücreti ziyaret günü tahsil edildi.
+        var fees = new[] { 1450m, 800m, 950m, 900m, 1100m, 1650m };
+        for (var i = 0; i < exams.Count; i++)
+        {
+            var exam = exams[i];
+            var charge = Charge.Create(ctx.TenantId, ctx.Clinic.Id, owner.Id, karamel.Id, null, exam.Id, Tag(exam.VisitReason), 1m, fees[i],
+                ctx.UserId, exam.ExaminedAtUtc.AddMinutes(30), null);
+            if (!charge.IsSuccess)
+                throw new InvalidOperationException($"Karamel ücreti yazılamadı: {charge.Error.Code}");
+            _db.Charges.Add(charge.Value!);
+            var paidAt = exam.ExaminedAtUtc.AddMinutes(40);
+            var payment = new Payment(ctx.TenantId, ctx.Clinic.Id, owner.Id, karamel.Id, null, exam.Id, fees[i], Charge.DefaultCurrency,
+                i % 2 == 0 ? PaymentMethod.Card : PaymentMethod.Cash, paidAt, Tag("Ziyaret çıkışında tahsil edildi."));
+            var allocated = payment.AllocateFully([(charge.Value!, fees[i])], ctx.UserId, paidAt);
+            if (!allocated.IsSuccess)
+                throw new InvalidOperationException($"Karamel ödemesi tahsis edilemedi: {allocated.Error.Code}");
+            _db.Payments.Add(payment);
+            _db.PaymentAllocations.AddRange(allocated.Value!);
+            await _paymentEvents.EnqueueAsync(PaymentIntegrationEventTypes.Created,
+                new PaymentCreatedIntegrationEvent(Guid.NewGuid(), ctx.NowUtc,
+                    PaymentProjectionSnapshotFactory.Create(payment, owner.FullName, ctx.Clinic.Name, karamel.Name)), ct);
+            payments++;
+        }
+
+        // Yaklaşan kontrol randevusu (kilo takibi).
+        var controlDay = ctx.Today.AddDays(10);
+        if (controlDay.DayOfWeek == DayOfWeek.Sunday)
+            controlDay = controlDay.AddDays(1);
+        var control = new Appointment(ctx.TenantId, ctx.Clinic.Id, karamel.Id, ctx.LocalToUtc(controlDay, new TimeOnly(11, 0)), 30,
+            AppointmentType.Checkup, AppointmentStatus.Scheduled, Tag("Kilo kontrolü ve karma aşı rapeli."));
+        _db.Appointments.Add(control);
+        var sequence = control.AdvanceMutationSequence();
+        var snapshot = await _appointmentSnapshots.CreateAsync(control, ct);
+        await _appointmentEvents.EnqueueAsync(AppointmentIntegrationEventTypes.Created,
+            new AppointmentCreatedIntegrationEvent(Guid.NewGuid(), ctx.NowUtc, sequence, snapshot), ct);
+
+        await _db.SaveChangesAsync(ct);
+        return $"Karamel: {exams.Count} geçmiş muayene, {applied.Length} aşı/parazit uygulaması, {labs.Length} lab, 2 reçete, 2 tedavi, {payments} ödeme, 1 kontrol randevusu, uyarı notu.";
+    }
 
     private async Task<string> WriteHospitalizationsAsync(Ctx ctx, CancellationToken ct)
     {
@@ -760,6 +958,9 @@ public sealed class DemoClinicSeeder
         Guid DogSpeciesId)
     {
         public Pet Pet(string name) => Pets.First(p => p.Name == name);
+
+        /// <summary>Klinik günündeki (Europe/Istanbul) saatin UTC karşılığı.</summary>
+        public DateTime LocalToUtc(DateOnly day, TimeOnly time) => OperationDayBounds.ForLocalDate(day).DayStartUtc + time.ToTimeSpan();
 
         public Client? OwnerOf(Guid petId)
         {
