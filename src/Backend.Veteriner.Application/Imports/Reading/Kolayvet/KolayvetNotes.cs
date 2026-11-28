@@ -87,7 +87,7 @@ internal static class KolayvetNotes
         {
             Severity = ImportNoteSeverity.Info,
             Count = applied + appointments,
-            Unit = "aşı",
+            Unit = "kayıt",
             Title = "aşı geçmişine ve randevuya dönüşecek",
             Source = VaccineList,
             Parts = [new("Yapılmış aşı → aşı geçmişi", applied), new("Gelecek aşı → randevu", appointments)],
