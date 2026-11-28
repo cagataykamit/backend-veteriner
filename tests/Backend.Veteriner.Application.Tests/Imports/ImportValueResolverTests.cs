@@ -66,6 +66,8 @@ public sealed class ImportValueResolverTests
     private static readonly Guid Vizsla = Guid.NewGuid();
     private static readonly Guid Brittany = Guid.NewGuid();
     private static readonly Guid Ppr = Guid.NewGuid();
+    private static readonly Guid Lyme = Guid.NewGuid();
+    private static readonly Guid Corona = Guid.NewGuid();
     private static readonly Guid Ferret = Guid.NewGuid();
     private static readonly Guid BrownWhite = Guid.NewGuid();
     private static readonly Guid YellowWhite = Guid.NewGuid();
@@ -92,6 +94,11 @@ public sealed class ImportValueResolverTests
         Vaccines:
         [
             new(InternalExternal, "İç-Dış Parazit", "INTERNAL_EXTERNAL_PARASITE", null),
+            new(Rabies, "Kuduz", "RABIES", null),
+            new(Bronchine, "Bordetella / Parainfluenza (Bronşin)", "BRONCHINE", Dog),
+            new(Lyme, "Lyme (Borelyoz)", "LYME", Dog),
+            new(Corona, "Köpek Koronavirüs Enteriti (CCoV)", "CORONA", Dog),
+            new(FeLv, "Kedi Lösemisi (FeLV)", "LEUKEMIA", Cat),
             new(External, "Dış Parazit", "EXTERNAL_PARASITE", null),
             new(Internal, "İç Parazit", "INTERNAL_PARASITE", null),
             new(Fungal, "Mantar (Dermatofitoz)", "DERMATOPHYTOSIS", null),
@@ -152,6 +159,53 @@ public sealed class ImportValueResolverTests
         [nameof(Mastitis)] = Mastitis,
         [nameof(Enterotoxemia)] = Enterotoxemia,
         [nameof(Ppr)] = Ppr,
+    };
+
+    /// <summary>
+    /// Gerçek Kolayvet aşı takvimindeki adların hepsi (2026-11-28, 14 ad; kaç kez geçtiği yorumda) kataloğa kendiliğinden eşlenir.
+    /// "İç Dış Multi" aşı değil, iç ve dış paraziti birlikte kapsayan antiparaziter uygulamadır.
+    /// </summary>
+    public static TheoryData<string, string, string> KolayvetVaccineNames => new()
+    {
+        { "İç - Dış Parazit", "Dog", nameof(InternalExternal) }, // 106
+        { "ic-dis multi", "Dog", nameof(InternalExternal) }, // 34
+        { "İç Dış Multi", "Cat", nameof(InternalExternal) },
+        { "İç-Dış", "Dog", nameof(InternalExternal) },
+        { "iç dış parazit", "Dog", nameof(InternalExternal) },
+        { "İç Parazit", "Dog", nameof(Internal) },
+        { "Dış Parazit", "Dog", nameof(External) },
+        { "Karma 2 Aşısı", "Dog", nameof(MixedDog) }, // 101
+        { "Karma 1 Aşısı", "Cat", nameof(MixedCat) }, // 42
+        { "Kuduz Aşısı", "Dog", nameof(Rabies) }, // 68
+        { "Kuduz", "Cat", nameof(Rabies) }, // 45
+        { "Lösemi 2 Aşısı", "Cat", nameof(FeLv) }, // 49
+        { "Lösemi 1 Aşısı", "Cat", nameof(FeLv) }, // 21
+        { "Bronchine 2", "Dog", nameof(Bronchine) }, // 15
+        { "Bronchine 1", "Dog", nameof(Bronchine) }, // 7
+        { "Corona 2", "Dog", nameof(Corona) }, // 14
+        { "Corona 1", "Dog", nameof(Corona) }, // 10
+        { "Lyme2", "Dog", nameof(Lyme) }, // 9
+        { "Lyme1", "Dog", nameof(Lyme) }, // 5
+    };
+
+    [Theory]
+    [MemberData(nameof(KolayvetVaccineNames))]
+    public void Kolayvet_Vaccine_Names_Should_Resolve_To_The_System_Catalog(string source, string species, string expected)
+        => Extended.Resolve(ImportValueKind.Vaccine, source, species == "Cat" ? Cat : Dog)
+            .Should().Be(ImportValueResolution.Resolved(KolayvetVaccines[expected]));
+
+    private static readonly Dictionary<string, Guid> KolayvetVaccines = new()
+    {
+        [nameof(InternalExternal)] = InternalExternal,
+        [nameof(Internal)] = Internal,
+        [nameof(External)] = External,
+        [nameof(MixedDog)] = MixedDog,
+        [nameof(MixedCat)] = MixedCat,
+        [nameof(Rabies)] = Rabies,
+        [nameof(FeLv)] = FeLv,
+        [nameof(Bronchine)] = Bronchine,
+        [nameof(Corona)] = Corona,
+        [nameof(Lyme)] = Lyme,
     };
 
     [Theory]

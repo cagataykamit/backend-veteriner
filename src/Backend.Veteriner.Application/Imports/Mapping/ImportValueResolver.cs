@@ -252,6 +252,8 @@ public sealed class ImportValueResolver
             ["borelyoz"] = "lymeborelyoz",
             ["icdis"] = "icdisparazit",
             ["icvedisparazit"] = "icdisparazit",
+            // Kolayvet aşı listesi: "İç Dış Multi" / "ic-dis multi" (aşı değil, iç ve dış antiparaziter).
+            ["icdismulti"] = "icdisparazit",
             ["mera"] = "enterotoksemi",
             ["puppydp"] = "kopekdpdistemperparvovirus",
             ["dp"] = "kopekdpdistemperparvovirus",
