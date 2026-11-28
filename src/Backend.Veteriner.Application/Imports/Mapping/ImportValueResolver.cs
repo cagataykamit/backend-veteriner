@@ -120,6 +120,8 @@ public sealed class ImportValueResolver
             ["habes"] = "habesabyssinian",
             ["oriental"] = "orientalshorthair",
             ["britishbluepoint"] = "britishshorthair",
+            // Kolayvet: "British Cat" (kedi ırkı olarak yazılmış British Shorthair).
+            ["britishcat"] = "britishshorthair",
             ["britishshorthairgoldenny11"] = "britishshorthair",
             ["britishshorthairtortie"] = "britishshorthair",
             ["britishangora"] = "britishlonghair",
@@ -252,6 +254,8 @@ public sealed class ImportValueResolver
             ["borelyoz"] = "lymeborelyoz",
             ["icdis"] = "icdisparazit",
             ["icvedisparazit"] = "icdisparazit",
+            // Kolayvet aşı listesi: "İç Dış Multi" / "ic-dis multi" (aşı değil, iç ve dış antiparaziter).
+            ["icdismulti"] = "icdisparazit",
             ["mera"] = "enterotoksemi",
             ["puppydp"] = "kopekdpdistemperparvovirus",
             ["dp"] = "kopekdpdistemperparvovirus",
@@ -293,6 +297,9 @@ public sealed class ImportValueResolver
     };
 
     private readonly Dictionary<ImportValueKind, ILookup<string, ImportCatalogEntry>> _byKey = new();
+
+    /// <summary>Katalogdaki parantezli adların parçaları ("Sibirya Kurdu (Siberian Husky)" → sibiryakurdu, siberianhusky).</summary>
+    private readonly Dictionary<ImportValueKind, ILookup<string, ImportCatalogEntry>> _byPart = new();
     private readonly Dictionary<(ImportValueKind Kind, string Key), Guid?> _userMappings = new();
     private readonly IReadOnlySet<Guid> _patternIds;
 
@@ -306,6 +313,9 @@ public sealed class ImportValueResolver
                     .Where(k => k.Length > 0)
                     .Distinct()
                     .Select(k => (Key: k, Entry: e)))
+                .ToLookup(x => x.Key, x => x.Entry);
+            _byPart[kind] = catalogs.Of(kind)
+                .SelectMany(e => NameParts(e.Name).Select(p => (Key: p, Entry: e)))
                 .ToLookup(x => x.Key, x => x.Entry);
         }
 
@@ -338,6 +348,9 @@ public sealed class ImportValueResolver
             return resolved;
         }
 
+        if (TryParts(kind, source!, key, parentId, out resolved))
+            return resolved;
+
         // Kullanıcı eşlemesi yalnız kendiliğinden eşlenemeyen satırlara uygulanır (2026-11-14): ekran değeri yalnız bu satırların
         // sayısıyla gösterir; "atla" ya da seçilen karşılık, aynı yazımın hastanın türüne göre eşlenmiş öbür satırlarını bozmaz.
         if (_userMappings.TryGetValue((kind, key), out var target))
@@ -348,7 +361,7 @@ public sealed class ImportValueResolver
 
     /// <summary>
     /// Aşı serisi anahtarı: katlanmış addan baştaki/sondaki <c>yıllık</c>, sondaki doz numarası ve <c>N aylık</c>, sondaki
-    /// <c>aşı</c>/<c>aşısı</c>, baştaki <c>kedi</c>/<c>köpek</c> atılır (<c>YILLIK KEDİ KARMA</c> = <c>KEDİ KARMA 2</c> = <c>Karma Aşısı</c> =
+    /// <c>aşı</c>/<c>aşısı</c> (doz numarası ekten önce de olabilir: <c>Karma 2 Aşısı</c>), baştaki <c>kedi</c>/<c>köpek</c> atılır (<c>YILLIK KEDİ KARMA</c> = <c>KEDİ KARMA 2</c> = <c>Karma Aşısı</c> =
     /// <c>karma</c>). Sonraki aşı tarihini serinin
     /// son uygulamasına bağlamak (E-vet dönüştürücüsü) ve katalog eşlemesi aynı kuralı kullanır.
     /// </summary>
@@ -387,6 +400,8 @@ public sealed class ImportValueResolver
         var reduced = VaccineYearly.Replace(key, string.Empty);
         reduced = VaccineDoseSuffix.Replace(reduced, string.Empty);
         reduced = VaccineWordSuffix.Replace(reduced, string.Empty);
+        // Doz numarası ekten önce de gelebilir (Kolayvet: "Karma 2 Aşısı").
+        reduced = VaccineDoseSuffix.Replace(reduced, string.Empty);
         reduced = VaccineSpeciesPrefix.Replace(reduced, string.Empty);
         return reduced.Length == 0 ? key : reduced;
     }
@@ -396,6 +411,47 @@ public sealed class ImportValueResolver
     private static readonly Regex VaccineDoseSuffix = new(@"\d*aylik$|\d+$", RegexOptions.Compiled, RegexTimeout);
     private static readonly Regex VaccineWordSuffix = new("(?<=.{3})(asisi|asi)$", RegexOptions.Compiled, RegexTimeout);
     private static readonly Regex VaccineSpeciesPrefix = new("^(kedi|kopek)(?=.)", RegexOptions.Compiled, RegexTimeout);
+
+    /// <summary>
+    /// Parantezli adlar ("Çin Aslanı (Chow Chow)", "Persian (İran Kedisi)", "Melez (Mix)"): kaynağın parantez dışı ve içi ayrı ayrı katalog
+    /// adı, takma ad ve aşı serisiyle; kaynak ve parçaları ayrıca katalogdaki parantezli adların parçalarıyla denenir. Bulunan kayıtlar
+    /// tek ve kesinse bağlanır; birden çoksa ya da hiç yoksa kullanıcıya bırakılır (kapsam: ırkta tür, aşıda hastanın türü).
+    /// </summary>
+    private bool TryParts(ImportValueKind kind, string source, string key, Guid? parentId, out ImportValueResolution resolved)
+    {
+        var parts = NameParts(source);
+        var found = new HashSet<Guid>();
+        foreach (var part in parts)
+        {
+            if (TryCatalogOrAlias(kind, part, parentId, out var hit)
+                || (kind == ImportValueKind.Vaccine && ReduceVaccineKey(part) is var series && series != part
+                    && TryCatalogOrAlias(kind, series, parentId, out hit)))
+            {
+                found.Add(hit.TargetId!.Value);
+            }
+        }
+
+        foreach (var candidate in parts.Prepend(key))
+            found.UnionWith(_byPart[kind][candidate].Where(e => InScope(kind, e, parentId)).Select(e => e.Id));
+
+        resolved = found.Count == 1 ? ImportValueResolution.Resolved(found.Single()) : ImportValueResolution.Unmapped;
+        return found.Count == 1;
+    }
+
+    /// <summary>"Dış (İç)" adının katlanmış parçaları: parantez dışı ve parantez içi; parantez yoksa boş.</summary>
+    private static string[] NameParts(string? name)
+    {
+        var open = name?.IndexOf('(') ?? -1;
+        var close = open < 0 ? -1 : name!.IndexOf(')', open + 1);
+        if (close < 0)
+            return [];
+
+        return new[] { name![..open] + name[(close + 1)..], name[(open + 1)..close] }
+            .Select(ImportTextFolding.Fold)
+            .Where(p => p.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+    }
 
     private bool TryCatalogOrAlias(ImportValueKind kind, string key, Guid? parentId, out ImportValueResolution resolved)
     {

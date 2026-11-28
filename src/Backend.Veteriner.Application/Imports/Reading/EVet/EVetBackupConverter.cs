@@ -522,7 +522,7 @@ internal static class EVetBackupConverter
         EVetSheet sheet, ConversionState state, List<ImportReadWarning> warnings)
     {
         var applied = new List<AppliedVaccine>();
-        var pending = new List<(ImportSourceRow Row, string Group, DateTime Start, string? PetKey)>();
+        var pending = new List<ImportPlannedVaccine<(ImportSourceRow Row, string? Protocol)>>();
         var appointments = new List<ImportSourceRow>();
         var records = new List<ImportSourceRow>();
         var missed = 0;
@@ -569,7 +569,7 @@ internal static class EVetBackupConverter
 
             if (vaccine is not null && status == "yapilacak")
             {
-                pending.Add((row, $"{petKey}\u001f{ImportValueResolver.VaccineSeriesKey(vaccine)}", start.Value, petProtocol));
+                pending.Add(new((row, petProtocol), petKey, vaccine, start.Value));
                 continue;
             }
 
@@ -589,45 +589,22 @@ internal static class EVetBackupConverter
             appointments.Add(Appointment(sheet, row, petProtocol, ownerName, petName, start.Value, vaccine: null, treatment));
         }
 
-        // Yapılacak aşı görevi → serinin son uygulamasının sonraki aşı tarihi; uygulama yoksa gelecek randevu.
-        var lastApplied = applied
-            .GroupBy(a => $"{a.PetKey}\u001f{ImportValueResolver.VaccineSeriesKey(a.Vaccine)}")
-            .ToDictionary(g => g.Key, g => g.OrderBy(a => a.Start).Last(), StringComparer.Ordinal);
-        var dueDates = 0;
-        foreach (var group in pending.GroupBy(p => p.Group, StringComparer.Ordinal))
+        // Yapılacak aşı görevi → serinin son uygulamasının sonraki aşı tarihi; uygulama yoksa gelecek randevu (kural ImportVaccineSchedule).
+        bool Inactive(ImportPlannedVaccine<(ImportSourceRow Row, string? Protocol)> p)
+            => p.Source.Protocol is { } protocol && state.InactivePets.Contains(protocol);
+        skipped.Add("vefat ya da pasif hastaya ait yapılacak aşı", pending.Count(Inactive));
+        var schedule = ImportVaccineSchedule.Resolve(applied, pending.Where(p => !Inactive(p)), state.NowLocal);
+        foreach (var planned in schedule.Appointments)
         {
-            var first = group.First();
-            var protocol = first.PetKey;
-            if (protocol is not null && state.InactivePets.Contains(protocol))
-            {
-                skipped.Add("vefat ya da pasif hastaya ait yapılacak aşı", group.Count());
-                continue;
-            }
-
-            if (lastApplied.TryGetValue(group.Key, out var last))
-            {
-                var due = group.Where(p => p.Start.Date > last.Start.Date).OrderBy(p => p.Start).FirstOrDefault();
-                if (due.Row is not null)
-                {
-                    last.DueAt = due.Start;
-                    dueDates++;
-                }
-
-                skipped.Add("sonraki aşı tarihine dönüşen ya da yinelenen yapılacak aşı", group.Count() - (due.Row is null ? 0 : 1));
-                continue;
-            }
-
-            var future = group.Where(p => p.Start > state.NowLocal).OrderBy(p => p.Start).FirstOrDefault();
-            if (future.Row is null)
-            {
-                skipped.Add("hiç uygulanmamış ve tarihi geçmiş aşı", group.Count());
-                continue;
-            }
-
-            appointments.Add(Appointment(sheet, future.Row, protocol, sheet[future.Row, "Müşteriler"], sheet[future.Row, "Hastalar"],
-                future.Start, sheet[future.Row, "Aşı Paketi"]));
-            skipped.Add("aynı aşı için birden çok yapılacak görev", group.Count() - 1);
+            var (planRow, protocol) = planned.Source;
+            appointments.Add(Appointment(sheet, planRow, protocol, sheet[planRow, "Müşteriler"], sheet[planRow, "Hastalar"],
+                planned.Start, sheet[planRow, "Aşı Paketi"]));
         }
+
+        var dueDates = schedule.DueDates;
+        skipped.Add("sonraki aşı tarihine dönüşen ya da yinelenen yapılacak aşı", schedule.Skipped.GetValueOrDefault(ImportPlannedVaccineSkip.DueDateOrRepeat));
+        skipped.Add("hiç uygulanmamış ve tarihi geçmiş aşı", schedule.Skipped.GetValueOrDefault(ImportPlannedVaccineSkip.NeverAppliedPast));
+        skipped.Add("aynı aşı için birden çok yapılacak görev", schedule.Skipped.GetValueOrDefault(ImportPlannedVaccineSkip.ExtraPlanned));
 
         var (serialMatched, serialUnmatched) = MatchVaccineReport(applied, state.Reports);
         var vaccinationRows = applied.Select(a => a.ToRow()).ToList();
@@ -769,6 +746,7 @@ internal static class EVetBackupConverter
     /// <summary>Tamamlanmış aşı görevi; sonraki aşı tarihi yapılacak görevlerden sonra atanır.</summary>
     private sealed class AppliedVaccine(
         ImportSourceRow row, string petKey, string? petProtocol, string? ownerName, string? petName, string vaccine, DateTime start, EVetSheet sheet, string? earlyNote)
+        : IImportAppliedVaccine
     {
         public string PetKey { get; } = petKey;
         public string Vaccine { get; } = vaccine;

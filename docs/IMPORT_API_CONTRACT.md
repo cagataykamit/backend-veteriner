@@ -20,6 +20,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 | Devir alacağı (ADR-048 T3 eki) | `AcikBakiye < 0` yeni müşteriye devir alacağı açar (müşteri kredisi, kaynak `OpeningBalance`); `Imports.CreditBalanceNotImported` kalktı; geri alma alacağı da siler (bölüm 12.3, 12.5, 12.7, 12.9; `CLIENT_CREDIT_API_CONTRACT.md` §13) | **Uygulandı** (migration `AddImportedClientCredits`) |
 | E-vet geçmiş görevleri (ADR-048 eki, 2026-11-12) | Randevu Listesi'nde geçmişte kalan aşı dışı görev (tamamlanmış ya da gelinmemiş) klinik geçmiş satırına çevrilir; bu satırların `rowNumber` değeri `1.000.000 + Excel satırı` (bölüm 13.2) | **Uygulandı** (migration yok) |
 | E-vet aynı hayvanın kayıtları (2026-11-14) | Sahibi değişen hayvanın eski kayıtları (aynı protokol ya da mikroçip, zincir dahil) ve aynı sahipteki kopya kayıt tek hastada birleşir: geçmişi ona bağlanır, vefat olarak gelmez (bölüm 13.2) | **Uygulandı** (migration yok) |
+| Kolayvet dışa aktarmaları (2026-11-28) | `sourceProfile = Kolayvet` yeniden açıldı; tekrarlanan `kolayvetFiles` alanıyla Müşteri Listesi, Hasta Listesi, Aşı Takvimi ve Hasta Listesi (Detaylı) `.xlsx` dosyaları; aşı serisi anahtarı `Karma 2 Aşısı` biçimini de çözer (bölüm 15) | **Uygulandı** (migration yok) |
 | Eksik alanlar (2026-11-12) | Müşteri `Not`; ürün `KdvOrani`, `AlisFiyati`; E-vet müşteri açıklaması/meslek/doğum tarihi/ikinci telefon/kayıt tarihi, hasta kayıt tarihi ve işaretleri, aşı SKT'si, ürün KDV'si ve alış fiyatı (bölüm 4.3, 13.2) | **Uygulandı** (migration `AddProductTaxAndClientNotes`) |
 | Dosya notları (2026-11-16) | `warnings[]` öğesine isteğe bağlı satır alanları (`severity`, `count`, `unit`, `title`, `source`, `parts`, `outcome`, `example`, `target`); E-vet notlarına tür başına kod; notlar partiye yazılır ve parti ayrıntısıyla döner (bölüm 7.2.1) | **Uygulandı** (migration `AddImportBatchWarnings`) |
 | Geri alma süresi ve sade liste (2026-11-16) | Geri alma uygulamadan sonra 30 gün açık, sonra aktarma kesinleşir (`409 Imports.RollbackWindowClosed`); parti nesnesinde `canRollback`, `rollbackDeadlineUtc`; liste varsayılan olarak kapanmış partileri (`RolledBack`, `Discarded`, `Expired`) göstermez, `includeClosed=true` ile gelir (bölüm 7.5, 7.11, 7.12, 9.1) | **Uygulandı** (migration yok) |
@@ -103,7 +104,7 @@ Backend tek doğruluk kaynağıdır. Kaynak: ADR-014 K8 (ürün deposu), `ASAMA9
 - K13'te yeni migration **yoktur** (`Validating` durumu, kira sütunları ve tek-aktif-iş indeksi B1'den beri vardır).
 
 **Frontend için değişenler (TIER-021 — kaynak program profilleri; geriye uyumlu ekleme):**
-- Yükleme öncesi "Hangi programdan geliyorsunuz?" seçenekleri `GET /imports/source-profiles` ile okunur (bölüm 7.15; `Imports.Read`, her pakette). Liste: `Generic` (Genel Excel / CSV), `EVet`. `Kolayvet` şimdilik listede yok ve yeni aktarmada reddedilir (2026-11-22 kullanıcı kararı; aktarma yapılmadı, örnek dosya gelince geri eklenir; var olan partiler adını korur). Seçenek adları ve not metni sunucudan gelir; istemci kopyalamaz.
+- Yükleme öncesi "Hangi programdan geliyorsunuz?" seçenekleri `GET /imports/source-profiles` ile okunur (bölüm 7.15; `Imports.Read`, her pakette). Liste: `Generic` (Genel Excel / CSV), `Kolayvet`, `EVet`. `Kolayvet` 2026-11-22'de gizlenmişti; gerçek dışa aktarma dosyası görülünce yeniden açıldı (2026-11-28, bölüm 15). Seçenek adları ve not metni sunucudan gelir; istemci kopyalamaz.
 - Seçilen profil `POST /imports/batches` gövdesinde `sourceProfile` alanıyla gönderilir (isteğe bağlı; yoksa `Generic`). Geçersiz değer `400 Validation.FluentValidation`. Aynı `requestId` ile farklı `sourceProfile` gelirse `409 Imports.RequestIdConflict`.
 - Parti nesnesine (ayrıntı, liste, yükleme ve eşleme yanıtı) `sourceProfile` eklendi. Profil yüklemeden sonra değişmez; başka profil için dosya yeniden yüklenir (taslak silinebilir).
 - `tables[].columns[].confidence` yeni değer alabilir: **`Profile`** (seçilen programın hazır eşlemesi). Sıra: `Exact` → `Profile` → `Alias`. Profil eşlemelerinin hepsi şu an **doğrulanmamıştır** (`verified = false`); ekran bunu kullanıcıya söylemeli ve eşlemeyi her zaman düzeltilebilir bırakmalıdır.
@@ -284,7 +285,7 @@ Saklama: tarih-saat alanları (`Vaccination.AppliedAtUtc`, `DueAtUtc`) için yal
 Klinik yükleme öncesi eski programını seçer: **Genel Excel / CSV** (`Generic`), **Kolayvet** (`Kolayvet`), **E-vet** (`EVet`). Seçim sütun önerisini genişletir; ikinci bir eşleme mekanizması yoktur. Kural tek yerdedir: `ImportSourceProfiles` (kod; başlık → kanonik alan, kaynak notu, `Verified`). Öneri sırası (bölüm 7.2): kanonik/şablon başlığı (`Exact`) → seçilen profilin başlığı (`Profile`) → genel takma adlar (`Alias`). Katlama bölüm 5'teki gibidir (büyük/küçük harf ve Türkçe harf farkı yok). Kullanıcı öneriyi `PUT .../mapping` ile her zaman düzeltir (ADR-019 K1).
 
 - **Gerçek dışa aktarma dosyası görülmedi.** Her profil satırı kamuya açık bilgiden ya da rakip incelemesinde görülen sütun adından gelir ve `verified = false`'tur. Kaynağı bulunamayan başlık profile yazılmaz; genel takma ad listesinde kalır. Gerçek dosya görülünce yalnız `ImportSourceProfiles` düzeltilir ve ilgili satır `Verified = true` yapılır.
-- **Kolayvet:** kamuya açık sütun adı bulunamadı; profil eşlemesizdir, genel takma adlar kullanılır. Dayanak: Kolayvet sitesi hasta ve müşteri verisinin Excel/PDF olarak dışa alınabildiğini yazıyor (`kolayvet.com/ozellikler/ozellikler/gelismis-ice-disa-aktarma`).
+- **Kolayvet (2026-11-28, gerçek dosyayla görüldü):** liste dışa aktarmaları eşleme adımından önce kanonik tablolara çevrilir (bölüm 15); profil eşlemesizdir (`verified = false`, eşleme listesi boş). Kolayvet dosyası CSV alanlarıyla yüklenirse genel takma adlar kullanılır.
 - **E-vet (2026-11-11, gerçek dosyayla doğrulandı, `verified = true`):** "Genel > Yedek Al" Excel dosyası eşleme adımından önce kanonik tablolara çevrilir (bölüm 13); sütun önerisi gerekmez. Profil eşlemeleri yalnız yedeğin tek sayfasının ayrıca CSV olarak yüklendiği durum içindir ve yedekteki gerçek başlıklardır: müşteri `Müşteriler` → `AdSoyad`, `Protokol No` → `MusteriNo`, `Gsm`, `Email`, `Bakiye` → `AcikBakiye`, `Kimlik No` → `KimlikNo`, `Vergi Dairesi`, `Durum`; hasta `Hastalar` (yedek) / `Hasta Adı` (rapor) → `HayvanAdi`, `Protokol No` → `HayvanNo`, `Müşteriler` → `SahipAdSoyad`, `Hasta Türü` → `Tur`, `Irk` / `Hasta Irkı` → `Irk`, `Cinsiyet`, `Doğum Tarihi`, `Çip No` → `Mikrocip`, `Kart No` → `KarneNo`, `Renk`, `Ağırlık`, `Alerjik Durumu` → `Alerji`, `Ölüm Zamanı` → `VefatTarihi`, `Durum`. (Eski, ekran görüntüsünden türetilmiş doğrulanmamış eşlemeler kaldırıldı.)
 - Genel takma adlara bu dilimde eklenenler: `Hasta Irkı`, `Hayvan Irkı` (`Irk`), `Çip Numarası` (`Mikrocip`), `Kilo (kg)` (`Agirlik`), `Aşı Uygulama Tarihi` (`UygulamaTarihi`).
 - Seçilen profil partide saklanır (`ImportBatches.SourceProfile`, istatistik ve destek için) ve parti nesnesinde `sourceProfile` olarak döner. Kişisel veri değildir.
@@ -431,10 +432,11 @@ Hata zarfı için bölüm 8. `{id}` = parti kimliği.
 | `requestId` | **Evet** (Guid) | Aynı kiracı + aynı `requestId` ikinci çağrıda **aynı partiyi** döndürür (`200`); farklı içerikle gelirse `409 Imports.RequestIdConflict`. |
 | `file` | Evet (XLSX için) | XLSX: üç sayfa içerebilir. Ya `file` ya da CSV alanlarından en az biri zorunludur. |
 | `customersFile`, `petsFile`, `vaccinationsFile` | CSV için | Her biri ayrı CSV. `file` ile birlikte verilemez. |
+| `kolayvetFiles` | Kolayvet için | Tekrarlanan alan, en çok 4 `.xlsx` (bölüm 15). Yalnız `sourceProfile = Kolayvet` ile ve başka dosya alanı olmadan. |
 | `clinicId` | Aşı varsa evet | Bölüm 4.3. |
 | `name` | Hayır | Listede görünen etiket (≤ 100); kişisel veri içermemeli. |
 | `encoding`, `delimiter` | Hayır | CSV zorlaması. |
-| `sourceProfile` | Hayır | Kaynak program: `Generic` (varsayılan), `EVet` (`Kolayvet` şimdilik 400) (bölüm 4.5; TIER-021). Partide saklanır, sütun önerisini seçer. |
+| `sourceProfile` | Hayır | Kaynak program: `Generic` (varsayılan), `Kolayvet`, `EVet` (bölüm 4.5; TIER-021). Partide saklanır, sütun önerisini seçer. |
 
 İşlem: dosya boyut/biçim denetimi, **içerik özeti (SHA-256)** hesabı, başlıkların okunması, kanonik başlıklarla otomatik eşleme önerisi. Satırlar bu aşamada saklanır (`Uploaded`) ama doğrulanmamıştır.
 
@@ -1198,3 +1200,39 @@ Klinik eski programdan bir yedekle geçer, birkaç gün daha eski programda çal
 - Eşleşen kayıt (müşteri, hasta) geri almada **hiçbir zaman silinmez** (değişmedi).
 - Partinin eşleşen müşteriye açtığı bakiye farkı hareketi (ücret ya da alacak) geri almada silinir; ücrete tahsis yapılmışsa ya da alacaktan mahsup edilmişse kalır. `rollback-preview` yanıtına `balanceAdjustments: { delete, keep }` eklendi (yalnız sayı).
 - Kaynak bağları geri almada silinmez; hedefi silinen bağ sonraki aktarmada yok sayılır (14.1).
+
+## 15) Kolayvet dışa aktarmaları (2026-11-28; geriye uyumlu ekleme)
+
+Kolayvet'te tam yedek yok. Liste ekranlarındaki "Dışa Aktar" ekrandaki tabloyu `.xlsx` olarak verir; yalnız ekrandaki sayfa iner, tümü için sayfanın altındaki satır sayısından "Tümünü listele" seçilmelidir. Dosyalar gerçek bir Kolayvet hesabında (Standart paket) incelendi; kişisel veri depoya girmedi. `sourceProfile = Kolayvet` iken sunucu dosyaları **yükleme anında** kanonik tablolara çevirir; sonraki adımlar (doğrulama, uygulama, geri alma, güncelleme aktarması) bölüm 1–14 kurallarıyla aynen işler. Dönüştürücü tek yer: `Imports/Reading/Kolayvet` (`KolayvetExportConverter`, `KolayvetCells`, `KolayvetNotes`). Kolayvet aktarmasında ürün, muayene, satış ve tahsilat yoktur (ilk müşterinin hesabında kayıt yoktu; ayrı iş).
+
+### 15.1 Girdi
+
+Tek alan: `kolayvetFiles` (tekrarlanır, en çok 4, her biri `.xlsx`). Başka dosya alanıyla ya da başka profille gelirse `400 Imports.UnsupportedFile`. Dosya türü **dosya adından değil başlık satırından** tanınır (ilk 5 satırda aranır; 1. satır birleştirilmiş sayfa başlığıdır, örn. `Müşteri Listesi | Kolayvet`).
+
+| Kolayvet menüsü | Tanıyan başlıklar | Zorunlu | Kullanım |
+|---|---|---|---|
+| Müşteriler > Müşteri Listesi > Entegrasyonlar > Dışa Aktar | `Müşteri NO`, `Müşteri Adı`, `Cep Telefonu` | Önerilir | Müşteriler |
+| Hastalar > Hasta Listesi > Hızlı İşlemler > Dışa Aktar | `Müşteri NO`, `Hasta NO`, `Hasta Adı`, `Türü` | Önerilir | Hastalar (sahibe müşteri numarasıyla) |
+| Aşı Takvimi > Tüm Aşılar > Hızlı İşlemler > Dışa Aktar | `Hasta NO`, `Aşı`, `Aşı Tarihi`, `Yapılma durumu` | Hayır | Aşı geçmişi, sonraki aşı tarihi, aşı randevusu |
+| Raporlar > Hasta Listesi (Detaylı) > Dışa Aktar > Excel Dosyası | `Müşteri Bilgileri`, `Hasta Bilgileri`, `Ek Bilgiler` | Hayır | Doğum tarihi, mikroçip, kayıt tarihi. Hasta Listesi olmadan `400` (rapor hasta numarası taşımaz) |
+
+Tanınmayan dosya `400 Imports.UnsupportedFile` ("<dosya adı> Kolayvet dışa aktarması olarak tanınmadı"); aynı türden iki dosya `400`. İçerik özeti: `kolayvet=<sha256>` parçaları özetlerine göre sıralanıp `;` ile birleştirilir (yükleme sırası özeti değiştirmez).
+
+### 15.2 Dönüştürme
+
+**Müşteri:** `Müşteri NO` → `MusteriNo`; `Müşteri Adı` → `AdSoyad`; `Cep Telefonu` → `Telefon` (hücrede numara iki kez bitişik ve düğme metni var: ilk Türkiye cep numarası alınır); `Kalan bakiye` → `AcikBakiye` (2 ondalık, 0 boş; artı devir borcu, eksi devir alacağı — işaret gerçek dosyada sıfır olmayan bakiye görülmediği için doğrulanmadı); `TC Kimlik No` → `KimlikNo`. E-posta, adres ve notlar dışa aktarmada yoktur.
+
+**Hasta:** `Hasta NO` → `HayvanNo`, `Müşteri NO` → `MusteriNo`, `Müşteri Adı` → `SahipAdSoyad`, `Hasta Adı`, `Türü` → `Tur`, `Irkı` → `Irk`, `Cinsiyet`, `Mikroçip` (gerçek dosyada hep boş). Detaylı rapor yüklendiyse satırı şöyle bağlanır: "Müşteri Bilgileri"nden ad ve `Tel:` → müşteri numarası (aynı adlı birden çok müşteride telefonla ayrılır; müşteri dosyası yoksa hasta listesindeki sahip adı), "Hasta Bilgileri"nin ilk parçası (`AD⏎Tür / Irk  Cinsiyet`) → o müşterideki ad + tür → tek hasta. Eklenenler: `DogumTarihi` (`Doğum tarihi:`), `Mikrocip` (`Mikroçip No:`, listede boşsa), `Not` satırları `Eski programa kayıt: gg.aa.yyyy` (`Kayıt tarihi:`) ve `Tarbil (eski program): …`. Bağlanamayan ya da birden çok hastaya uyan rapor satırı eklenmez ve notta sayılır. Gerçek dosyada 51 rapor satırının 51'i bağlandı.
+
+**Aşı Takvimi:** tarih `gg Ay yyyy` (Türkçe ay adı) ya da `yyyy-aa-gg`.
+- `Yapıldı` → aşı geçmişi: `UygulamaTarihi` = `Yapılma Tarihi` (boşsa `Aşı Tarihi`, notta söylenir), `AsiAdi` = `Aşı`, `Seri` = `Seri No`, hasta `Hasta NO`.
+- `Yapılmadı` → E-vet'teki kural (tek yer `ImportVaccineSchedule`): aynı hastanın aynı aşı serisindeki son uygulamasından sonraki en erken kayıt o uygulamanın `SonrakiAsiTarihi`dir (geçmişte kalmışsa da: gecikmiş aşı); seride uygulama yoksa gelecekteki ilk kayıt **saat 10:00'da** aşı randevusu olur (`RandevuTuru = Aşı`, not `Aşı: <ad>; Kolayvet aşı takviminden, saat belirtilmemiş`); geçmişteyse aktarılmaz.
+- Aşı serisi anahtarı (`ImportValueResolver.VaccineSeriesKey`) doz numarasını `aşısı` ekinden sonra da atar: `Karma 1 Aşısı` = `Karma 2 Aşısı` = `karma`. Parazit ürünleri (`İç - Dış Parazit`) değer eşlemesinde kullanıcıya sorulur.
+- `Hasta Tür` (hep `null / null`), `Lokasyon`, `Müşteri Telefon`, `TC Kimlik No` kullanılmaz; uygulayan hekim dışa aktarmada yoktur.
+
+**Notlar** (`warnings[]`, kod `Imports.Kolayvet.*`): `PatientReport` (eklenen/eşleşmeyen), `PatientReportMissing` (rapor yok: doğum tarihi ve mikroçip gelmez), `VaccineConversion`, `VaccinesSkipped` (nedenleriyle), `PossiblyTruncated` (satır sayısı tam 10/20/50/100: "Tümünü listele" seçilmemiş olabilir), `MissingLinks` (hastanın müşterisi müşteri dosyasında, aşının hastası hasta dosyasında yok).
+
+### 15.3 Bilinen sınırlar
+
+- Dışa aktarmada olmayan: müşteri e-posta/adres/notlar, hasta renk/kısırlık/kilo/karne/alerji, uygulayan hekim, aşı dışı randevular, muayeneler (ayrı iş), ürünler, satış ve tahsilatlar, belgeler. Tam veri için klinik Kolayvet desteğinden döküm ister; dosya görülünce ayrı dönüştürücü.
+- Detaylı rapor tüm hastaları listelemeyebilir (gerçek dosyada 61 hastanın 51'i); kalanlar doğum tarihsiz gelir.

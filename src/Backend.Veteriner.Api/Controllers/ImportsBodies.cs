@@ -50,6 +50,12 @@ public sealed class CreateImportBatchForm
     /// <summary>E-vet Rapor &gt; Resmi &gt; Aşı Bilgi (CSV); yalnız E-vet profilinde, yedekle (<see cref="File"/>) birlikte.</summary>
     public IFormFile? EVetVaccineReportFile { get; init; }
 
+    /// <summary>
+    /// Kolayvet liste dışa aktarmaları (<c>.xlsx</c>, alan tekrarlanır, en çok 4): Müşteri Listesi, Hasta Listesi, Aşı Takvimi,
+    /// Raporlar &gt; Hasta Listesi (Detaylı). Yalnız Kolayvet profilinde ve başka dosya alanı olmadan (IMPORT_API_CONTRACT.md §15).
+    /// </summary>
+    public List<IFormFile>? KolayvetFiles { get; init; }
+
     public string? Encoding { get; init; }
     public string? Delimiter { get; init; }
 

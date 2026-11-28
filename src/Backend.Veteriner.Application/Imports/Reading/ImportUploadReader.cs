@@ -39,6 +39,9 @@ public sealed class ImportUploadReader
         "application/octet-stream",
     ];
 
+    /// <summary>Kolayvet liste dışa aktarmaları: müşteri, hasta, aşı ve detaylı hasta raporu (IMPORT_API_CONTRACT.md §15.1).</summary>
+    public const int MaxKolayvetFiles = 4;
+
     private readonly ImportFileLimits _limits;
     private readonly TimeProvider _timeProvider;
 
@@ -55,7 +58,7 @@ public sealed class ImportUploadReader
         ImportSourceProfile profile = ImportSourceProfile.Generic)
     {
         if (!files.HasAny)
-            return Fail("Imports.EmptyFile", "Yüklenecek dosya yok; file (XLSX) veya tablo başına CSV alanlarından birini (customersFile, petsFile, vaccinationsFile, clinicalRecordsFile, accountEntriesFile, appointmentsFile, productsFile) gönderin.");
+            return Fail("Imports.EmptyFile", "Yüklenecek dosya yok; file (XLSX), tablo başına CSV alanlarından birini (customersFile, petsFile, vaccinationsFile, clinicalRecordsFile, accountEntriesFile, appointmentsFile, productsFile) ya da kolayvetFiles gönderin.");
 
         var combination = CheckCombination(files, profile);
         if (!combination.IsSuccess)
@@ -75,12 +78,16 @@ public sealed class ImportUploadReader
     /// <summary>
     /// Ayrıştırma ve tavan denetimi. <paramref name="trialTenant"/> ise tablo satır tavanı deneme sınırıdır
     /// (<see cref="ImportFileLimits.ForTrial"/>, TRIAL-004); kararı <c>ITrialLimitPolicy</c> ile çağıran verir.
-    /// E-vet profilinde E-vet yedeği kanonik tablolara çevrilir (<see cref="EVet.EVetBackupConverter"/>).
+    /// E-vet profilinde E-vet yedeği (<see cref="EVet.EVetBackupConverter"/>), Kolayvet profilinde liste dışa aktarmaları
+    /// (<see cref="Kolayvet.KolayvetExportConverter"/>) kanonik tablolara çevrilir.
     /// </summary>
     public Result<ImportReadResult> Read(ImportPreparedUpload upload, bool trialTenant)
     {
         var limits = trialTenant ? _limits.ForTrial() : _limits;
         var files = upload.Files;
+        if (files.HasKolayvetFiles)
+            return Kolayvet.KolayvetExportConverter.Convert(files.KolayvetFiles!, limits, _timeProvider.GetUtcNow().UtcDateTime);
+
         if (files.Workbook is not null)
         {
             if (upload.Profile != ImportSourceProfile.EVet)
@@ -168,10 +175,22 @@ public sealed class ImportUploadReader
 
     /// <summary>
     /// Alan birlikteliği: XLSX ile CSV yalnız E-vet profilinde (yedek + ürün listesi raporu) birlikte gelir; E-vet yardımcı
-    /// raporları yalnız E-vet profilinde ve yedekle birlikte kabul edilir.
+    /// raporları yalnız E-vet profilinde ve yedekle birlikte kabul edilir. Kolayvet dosyaları yalnız Kolayvet profilinde, en çok
+    /// <see cref="MaxKolayvetFiles"/> tane ve başka dosya alanı olmadan gelir.
     /// </summary>
     private static Result CheckCombination(ImportFileSet files, ImportSourceProfile profile)
     {
+        if (files.HasKolayvetFiles)
+        {
+            if (profile != ImportSourceProfile.Kolayvet)
+                return Result.Failure("Imports.UnsupportedFile", "kolayvetFiles yalnız Kolayvet profiliyle yüklenir.");
+            if (files.Workbook is not null || files.HasCsv || files.HasEVetReports)
+                return Result.Failure("Imports.UnsupportedFile", "kolayvetFiles başka dosya alanlarıyla birlikte gönderilemez.");
+            if (files.KolayvetFiles!.Count > MaxKolayvetFiles)
+                return Result.Failure("Imports.UnsupportedFile", $"En çok {MaxKolayvetFiles} Kolayvet dosyası yüklenir (Müşteri Listesi, Hasta Listesi, Aşı Takvimi, Hasta Listesi (Detaylı)).");
+            return Result.Success();
+        }
+
         if (files.HasEVetReports && profile != ImportSourceProfile.EVet)
             return Result.Failure("Imports.UnsupportedFile", "E-vet raporları (evetPatientReportFile, evetVaccineReportFile) yalnız E-vet profiliyle yüklenir.");
 
@@ -271,19 +290,20 @@ public sealed class ImportUploadReader
     }
 
     /// <summary>
-    /// Tek XLSX: dosyanın özeti. Aksi halde <c>anahtar=özet</c> parçalarının (<c>file</c>, tablo anahtarları, E-vet raporları)
-    /// <c>;</c> ile birleşiminin özeti.
+    /// Tek XLSX: dosyanın özeti. Aksi halde <c>anahtar=özet</c> parçalarının (<c>file</c>, tablo anahtarları, E-vet raporları,
+    /// Kolayvet dosyaları) <c>;</c> ile birleşiminin özeti. Kolayvet dosyaları özetine göre sıralanır: yükleme sırası özeti değiştirmez.
     /// </summary>
     private static string ComputeHash(ImportFileSet files)
     {
         if (files.Workbook is not null && !files.HasCsv && !files.HasEVetReports)
             return Convert.ToHexStringLower(SHA256.HashData(files.Workbook.Content));
 
-        var inputs = CsvInputs(files).Select(x => (Key: ImportCanonicalNames.Key(x.Table), x.File)).Concat(files.EVetReports);
+        var parts = CsvInputs(files).Select(x => (Key: ImportCanonicalNames.Key(x.Table), x.File)).Concat(files.EVetReports)
+            .Select(x => $"{x.Key}={Convert.ToHexStringLower(SHA256.HashData(x.File.Content))}")
+            .Concat((files.KolayvetFiles ?? []).Select(f => $"kolayvet={Convert.ToHexStringLower(SHA256.HashData(f.Content))}").Order(StringComparer.Ordinal));
         if (files.Workbook is not null)
-            inputs = inputs.Prepend(("file", files.Workbook));
+            parts = parts.Prepend($"file={Convert.ToHexStringLower(SHA256.HashData(files.Workbook.Content))}");
 
-        var parts = inputs.Select(x => $"{x.Key}={Convert.ToHexStringLower(SHA256.HashData(x.File.Content))}");
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.ASCII.GetBytes(string.Join(';', parts))));
     }
 
@@ -297,6 +317,9 @@ public sealed class ImportUploadReader
 
         foreach (var (_, file) in files.EVetReports)
             yield return (file, false);
+
+        foreach (var file in files.KolayvetFiles ?? [])
+            yield return (file, true);
     }
 
     private static IEnumerable<(ImportTable Table, ImportUploadedFile File)> CsvInputs(ImportFileSet files) => files.CsvFiles;
