@@ -1211,10 +1211,10 @@ Tek alan: `kolayvetFiles` (tekrarlanır, en çok 4, her biri `.xlsx`). Başka do
 
 | Kolayvet menüsü | Tanıyan başlıklar | Zorunlu | Kullanım |
 |---|---|---|---|
-| Müşteriler > Müşteri Listesi > İşlemler > Dışa Aktar | `Müşteri NO`, `Müşteri Adı`, `Cep Telefonu` | Önerilir | Müşteriler |
-| Hastalar > Hasta Listesi > İşlemler > Dışa Aktar | `Müşteri NO`, `Hasta NO`, `Hasta Adı`, `Türü` | Önerilir | Hastalar (sahibe müşteri numarasıyla) |
+| Müşteriler > Müşteri Listesi > Entegrasyonlar > Dışa Aktar | `Müşteri NO`, `Müşteri Adı`, `Cep Telefonu` | Önerilir | Müşteriler |
+| Hastalar > Hasta Listesi > Hızlı İşlemler > Dışa Aktar | `Müşteri NO`, `Hasta NO`, `Hasta Adı`, `Türü` | Önerilir | Hastalar (sahibe müşteri numarasıyla) |
 | Aşı Takvimi > Tüm Aşılar > Hızlı İşlemler > Dışa Aktar | `Hasta NO`, `Aşı`, `Aşı Tarihi`, `Yapılma durumu` | Hayır | Aşı geçmişi, sonraki aşı tarihi, aşı randevusu |
-| Raporlar > Hasta Listesi (Detaylı) > Excel Olarak İndir | `Müşteri Bilgileri`, `Hasta Bilgileri`, `Ek Bilgiler` | Hayır | Doğum tarihi, mikroçip, kayıt tarihi. Hasta Listesi olmadan `400` (rapor hasta numarası taşımaz) |
+| Raporlar > Hasta Listesi (Detaylı) > Dışa Aktar > Excel Dosyası | `Müşteri Bilgileri`, `Hasta Bilgileri`, `Ek Bilgiler` | Hayır | Doğum tarihi, mikroçip, kayıt tarihi. Hasta Listesi olmadan `400` (rapor hasta numarası taşımaz) |
 
 Tanınmayan dosya `400 Imports.UnsupportedFile` ("<dosya adı> Kolayvet dışa aktarması olarak tanınmadı"); aynı türden iki dosya `400`. İçerik özeti: `kolayvet=<sha256>` parçaları özetlerine göre sıralanıp `;` ile birleştirilir (yükleme sırası özeti değiştirmez).
 
