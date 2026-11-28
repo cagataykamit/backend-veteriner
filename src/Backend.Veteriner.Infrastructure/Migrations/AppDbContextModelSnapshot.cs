@@ -352,6 +352,15 @@ namespace Backend.Veteriner.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime?>("AcknowledgedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("AcknowledgedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("AcknowledgedVersion")
+                        .HasColumnType("int");
+
                     b.Property<Guid>("ClinicId")
                         .HasColumnType("uniqueidentifier");
 

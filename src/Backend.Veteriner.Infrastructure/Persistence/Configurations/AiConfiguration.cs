@@ -114,6 +114,9 @@ public sealed class ClinicAiSettingsConfiguration : IEntityTypeConfiguration<Cli
         b.Property(x => x.UpdatedByUserId);
         b.Property(x => x.QuotaWarningMonthStartUtc);
         b.Property(x => x.QuotaWarningLevel).IsRequired();
+        b.Property(x => x.AcknowledgedVersion);
+        b.Property(x => x.AcknowledgedAtUtc);
+        b.Property(x => x.AcknowledgedByUserId);
 
         b.HasIndex(x => new { x.TenantId, x.ClinicId }).IsUnique();
 
