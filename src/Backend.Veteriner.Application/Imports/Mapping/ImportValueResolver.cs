@@ -348,7 +348,7 @@ public sealed class ImportValueResolver
 
     /// <summary>
     /// Aşı serisi anahtarı: katlanmış addan baştaki/sondaki <c>yıllık</c>, sondaki doz numarası ve <c>N aylık</c>, sondaki
-    /// <c>aşı</c>/<c>aşısı</c>, baştaki <c>kedi</c>/<c>köpek</c> atılır (<c>YILLIK KEDİ KARMA</c> = <c>KEDİ KARMA 2</c> = <c>Karma Aşısı</c> =
+    /// <c>aşı</c>/<c>aşısı</c> (doz numarası ekten önce de olabilir: <c>Karma 2 Aşısı</c>), baştaki <c>kedi</c>/<c>köpek</c> atılır (<c>YILLIK KEDİ KARMA</c> = <c>KEDİ KARMA 2</c> = <c>Karma Aşısı</c> =
     /// <c>karma</c>). Sonraki aşı tarihini serinin
     /// son uygulamasına bağlamak (E-vet dönüştürücüsü) ve katalog eşlemesi aynı kuralı kullanır.
     /// </summary>
@@ -387,6 +387,8 @@ public sealed class ImportValueResolver
         var reduced = VaccineYearly.Replace(key, string.Empty);
         reduced = VaccineDoseSuffix.Replace(reduced, string.Empty);
         reduced = VaccineWordSuffix.Replace(reduced, string.Empty);
+        // Doz numarası ekten önce de gelebilir (Kolayvet: "Karma 2 Aşısı").
+        reduced = VaccineDoseSuffix.Replace(reduced, string.Empty);
         reduced = VaccineSpeciesPrefix.Replace(reduced, string.Empty);
         return reduced.Length == 0 ? key : reduced;
     }

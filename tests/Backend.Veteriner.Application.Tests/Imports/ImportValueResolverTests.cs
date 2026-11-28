@@ -266,6 +266,9 @@ public sealed class ImportValueResolverTests
     [InlineData("TETANOZ YILLIK", "tetanoz")]
     [InlineData("Kedi", "kedi")]
     [InlineData("İÇ+DIŞ PARAZİT", "icdisparazit")]
+    [InlineData("Karma 2 Aşısı", "karma")]
+    [InlineData("Lösemi 1 Aşısı", "losemi")]
+    [InlineData("Kuduz Aşısı", "kuduz")]
     public void Vaccine_Series_Key_Should_Drop_Dose_Year_And_Species_Words(string name, string expected)
         => ImportValueResolver.VaccineSeriesKey(name).Should().Be(expected);
 
