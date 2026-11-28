@@ -67,6 +67,11 @@ public sealed class ImportValueResolverTests
     private static readonly Guid Brittany = Guid.NewGuid();
     private static readonly Guid Ppr = Guid.NewGuid();
     private static readonly Guid Lyme = Guid.NewGuid();
+    private static readonly Guid ChowChow = Guid.NewGuid();
+    private static readonly Guid Persian = Guid.NewGuid();
+    private static readonly Guid MixedBreedDog = Guid.NewGuid();
+    private static readonly Guid BullTerrier = Guid.NewGuid();
+    private static readonly Guid BorderTerrier = Guid.NewGuid();
     private static readonly Guid Corona = Guid.NewGuid();
     private static readonly Guid Ferret = Guid.NewGuid();
     private static readonly Guid BrownWhite = Guid.NewGuid();
@@ -79,7 +84,7 @@ public sealed class ImportValueResolverTests
 
     private static readonly ImportCatalogs ExtendedCatalogs = new(
         Species: [new(Dog, "Köpek", "DOG", null), new(Cat, "Kedi", "CAT", null), new(GuineaPig, "Kobay (Gine Domuzu)", "GUINEA_PIG", null), new(Exotic, "Egzotik", "EXOTIC", null), new(Ferret, "Ferret (Gelincik)", "FERRET", null), new(Other, "Diğer", "OTHER", null)],
-        Breeds: [new(ScottishFold, "Scottish Fold", null, Cat), new(BritishShorthair, "British Shorthair", null, Cat), new(Setter, "İngiliz Setter", null, Dog), new(Malinois, "Belçika Çoban Köpeği (Malinois)", null, Dog), new(Maltese, "Maltese", null, Dog), new(Husky, "Sibirya Kurdu (Siberian Husky)", null, Dog), new(Dobermann, "Dobermann", null, Dog), new(Vizsla, "Vizsla (Macar Kısa Tüylü Pointer)", null, Dog), new(Brittany, "Epagneul Breton (Brittany)", null, Dog)],
+        Breeds: [new(ChowChow, "Chow Chow", null, Dog), new(Persian, "Persian", null, Cat), new(MixedBreedDog, "Melez", null, Dog), new(BullTerrier, "Bull Terrier", null, Dog), new(BorderTerrier, "Border Terrier", null, Dog), new(ScottishFold, "Scottish Fold", null, Cat), new(BritishShorthair, "British Shorthair", null, Cat), new(Setter, "İngiliz Setter", null, Dog), new(Malinois, "Belçika Çoban Köpeği (Malinois)", null, Dog), new(Maltese, "Maltese", null, Dog), new(Husky, "Sibirya Kurdu (Siberian Husky)", null, Dog), new(Dobermann, "Dobermann", null, Dog), new(Vizsla, "Vizsla (Macar Kısa Tüylü Pointer)", null, Dog), new(Brittany, "Epagneul Breton (Brittany)", null, Dog)],
         Colors:
         [
             new(Piebald, "Alacalı", "PIEBALD", null),
@@ -207,6 +212,41 @@ public sealed class ImportValueResolverTests
         [nameof(Corona)] = Corona,
         [nameof(Lyme)] = Lyme,
     };
+
+    /// <summary>
+    /// Gerçek Kolayvet hasta listesinde eşlenmeyen ırk adları (2026-11-28): parantezli adın dışı ve içi ayrı ayrı denenir; katalogdaki
+    /// parantezli adların parçaları da aranır ("Siberian Husky" → "Sibirya Kurdu (Siberian Husky)").
+    /// </summary>
+    [Theory]
+    [InlineData("Çin Aslanı (Chow Chow)", "Dog", nameof(ChowChow))]
+    [InlineData("Persian (İran Kedisi)", "Cat", nameof(Persian))]
+    [InlineData("Melez (Mix)", "Dog", nameof(MixedBreedDog))]
+    [InlineData("British Cat", "Cat", nameof(BritishShorthair))]
+    [InlineData("Siberian Husky", "Dog", nameof(Husky))]
+    [InlineData("Husky (Sibirya Kurdu)", "Dog", nameof(Husky))]
+    public void Parenthesized_And_Alias_Breed_Names_Should_Resolve(string source, string species, string expected)
+        => Extended.Resolve(ImportValueKind.Breed, source, species == "Cat" ? Cat : Dog).TargetId
+            .Should().Be(new Dictionary<string, Guid>
+            {
+                [nameof(ChowChow)] = ChowChow, [nameof(Persian)] = Persian, [nameof(MixedBreedDog)] = MixedBreedDog,
+                [nameof(BritishShorthair)] = BritishShorthair, [nameof(Husky)] = Husky,
+            }[expected]);
+
+    /// <summary>Belirsiz ad ("Terrier" birden çok ırka uyar), iki ayrı ırka uyan parantez ve yanlış tür kendiliğinden bağlanmaz.</summary>
+    [Theory]
+    [InlineData("Terrier", "Dog")]
+    [InlineData("Bull Terrier (Border Terrier)", "Dog")]
+    [InlineData("Persian (İran Kedisi)", "Dog")]
+    [InlineData("Çin Aslanı (Chow Chow)", "Cat")]
+    public void Ambiguous_Or_Other_Species_Breed_Names_Should_Stay_Unmapped(string source, string species)
+        => Extended.Resolve(ImportValueKind.Breed, source, species == "Cat" ? Cat : Dog).Kind.Should().Be(ImportValueResolutionKind.Unmapped);
+
+    [Theory]
+    [InlineData("Rabisin (Kuduz)", nameof(Rabies))]
+    [InlineData("Kuduz Aşısı (Rabisin)", nameof(Rabies))]
+    [InlineData("Nobivac (İç Dış Multi)", nameof(InternalExternal))]
+    public void Parenthesized_Vaccine_Names_Should_Resolve(string source, string expected)
+        => Extended.Resolve(ImportValueKind.Vaccine, source, Dog).TargetId.Should().Be(KolayvetVaccines[expected]);
 
     [Theory]
     [InlineData("UYUZ TEDAVİSİ")]
